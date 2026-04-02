@@ -6,13 +6,15 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
-	"heckel.io/ntfy/v2/server"
-	"heckel.io/ntfy/v2/user"
 	"os"
 	"strings"
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
+	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/pg"
+	"heckel.io/ntfy/v2/server"
+	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -29,6 +31,7 @@ var flagsUser = append(
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: server.DefaultConfigFile, DefaultText: server.DefaultConfigFile, Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"auth_file", "H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file used for access control"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-default-access", Aliases: []string{"auth_default_access", "p"}, EnvVars: []string{"NTFY_AUTH_DEFAULT_ACCESS"}, Value: "read-write", Usage: "default permissions if no matching entries in the auth database are found"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores"}),
 )
 
 var cmdUser = &cli.Command{
@@ -365,24 +368,30 @@ func createUserManager(c *cli.Context) (*user.Manager, error) {
 	authFile := c.String("auth-file")
 	authStartupQueries := c.String("auth-startup-queries")
 	authDefaultAccess := c.String("auth-default-access")
-	if authFile == "" {
-		return nil, errors.New("option auth-file not set; auth is unconfigured for this server")
-	} else if !util.FileExists(authFile) {
-		return nil, errors.New("auth-file does not exist; please start the server at least once to create it")
-	}
+	databaseURL := c.String("database-url")
 	authDefault, err := user.ParsePermission(authDefaultAccess)
 	if err != nil {
 		return nil, errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
 	}
 	authConfig := &user.Config{
-		Filename:            authFile,
-		StartupQueries:      authStartupQueries,
 		DefaultAccess:       authDefault,
 		ProvisionEnabled:    false, // Hack: Do not re-provision users on manager initialization
 		BcryptCost:          user.DefaultUserPasswordBcryptCost,
 		QueueWriterInterval: user.DefaultUserStatsQueueWriterInterval,
 	}
-	return user.NewManager(authConfig)
+	if databaseURL != "" {
+		host, dbErr := pg.Open(databaseURL)
+		if dbErr != nil {
+			return nil, dbErr
+		}
+		return user.NewPostgresManager(db.New(host, nil), authConfig)
+	} else if authFile != "" {
+		if !util.FileExists(authFile) {
+			return nil, errors.New("auth-file does not exist; please start the server at least once to create it")
+		}
+		return user.NewSQLiteManager(authFile, authStartupQueries, authConfig)
+	}
+	return nil, errors.New("option database-url or auth-file not set; auth is unconfigured for this server")
 }
 
 func readPasswordAndConfirm(c *cli.Context) (string, error) {

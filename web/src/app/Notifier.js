@@ -1,5 +1,5 @@
 import { playSound, topicDisplayName, topicShortUrl, urlB64ToUint8Array } from "./utils";
-import { toNotificationParams } from "./notificationUtils";
+import { notificationTag, toNotificationParams } from "./notificationUtils";
 import prefs from "./Prefs";
 import routes from "../components/routes";
 
@@ -8,6 +8,8 @@ import routes from "../components/routes";
  * support this; most importantly, all iOS browsers do not support window.Notification.
  */
 class Notifier {
+  lastSoundPlayedAt = 0;
+
   async notify(subscription, notification) {
     if (!this.supported()) {
       return;
@@ -23,20 +25,43 @@ class Notifier {
     const registration = await this.serviceWorkerRegistration();
     await registration.showNotification(
       ...toNotificationParams({
-        subscriptionId: subscription.id,
         message: notification,
         defaultTitle,
         topicRoute: new URL(routes.forSubscription(subscription), window.location.origin).toString(),
+        baseUrl: subscription.baseUrl,
+        topic: subscription.topic,
       })
     );
   }
 
+  async cancel(subscription, notification) {
+    if (!this.supported()) {
+      return;
+    }
+    try {
+      const sequenceId = notification.sequence_id || notification.id;
+      const tag = notificationTag(subscription.baseUrl, subscription.topic, sequenceId);
+      console.log(`[Notifier] Cancelling notification with tag ${tag}`);
+      const registration = await this.serviceWorkerRegistration();
+      const notifications = await registration.getNotifications({ tag });
+      notifications.forEach((n) => n.close());
+    } catch (e) {
+      console.log(`[Notifier] Error cancelling notification`, e);
+    }
+  }
+
   async playSound() {
-    // Play sound
+    // Play sound, but not more than once every 2 seconds
+    const now = Date.now();
+    if (now - this.lastSoundPlayedAt < 2000) {
+      console.log(`[Notifier] Not playing notification sound, since it was last played <2s ago`, this.lastSoundPlayedAt);
+      return;
+    }
     const sound = await prefs.sound();
     if (sound && sound !== "none") {
       try {
         await playSound(sound);
+        this.lastSoundPlayedAt = Date.now();
       } catch (e) {
         console.log(`[Notifier] Error playing audio`, e);
       }

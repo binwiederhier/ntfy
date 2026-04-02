@@ -1,8 +1,13 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net/netip"
+	"reflect"
+	"text/template"
 	"time"
 
 	"heckel.io/ntfy/v2/user"
@@ -11,12 +16,11 @@ import (
 // Defines default config settings (excluding limits, see below)
 const (
 	DefaultListenHTTP                           = ":80"
-	DefaultConfigFile                           = "/etc/ntfy/server.yml"
-	DefaultTemplateDir                          = "/etc/ntfy/templates"
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultCacheBatchTimeout                    = time.Duration(0)
 	DefaultKeepaliveInterval                    = 45 * time.Second // Not too frequently to save battery (Android read timeout used to be 77s!)
 	DefaultManagerInterval                      = time.Minute
+	DefaultManagerBatchSize                     = 30000
 	DefaultDelayedSenderInterval                = 10 * time.Second
 	DefaultMessageDelayMin                      = 10 * time.Second
 	DefaultMessageDelayMax                      = 3 * 24 * time.Hour
@@ -24,6 +28,12 @@ const (
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
+)
+
+// Platform-specific default paths (set in config_unix.go or config_windows.go)
+var (
+	DefaultConfigFile  string
+	DefaultTemplateDir string
 )
 
 // Defines default Web Push settings
@@ -37,11 +47,13 @@ const (
 // - total topic limit: max number of topics overall
 // - various attachment limits
 const (
-	DefaultMessageSizeLimit         = 4096 // Bytes; note that FCM/APNS have a limit of ~4 KB for the entire message
-	DefaultTotalTopicLimit          = 15000
-	DefaultAttachmentTotalSizeLimit = int64(5 * 1024 * 1024 * 1024) // 5 GB
-	DefaultAttachmentFileSizeLimit  = int64(15 * 1024 * 1024)       // 15 MB
-	DefaultAttachmentExpiryDuration = 3 * time.Hour
+	DefaultMessageSizeLimit            = 4096 // Bytes; note that FCM/APNS have a limit of ~4 KB for the entire message
+	DefaultTotalTopicLimit             = 15000
+	DefaultAttachmentTotalSizeLimit    = int64(5 * 1024 * 1024 * 1024) // 5 GB
+	DefaultAttachmentFileSizeLimit     = int64(15 * 1024 * 1024)       // 15 MB
+	DefaultAttachmentExpiryDuration    = 3 * time.Hour
+	DefaultAttachmentOrphanGracePeriod = time.Hour // Don't delete orphaned objects younger than this to avoid races with in-flight uploads
+
 )
 
 // Defines all per-visitor limits
@@ -86,6 +98,8 @@ type Config struct {
 	ListenUnixMode                       fs.FileMode
 	KeyFile                              string
 	CertFile                             string
+	DatabaseURL                          string   // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
+	DatabaseReplicaURLs                  []string // PostgreSQL read replica connection strings
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
@@ -104,9 +118,11 @@ type Config struct {
 	AttachmentTotalSizeLimit             int64
 	AttachmentFileSizeLimit              int64
 	AttachmentExpiryDuration             time.Duration
+	AttachmentOrphanGracePeriod          time.Duration
 	TemplateDir                          string // Directory to load named templates from
 	KeepaliveInterval                    time.Duration
 	ManagerInterval                      time.Duration
+	ManagerBatchSize                     int
 	DisallowedTopics                     []string
 	WebRoot                              string // empty to disable
 	DelayedSenderInterval                time.Duration
@@ -119,6 +135,7 @@ type Config struct {
 	SMTPSenderUser                       string
 	SMTPSenderPass                       string
 	SMTPSenderFrom                       string
+	SMTPSenderVerify                     bool
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
@@ -131,6 +148,7 @@ type Config struct {
 	TwilioCallsBaseURL                   string
 	TwilioVerifyBaseURL                  string
 	TwilioVerifyService                  string
+	TwilioCallFormat                     *template.Template
 	MetricsEnable                        bool
 	MetricsListenHTTP                    string
 	ProfileListenHTTP                    string
@@ -176,7 +194,9 @@ type Config struct {
 	WebPushStartupQueries                string
 	WebPushExpiryDuration                time.Duration
 	WebPushExpiryWarningDuration         time.Duration
-	Version                              string // injected by App
+	BuildVersion                         string // Injected by App
+	BuildDate                            string // Injected by App
+	BuildCommit                          string // Injected by App
 }
 
 // NewConfig instantiates a default new server config
@@ -190,6 +210,7 @@ func NewConfig() *Config {
 		ListenUnixMode:                       0,
 		KeyFile:                              "",
 		CertFile:                             "",
+		DatabaseURL:                          "",
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
@@ -205,9 +226,11 @@ func NewConfig() *Config {
 		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:              DefaultAttachmentFileSizeLimit,
 		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
+		AttachmentOrphanGracePeriod:          DefaultAttachmentOrphanGracePeriod,
 		TemplateDir:                          DefaultTemplateDir,
 		KeepaliveInterval:                    DefaultKeepaliveInterval,
 		ManagerInterval:                      DefaultManagerInterval,
+		ManagerBatchSize:                     DefaultManagerBatchSize,
 		DisallowedTopics:                     DefaultDisallowedTopics,
 		WebRoot:                              "/",
 		DelayedSenderInterval:                DefaultDelayedSenderInterval,
@@ -220,6 +243,7 @@ func NewConfig() *Config {
 		SMTPSenderUser:                       "",
 		SMTPSenderPass:                       "",
 		SMTPSenderFrom:                       "",
+		SMTPSenderVerify:                     false,
 		SMTPServerListen:                     "",
 		SMTPServerDomain:                     "",
 		SMTPServerAddrPrefix:                 "",
@@ -232,6 +256,7 @@ func NewConfig() *Config {
 		TwilioPhoneNumber:                    "",
 		TwilioVerifyBaseURL:                  "https://verify.twilio.com", // Override for tests
 		TwilioVerifyService:                  "",
+		TwilioCallFormat:                     nil,
 		MessageSizeLimit:                     DefaultMessageSizeLimit,
 		MessageDelayMin:                      DefaultMessageDelayMin,
 		MessageDelayMax:                      DefaultMessageDelayMax,
@@ -265,12 +290,32 @@ func NewConfig() *Config {
 		EnableReservations:                   false,
 		RequireLogin:                         false,
 		AccessControlAllowOrigin:             "*",
-		Version:                              "",
 		WebPushPrivateKey:                    "",
 		WebPushPublicKey:                     "",
 		WebPushFile:                          "",
 		WebPushEmailAddress:                  "",
 		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
 		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
+		BuildVersion:                         "",
+		BuildDate:                            "",
+		BuildCommit:                          "",
 	}
+}
+
+// Hash computes an SHA-256 hash of the configuration. This is used to detect
+// configuration changes for the web app version check feature. It uses reflection
+// to include all JSON-serializable fields automatically.
+func (c *Config) Hash() string {
+	v := reflect.ValueOf(*c)
+	t := v.Type()
+	var result string
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		fieldName := t.Field(i).Name
+		// Try to marshal the field and skip if it fails (e.g. *template.Template, netip.Prefix)
+		if b, err := json.Marshal(field.Interface()); err == nil {
+			result += fmt.Sprintf("%s:%s|", fieldName, string(b))
+		}
+	}
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(result)))
 }

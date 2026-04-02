@@ -152,6 +152,61 @@ func (l *RateLimiter) Reset() {
 	l.value = 0
 }
 
+// CountingReader wraps an io.Reader and counts the number of bytes read through it.
+type CountingReader struct {
+	r     io.Reader
+	total int64
+}
+
+// NewCountingReader creates a new CountingReader
+func NewCountingReader(r io.Reader) *CountingReader {
+	return &CountingReader{r: r}
+}
+
+// Read passes through to the underlying reader and counts the bytes read
+func (r *CountingReader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
+	r.total += int64(n)
+	return
+}
+
+// Total returns the total number of bytes read so far
+func (r *CountingReader) Total() int64 {
+	return r.total
+}
+
+// LimitReader implements an io.Reader that will pass through all Read calls to the underlying
+// reader r until any of the limiter's limit is reached, at which point a Read will return ErrLimitReached.
+// Each limiter's value is increased after every read based on the number of bytes actually read.
+type LimitReader struct {
+	r        io.Reader
+	limiters []Limiter
+}
+
+// NewLimitReader creates a new LimitReader
+func NewLimitReader(r io.Reader, limiters ...Limiter) *LimitReader {
+	return &LimitReader{
+		r:        r,
+		limiters: limiters,
+	}
+}
+
+// Read passes through all reads to the underlying reader until any of the given limiter's limit is reached
+func (r *LimitReader) Read(p []byte) (n int, err error) {
+	n, err = r.r.Read(p)
+	if n > 0 {
+		for i := 0; i < len(r.limiters); i++ {
+			if !r.limiters[i].AllowN(int64(n)) {
+				for j := i - 1; j >= 0; j-- {
+					r.limiters[j].AllowN(-int64(n)) // Revert limiters if not allowed
+				}
+				return 0, ErrLimitReached
+			}
+		}
+	}
+	return
+}
+
 // LimitWriter implements an io.Writer that will pass through all Write calls to the underlying
 // writer w until any of the limiter's limit is reached, at which point a Write will return ErrLimitReached.
 // Each limiter's value is increased with every write.

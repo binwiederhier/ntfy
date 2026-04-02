@@ -3,16 +3,23 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"regexp"
+
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/v2/log"
-	"os"
-	"regexp"
 )
 
 const (
 	categoryClient = "Client commands"
 	categoryServer = "Server commands"
+)
+
+// Build metadata keys for app.Metadata
+const (
+	MetadataKeyCommit = "commit"
+	MetadataKeyDate   = "date"
 )
 
 var commands = make([]*cli.Command, 0)

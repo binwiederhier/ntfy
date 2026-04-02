@@ -2,195 +2,35 @@ package server
 
 import (
 	"net/http"
-	"net/netip"
-	"time"
 
-	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
 
-// List of possible events
-const (
-	openEvent        = "open"
-	keepaliveEvent   = "keepalive"
-	messageEvent     = "message"
-	pollRequestEvent = "poll_request"
-)
-
-const (
-	messageIDLength = 12
-)
-
-// message represents a message published to a topic
-type message struct {
-	ID          string      `json:"id"`                // Random message ID
-	Time        int64       `json:"time"`              // Unix time in seconds
-	Expires     int64       `json:"expires,omitempty"` // Unix time in seconds (not required for open/keepalive)
-	Event       string      `json:"event"`             // One of the above
-	Topic       string      `json:"topic"`
-	Title       string      `json:"title,omitempty"`
-	Message     string      `json:"message,omitempty"`
-	Priority    int         `json:"priority,omitempty"`
-	Tags        []string    `json:"tags,omitempty"`
-	Click       string      `json:"click,omitempty"`
-	Icon        string      `json:"icon,omitempty"`
-	Actions     []*action   `json:"actions,omitempty"`
-	Attachment  *attachment `json:"attachment,omitempty"`
-	PollID      string      `json:"poll_id,omitempty"`
-	ContentType string      `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
-	Encoding    string      `json:"encoding,omitempty"`     // empty for raw UTF-8, or "base64" for encoded bytes
-	Sender      netip.Addr  `json:"-"`                      // IP address of uploader, used for rate limiting
-	User        string      `json:"-"`                      // UserID of the uploader, used to associated attachments
-}
-
-func (m *message) Context() log.Context {
-	fields := map[string]any{
-		"topic":             m.Topic,
-		"message_id":        m.ID,
-		"message_time":      m.Time,
-		"message_event":     m.Event,
-		"message_body_size": len(m.Message),
-	}
-	if m.Sender.IsValid() {
-		fields["message_sender"] = m.Sender.String()
-	}
-	if m.User != "" {
-		fields["message_user"] = m.User
-	}
-	return fields
-}
-
-type attachment struct {
-	Name    string `json:"name"`
-	Type    string `json:"type,omitempty"`
-	Size    int64  `json:"size,omitempty"`
-	Expires int64  `json:"expires,omitempty"`
-	URL     string `json:"url"`
-}
-
-type action struct {
-	ID      string            `json:"id"`
-	Action  string            `json:"action"`            // "view", "broadcast", or "http"
-	Label   string            `json:"label"`             // action button label
-	Clear   bool              `json:"clear"`             // clear notification after successful execution
-	URL     string            `json:"url,omitempty"`     // used in "view" and "http" actions
-	Method  string            `json:"method,omitempty"`  // used in "http" action, default is POST (!)
-	Headers map[string]string `json:"headers,omitempty"` // used in "http" action
-	Body    string            `json:"body,omitempty"`    // used in "http" action
-	Intent  string            `json:"intent,omitempty"`  // used in "broadcast" action
-	Extras  map[string]string `json:"extras,omitempty"`  // used in "broadcast" action
-}
-
-func newAction() *action {
-	return &action{
-		Headers: make(map[string]string),
-		Extras:  make(map[string]string),
-	}
-}
-
 // publishMessage is used as input when publishing as JSON
 type publishMessage struct {
-	Topic    string   `json:"topic"`
-	Title    string   `json:"title"`
-	Message  string   `json:"message"`
-	Priority int      `json:"priority"`
-	Tags     []string `json:"tags"`
-	Click    string   `json:"click"`
-	Icon     string   `json:"icon"`
-	Actions  []action `json:"actions"`
-	Attach   string   `json:"attach"`
-	Markdown bool     `json:"markdown"`
-	Filename string   `json:"filename"`
-	Email    string   `json:"email"`
-	Call     string   `json:"call"`
-	Cache    string   `json:"cache"`    // use string as it defaults to true (or use &bool instead)
-	Firebase string   `json:"firebase"` // use string as it defaults to true (or use &bool instead)
-	Delay    string   `json:"delay"`
+	Topic      string         `json:"topic"`
+	SequenceID string         `json:"sequence_id"`
+	Title      string         `json:"title"`
+	Message    string         `json:"message"`
+	Priority   int            `json:"priority"`
+	Tags       []string       `json:"tags"`
+	Click      string         `json:"click"`
+	Icon       string         `json:"icon"`
+	Actions    []model.Action `json:"actions"`
+	Attach     string         `json:"attach"`
+	Markdown   bool           `json:"markdown"`
+	Filename   string         `json:"filename"`
+	Email      string         `json:"email"`
+	Call       string         `json:"call"`
+	Cache      string         `json:"cache"`    // use string as it defaults to true (or use &bool instead)
+	Firebase   string         `json:"firebase"` // use string as it defaults to true (or use &bool instead)
+	Delay      string         `json:"delay"`
 }
 
 // messageEncoder is a function that knows how to encode a message
-type messageEncoder func(msg *message) (string, error)
-
-// newMessage creates a new message with the current timestamp
-func newMessage(event, topic, msg string) *message {
-	return &message{
-		ID:      util.RandomString(messageIDLength),
-		Time:    time.Now().Unix(),
-		Event:   event,
-		Topic:   topic,
-		Message: msg,
-	}
-}
-
-// newOpenMessage is a convenience method to create an open message
-func newOpenMessage(topic string) *message {
-	return newMessage(openEvent, topic, "")
-}
-
-// newKeepaliveMessage is a convenience method to create a keepalive message
-func newKeepaliveMessage(topic string) *message {
-	return newMessage(keepaliveEvent, topic, "")
-}
-
-// newDefaultMessage is a convenience method to create a notification message
-func newDefaultMessage(topic, msg string) *message {
-	return newMessage(messageEvent, topic, msg)
-}
-
-// newPollRequestMessage is a convenience method to create a poll request message
-func newPollRequestMessage(topic, pollID string) *message {
-	m := newMessage(pollRequestEvent, topic, newMessageBody)
-	m.PollID = pollID
-	return m
-}
-
-func validMessageID(s string) bool {
-	return util.ValidRandomString(s, messageIDLength)
-}
-
-type sinceMarker struct {
-	time time.Time
-	id   string
-}
-
-func newSinceTime(timestamp int64) sinceMarker {
-	return sinceMarker{time.Unix(timestamp, 0), ""}
-}
-
-func newSinceID(id string) sinceMarker {
-	return sinceMarker{time.Unix(0, 0), id}
-}
-
-func (t sinceMarker) IsAll() bool {
-	return t == sinceAllMessages
-}
-
-func (t sinceMarker) IsNone() bool {
-	return t == sinceNoMessages
-}
-
-func (t sinceMarker) IsLatest() bool {
-	return t == sinceLatestMessage
-}
-
-func (t sinceMarker) IsID() bool {
-	return t.id != "" && t.id != "latest"
-}
-
-func (t sinceMarker) Time() time.Time {
-	return t.time
-}
-
-func (t sinceMarker) ID() string {
-	return t.id
-}
-
-var (
-	sinceAllMessages   = sinceMarker{time.Unix(0, 0), ""}
-	sinceNoMessages    = sinceMarker{time.Unix(1, 0), ""}
-	sinceLatestMessage = sinceMarker{time.Unix(0, 0), "latest"}
-)
+type messageEncoder func(msg *model.Message) (string, error)
 
 type queryFilter struct {
 	ID       string
@@ -222,8 +62,8 @@ func parseQueryFilters(r *http.Request) (*queryFilter, error) {
 	}, nil
 }
 
-func (q *queryFilter) Pass(msg *message) bool {
-	if msg.Event != messageEvent {
+func (q *queryFilter) Pass(msg *model.Message) bool {
+	if msg.Event != model.MessageEvent && msg.Event != model.MessageDeleteEvent && msg.Event != model.MessageClearEvent {
 		return true // filters only apply to messages
 	} else if q.ID != "" && msg.ID != q.ID {
 		return false
@@ -276,7 +116,7 @@ func (t templateMode) FileName() string {
 	return ""
 }
 
-// templateFile represents a template file with title and message
+// templateFile represents a template file with title, message, and priority
 // It is used for file-based templates, e.g. grafana, influxdb, etc.
 //
 // Example YAML:
@@ -285,13 +125,21 @@ func (t templateMode) FileName() string {
 //	  message: |
 //		   This is a {{ .Type }} alert.
 //		   It can be multiline.
+//	  priority: '{{ if eq .status "Error" }}5{{ else }}3{{ end }}'
 type templateFile struct {
-	Title   *string `yaml:"title"`
-	Message *string `yaml:"message"`
+	Title    *string `yaml:"title"`
+	Message  *string `yaml:"message"`
+	Priority *string `yaml:"priority"`
 }
 
 type apiHealthResponse struct {
 	Healthy bool `json:"healthy"`
+}
+
+type apiVersionResponse struct {
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
+	Date    string `json:"date"`
 }
 
 type apiStatsResponse struct {
@@ -378,6 +226,15 @@ type apiAccountPhoneNumberAddRequest struct {
 	Code   string `json:"code"` // Only set when adding a phone number
 }
 
+type apiAccountEmailVerifyRequest struct {
+	Email string `json:"email"`
+}
+
+type apiAccountEmailAddRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
 type apiAccountTier struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
@@ -434,6 +291,7 @@ type apiAccountResponse struct {
 	Reservations  []*apiAccountReservation   `json:"reservations,omitempty"`
 	Tokens        []*apiAccountTokenResponse `json:"tokens,omitempty"`
 	PhoneNumbers  []string                   `json:"phone_numbers,omitempty"`
+	Emails        []string                   `json:"emails,omitempty"`
 	Tier          *apiAccountTier            `json:"tier,omitempty"`
 	Limits        *apiAccountLimits          `json:"limits,omitempty"`
 	Stats         *apiAccountStats           `json:"stats,omitempty"`
@@ -454,11 +312,13 @@ type apiConfigResponse struct {
 	EnablePayments     bool     `json:"enable_payments"`
 	EnableCalls        bool     `json:"enable_calls"`
 	EnableEmails       bool     `json:"enable_emails"`
+	EnableEmailVerify  bool     `json:"enable_email_verify"`
 	EnableReservations bool     `json:"enable_reservations"`
 	EnableWebPush      bool     `json:"enable_web_push"`
 	BillingContact     string   `json:"billing_contact"`
 	WebPushPublicKey   string   `json:"web_push_public_key"`
 	DisallowedTopics   []string `json:"disallowed_topics"`
+	ConfigHash         string   `json:"config_hash"`
 }
 
 type apiAccountBillingPrices struct {
@@ -537,12 +397,12 @@ const (
 )
 
 type webPushPayload struct {
-	Event          string   `json:"event"`
-	SubscriptionID string   `json:"subscription_id"`
-	Message        *message `json:"message"`
+	Event          string         `json:"event"`
+	SubscriptionID string         `json:"subscription_id"`
+	Message        *model.Message `json:"message"`
 }
 
-func newWebPushPayload(subscriptionID string, message *message) *webPushPayload {
+func newWebPushPayload(subscriptionID string, message *model.Message) *webPushPayload {
 	return &webPushPayload{
 		Event:          webPushMessageEvent,
 		SubscriptionID: subscriptionID,
@@ -557,22 +417,6 @@ type webPushControlMessagePayload struct {
 func newWebPushSubscriptionExpiringPayload() *webPushControlMessagePayload {
 	return &webPushControlMessagePayload{
 		Event: webPushExpiringEvent,
-	}
-}
-
-type webPushSubscription struct {
-	ID       string
-	Endpoint string
-	Auth     string
-	P256dh   string
-	UserID   string
-}
-
-func (w *webPushSubscription) Context() log.Context {
-	return map[string]any{
-		"web_push_subscription_id":       w.ID,
-		"web_push_subscription_user_id":  w.UserID,
-		"web_push_subscription_endpoint": w.Endpoint,
 	}
 }
 

@@ -3,27 +3,20 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"sort"
+	"strings"
+
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/util"
-	"os"
-	"os/exec"
-	"os/user"
-	"path/filepath"
-	"sort"
-	"strings"
 )
 
 func init() {
 	commands = append(commands, cmdSubscribe)
 }
-
-const (
-	clientRootConfigFileUnixAbsolute    = "/etc/ntfy/client.yml"
-	clientUserConfigFileUnixRelative    = "ntfy/client.yml"
-	clientUserConfigFileWindowsRelative = "ntfy\\client.yml"
-)
 
 var flagsSubscribe = append(
 	append([]cli.Flag{}, flagsDefault...),
@@ -310,43 +303,14 @@ func loadConfig(c *cli.Context) (*client.Config, error) {
 	if filename != "" {
 		return client.LoadConfig(filename)
 	}
-	configFile, err := defaultClientConfigFile()
-	if err != nil {
-		log.Warn("Could not determine default client config file: %s", err.Error())
-	} else {
-		if s, _ := os.Stat(configFile); s != nil {
-			return client.LoadConfig(configFile)
+	if client.DefaultConfigFile != "" {
+		if s, _ := os.Stat(client.DefaultConfigFile); s != nil {
+			return client.LoadConfig(client.DefaultConfigFile)
 		}
-		log.Debug("Config file %s not found", configFile)
+		log.Debug("Config file %s not found", client.DefaultConfigFile)
 	}
 	log.Debug("Loading default config")
 	return client.NewConfig(), nil
-}
-
-//lint:ignore U1000 Conditionally used in different builds
-func defaultClientConfigFileUnix() (string, error) {
-	u, err := user.Current()
-	if err != nil {
-		return "", fmt.Errorf("could not determine current user: %w", err)
-	}
-	configFile := clientRootConfigFileUnixAbsolute
-	if u.Uid != "0" {
-		homeDir, err := os.UserConfigDir()
-		if err != nil {
-			return "", fmt.Errorf("could not determine user config dir: %w", err)
-		}
-		return filepath.Join(homeDir, clientUserConfigFileUnixRelative), nil
-	}
-	return configFile, nil
-}
-
-//lint:ignore U1000 Conditionally used in different builds
-func defaultClientConfigFileWindows() (string, error) {
-	homeDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("could not determine user config dir: %w", err)
-	}
-	return filepath.Join(homeDir, clientUserConfigFileWindowsRelative), nil
 }
 
 func logMessagePrefix(m *client.Message) string {

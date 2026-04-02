@@ -47,6 +47,14 @@ export class IncorrectPasswordError extends Error {
   }
 }
 
+export class EmailVerificationCodeInvalidError extends Error {
+  static CODE = 40051; // errHTTPBadRequestEmailVerificationCodeInvalid
+
+  constructor() {
+    super("Email verification code invalid or expired");
+  }
+}
+
 export const throwAppError = async (response) => {
   if (response.status === 401 || response.status === 403) {
     console.log(`[Error] HTTP ${response.status}`, response);
@@ -63,6 +71,8 @@ export const throwAppError = async (response) => {
       throw new AccountCreateLimitReachedError();
     } else if (error.code === IncorrectPasswordError.CODE) {
       throw new IncorrectPasswordError();
+    } else if (error.code === EmailVerificationCodeInvalidError.CODE) {
+      throw new EmailVerificationCodeInvalidError();
     } else if (error?.error) {
       throw new Error(`Error ${error.code}: ${error.error}`);
     }

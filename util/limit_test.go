@@ -2,9 +2,12 @@ package util
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/require"
+	"io"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFixedLimiter_AllowValueReset(t *testing.T) {
@@ -146,4 +149,99 @@ func TestLimitWriter_WriteTwoDifferentLimiters_Wait_FixedLimiterFail(t *testing.
 	time.Sleep(250 * time.Millisecond)
 	_, err = lw.Write(make([]byte, 8)) // <<< FixedLimiter fails
 	require.Equal(t, ErrLimitReached, err)
+}
+
+func TestCountingReader_Total(t *testing.T) {
+	cr := NewCountingReader(strings.NewReader("hello world"))
+	buf := make([]byte, 5)
+
+	n, err := cr.Read(buf)
+	require.Nil(t, err)
+	require.Equal(t, 5, n)
+	require.Equal(t, int64(5), cr.Total())
+
+	n, err = cr.Read(buf)
+	require.Nil(t, err)
+	require.Equal(t, 5, n)
+	require.Equal(t, int64(10), cr.Total())
+
+	n, err = cr.Read(buf)
+	require.Nil(t, err)
+	require.Equal(t, 1, n)
+	require.Equal(t, int64(11), cr.Total())
+
+	_, err = cr.Read(buf)
+	require.Equal(t, io.EOF, err)
+	require.Equal(t, int64(11), cr.Total())
+}
+
+func TestCountingReader_Empty(t *testing.T) {
+	cr := NewCountingReader(strings.NewReader(""))
+	require.Equal(t, int64(0), cr.Total())
+
+	_, err := cr.Read(make([]byte, 10))
+	require.Equal(t, io.EOF, err)
+	require.Equal(t, int64(0), cr.Total())
+}
+
+func TestLimitReader_ReadNoLimiter(t *testing.T) {
+	lr := NewLimitReader(strings.NewReader("hello"))
+	data, err := io.ReadAll(lr)
+	require.Nil(t, err)
+	require.Equal(t, "hello", string(data))
+}
+
+func TestLimitReader_ReadOneLimiter(t *testing.T) {
+	l := NewFixedLimiter(10)
+	lr := NewLimitReader(strings.NewReader("hello world!"), l)
+
+	buf := make([]byte, 5)
+	n, err := lr.Read(buf)
+	require.Nil(t, err)
+	require.Equal(t, 5, n)
+	require.Equal(t, int64(5), l.Value())
+
+	n, err = lr.Read(buf)
+	require.Nil(t, err)
+	require.Equal(t, 5, n)
+	require.Equal(t, int64(10), l.Value())
+
+	_, err = lr.Read(buf)
+	require.Equal(t, ErrLimitReached, err)
+}
+
+func TestLimitReader_ReadTwoLimiters(t *testing.T) {
+	l1 := NewFixedLimiter(11)
+	l2 := NewFixedLimiter(8)
+	lr := NewLimitReader(strings.NewReader("hello world!"), l1, l2)
+
+	buf := make([]byte, 5)
+	n, err := lr.Read(buf)
+	require.Nil(t, err)
+	require.Equal(t, 5, n)
+
+	// Second read: l2 (limit 8) should reject 5 more bytes
+	_, err = lr.Read(buf)
+	require.Equal(t, ErrLimitReached, err)
+	// l1 should have been reverted
+	require.Equal(t, int64(5), l1.Value())
+	require.Equal(t, int64(5), l2.Value())
+}
+
+func TestLimitReader_ReadAll(t *testing.T) {
+	l := NewFixedLimiter(100)
+	lr := NewLimitReader(strings.NewReader("hello"), l)
+	data, err := io.ReadAll(lr)
+	require.Nil(t, err)
+	require.Equal(t, "hello", string(data))
+	require.Equal(t, int64(5), l.Value())
+}
+
+func TestLimitReader_ReadExactLimit(t *testing.T) {
+	l := NewFixedLimiter(5)
+	lr := NewLimitReader(bytes.NewReader(make([]byte, 5)), l)
+	data, err := io.ReadAll(lr)
+	require.Nil(t, err)
+	require.Equal(t, 5, len(data))
+	require.Equal(t, int64(5), l.Value())
 }

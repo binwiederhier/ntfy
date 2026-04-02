@@ -71,7 +71,8 @@ The web app is a static website without a backend (other than the ntfy API). All
 cache and local storage. That means it does not need to be protected with a login screen, and it poses no additional 
 security risk. So technically, it does not need to be disabled.
 
-However, if you still want to disable it, you can do so with the `web-root: disable` option in the `server.yml` file. 
+However, if you still want, you can require login with the `require-login: true` option,
+or disable it with the `web-root: disable` option in the `server.yml` file. 
 
 Think of the ntfy web app like an Android/iOS app. It is freely available and accessible to anyone, yet useless without
 a proper backend. So as long as you secure your backend with ACLs, exposing the ntfy web app to the Internet is harmless.
@@ -94,11 +95,11 @@ I would be humbled if you helped me carry the server and developer account costs
 appreciated.
 
 ## Can I email you? Can I DM you on Discord/Matrix?
-While I love chatting on [Discord](https://discord.gg/cT7ECsZj9w), [Matrix](https://matrix.to/#/#ntfy-space:matrix.org), 
-[Lemmy](https://discuss.ntfy.sh/c/ntfy), or [GitHub](https://github.com/binwiederhier/ntfy/issues), I generally 
-**do not respond to emails about ntfy or direct messages** about ntfy, unless you are paying for a 
-[ntfy Pro](https://ntfy.sh/#pricing) plan, or you are inquiring about business opportunities. 
+For community support, please use the public channels listed on the [contact page](contact.md). I generally 
+**do not respond to direct messages** about ntfy, unless you are paying for a [ntfy Pro](https://ntfy.sh/#pricing) 
+plan (see [paid support](contact.md#paid-support)), or you are inquiring about business 
+opportunities (see [other inquiries](contact.md#other-inquiries)).
 
 I am sorry, but answering individual questions about ntfy on a 1-on-1 basis is not scalable. Answering your questions 
-in the above-mentioned forums benefits others, since I can link to the discussion at a later point in time, or other users
+in public forums benefits others, since I can link to the discussion at a later point in time, or other users
 may be able to help out. I hope you understand.

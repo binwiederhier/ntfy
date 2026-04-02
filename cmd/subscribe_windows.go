@@ -1,3 +1,5 @@
+//go:build windows
+
 package cmd
 
 const (
@@ -9,7 +11,3 @@ const (
 var (
 	scriptLauncher = []string{"cmd.exe", "/Q", "/C"}
 )
-
-func defaultClientConfigFile() (string, error) {
-	return defaultClientConfigFileWindows()
-}

@@ -1,6 +1,6 @@
 # Publishing
-Publishing messages can be done via HTTP PUT/POST or via the [ntfy CLI](install.md). Topics are created on the fly by 
-subscribing or publishing to them. Because there is no sign-up, **the topic is essentially a password**, so pick 
+Publishing messages can be done via HTTP PUT/POST or via the [ntfy CLI](subscribe/cli.md#publish-messages) ([install instructions](install.md)).
+Topics are created on the fly by subscribing or publishing to them. Because there is no sign-up, **the topic is essentially a password**, so pick 
 something that's not easily guessable.
 
 Here's an example showing how to publish a simple message using a POST request:
@@ -641,7 +641,7 @@ You can format messages using [Markdown](https://www.markdownguide.org/basic-syn
 
 By default, messages sent to ntfy are rendered as plain text. To enable Markdown, set the `X-Markdown` header (or any of
 its aliases: `Markdown`, or `md`) to `true` (or `1` or `yes`), or set the `Content-Type` header to `text/markdown`.
-As of today, **Markdown is only supported in the web app.** Here's an example of how to enable Markdown formatting:
+Here's an example of how to enable Markdown formatting:
 
 === "Command line (curl)"
     ```
@@ -727,61 +727,65 @@ Here's what that looks like in the web app:
   <figcaption>Markdown formatting in the web app</figcaption>
 </figure>
 
-## Scheduled delivery
+## Click action
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
-You can delay the delivery of messages and let ntfy send them at a later date. This can be used to send yourself 
-reminders or even to execute commands at a later date (if your subscriber acts on messages).
+You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
+to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
+the web browser (or the app) and open the website.
 
-Usage is pretty straight forward. You can set the delivery time using the `X-Delay` header (or any of its aliases: `Delay`, 
-`X-At`, `At`, `X-In` or `In`), either by specifying a Unix timestamp (e.g. `1639194738`), a duration (e.g. `30m`, 
-`3h`, `2 days`), or a natural language time string (e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`, 
-[and more](https://github.com/olebedev/when)). 
+To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its alias `Click`).
+If you pass a website URL (`http://` or `https://`) the web browser will open. If you pass another URI that can be handled
+by another app, the responsible app may open. 
 
-As of today, the minimum delay you can set is **10 seconds** and the maximum delay is **3 days**. This can be configured
-with the `message-delay-limit` option).
+Examples:
 
-For the purposes of [message caching](config.md#message-cache), scheduled messages are kept in the cache until 12 hours 
-after they were delivered (or whatever the server-side cache duration is set to). For instance, if a message is scheduled
-to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Also note that naturally, 
-[turning off server-side caching](#message-caching) is not possible in combination with this feature.  
+* `http://` or `https://` will open your browser (or an app if it registered for a URL)
+* `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
+* `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
+* `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
+* `twitter://` links will open Twitter, e.g. `twitter://user?screen_name=..`
+* ...
+
+Here's an example that will open Reddit when the notification is clicked:
 
 === "Command line (curl)"
     ```
-    curl -H "At: tomorrow, 10am" -d "Good morning" ntfy.sh/hello
-    curl -H "In: 30min" -d "It's 30 minutes later now" ntfy.sh/reminder
-    curl -H "Delay: 1639194738" -d "Unix timestamps are awesome" ntfy.sh/itsaunixsystem
+    curl \
+        -d "New messages on Reddit" \
+        -H "Click: https://www.reddit.com/message/messages" \
+        ntfy.sh/reddit_alerts
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        --at="tomorrow, 10am" \
-        hello "Good morning"
+        --click="https://www.reddit.com/message/messages" \
+        reddit_alerts "New messages on Reddit"
     ```
 
 === "HTTP"
     ``` http
-    POST /hello HTTP/1.1
+    POST /reddit_alerts HTTP/1.1
     Host: ntfy.sh
-    At: tomorrow, 10am
+    Click: https://www.reddit.com/message/messages 
 
-    Good morning
+    New messages on Reddit
     ```
 
 === "JavaScript"
     ``` javascript
-    fetch('https://ntfy.sh/hello', {
+    fetch('https://ntfy.sh/reddit_alerts', {
         method: 'POST',
-        body: 'Good morning',
-        headers: { 'At': 'tomorrow, 10am' }
+        body: 'New messages on Reddit',
+        headers: { 'Click': 'https://www.reddit.com/message/messages' }
     })
     ```
 
 === "Go"
     ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/hello", strings.NewReader("Good morning"))
-    req.Header.Set("At", "tomorrow, 10am")
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/reddit_alerts", strings.NewReader("New messages on Reddit"))
+    req.Header.Set("Click", "https://www.reddit.com/message/messages")
     http.DefaultClient.Do(req)
     ```
 
@@ -789,281 +793,207 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     ``` powershell
     $Request = @{
       Method = "POST"
-      URI = "https://ntfy.sh/hello"
-      Headers = @{
-        At = "tomorrow, 10am"
-      }
-      Body = "Good morning"
+      URI = "https://ntfy.sh/reddit_alerts"
+      Headers = @{ Click="https://www.reddit.com/message/messages" }
+      Body = "New messages on Reddit"
     }
     Invoke-RestMethod @Request
     ```
-    
+
 === "Python"
     ``` python
-    requests.post("https://ntfy.sh/hello",
-        data="Good morning",
-        headers={ "At": "tomorrow, 10am" })
+    requests.post("https://ntfy.sh/reddit_alerts",
+        data="New messages on Reddit",
+        headers={ "Click": "https://www.reddit.com/message/messages" })
     ```
 
 === "PHP"
     ``` php-inline
-    file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
+    file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
         'http' => [
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "At: tomorrow, 10am",
-            'content' => 'Good morning'
+                "Click: https://www.reddit.com/message/messages",
+            'content' => 'New messages on Reddit'
         ]
     ]));
     ```
 
-Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Time Zone**):
+## Icons
+_Supported on:_ :material-android:
 
-<table class="remove-md-box"><tr>
-<td>
-    <table><thead><tr><th><code>Delay/At/In</code> header</th><th>Message will be delivered at</th><th>Explanation</th></tr></thead><tbody>
-    <tr><td><code>30m</code></td><td>12/10/2021, 9:<b>30</b>am</td><td>30 minutes from now</td></tr>
-    <tr><td><code>2 hours</code></td><td>12/10/2021, <b>11:30</b>am</td><td>2 hours from now</td></tr>
-    <tr><td><code>1 day</code></td><td>12/<b>11</b>/2021, 9am</td><td>24 hours from now</td></tr>
-    <tr><td><code>10am</code></td><td>12/10/2021, <b>10am</b></td><td>Today at 10am (same day, because it's only 9am)</td></tr>
-    <tr><td><code>8am</code></td><td>12/<b>11</b>/2021, <b>8am</b></td><td>Tomorrow at 8am (because it's 9am already)</td></tr>
-    <tr><td><code>1639152000</code></td><td>12/10/2021, 11am (EST)</td><td> Today at 11am (EST)</td></tr>
-    </tbody></table>
-</td>
-</tr></table>
+You can include an icon that will appear next to the text of the notification. Simply pass the `X-Icon` header or query
+parameter (or its alias `Icon`) to specify the URL that the icon is located at. The client will automatically download
+the icon (unless it is already cached locally, and less than 24 hours old), and show it in the notification. Icons are 
+cached locally in the client until the notification is deleted. **Only JPEG and PNG images are supported at this time**.
 
-## Webhooks (publish via GET) 
-_Supported on:_ :material-android: :material-apple: :material-firefox:
-
-In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use 
-a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support.
-
-To send messages via HTTP GET, simply call the `/publish` endpoint (or its aliases `/send` and `/trigger`). Without 
-any arguments, this will send the message `triggered` to the topic. However, you can provide all arguments that are 
-also supported as HTTP headers as URL-encoded arguments. Be sure to check the list of all 
-[supported parameters and headers](#list-of-all-parameters) for details.
-
-For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhook/trigger` to send a message 
-(aka trigger the webhook):
+Here's an example showing how to include an icon:
 
 === "Command line (curl)"
     ```
-    curl ntfy.sh/mywebhook/trigger
-    ```
-
-=== "ntfy CLI"
-    ```
-    ntfy trigger mywebhook
-    ```
-
-=== "HTTP"
-    ``` http
-    GET /mywebhook/trigger HTTP/1.1
-    Host: ntfy.sh
-    ```
-
-=== "JavaScript"
-    ``` javascript
-    fetch('https://ntfy.sh/mywebhook/trigger')
-    ```
-
-=== "Go"
-    ``` go
-    http.Get("https://ntfy.sh/mywebhook/trigger")
-    ```
-
-=== "PowerShell"
-    ``` powershell
-    Invoke-RestMethod "ntfy.sh/mywebhook/trigger"
-    ```    
-
-=== "Python"
-    ``` python
-    requests.get("https://ntfy.sh/mywebhook/trigger")
-    ```
-
-=== "PHP"
-    ``` php-inline
-    file_get_contents('https://ntfy.sh/mywebhook/trigger');
-    ```
-
-To add a custom message, simply append the `message=` URL parameter. And of course you can set the 
-[message priority](#message-priority), the [message title](#message-title), and [tags](#tags-emojis) as well. 
-For a full list of possible parameters, check the list of [supported parameters and headers](#list-of-all-parameters).
-
-Here's an example with a custom message, tags and a priority:
-
-=== "Command line (curl)"
-    ```
-    curl "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
+    curl \
+        -H "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
+        -H "Title: Kodi: Resuming Playback" \
+        -H "Tags: arrow_forward" \
+        -d "The Wire, S01E01" \
+        ntfy.sh/tvshows
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        -p 5 --tags=warning,skull \
-        mywebhook "Webhook triggered"
+        --icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
+        --title="Kodi: Resuming Playback" \
+        --tags="arrow_forward" \
+        tvshows \
+        "The Wire, S01E01"
     ```
 
 === "HTTP"
     ``` http
-    GET /mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull HTTP/1.1
+    POST /tvshows HTTP/1.1
     Host: ntfy.sh
+    Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png
+    Tags: arrow_forward
+    Title: Kodi: Resuming Playback
+
+    The Wire, S01E01
     ```
 
 === "JavaScript"
     ``` javascript
-    fetch('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull')
+    fetch('https://ntfy.sh/tvshows', {
+        method: 'POST',
+        headers: { 
+            'Icon': 'https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png',
+            'Title': 'Kodi: Resuming Playback',
+            'Tags': 'arrow_forward'
+        },
+        body: "The Wire, S01E01"
+    })
     ```
 
 === "Go"
     ``` go
-    http.Get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/tvshows", strings.NewReader("The Wire, S01E01"))
+    req.Header.Set("Icon", "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png")
+    req.Header.Set("Tags", "arrow_forward")
+    req.Header.Set("Title", "Kodi: Resuming Playback")
+    http.DefaultClient.Do(req)
     ```
 
 === "PowerShell"
     ``` powershell
-    Invoke-RestMethod "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/tvshows"
+      Headers = @{
+        Title = "Kodi: Resuming Playback"
+        Tags = "arrow_forward"
+        Icon = "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png"
+      }
+      Body = "The Wire, S01E01"
+    }
+    Invoke-RestMethod @Request
     ```
 
 === "Python"
     ``` python
-    requests.get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
+    requests.post("https://ntfy.sh/tvshows",
+        data="The Wire, S01E01",
+        headers={
+            "Title": "Kodi: Resuming Playback",
+            "Tags": "arrow_forward",
+            "Icon": "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png"
+        })
     ```
 
 === "PHP"
     ``` php-inline
-    file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
+    file_get_contents('https://ntfy.sh/tvshows', false, stream_context_create([
+        'http' => [
+        'method' => 'PUT',
+        'header' =>
+            "Content-Type: text/plain\r\n" . // Does not matter
+            "Title: Kodi: Resuming Playback\r\n" .
+            "Tags: arrow_forward\r\n" .
+            "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png",
+        ],
+        'content' => "The Wire, S01E01"
+    ]));
     ```
 
-## Message templating
-_Supported on:_ :material-android: :material-apple: :material-firefox:
-
-Templating lets you **format a JSON message body into human-friendly message and title text** using
-[Go templates](https://pkg.go.dev/text/template) (see tutorials [here](https://blog.gopheracademy.com/advent-2017/using-go-templates/), 
-[here](https://www.digitalocean.com/community/tutorials/how-to-use-templates-in-go), and
-[here](https://developer.hashicorp.com/nomad/tutorials/templates/go-template-syntax)). This is specifically useful when
-**combined with webhooks** from services such as [GitHub](https://docs.github.com/en/webhooks/about-webhooks),
-[Grafana](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/),
-[Alertmanager](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config), or other services that emit JSON webhooks.
-
-Instead of using a separate bridge program to parse the webhook body into the format ntfy expects, you can include a templated
-message and/or a templated title which will be populated based on the fields of the webhook body (so long as the webhook body
-is valid JSON).
-
-You can enable templating by setting the `X-Template` header (or its aliases `Template` or `tpl`, or the query parameter `?template=...`):
-
-* **Pre-defined template files**: Setting the `X-Template` header or query parameter to a pre-defined template name (one of `github`,
-  `grafana`, or `alertmanager`, such as `?template=github`) will use the built-in template with that name.
-  See [pre-defined templates](#pre-defined-templates) for more details.
-* **Custom template files**: Setting the `X-Template` header or query parameter to a custom template name (e.g. `?template=myapp`)
-  will use a custom template file from the template directory (defaults to `/etc/ntfy/templates`, can be overridden with `template-dir`).
-  See [custom templates](#custom-templates) for more details.
-* **Inline templating**: Setting the `X-Template` header or query parameter to `yes` or `1` (e.g. `?template=yes`)
-  will enable inline templating, which means that the `message` and/or `title` will be parsed as a Go template.
-  See [inline templating](#inline-templating) for more details.
-
-To learn the basics of Go's templating language, please see [template syntax](#template-syntax).
-
-### Pre-defined templates
-
-When `X-Template: <name>` (aliases: `Template: <name>`, `Tpl: <name>`) or `?template=<name>` is set, ntfy will transform the
-message and/or title based on one of the built-in pre-defined templates.
-
-The following **pre-defined templates** are available:
-
-* `github`: Formats a subset of [GitHub webhook](https://docs.github.com/en/webhooks/about-webhooks) payloads (PRs, issues, new star, new watcher, new comment). See [github.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/github.yml).
-* `grafana`: Formats [Grafana webhook](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/) payloads (firing/resolved alerts). See [grafana.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/grafana.yml).
-* `alertmanager`: Formats [Alertmanager webhook](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config) payloads (firing/resolved alerts). See [alertmanager.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/alertmanager.yml).
-
-To override the pre-defined templates, you can place a file with the same name in the template directory (defaults to `/etc/ntfy/templates`,
-can be overridden with `template-dir`). See [custom templates](#custom-templates) for more details.
-
-Here's an example of how to use the **pre-defined `github` template**: 
-
-First, configure the webhook in GitHub to send a webhook to your ntfy topic, e.g. `https://ntfy.sh/mytopic?template=github`.
-<figure markdown>
-  ![GitHub webhook config](static/img/screenshot-github-webhook-config.png){ width=600 }
-  <figcaption>GitHub webhook configuration</figcaption>
-</figure>
-
-After that, when GitHub publishes a JSON webhook to the topic, ntfy will transform it according to the template rules
-and you'll receive notifications in the ntfy app. Here's an example for when somebody stars your repository:
+Here's an example of how it will look on Android:
 
 <figure markdown>
-  ![pre-defined template](static/img/android-screenshot-template-predefined.png){ width=500 }
-  <figcaption>Receiving a webhook, formatted using the pre-defined "github" template</figcaption>
+  ![file attachment](static/img/android-screenshot-icon.png){ width=500 }
+  <figcaption>Custom icon from an external URL</figcaption>
 </figure>
 
-### Custom templates
+## Attachments
+_Supported on:_ :material-android: :material-firefox:
 
-To define **your own custom templates**, place a template file in the template directory (defaults to `/etc/ntfy/templates`, can be overridden with `template-dir`)
-and set the `X-Template` header or query parameter to the name of the template file (without the `.yml` extension). 
+You can **send images and other files to your phone** as attachments to a notification. The attachments are then downloaded
+onto your phone (depending on size and setting automatically), and can be used from the Downloads folder.
 
-For example, if you have a template file `/etc/ntfy/templates/myapp.yml`, you can set the header `X-Template: myapp` or
-the query parameter `?template=myapp` to use it.
+There are two different ways to send attachments: 
 
-Template files must have the `.yml` (not: `.yaml`!) extension and must be formatted as YAML. They may contain `title` and `message` keys,
-which are interpreted as Go templates.
+* sending [a local file](#attach-local-file) via PUT, e.g. from `~/Flowers/flower.jpg` or `ringtone.mp3`
+* or by [passing an external URL](#attach-file-from-a-url) as an attachment, e.g. `https://f-droid.org/F-Droid.apk` 
 
-Here's an **example custom template**:
+### Attach local file
+To **send a file from your computer** as an attachment, you can send it as the PUT request body. If a message is greater 
+than the maximum message size (4,096 bytes) or consists of non UTF-8 characters, the ntfy server will automatically 
+detect the mime type and size, and send the message as an attachment file. To send smaller text-only messages or files 
+as attachments, you must pass a filename by passing the `X-Filename` header or query parameter (or any of its aliases 
+`Filename`, `File` or `f`). 
 
-=== "Custom template (/etc/ntfy/templates/myapp.yml)"
-    ```yaml
-    title: |
-      {{- if eq .status "firing" }}
-        {{- if gt .percent 90.0 }}🚨 Critical alert
-        {{- else }}⚠️ Alert{{- end }}
-      {{- else if eq .status "resolved" }}
-      ✅ Alert resolved
-      {{- end }}
-    message: |
-      Status: {{ .status }}
-      Type: {{ .type | upper }} ({{ .percent }}%)
-      Server: {{ .server }}
-    ```
+By default, and how ntfy.sh is configured, the **max attachment size is 15 MB** (with 100 MB total per visitor). 
+Attachments **expire after 3 hours**, which typically is plenty of time for the user to download it, or for the Android app
+to auto-download it. Please also check out the [other limits below](#limitations).
 
-Once you have the template file in place, you can send the payload to your topic using the `X-Template`
-header or query parameter:
+Here's an example showing how to upload an image:
 
 === "Command line (curl)"
     ```
-    echo '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}' | \
-      curl -sT- "https://ntfy.example.com/mytopic?template=myapp"
+    curl \
+        -T flower.jpg \
+        -H "Filename: flower.jpg" \
+        ntfy.sh/flowers
     ```
 
 === "ntfy CLI"
     ```
-    echo '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}' | \
-      ntfy publish --template=myapp https://ntfy.example.com/mytopic 
+    ntfy publish \
+        --file=flower.jpg \
+        flowers
     ```
 
 === "HTTP"
     ``` http
-    POST /mytopic?template=myapp HTTP/1.1
-    Host: ntfy.example.com
-
-    {
-      "status": "firing",
-      "type": "cpu",
-      "server": "ntfy.sh",
-      "percent": 99
-    }
+    PUT /flowers HTTP/1.1
+    Host: ntfy.sh
+    Filename: flower.jpg
+    Content-Type: 52312
+     
+    (binary JPEG data)
     ```
 
 === "JavaScript"
     ``` javascript
-    fetch('https://ntfy.example.com/mytopic?template=myapp', {
-        method: 'POST',
-        body: '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+    fetch('https://ntfy.sh/flowers', {
+        method: 'PUT',
+        body: document.getElementById("file").files[0],
+        headers: { 'Filename': 'flower.jpg' }
     })
     ```
 
 === "Go"
     ``` go
-    payload := `{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}`
-    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mytopic?template=myapp", strings.NewReader(payload))
+    file, _ := os.Open("flower.jpg")
+    req, _ := http.NewRequest("PUT", "https://ntfy.sh/flowers", file)
+    req.Header.Set("Filename", "flower.jpg")
     http.DefaultClient.Do(req)
     ```
 
@@ -1071,281 +1001,88 @@ header or query parameter:
     ``` powershell
     $Request = @{
       Method = "POST"
-      Uri = "https://ntfy.example.com/mytopic?template=myapp"
-      Body = '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+      Uri = "ntfy.sh/flowers"
+      InFile = "flower.jpg"
+      Headers = @{"Filename" = "flower.jpg"}
     }
     Invoke-RestMethod @Request
     ```
 
 === "Python"
     ``` python
-    requests.post("https://ntfy.example.com/mytopic?template=myapp",
-      json={"status":"firing","type":"cpu","server":"ntfy.sh","percent":99})
+    requests.put("https://ntfy.sh/flowers",
+        data=open("flower.jpg", 'rb'),
+        headers={ "Filename": "flower.jpg" })
     ```
 
 === "PHP"
     ``` php-inline
-    file_get_contents('https://ntfy.example.com/mytopic?template=myapp', false, stream_context_create([
+    file_get_contents('https://ntfy.sh/flowers', false, stream_context_create([
         'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json",
-            'content' => '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+            'method' => 'PUT',
+            'header' =>
+                "Content-Type: application/octet-stream\r\n" . // Does not matter
+                "Filename: flower.jpg",
+            'content' => file_get_contents('flower.jpg') // Dangerous for large files 
         ]
     ]));
     ```
 
-Which will result in a notification that looks like this:
+Here's what that looks like on Android:
 
 <figure markdown>
-  ![notification from custom JSON webhook template](static/img/android-screenshot-template-custom.png){ width=500 }
-  <figcaption>JSON webhook, transformed using a custom template</figcaption>
+  ![image attachment](static/img/android-screenshot-attachment-image.png){ width=500 }
+  <figcaption>Image attachment sent from a local file</figcaption>
 </figure>
 
-### Inline templating
+### Attach file from a URL
+Instead of sending a local file to your phone, you can use **an external URL** to specify where the attachment is hosted.
+This could be a Dropbox link, a file from social media, or any other publicly available URL. Since the files are 
+externally hosted, the expiration or size limits from above do not apply here.
 
-When `X-Template: yes` (aliases: `Template: yes`, `Tpl: yes`) or `?template=yes` is set, you can use Go templates in the `message` and `title` fields of your
-webhook payload. 
+To attach an external file, simple pass the `X-Attach` header or query parameter (or any of its aliases `Attach` or `a`)
+to specify the attachment URL. It can be any type of file. 
 
-Inline templates are most useful for templated one-off messages, or if you do not control the ntfy server (e.g., if you're using ntfy.sh).
-Consider using [pre-defined templates](#pre-defined-templates) or [custom templates](#custom-templates) instead, 
-if you control the ntfy server, as templates are much easier to maintain.
+ntfy will automatically try to derive the file name from the URL (e.g `https://example.com/flower.jpg` will yield a 
+filename `flower.jpg`). To override this filename, you may send the `X-Filename` header or query parameter (or any of its
+aliases `Filename`, `File` or `f`).
 
-Here's an **example for a Grafana alert**:
-
-<figure markdown>
-  ![notification with actions](static/img/android-screenshot-template.jpg){ width=500 }
-  <figcaption>Grafana webhook, formatted using templates</figcaption>
-</figure>
-
-This was sent using the following templates and payloads
-
-=== "Message template"
-    ```
-    {{range .alerts}}
-      {{.annotations.summary}}
-      
-      Values:
-      {{range $k,$v := .values}}
-        - {{$k}}={{$v}}
-      {{end}}
-    {{end}}
-    ```
-
-=== "Title template"
-    ```
-    {{.title}}
-    ```
-
-=== "Encoded webhook URL"
-    ```
-    # Additional URL encoding (see https://www.urlencoder.org/) is necessary for Grafana, 
-    # and may be required for other tools too
-
-    https://ntfy.sh/mytopic?tpl=1&t=%7B%7B.title%7D%7D&m=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.summary%7D%7D%5Cn%5CnValues%3A%5Cn%7B%7Brange%20%24k%2C%24v%20%3A%3D%20.values%7D%7D-%20%7B%7B%24k%7D%7D%3D%7B%7B%24v%7D%7D%5Cn%7B%7Bend%7D%7D%7B%7Bend%7D%7D
-    ```
-
-=== "Grafana-sent payload"
-    ```
-    {"receiver":"ntfy\\.example\\.com/alerts","status":"resolved","alerts":[{"status":"resolved","labels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts","instance":"10.108.0.2:9100","job":"node-exporter"},"annotations":{"summary":"15m load average too high"},"startsAt":"2024-03-15T02:28:00Z","endsAt":"2024-03-15T02:42:00Z","generatorURL":"localhost:3000/alerting/grafana/NW9oDw-4z/view","fingerprint":"becbfb94bd81ef48","silenceURL":"localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter","dashboardURL":"","panelURL":"","values":{"B":18.98211314475876,"C":0},"valueString":"[ var='B' labels={__name__=node_load15, instance=10.108.0.2:9100, job=node-exporter} value=18.98211314475876 ], [ var='C' labels={__name__=node_load15, instance=10.108.0.2:9100, job=node-exporter} value=0 ]"}],"groupLabels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts"},"commonLabels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts","instance":"10.108.0.2:9100","job":"node-exporter"},"commonAnnotations":{"summary":"15m load average too high"},"externalURL":"localhost:3000/","version":"1","groupKey":"{}:{alertname=\"Load avg 15m too high\", grafana_folder=\"Node alerts\"}","truncatedAlerts":0,"orgId":1,"title":"[RESOLVED] Load avg 15m too high Node alerts (10.108.0.2:9100 node-exporter)","state":"ok","message":"**Resolved**\n\nValue: B=18.98211314475876, C=0\nLabels:\n - alertname = Load avg 15m too high\n - grafana_folder = Node alerts\n - instance = 10.108.0.2:9100\n - job = node-exporter\nAnnotations:\n - summary = 15m load average too high\nSource: localhost:3000/alerting/grafana/NW9oDw-4z/view\nSilence: localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter\n"}
-    ```
-
-Here's an **easier example with a shorter JSON payload**:
+Here's an example showing how to attach an APK file:
 
 === "Command line (curl)"
     ```
-    # To use { and } in the URL without encoding, we need to turn off
-    # curl's globbing using --globoff
-
     curl \
-        --globoff \
-        -d '{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}' \
-        'ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}'
+        -X POST \
+        -H "Attach: https://f-droid.org/F-Droid.apk" \
+        ntfy.sh/mydownloads
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --attach="https://f-droid.org/F-Droid.apk" \
+        mydownloads
     ```
 
 === "HTTP"
     ``` http
-    POST /mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}} HTTP/1.1
+    POST /mydownloads HTTP/1.1
     Host: ntfy.sh
-
-    {"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}
+    Attach: https://f-droid.org/F-Droid.apk
     ```
 
 === "JavaScript"
     ``` javascript
-    fetch('https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}', {
+    fetch('https://ntfy.sh/mydownloads', {
         method: 'POST',
-        body: '{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}'
+        headers: { 'Attach': 'https://f-droid.org/F-Droid.apk' }
     })
     ```
 
 === "Go"
     ``` go
-    body := `{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}`
-    uri := "https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}"
-    req, _ := http.NewRequest("POST", uri, strings.NewReader(body))
-    http.DefaultClient.Do(req)
-    ```
-
-
-=== "PowerShell"
-    ``` powershell
-    $Request = @{
-        Method = "POST"
-        URI = "https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}"
-        Body = '{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}'
-        ContentType = "application/json"
-    }
-    Invoke-RestMethod @Request
-    ```
-
-=== "Python"
-    ``` python
-    requests.post(
-        "https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}",
-        data='{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}'
-    )
-    ```
-
-=== "PHP"
-    ``` php-inline
-    file_get_contents("https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}", false, stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json",
-            'content' => '{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}'
-        ]
-    ]));
-    ```
-
-This example uses the `message`/`m` and `title`/`t` query parameters, but obviously this also works with the corresponding
-`Message`/`Title` headers. It will send a notification with a title `phil-pc: A severe error has occurred` and a message
-`Error message: Disk has run out of space`.
-
-### Template syntax
-ntfy uses [Go templates](https://pkg.go.dev/text/template) for its templates, which is arguably one of the most powerful,
-yet also one of the worst templating languages out there.
-
-You can use the following features in your templates:
-
-* Variables, e.g. `{{.alert.title}}` or `An error occurred: {{.error.desc}}`
-* Conditionals (if/else, e.g. `{{if eq .action "opened"}}..{{else}}..{{end}}`, see [example](https://repeatit.io/#/share/eyJ0ZW1wbGF0ZSI6Ilt7ey5wdWxsX3JlcXVlc3QuaGVhZC5yZXBvLmZ1bGxfbmFtZX19XSBQdWxsIHJlcXVlc3Qge3tpZiBlcSAuYWN0aW9uIFwib3BlbmVkXCJ9fU9QRU5FRHt7ZWxzZX19Q0xPU0VEe3tlbmR9fToge3sucHVsbF9yZXF1ZXN0LnRpdGxlfX0iLCJpbnB1dCI6IntcbiAgXCJhY3Rpb25cIjogXCJvcGVuZWRcIixcbiAgXCJudW1iZXJcIjogMSxcbiAgXCJwdWxsX3JlcXVlc3RcIjoge1xuICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9wdWxscy8xXCIsXG4gICAgXCJpZFwiOiAxNzgzNDIwOTcyLFxuICAgIFwibm9kZV9pZFwiOiBcIlBSX2t3RE9IQWJkbzg1cVROZ3NcIixcbiAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGwvMVwiLFxuICAgIFwiZGlmZl91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllci9kYWJibGUvcHVsbC8xLmRpZmZcIixcbiAgICBcInBhdGNoX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZS9wdWxsLzEucGF0Y2hcIixcbiAgICBcImlzc3VlX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzLzFcIixcbiAgICBcIm51bWJlclwiOiAxLFxuICAgIFwic3RhdGVcIjogXCJvcGVuXCIsXG4gICAgXCJsb2NrZWRcIjogZmFsc2UsXG4gICAgXCJ0aXRsZVwiOiBcIkEgc2FtcGxlIFBSIGZyb20gUGhpbFwiLFxuICAgIFwidXNlclwiOiB7XG4gICAgICBcImxvZ2luXCI6IFwiYmlud2llZGVyaGllclwiLFxuICAgICAgXCJpZFwiOiA2NjQ1OTcsXG4gICAgICBcIm5vZGVfaWRcIjogXCJNRFE2VlhObGNqWTJORFU1Tnc9PVwiLFxuICAgICAgXCJhdmF0YXJfdXJsXCI6IFwiaHR0cHM6Ly9hdmF0YXJzLmdpdGh1YnVzZXJjb250ZW50LmNvbS91LzY2NDU5Nz92PTRcIixcbiAgICAgIFwiZ3JhdmF0YXJfaWRcIjogXCJcIixcbiAgICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyXCIsXG4gICAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXJcIixcbiAgICAgIFwiZm9sbG93ZXJzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dlcnNcIixcbiAgICAgIFwiZm9sbG93aW5nX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dpbmd7L290aGVyX3VzZXJ9XCIsXG4gICAgICBcImdpc3RzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9naXN0c3svZ2lzdF9pZH1cIixcbiAgICAgIFwic3RhcnJlZF91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3RhcnJlZHsvb3duZXJ9ey9yZXBvfVwiLFxuICAgICAgXCJzdWJzY3JpcHRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdWJzY3JpcHRpb25zXCIsXG4gICAgICBcIm9yZ2FuaXphdGlvbnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL29yZ3NcIixcbiAgICAgIFwicmVwb3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlcG9zXCIsXG4gICAgICBcImV2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZXZlbnRzey9wcml2YWN5fVwiLFxuICAgICAgXCJyZWNlaXZlZF9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlY2VpdmVkX2V2ZW50c1wiLFxuICAgICAgXCJ0eXBlXCI6IFwiVXNlclwiLFxuICAgICAgXCJzaXRlX2FkbWluXCI6IGZhbHNlXG4gICAgfSxcbiAgICBcImJvZHlcIjogbnVsbCxcbiAgICBcImNyZWF0ZWRfYXRcIjogXCIyMDI0LTAzLTIxVDAyOjUyOjA5WlwiLFxuICAgIFwidXBkYXRlZF9hdFwiOiBcIjIwMjQtMDMtMjFUMDI6NTI6MDlaXCIsXG4gICAgXCJjbG9zZWRfYXRcIjogbnVsbCxcbiAgICBcIm1lcmdlZF9hdFwiOiBudWxsLFxuICAgIFwibWVyZ2VfY29tbWl0X3NoYVwiOiBudWxsLFxuICAgIFwiYXNzaWduZWVcIjogbnVsbCxcbiAgICBcImFzc2lnbmVlc1wiOiBbXSxcbiAgICBcInJlcXVlc3RlZF9yZXZpZXdlcnNcIjogW10sXG4gICAgXCJyZXF1ZXN0ZWRfdGVhbXNcIjogW10sXG4gICAgXCJsYWJlbHNcIjogW10sXG4gICAgXCJtaWxlc3RvbmVcIjogbnVsbCxcbiAgICBcImRyYWZ0XCI6IGZhbHNlLFxuICAgIFwiY29tbWl0c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGxzLzEvY29tbWl0c1wiLFxuICAgIFwicmV2aWV3X2NvbW1lbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvMS9jb21tZW50c1wiLFxuICAgIFwicmV2aWV3X2NvbW1lbnRfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9wdWxscy9jb21tZW50c3svbnVtYmVyfVwiLFxuICAgIFwiY29tbWVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9pc3N1ZXMvMS9jb21tZW50c1wiLFxuICAgIFwic3RhdHVzZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdGF0dXNlcy81NzAzODQyY2M1NzE1ZWQxZTM1OGQyM2ViYjY5M2RiMDk3NDdhZTliXCIsXG4gICAgXCJoZWFkXCI6IHtcbiAgICAgIFwibGFiZWxcIjogXCJiaW53aWVkZXJoaWVyOmFhXCIsXG4gICAgICBcInJlZlwiOiBcImFhXCIsXG4gICAgICBcInNoYVwiOiBcIjU3MDM4NDJjYzU3MTVlZDFlMzU4ZDIzZWJiNjkzZGIwOTc0N2FlOWJcIixcbiAgICAgIFwidXNlclwiOiB7XG4gICAgICAgIFwibG9naW5cIjogXCJiaW53aWVkZXJoaWVyXCIsXG4gICAgICAgIFwiaWRcIjogNjY0NTk3LFxuICAgICAgICBcIm5vZGVfaWRcIjogXCJNRFE2VlhObGNqWTJORFU1Tnc9PVwiLFxuICAgICAgICBcImF2YXRhcl91cmxcIjogXCJodHRwczovL2F2YXRhcnMuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3UvNjY0NTk3P3Y9NFwiLFxuICAgICAgICBcImdyYXZhdGFyX2lkXCI6IFwiXCIsXG4gICAgICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyXCIsXG4gICAgICAgIFwiaHRtbF91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllclwiLFxuICAgICAgICBcImZvbGxvd2Vyc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93ZXJzXCIsXG4gICAgICAgIFwiZm9sbG93aW5nX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dpbmd7L290aGVyX3VzZXJ9XCIsXG4gICAgICAgIFwiZ2lzdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2dpc3Rzey9naXN0X2lkfVwiLFxuICAgICAgICBcInN0YXJyZWRfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3N0YXJyZWR7L293bmVyfXsvcmVwb31cIixcbiAgICAgICAgXCJzdWJzY3JpcHRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdWJzY3JpcHRpb25zXCIsXG4gICAgICAgIFwib3JnYW5pemF0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvb3Jnc1wiLFxuICAgICAgICBcInJlcG9zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZXBvc1wiLFxuICAgICAgICBcImV2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZXZlbnRzey9wcml2YWN5fVwiLFxuICAgICAgICBcInJlY2VpdmVkX2V2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvcmVjZWl2ZWRfZXZlbnRzXCIsXG4gICAgICAgIFwidHlwZVwiOiBcIlVzZXJcIixcbiAgICAgICAgXCJzaXRlX2FkbWluXCI6IGZhbHNlXG4gICAgICB9LFxuICAgICAgXCJyZXBvXCI6IHtcbiAgICAgICAgXCJpZFwiOiA0NzAyMTIwMDMsXG4gICAgICAgIFwibm9kZV9pZFwiOiBcIlJfa2dET0hBYmRvd1wiLFxuICAgICAgICBcIm5hbWVcIjogXCJkYWJibGVcIixcbiAgICAgICAgXCJmdWxsX25hbWVcIjogXCJiaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgICAgICBcInByaXZhdGVcIjogZmFsc2UsXG4gICAgICAgIFwib3duZXJcIjoge1xuICAgICAgICAgIFwibG9naW5cIjogXCJiaW53aWVkZXJoaWVyXCIsXG4gICAgICAgICAgXCJpZFwiOiA2NjQ1OTcsXG4gICAgICAgICAgXCJub2RlX2lkXCI6IFwiTURRNlZYTmxjalkyTkRVNU53PT1cIixcbiAgICAgICAgICBcImF2YXRhcl91cmxcIjogXCJodHRwczovL2F2YXRhcnMuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3UvNjY0NTk3P3Y9NFwiLFxuICAgICAgICAgIFwiZ3JhdmF0YXJfaWRcIjogXCJcIixcbiAgICAgICAgICBcInVybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllclwiLFxuICAgICAgICAgIFwiaHRtbF91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllclwiLFxuICAgICAgICAgIFwiZm9sbG93ZXJzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dlcnNcIixcbiAgICAgICAgICBcImZvbGxvd2luZ191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93aW5ney9vdGhlcl91c2VyfVwiLFxuICAgICAgICAgIFwiZ2lzdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2dpc3Rzey9naXN0X2lkfVwiLFxuICAgICAgICAgIFwic3RhcnJlZF91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3RhcnJlZHsvb3duZXJ9ey9yZXBvfVwiLFxuICAgICAgICAgIFwic3Vic2NyaXB0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3Vic2NyaXB0aW9uc1wiLFxuICAgICAgICAgIFwib3JnYW5pemF0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvb3Jnc1wiLFxuICAgICAgICAgIFwicmVwb3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlcG9zXCIsXG4gICAgICAgICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2V2ZW50c3svcHJpdmFjeX1cIixcbiAgICAgICAgICBcInJlY2VpdmVkX2V2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvcmVjZWl2ZWRfZXZlbnRzXCIsXG4gICAgICAgICAgXCJ0eXBlXCI6IFwiVXNlclwiLFxuICAgICAgICAgIFwic2l0ZV9hZG1pblwiOiBmYWxzZVxuICAgICAgICB9LFxuICAgICAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlXCIsXG4gICAgICAgIFwiZGVzY3JpcHRpb25cIjogXCJBIHJlcG8gZm9yIGRhYmJsaW5nXCIsXG4gICAgICAgIFwiZm9ya1wiOiBmYWxzZSxcbiAgICAgICAgXCJ1cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlXCIsXG4gICAgICAgIFwiZm9ya3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9mb3Jrc1wiLFxuICAgICAgICBcImtleXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9rZXlzey9rZXlfaWR9XCIsXG4gICAgICAgIFwiY29sbGFib3JhdG9yc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbGxhYm9yYXRvcnN7L2NvbGxhYm9yYXRvcn1cIixcbiAgICAgICAgXCJ0ZWFtc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3RlYW1zXCIsXG4gICAgICAgIFwiaG9va3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9ob29rc1wiLFxuICAgICAgICBcImlzc3VlX2V2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2lzc3Vlcy9ldmVudHN7L251bWJlcn1cIixcbiAgICAgICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9ldmVudHNcIixcbiAgICAgICAgXCJhc3NpZ25lZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9hc3NpZ25lZXN7L3VzZXJ9XCIsXG4gICAgICAgIFwiYnJhbmNoZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9icmFuY2hlc3svYnJhbmNofVwiLFxuICAgICAgICBcInRhZ3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS90YWdzXCIsXG4gICAgICAgIFwiYmxvYnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvYmxvYnN7L3NoYX1cIixcbiAgICAgICAgXCJnaXRfdGFnc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2dpdC90YWdzey9zaGF9XCIsXG4gICAgICAgIFwiZ2l0X3JlZnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvcmVmc3svc2hhfVwiLFxuICAgICAgICBcInRyZWVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZ2l0L3RyZWVzey9zaGF9XCIsXG4gICAgICAgIFwic3RhdHVzZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdGF0dXNlcy97c2hhfVwiLFxuICAgICAgICBcImxhbmd1YWdlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2xhbmd1YWdlc1wiLFxuICAgICAgICBcInN0YXJnYXplcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdGFyZ2F6ZXJzXCIsXG4gICAgICAgIFwiY29udHJpYnV0b3JzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29udHJpYnV0b3JzXCIsXG4gICAgICAgIFwic3Vic2NyaWJlcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdWJzY3JpYmVyc1wiLFxuICAgICAgICBcInN1YnNjcmlwdGlvbl91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3N1YnNjcmlwdGlvblwiLFxuICAgICAgICBcImNvbW1pdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb21taXRzey9zaGF9XCIsXG4gICAgICAgIFwiZ2l0X2NvbW1pdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvY29tbWl0c3svc2hhfVwiLFxuICAgICAgICBcImNvbW1lbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29tbWVudHN7L251bWJlcn1cIixcbiAgICAgICAgXCJpc3N1ZV9jb21tZW50X3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzL2NvbW1lbnRzey9udW1iZXJ9XCIsXG4gICAgICAgIFwiY29udGVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb250ZW50cy97K3BhdGh9XCIsXG4gICAgICAgIFwiY29tcGFyZV91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbXBhcmUve2Jhc2V9Li4ue2hlYWR9XCIsXG4gICAgICAgIFwibWVyZ2VzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbWVyZ2VzXCIsXG4gICAgICAgIFwiYXJjaGl2ZV91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3thcmNoaXZlX2Zvcm1hdH17L3JlZn1cIixcbiAgICAgICAgXCJkb3dubG9hZHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9kb3dubG9hZHNcIixcbiAgICAgICAgXCJpc3N1ZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9pc3N1ZXN7L251bWJlcn1cIixcbiAgICAgICAgXCJwdWxsc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGxzey9udW1iZXJ9XCIsXG4gICAgICAgIFwibWlsZXN0b25lc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL21pbGVzdG9uZXN7L251bWJlcn1cIixcbiAgICAgICAgXCJub3RpZmljYXRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbm90aWZpY2F0aW9uc3s/c2luY2UsYWxsLHBhcnRpY2lwYXRpbmd9XCIsXG4gICAgICAgIFwibGFiZWxzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbGFiZWxzey9uYW1lfVwiLFxuICAgICAgICBcInJlbGVhc2VzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcmVsZWFzZXN7L2lkfVwiLFxuICAgICAgICBcImRlcGxveW1lbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZGVwbG95bWVudHNcIixcbiAgICAgICAgXCJjcmVhdGVkX2F0XCI6IFwiMjAyMi0wMy0xNVQxNTowNjoxN1pcIixcbiAgICAgICAgXCJ1cGRhdGVkX2F0XCI6IFwiMjAyMi0wMy0xNVQxNTowNjoxN1pcIixcbiAgICAgICAgXCJwdXNoZWRfYXRcIjogXCIyMDI0LTAzLTIxVDAyOjUyOjEwWlwiLFxuICAgICAgICBcImdpdF91cmxcIjogXCJnaXQ6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgICAgICBcInNzaF91cmxcIjogXCJnaXRAZ2l0aHViLmNvbTpiaW53aWVkZXJoaWVyL2RhYmJsZS5naXRcIixcbiAgICAgICAgXCJjbG9uZV91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllci9kYWJibGUuZ2l0XCIsXG4gICAgICAgIFwic3ZuX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgICAgICBcImhvbWVwYWdlXCI6IG51bGwsXG4gICAgICAgIFwic2l6ZVwiOiAxLFxuICAgICAgICBcInN0YXJnYXplcnNfY291bnRcIjogMCxcbiAgICAgICAgXCJ3YXRjaGVyc19jb3VudFwiOiAwLFxuICAgICAgICBcImxhbmd1YWdlXCI6IG51bGwsXG4gICAgICAgIFwiaGFzX2lzc3Vlc1wiOiB0cnVlLFxuICAgICAgICBcImhhc19wcm9qZWN0c1wiOiB0cnVlLFxuICAgICAgICBcImhhc19kb3dubG9hZHNcIjogdHJ1ZSxcbiAgICAgICAgXCJoYXNfd2lraVwiOiB0cnVlLFxuICAgICAgICBcImhhc19wYWdlc1wiOiBmYWxzZSxcbiAgICAgICAgXCJoYXNfZGlzY3Vzc2lvbnNcIjogZmFsc2UsXG4gICAgICAgIFwiZm9ya3NfY291bnRcIjogMCxcbiAgICAgICAgXCJtaXJyb3JfdXJsXCI6IG51bGwsXG4gICAgICAgIFwiYXJjaGl2ZWRcIjogZmFsc2UsXG4gICAgICAgIFwiZGlzYWJsZWRcIjogZmFsc2UsXG4gICAgICAgIFwib3Blbl9pc3N1ZXNfY291bnRcIjogMSxcbiAgICAgICAgXCJsaWNlbnNlXCI6IG51bGwsXG4gICAgICAgIFwiYWxsb3dfZm9ya2luZ1wiOiB0cnVlLFxuICAgICAgICBcImlzX3RlbXBsYXRlXCI6IGZhbHNlLFxuICAgICAgICBcIndlYl9jb21taXRfc2lnbm9mZl9yZXF1aXJlZFwiOiBmYWxzZSxcbiAgICAgICAgXCJ0b3BpY3NcIjogW10sXG4gICAgICAgIFwidmlzaWJpbGl0eVwiOiBcInB1YmxpY1wiLFxuICAgICAgICBcImZvcmtzXCI6IDAsXG4gICAgICAgIFwib3Blbl9pc3N1ZXNcIjogMSxcbiAgICAgICAgXCJ3YXRjaGVyc1wiOiAwLFxuICAgICAgICBcImRlZmF1bHRfYnJhbmNoXCI6IFwibWFpblwiLFxuICAgICAgICBcImFsbG93X3NxdWFzaF9tZXJnZVwiOiB0cnVlLFxuICAgICAgICBcImFsbG93X21lcmdlX2NvbW1pdFwiOiB0cnVlLFxuICAgICAgICBcImFsbG93X3JlYmFzZV9tZXJnZVwiOiB0cnVlLFxuICAgICAgICBcImFsbG93X2F1dG9fbWVyZ2VcIjogZmFsc2UsXG4gICAgICAgIFwiZGVsZXRlX2JyYW5jaF9vbl9tZXJnZVwiOiBmYWxzZSxcbiAgICAgICAgXCJhbGxvd191cGRhdGVfYnJhbmNoXCI6IGZhbHNlLFxuICAgICAgICBcInVzZV9zcXVhc2hfcHJfdGl0bGVfYXNfZGVmYXVsdFwiOiBmYWxzZSxcbiAgICAgICAgXCJzcXVhc2hfbWVyZ2VfY29tbWl0X21lc3NhZ2VcIjogXCJDT01NSVRfTUVTU0FHRVNcIixcbiAgICAgICAgXCJzcXVhc2hfbWVyZ2VfY29tbWl0X3RpdGxlXCI6IFwiQ09NTUlUX09SX1BSX1RJVExFXCIsXG4gICAgICAgIFwibWVyZ2VfY29tbWl0X21lc3NhZ2VcIjogXCJQUl9USVRMRVwiLFxuICAgICAgICBcIm1lcmdlX2NvbW1pdF90aXRsZVwiOiBcIk1FUkdFX01FU1NBR0VcIlxuICAgICAgfVxuICAgIH0sXG4gICAgXCJiYXNlXCI6IHtcbiAgICAgIFwibGFiZWxcIjogXCJiaW53aWVkZXJoaWVyOm1haW5cIixcbiAgICAgIFwicmVmXCI6IFwibWFpblwiLFxuICAgICAgXCJzaGFcIjogXCI3MmQ5MzFhMjBiYjgzZDEyM2FiNDVhY2NhZjc2MTE1MGM4YjAxMjExXCIsXG4gICAgICBcInVzZXJcIjoge1xuICAgICAgICBcImxvZ2luXCI6IFwiYmlud2llZGVyaGllclwiLFxuICAgICAgICBcImlkXCI6IDY2NDU5NyxcbiAgICAgICAgXCJub2RlX2lkXCI6IFwiTURRNlZYTmxjalkyTkRVNU53PT1cIixcbiAgICAgICAgXCJhdmF0YXJfdXJsXCI6IFwiaHR0cHM6Ly9hdmF0YXJzLmdpdGh1YnVzZXJjb250ZW50LmNvbS91LzY2NDU5Nz92PTRcIixcbiAgICAgICAgXCJncmF2YXRhcl9pZFwiOiBcIlwiLFxuICAgICAgICBcInVybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllclwiLFxuICAgICAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXJcIixcbiAgICAgICAgXCJmb2xsb3dlcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2ZvbGxvd2Vyc1wiLFxuICAgICAgICBcImZvbGxvd2luZ191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93aW5ney9vdGhlcl91c2VyfVwiLFxuICAgICAgICBcImdpc3RzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9naXN0c3svZ2lzdF9pZH1cIixcbiAgICAgICAgXCJzdGFycmVkX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdGFycmVkey9vd25lcn17L3JlcG99XCIsXG4gICAgICAgIFwic3Vic2NyaXB0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3Vic2NyaXB0aW9uc1wiLFxuICAgICAgICBcIm9yZ2FuaXphdGlvbnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL29yZ3NcIixcbiAgICAgICAgXCJyZXBvc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvcmVwb3NcIixcbiAgICAgICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2V2ZW50c3svcHJpdmFjeX1cIixcbiAgICAgICAgXCJyZWNlaXZlZF9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlY2VpdmVkX2V2ZW50c1wiLFxuICAgICAgICBcInR5cGVcIjogXCJVc2VyXCIsXG4gICAgICAgIFwic2l0ZV9hZG1pblwiOiBmYWxzZVxuICAgICAgfSxcbiAgICAgIFwicmVwb1wiOiB7XG4gICAgICAgIFwiaWRcIjogNDcwMjEyMDAzLFxuICAgICAgICBcIm5vZGVfaWRcIjogXCJSX2tnRE9IQWJkb3dcIixcbiAgICAgICAgXCJuYW1lXCI6IFwiZGFiYmxlXCIsXG4gICAgICAgIFwiZnVsbF9uYW1lXCI6IFwiYmlud2llZGVyaGllci9kYWJibGVcIixcbiAgICAgICAgXCJwcml2YXRlXCI6IGZhbHNlLFxuICAgICAgICBcIm93bmVyXCI6IHtcbiAgICAgICAgICBcImxvZ2luXCI6IFwiYmlud2llZGVyaGllclwiLFxuICAgICAgICAgIFwiaWRcIjogNjY0NTk3LFxuICAgICAgICAgIFwibm9kZV9pZFwiOiBcIk1EUTZWWE5sY2pZMk5EVTVOdz09XCIsXG4gICAgICAgICAgXCJhdmF0YXJfdXJsXCI6IFwiaHR0cHM6Ly9hdmF0YXJzLmdpdGh1YnVzZXJjb250ZW50LmNvbS91LzY2NDU5Nz92PTRcIixcbiAgICAgICAgICBcImdyYXZhdGFyX2lkXCI6IFwiXCIsXG4gICAgICAgICAgXCJ1cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXJcIixcbiAgICAgICAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXJcIixcbiAgICAgICAgICBcImZvbGxvd2Vyc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93ZXJzXCIsXG4gICAgICAgICAgXCJmb2xsb3dpbmdfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2ZvbGxvd2luZ3svb3RoZXJfdXNlcn1cIixcbiAgICAgICAgICBcImdpc3RzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9naXN0c3svZ2lzdF9pZH1cIixcbiAgICAgICAgICBcInN0YXJyZWRfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3N0YXJyZWR7L293bmVyfXsvcmVwb31cIixcbiAgICAgICAgICBcInN1YnNjcmlwdGlvbnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3N1YnNjcmlwdGlvbnNcIixcbiAgICAgICAgICBcIm9yZ2FuaXphdGlvbnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL29yZ3NcIixcbiAgICAgICAgICBcInJlcG9zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZXBvc1wiLFxuICAgICAgICAgIFwiZXZlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9ldmVudHN7L3ByaXZhY3l9XCIsXG4gICAgICAgICAgXCJyZWNlaXZlZF9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlY2VpdmVkX2V2ZW50c1wiLFxuICAgICAgICAgIFwidHlwZVwiOiBcIlVzZXJcIixcbiAgICAgICAgICBcInNpdGVfYWRtaW5cIjogZmFsc2VcbiAgICAgICAgfSxcbiAgICAgICAgXCJodG1sX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgICAgICBcImRlc2NyaXB0aW9uXCI6IFwiQSByZXBvIGZvciBkYWJibGluZ1wiLFxuICAgICAgICBcImZvcmtcIjogZmFsc2UsXG4gICAgICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgICAgICBcImZvcmtzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZm9ya3NcIixcbiAgICAgICAgXCJrZXlzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUva2V5c3sva2V5X2lkfVwiLFxuICAgICAgICBcImNvbGxhYm9yYXRvcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb2xsYWJvcmF0b3Jzey9jb2xsYWJvcmF0b3J9XCIsXG4gICAgICAgIFwidGVhbXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS90ZWFtc1wiLFxuICAgICAgICBcImhvb2tzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaG9va3NcIixcbiAgICAgICAgXCJpc3N1ZV9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9pc3N1ZXMvZXZlbnRzey9udW1iZXJ9XCIsXG4gICAgICAgIFwiZXZlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZXZlbnRzXCIsXG4gICAgICAgIFwiYXNzaWduZWVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvYXNzaWduZWVzey91c2VyfVwiLFxuICAgICAgICBcImJyYW5jaGVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvYnJhbmNoZXN7L2JyYW5jaH1cIixcbiAgICAgICAgXCJ0YWdzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvdGFnc1wiLFxuICAgICAgICBcImJsb2JzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZ2l0L2Jsb2Jzey9zaGF9XCIsXG4gICAgICAgIFwiZ2l0X3RhZ3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvdGFnc3svc2hhfVwiLFxuICAgICAgICBcImdpdF9yZWZzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZ2l0L3JlZnN7L3NoYX1cIixcbiAgICAgICAgXCJ0cmVlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2dpdC90cmVlc3svc2hhfVwiLFxuICAgICAgICBcInN0YXR1c2VzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3RhdHVzZXMve3NoYX1cIixcbiAgICAgICAgXCJsYW5ndWFnZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9sYW5ndWFnZXNcIixcbiAgICAgICAgXCJzdGFyZ2F6ZXJzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3RhcmdhemVyc1wiLFxuICAgICAgICBcImNvbnRyaWJ1dG9yc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbnRyaWJ1dG9yc1wiLFxuICAgICAgICBcInN1YnNjcmliZXJzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3Vic2NyaWJlcnNcIixcbiAgICAgICAgXCJzdWJzY3JpcHRpb25fdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdWJzY3JpcHRpb25cIixcbiAgICAgICAgXCJjb21taXRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29tbWl0c3svc2hhfVwiLFxuICAgICAgICBcImdpdF9jb21taXRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZ2l0L2NvbW1pdHN7L3NoYX1cIixcbiAgICAgICAgXCJjb21tZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbW1lbnRzey9udW1iZXJ9XCIsXG4gICAgICAgIFwiaXNzdWVfY29tbWVudF91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2lzc3Vlcy9jb21tZW50c3svbnVtYmVyfVwiLFxuICAgICAgICBcImNvbnRlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29udGVudHMveytwYXRofVwiLFxuICAgICAgICBcImNvbXBhcmVfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb21wYXJlL3tiYXNlfS4uLntoZWFkfVwiLFxuICAgICAgICBcIm1lcmdlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL21lcmdlc1wiLFxuICAgICAgICBcImFyY2hpdmVfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS97YXJjaGl2ZV9mb3JtYXR9ey9yZWZ9XCIsXG4gICAgICAgIFwiZG93bmxvYWRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZG93bmxvYWRzXCIsXG4gICAgICAgIFwiaXNzdWVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzey9udW1iZXJ9XCIsXG4gICAgICAgIFwicHVsbHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9wdWxsc3svbnVtYmVyfVwiLFxuICAgICAgICBcIm1pbGVzdG9uZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9taWxlc3RvbmVzey9udW1iZXJ9XCIsXG4gICAgICAgIFwibm90aWZpY2F0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL25vdGlmaWNhdGlvbnN7P3NpbmNlLGFsbCxwYXJ0aWNpcGF0aW5nfVwiLFxuICAgICAgICBcImxhYmVsc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2xhYmVsc3svbmFtZX1cIixcbiAgICAgICAgXCJyZWxlYXNlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3JlbGVhc2Vzey9pZH1cIixcbiAgICAgICAgXCJkZXBsb3ltZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2RlcGxveW1lbnRzXCIsXG4gICAgICAgIFwiY3JlYXRlZF9hdFwiOiBcIjIwMjItMDMtMTVUMTU6MDY6MTdaXCIsXG4gICAgICAgIFwidXBkYXRlZF9hdFwiOiBcIjIwMjItMDMtMTVUMTU6MDY6MTdaXCIsXG4gICAgICAgIFwicHVzaGVkX2F0XCI6IFwiMjAyNC0wMy0yMVQwMjo1MjoxMFpcIixcbiAgICAgICAgXCJnaXRfdXJsXCI6IFwiZ2l0Oi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZS5naXRcIixcbiAgICAgICAgXCJzc2hfdXJsXCI6IFwiZ2l0QGdpdGh1Yi5jb206Ymlud2llZGVyaGllci9kYWJibGUuZ2l0XCIsXG4gICAgICAgIFwiY2xvbmVfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgICAgICBcInN2bl91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllci9kYWJibGVcIixcbiAgICAgICAgXCJob21lcGFnZVwiOiBudWxsLFxuICAgICAgICBcInNpemVcIjogMSxcbiAgICAgICAgXCJzdGFyZ2F6ZXJzX2NvdW50XCI6IDAsXG4gICAgICAgIFwid2F0Y2hlcnNfY291bnRcIjogMCxcbiAgICAgICAgXCJsYW5ndWFnZVwiOiBudWxsLFxuICAgICAgICBcImhhc19pc3N1ZXNcIjogdHJ1ZSxcbiAgICAgICAgXCJoYXNfcHJvamVjdHNcIjogdHJ1ZSxcbiAgICAgICAgXCJoYXNfZG93bmxvYWRzXCI6IHRydWUsXG4gICAgICAgIFwiaGFzX3dpa2lcIjogdHJ1ZSxcbiAgICAgICAgXCJoYXNfcGFnZXNcIjogZmFsc2UsXG4gICAgICAgIFwiaGFzX2Rpc2N1c3Npb25zXCI6IGZhbHNlLFxuICAgICAgICBcImZvcmtzX2NvdW50XCI6IDAsXG4gICAgICAgIFwibWlycm9yX3VybFwiOiBudWxsLFxuICAgICAgICBcImFyY2hpdmVkXCI6IGZhbHNlLFxuICAgICAgICBcImRpc2FibGVkXCI6IGZhbHNlLFxuICAgICAgICBcIm9wZW5faXNzdWVzX2NvdW50XCI6IDEsXG4gICAgICAgIFwibGljZW5zZVwiOiBudWxsLFxuICAgICAgICBcImFsbG93X2ZvcmtpbmdcIjogdHJ1ZSxcbiAgICAgICAgXCJpc190ZW1wbGF0ZVwiOiBmYWxzZSxcbiAgICAgICAgXCJ3ZWJfY29tbWl0X3NpZ25vZmZfcmVxdWlyZWRcIjogZmFsc2UsXG4gICAgICAgIFwidG9waWNzXCI6IFtdLFxuICAgICAgICBcInZpc2liaWxpdHlcIjogXCJwdWJsaWNcIixcbiAgICAgICAgXCJmb3Jrc1wiOiAwLFxuICAgICAgICBcIm9wZW5faXNzdWVzXCI6IDEsXG4gICAgICAgIFwid2F0Y2hlcnNcIjogMCxcbiAgICAgICAgXCJkZWZhdWx0X2JyYW5jaFwiOiBcIm1haW5cIixcbiAgICAgICAgXCJhbGxvd19zcXVhc2hfbWVyZ2VcIjogdHJ1ZSxcbiAgICAgICAgXCJhbGxvd19tZXJnZV9jb21taXRcIjogdHJ1ZSxcbiAgICAgICAgXCJhbGxvd19yZWJhc2VfbWVyZ2VcIjogdHJ1ZSxcbiAgICAgICAgXCJhbGxvd19hdXRvX21lcmdlXCI6IGZhbHNlLFxuICAgICAgICBcImRlbGV0ZV9icmFuY2hfb25fbWVyZ2VcIjogZmFsc2UsXG4gICAgICAgIFwiYWxsb3dfdXBkYXRlX2JyYW5jaFwiOiBmYWxzZSxcbiAgICAgICAgXCJ1c2Vfc3F1YXNoX3ByX3RpdGxlX2FzX2RlZmF1bHRcIjogZmFsc2UsXG4gICAgICAgIFwic3F1YXNoX21lcmdlX2NvbW1pdF9tZXNzYWdlXCI6IFwiQ09NTUlUX01FU1NBR0VTXCIsXG4gICAgICAgIFwic3F1YXNoX21lcmdlX2NvbW1pdF90aXRsZVwiOiBcIkNPTU1JVF9PUl9QUl9USVRMRVwiLFxuICAgICAgICBcIm1lcmdlX2NvbW1pdF9tZXNzYWdlXCI6IFwiUFJfVElUTEVcIixcbiAgICAgICAgXCJtZXJnZV9jb21taXRfdGl0bGVcIjogXCJNRVJHRV9NRVNTQUdFXCJcbiAgICAgIH1cbiAgICB9LFxuICAgIFwiX2xpbmtzXCI6IHtcbiAgICAgIFwic2VsZlwiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvMVwiXG4gICAgICB9LFxuICAgICAgXCJodG1sXCI6IHtcbiAgICAgICAgXCJocmVmXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGwvMVwiXG4gICAgICB9LFxuICAgICAgXCJpc3N1ZVwiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzLzFcIlxuICAgICAgfSxcbiAgICAgIFwiY29tbWVudHNcIjoge1xuICAgICAgICBcImhyZWZcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2lzc3Vlcy8xL2NvbW1lbnRzXCJcbiAgICAgIH0sXG4gICAgICBcInJldmlld19jb21tZW50c1wiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvMS9jb21tZW50c1wiXG4gICAgICB9LFxuICAgICAgXCJyZXZpZXdfY29tbWVudFwiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvY29tbWVudHN7L251bWJlcn1cIlxuICAgICAgfSxcbiAgICAgIFwiY29tbWl0c1wiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvMS9jb21taXRzXCJcbiAgICAgIH0sXG4gICAgICBcInN0YXR1c2VzXCI6IHtcbiAgICAgICAgXCJocmVmXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdGF0dXNlcy81NzAzODQyY2M1NzE1ZWQxZTM1OGQyM2ViYjY5M2RiMDk3NDdhZTliXCJcbiAgICAgIH1cbiAgICB9LFxuICAgIFwiYXV0aG9yX2Fzc29jaWF0aW9uXCI6IFwiT1dORVJcIixcbiAgICBcImF1dG9fbWVyZ2VcIjogbnVsbCxcbiAgICBcImFjdGl2ZV9sb2NrX3JlYXNvblwiOiBudWxsLFxuICAgIFwibWVyZ2VkXCI6IGZhbHNlLFxuICAgIFwibWVyZ2VhYmxlXCI6IG51bGwsXG4gICAgXCJyZWJhc2VhYmxlXCI6IG51bGwsXG4gICAgXCJtZXJnZWFibGVfc3RhdGVcIjogXCJ1bmtub3duXCIsXG4gICAgXCJtZXJnZWRfYnlcIjogbnVsbCxcbiAgICBcImNvbW1lbnRzXCI6IDAsXG4gICAgXCJyZXZpZXdfY29tbWVudHNcIjogMCxcbiAgICBcIm1haW50YWluZXJfY2FuX21vZGlmeVwiOiBmYWxzZSxcbiAgICBcImNvbW1pdHNcIjogMSxcbiAgICBcImFkZGl0aW9uc1wiOiAxLFxuICAgIFwiZGVsZXRpb25zXCI6IDEsXG4gICAgXCJjaGFuZ2VkX2ZpbGVzXCI6IDFcbiAgfSxcbiAgXCJyZXBvc2l0b3J5XCI6IHtcbiAgICBcImlkXCI6IDQ3MDIxMjAwMyxcbiAgICBcIm5vZGVfaWRcIjogXCJSX2tnRE9IQWJkb3dcIixcbiAgICBcIm5hbWVcIjogXCJkYWJibGVcIixcbiAgICBcImZ1bGxfbmFtZVwiOiBcImJpbndpZWRlcmhpZXIvZGFiYmxlXCIsXG4gICAgXCJwcml2YXRlXCI6IGZhbHNlLFxuICAgIFwib3duZXJcIjoge1xuICAgICAgXCJsb2dpblwiOiBcImJpbndpZWRlcmhpZXJcIixcbiAgICAgIFwiaWRcIjogNjY0NTk3LFxuICAgICAgXCJub2RlX2lkXCI6IFwiTURRNlZYTmxjalkyTkRVNU53PT1cIixcbiAgICAgIFwiYXZhdGFyX3VybFwiOiBcImh0dHBzOi8vYXZhdGFycy5naXRodWJ1c2VyY29udGVudC5jb20vdS82NjQ1OTc/dj00XCIsXG4gICAgICBcImdyYXZhdGFyX2lkXCI6IFwiXCIsXG4gICAgICBcInVybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllclwiLFxuICAgICAgXCJodG1sX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyXCIsXG4gICAgICBcImZvbGxvd2Vyc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93ZXJzXCIsXG4gICAgICBcImZvbGxvd2luZ191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93aW5ney9vdGhlcl91c2VyfVwiLFxuICAgICAgXCJnaXN0c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZ2lzdHN7L2dpc3RfaWR9XCIsXG4gICAgICBcInN0YXJyZWRfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3N0YXJyZWR7L293bmVyfXsvcmVwb31cIixcbiAgICAgIFwic3Vic2NyaXB0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3Vic2NyaXB0aW9uc1wiLFxuICAgICAgXCJvcmdhbml6YXRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9vcmdzXCIsXG4gICAgICBcInJlcG9zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZXBvc1wiLFxuICAgICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2V2ZW50c3svcHJpdmFjeX1cIixcbiAgICAgIFwicmVjZWl2ZWRfZXZlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZWNlaXZlZF9ldmVudHNcIixcbiAgICAgIFwidHlwZVwiOiBcIlVzZXJcIixcbiAgICAgIFwic2l0ZV9hZG1pblwiOiBmYWxzZVxuICAgIH0sXG4gICAgXCJodG1sX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgIFwiZGVzY3JpcHRpb25cIjogXCJBIHJlcG8gZm9yIGRhYmJsaW5nXCIsXG4gICAgXCJmb3JrXCI6IGZhbHNlLFxuICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgIFwiZm9ya3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9mb3Jrc1wiLFxuICAgIFwia2V5c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2tleXN7L2tleV9pZH1cIixcbiAgICBcImNvbGxhYm9yYXRvcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb2xsYWJvcmF0b3Jzey9jb2xsYWJvcmF0b3J9XCIsXG4gICAgXCJ0ZWFtc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3RlYW1zXCIsXG4gICAgXCJob29rc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2hvb2tzXCIsXG4gICAgXCJpc3N1ZV9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9pc3N1ZXMvZXZlbnRzey9udW1iZXJ9XCIsXG4gICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9ldmVudHNcIixcbiAgICBcImFzc2lnbmVlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2Fzc2lnbmVlc3svdXNlcn1cIixcbiAgICBcImJyYW5jaGVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvYnJhbmNoZXN7L2JyYW5jaH1cIixcbiAgICBcInRhZ3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS90YWdzXCIsXG4gICAgXCJibG9ic191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2dpdC9ibG9ic3svc2hhfVwiLFxuICAgIFwiZ2l0X3RhZ3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvdGFnc3svc2hhfVwiLFxuICAgIFwiZ2l0X3JlZnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvcmVmc3svc2hhfVwiLFxuICAgIFwidHJlZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvdHJlZXN7L3NoYX1cIixcbiAgICBcInN0YXR1c2VzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3RhdHVzZXMve3NoYX1cIixcbiAgICBcImxhbmd1YWdlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2xhbmd1YWdlc1wiLFxuICAgIFwic3RhcmdhemVyc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3N0YXJnYXplcnNcIixcbiAgICBcImNvbnRyaWJ1dG9yc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbnRyaWJ1dG9yc1wiLFxuICAgIFwic3Vic2NyaWJlcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdWJzY3JpYmVyc1wiLFxuICAgIFwic3Vic2NyaXB0aW9uX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3Vic2NyaXB0aW9uXCIsXG4gICAgXCJjb21taXRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29tbWl0c3svc2hhfVwiLFxuICAgIFwiZ2l0X2NvbW1pdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvY29tbWl0c3svc2hhfVwiLFxuICAgIFwiY29tbWVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb21tZW50c3svbnVtYmVyfVwiLFxuICAgIFwiaXNzdWVfY29tbWVudF91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2lzc3Vlcy9jb21tZW50c3svbnVtYmVyfVwiLFxuICAgIFwiY29udGVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb250ZW50cy97K3BhdGh9XCIsXG4gICAgXCJjb21wYXJlX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29tcGFyZS97YmFzZX0uLi57aGVhZH1cIixcbiAgICBcIm1lcmdlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL21lcmdlc1wiLFxuICAgIFwiYXJjaGl2ZV91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3thcmNoaXZlX2Zvcm1hdH17L3JlZn1cIixcbiAgICBcImRvd25sb2Fkc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2Rvd25sb2Fkc1wiLFxuICAgIFwiaXNzdWVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzey9udW1iZXJ9XCIsXG4gICAgXCJwdWxsc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGxzey9udW1iZXJ9XCIsXG4gICAgXCJtaWxlc3RvbmVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbWlsZXN0b25lc3svbnVtYmVyfVwiLFxuICAgIFwibm90aWZpY2F0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL25vdGlmaWNhdGlvbnN7P3NpbmNlLGFsbCxwYXJ0aWNpcGF0aW5nfVwiLFxuICAgIFwibGFiZWxzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbGFiZWxzey9uYW1lfVwiLFxuICAgIFwicmVsZWFzZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9yZWxlYXNlc3svaWR9XCIsXG4gICAgXCJkZXBsb3ltZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2RlcGxveW1lbnRzXCIsXG4gICAgXCJjcmVhdGVkX2F0XCI6IFwiMjAyMi0wMy0xNVQxNTowNjoxN1pcIixcbiAgICBcInVwZGF0ZWRfYXRcIjogXCIyMDIyLTAzLTE1VDE1OjA2OjE3WlwiLFxuICAgIFwicHVzaGVkX2F0XCI6IFwiMjAyNC0wMy0yMVQwMjo1MjoxMFpcIixcbiAgICBcImdpdF91cmxcIjogXCJnaXQ6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgIFwic3NoX3VybFwiOiBcImdpdEBnaXRodWIuY29tOmJpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgIFwiY2xvbmVfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgIFwic3ZuX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgIFwiaG9tZXBhZ2VcIjogbnVsbCxcbiAgICBcInNpemVcIjogMSxcbiAgICBcInN0YXJnYXplcnNfY291bnRcIjogMCxcbiAgICBcIndhdGNoZXJzX2NvdW50XCI6IDAsXG4gICAgXCJsYW5ndWFnZVwiOiBudWxsLFxuICAgIFwiaGFzX2lzc3Vlc1wiOiB0cnVlLFxuICAgIFwiaGFzX3Byb2plY3RzXCI6IHRydWUsXG4gICAgXCJoYXNfZG93bmxvYWRzXCI6IHRydWUsXG4gICAgXCJoYXNfd2lraVwiOiB0cnVlLFxuICAgIFwiaGFzX3BhZ2VzXCI6IGZhbHNlLFxuICAgIFwiaGFzX2Rpc2N1c3Npb25zXCI6IGZhbHNlLFxuICAgIFwiZm9ya3NfY291bnRcIjogMCxcbiAgICBcIm1pcnJvcl91cmxcIjogbnVsbCxcbiAgICBcImFyY2hpdmVkXCI6IGZhbHNlLFxuICAgIFwiZGlzYWJsZWRcIjogZmFsc2UsXG4gICAgXCJvcGVuX2lzc3Vlc19jb3VudFwiOiAxLFxuICAgIFwibGljZW5zZVwiOiBudWxsLFxuICAgIFwiYWxsb3dfZm9ya2luZ1wiOiB0cnVlLFxuICAgIFwiaXNfdGVtcGxhdGVcIjogZmFsc2UsXG4gICAgXCJ3ZWJfY29tbWl0X3NpZ25vZmZfcmVxdWlyZWRcIjogZmFsc2UsXG4gICAgXCJ0b3BpY3NcIjogW10sXG4gICAgXCJ2aXNpYmlsaXR5XCI6IFwicHVibGljXCIsXG4gICAgXCJmb3Jrc1wiOiAwLFxuICAgIFwib3Blbl9pc3N1ZXNcIjogMSxcbiAgICBcIndhdGNoZXJzXCI6IDAsXG4gICAgXCJkZWZhdWx0X2JyYW5jaFwiOiBcIm1haW5cIlxuICB9LFxuICBcInNlbmRlclwiOiB7XG4gICAgXCJsb2dpblwiOiBcImJpbndpZWRlcmhpZXJcIixcbiAgICBcImlkXCI6IDY2NDU5NyxcbiAgICBcIm5vZGVfaWRcIjogXCJNRFE2VlhObGNqWTJORFU1Tnc9PVwiLFxuICAgIFwiYXZhdGFyX3VybFwiOiBcImh0dHBzOi8vYXZhdGFycy5naXRodWJ1c2VyY29udGVudC5jb20vdS82NjQ1OTc/dj00XCIsXG4gICAgXCJncmF2YXRhcl9pZFwiOiBcIlwiLFxuICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyXCIsXG4gICAgXCJodG1sX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyXCIsXG4gICAgXCJmb2xsb3dlcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2ZvbGxvd2Vyc1wiLFxuICAgIFwiZm9sbG93aW5nX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dpbmd7L290aGVyX3VzZXJ9XCIsXG4gICAgXCJnaXN0c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZ2lzdHN7L2dpc3RfaWR9XCIsXG4gICAgXCJzdGFycmVkX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdGFycmVkey9vd25lcn17L3JlcG99XCIsXG4gICAgXCJzdWJzY3JpcHRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdWJzY3JpcHRpb25zXCIsXG4gICAgXCJvcmdhbml6YXRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9vcmdzXCIsXG4gICAgXCJyZXBvc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvcmVwb3NcIixcbiAgICBcImV2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZXZlbnRzey9wcml2YWN5fVwiLFxuICAgIFwicmVjZWl2ZWRfZXZlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZWNlaXZlZF9ldmVudHNcIixcbiAgICBcInR5cGVcIjogXCJVc2VyXCIsXG4gICAgXCJzaXRlX2FkbWluXCI6IGZhbHNlXG4gIH1cbn1cbiIsImNvbmZpZyI6eyJ0ZW1wbGF0ZSI6InRleHQiLCJmdWxsU2NyZWVuSFRNTCI6ZmFsc2UsImZ1bmN0aW9ucyI6WyJzcHJpZyJdLCJvcHRpb25zIjpbImxpdmUiXSwiaW5wdXRUeXBlIjoieWFtbCJ9fQ==))
-* Loops (e.g. `{{range .errors}}..{{end}}`, see [example](https://repeatit.io/#/share/eyJ0ZW1wbGF0ZSI6IlNldmVyZSBVUkxzOlxue3tyYW5nZSAuZXJyb3JzfX17e2lmIGVxIC5sZXZlbCBcInNldmVyZVwifX0tIHt7LnVybH19XG57e2VuZH19e3tlbmR9fSIsImlucHV0Ijoie1wiZm9vXCI6IFwiYmFyXCIsIFwiZXJyb3JzXCI6IFt7XCJsZXZlbFwiOiBcInNldmVyZVwiLCBcInVybFwiOiBcImh0dHBzOi8vc2V2ZXJlMS5jb21cIn0se1wibGV2ZWxcIjogXCJ3YXJuaW5nXCIsIFwidXJsXCI6IFwiaHR0cHM6Ly93YXJuaW5nLmNvbVwifSx7XCJsZXZlbFwiOiBcInNldmVyZVwiLCBcInVybFwiOiBcImh0dHBzOi8vc2V2ZXJlMi5jb21cIn1dfSIsImNvbmZpZyI6eyJ0ZW1wbGF0ZSI6InRleHQiLCJmdWxsU2NyZWVuSFRNTCI6ZmFsc2UsImZ1bmN0aW9ucyI6WyJzcHJpZyJdLCJvcHRpb25zIjpbImxpdmUiXSwiaW5wdXRUeXBlIjoieWFtbCJ9fQ==))
-
-A good way to experiment with Go templates is the **[Go Template Playground](https://repeatit.io)**. It is _highly recommended_ to test
-your templates there first ([example for Grafana alert](https://repeatit.io/#/share/eyJ0ZW1wbGF0ZSI6InRpdGxlPUdyYWZhbmErYWxlcnQ6K3t7LnRpdGxlfX0mbWVzc2FnZT17ey5tZXNzYWdlfX0iLCJpbnB1dCI6IntcbiAgXCJyZWNlaXZlclwiOiBcIm50ZnlcXFxcLmV4YW1wbGVcXFxcLmNvbS9hbGVydHNcIixcbiAgXCJzdGF0dXNcIjogXCJyZXNvbHZlZFwiLFxuICBcImFsZXJ0c1wiOiBbXG4gICAge1xuICAgICAgXCJzdGF0dXNcIjogXCJyZXNvbHZlZFwiLFxuICAgICAgXCJsYWJlbHNcIjoge1xuICAgICAgICBcImFsZXJ0bmFtZVwiOiBcIkxvYWQgYXZnIDE1bSB0b28gaGlnaFwiLFxuICAgICAgICBcImdyYWZhbmFfZm9sZGVyXCI6IFwiTm9kZSBhbGVydHNcIixcbiAgICAgICAgXCJpbnN0YW5jZVwiOiBcIjEwLjEwOC4wLjI6OTEwMFwiLFxuICAgICAgICBcImpvYlwiOiBcIm5vZGUtZXhwb3J0ZXJcIlxuICAgICAgfSxcbiAgICAgIFwiYW5ub3RhdGlvbnNcIjoge1xuICAgICAgICBcInN1bW1hcnlcIjogXCIxNW0gbG9hZCBhdmVyYWdlIHRvbyBoaWdoXCJcbiAgICAgIH0sXG4gICAgICBcInN0YXJ0c0F0XCI6IFwiMjAyNC0wMy0xNVQwMjoyODowMFpcIixcbiAgICAgIFwiZW5kc0F0XCI6IFwiMjAyNC0wMy0xNVQwMjo0MjowMFpcIixcbiAgICAgIFwiZ2VuZXJhdG9yVVJMXCI6IFwibG9jYWxob3N0OjMwMDAvYWxlcnRpbmcvZ3JhZmFuYS9OVzlvRHctNHovdmlld1wiLFxuICAgICAgXCJmaW5nZXJwcmludFwiOiBcImJlY2JmYjk0YmQ4MWVmNDhcIixcbiAgICAgIFwic2lsZW5jZVVSTFwiOiBcImxvY2FsaG9zdDozMDAwL2FsZXJ0aW5nL3NpbGVuY2UvbmV3P2FsZXJ0bWFuYWdlcj1ncmFmYW5hJm1hdGNoZXI9YWxlcnRuYW1lJTNETG9hZCthdmcrMTVtK3RvbytoaWdoJm1hdGNoZXI9Z3JhZmFuYV9mb2xkZXIlM0ROb2RlK2FsZXJ0cyZtYXRjaGVyPWluc3RhbmNlJTNEMTAuMTA4LjAuMiUzQTkxMDAmbWF0Y2hlcj1qb2IlM0Rub2RlLWV4cG9ydGVyXCIsXG4gICAgICBcImRhc2hib2FyZFVSTFwiOiBcIlwiLFxuICAgICAgXCJwYW5lbFVSTFwiOiBcIlwiLFxuICAgICAgXCJ2YWx1ZXNcIjoge1xuICAgICAgICBcIkJcIjogMTguOTgyMTEzMTQ0NzU4NzYsXG4gICAgICAgIFwiQ1wiOiAwXG4gICAgICB9LFxuICAgICAgXCJ2YWx1ZVN0cmluZ1wiOiBcIlsgdmFyPSdCJyBsYWJlbHM9e19fbmFtZV9fPW5vZGVfbG9hZDE1LCBpbnN0YW5jZT0xMC4xMDguMC4yOjkxMDAsIGpvYj1ub2RlLWV4cG9ydGVyfSB2YWx1ZT0xOC45ODIxMTMxNDQ3NTg3NiBdLCBbIHZhcj0nQycgbGFiZWxzPXtfX25hbWVfXz1ub2RlX2xvYWQxNSwgaW5zdGFuY2U9MTAuMTA4LjAuMjo5MTAwLCBqb2I9bm9kZS1leHBvcnRlcn0gdmFsdWU9MCBdXCJcbiAgICB9XG4gIF0sXG4gIFwiZ3JvdXBMYWJlbHNcIjoge1xuICAgIFwiYWxlcnRuYW1lXCI6IFwiTG9hZCBhdmcgMTVtIHRvbyBoaWdoXCIsXG4gICAgXCJncmFmYW5hX2ZvbGRlclwiOiBcIk5vZGUgYWxlcnRzXCJcbiAgfSxcbiAgXCJjb21tb25MYWJlbHNcIjoge1xuICAgIFwiYWxlcnRuYW1lXCI6IFwiTG9hZCBhdmcgMTVtIHRvbyBoaWdoXCIsXG4gICAgXCJncmFmYW5hX2ZvbGRlclwiOiBcIk5vZGUgYWxlcnRzXCIsXG4gICAgXCJpbnN0YW5jZVwiOiBcIjEwLjEwOC4wLjI6OTEwMFwiLFxuICAgIFwiam9iXCI6IFwibm9kZS1leHBvcnRlclwiXG4gIH0sXG4gIFwiY29tbW9uQW5ub3RhdGlvbnNcIjoge1xuICAgIFwic3VtbWFyeVwiOiBcIjE1bSBsb2FkIGF2ZXJhZ2UgdG9vIGhpZ2hcIlxuICB9LFxuICBcImV4dGVybmFsVVJMXCI6IFwibG9jYWxob3N0OjMwMDAvXCIsXG4gIFwidmVyc2lvblwiOiBcIjFcIixcbiAgXCJncm91cEtleVwiOiBcInt9OnthbGVydG5hbWU9XFxcIkxvYWQgYXZnIDE1bSB0b28gaGlnaFxcXCIsIGdyYWZhbmFfZm9sZGVyPVxcXCJOb2RlIGFsZXJ0c1xcXCJ9XCIsXG4gIFwidHJ1bmNhdGVkQWxlcnRzXCI6IDAsXG4gIFwib3JnSWRcIjogMSxcbiAgXCJ0aXRsZVwiOiBcIltSRVNPTFZFRF0gTG9hZCBhdmcgMTVtIHRvbyBoaWdoIE5vZGUgYWxlcnRzICgxMC4xMDguMC4yOjkxMDAgbm9kZS1leHBvcnRlcilcIixcbiAgXCJzdGF0ZVwiOiBcIm9rXCIsXG4gIFwibWVzc2FnZVwiOiBcIioqUmVzb2x2ZWQqKlxcblxcblZhbHVlOiBCPTE4Ljk4MjExMzE0NDc1ODc2LCBDPTBcXG5MYWJlbHM6XFxuIC0gYWxlcnRuYW1lID0gTG9hZCBhdmcgMTVtIHRvbyBoaWdoXFxuIC0gZ3JhZmFuYV9mb2xkZXIgPSBOb2RlIGFsZXJ0c1xcbiAtIGluc3RhbmNlID0gMTAuMTA4LjAuMjo5MTAwXFxuIC0gam9iID0gbm9kZS1leHBvcnRlclxcbkFubm90YXRpb25zOlxcbiAtIHN1bW1hcnkgPSAxNW0gbG9hZCBhdmVyYWdlIHRvbyBoaWdoXFxuU291cmNlOiBsb2NhbGhvc3Q6MzAwMC9hbGVydGluZy9ncmFmYW5hL05XOW9Edy00ei92aWV3XFxuU2lsZW5jZTogbG9jYWxob3N0OjMwMDAvYWxlcnRpbmcvc2lsZW5jZS9uZXc/YWxlcnRtYW5hZ2VyPWdyYWZhbmEmbWF0Y2hlcj1hbGVydG5hbWUlM0RMb2FkK2F2ZysxNW0rdG9vK2hpZ2gmbWF0Y2hlcj1ncmFmYW5hX2ZvbGRlciUzRE5vZGUrYWxlcnRzJm1hdGNoZXI9aW5zdGFuY2UlM0QxMC4xMDguMC4yJTNBOTEwMCZtYXRjaGVyPWpvYiUzRG5vZGUtZXhwb3J0ZXJcXG5cIlxufVxuIiwiY29uZmlnIjp7InRlbXBsYXRlIjoidGV4dCIsImZ1bGxTY3JlZW5IVE1MIjpmYWxzZSwiZnVuY3Rpb25zIjpbInNwcmlnIl0sIm9wdGlvbnMiOlsibGl2ZSJdLCJpbnB1dFR5cGUiOiJ5YW1sIn19)).
-
-### Template functions
-ntfy supports a subset of the **[Sprig template functions](publish/template-functions.md)** (originally copied from [Sprig](https://github.com/Masterminds/sprig),
-thank you to the Sprig developers 🙏). This is useful for advanced message templating and for transforming the data provided through the JSON payload.
-
-Below are the functions that are available to use inside your message/title templates.
-
-* [String Functions](publish/template-functions.md#string-functions): `trim`, `trunc`, `substr`, `plural`, etc.
-* [String List Functions](publish/template-functions.md#string-list-functions): `splitList`, `sortAlpha`, etc.
-* [Integer Math Functions](publish/template-functions.md#integer-math-functions): `add`, `max`, `mul`, etc.
-* [Integer List Functions](publish/template-functions.md#integer-list-functions): `until`, `untilStep`
-* [Float Math Functions](publish/template-functions.md#float-math-functions): `maxf`, `minf`
-* [Date Functions](publish/template-functions.md#date-functions): `now`, `date`, etc.
-* [Defaults Functions](publish/template-functions.md#default-functions): `default`, `empty`, `coalesce`, `fromJSON`, `toJSON`, `toPrettyJSON`, `toRawJSON`, `ternary`
-* [Encoding Functions](publish/template-functions.md#encoding-functions): `b64enc`, `b64dec`, etc.
-* [Lists and List Functions](publish/template-functions.md#lists-and-list-functions): `list`, `first`, `uniq`, etc.
-* [Dictionaries and Dict Functions](publish/template-functions.md#dictionaries-and-dict-functions): `get`, `set`, `dict`, `hasKey`, `pluck`, `dig`, etc.
-* [Type Conversion Functions](publish/template-functions.md#type-conversion-functions): `atoi`, `int64`, `toString`, etc.
-* [Path and Filepath Functions](publish/template-functions.md#path-and-filepath-functions): `base`, `dir`, `ext`, `clean`, `isAbs`, `osBase`, `osDir`, `osExt`, `osClean`, `osIsAbs`
-* [Flow Control Functions](publish/template-functions.md#flow-control-functions): `fail`
-* Advanced Functions
-    * [Reflection](publish/template-functions.md#reflection-functions): `typeOf`, `kindIs`, `typeIsLike`, etc.
-    * [Cryptographic and Security Functions](publish/template-functions.md#cryptographic-and-security-functions): `sha256sum`, etc.
-    * [URL](publish/template-functions.md#url-functions): `urlParse`, `urlJoin`
-
-
-## Publish as JSON
-_Supported on:_ :material-android: :material-apple: :material-firefox:
-
-For some integrations with other tools (e.g. [Jellyfin](https://jellyfin.org/), [overseerr](https://overseerr.dev/)), 
-adding custom headers to HTTP requests may be tricky or impossible, so ntfy also allows publishing the entire message 
-as JSON in the request body.
-
-To publish as JSON, simple PUT/POST the JSON object directly to the ntfy root URL. The message format is described below
-the example.
-
-!!! info
-    To publish as JSON, you must **PUT/POST to the ntfy root URL**, not to the topic URL. Be sure to check that you're
-    POST-ing to `https://ntfy.sh/` (correct), and not to `https://ntfy.sh/mytopic` (incorrect). 
-
-Here's an example using most supported parameters. Check the table below for a complete list. The `topic` parameter 
-is the only required one:
-
-=== "Command line (curl)"
-    ```
-    curl ntfy.sh \
-      -d '{
-        "topic": "mytopic",
-        "message": "Disk space is low at 5.1 GB",
-        "title": "Low disk space alert",
-        "tags": ["warning","cd"],
-        "priority": 4,
-        "attach": "https://filesrv.lan/space.jpg",
-        "filename": "diskspace.jpg",
-        "click": "https://homecamera.lan/xasds1h2xsSsa/",
-        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
-      }'
-    ```
-
-=== "HTTP"
-    ``` http
-    POST / HTTP/1.1
-    Host: ntfy.sh
-
-    {
-        "topic": "mytopic",
-        "message": "Disk space is low at 5.1 GB",
-        "title": "Low disk space alert",
-        "tags": ["warning","cd"],
-        "priority": 4,
-        "attach": "https://filesrv.lan/space.jpg",
-        "filename": "diskspace.jpg",
-        "click": "https://homecamera.lan/xasds1h2xsSsa/",
-        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
-    }
-    ```
-
-=== "JavaScript"
-    ``` javascript
-    fetch('https://ntfy.sh', {
-        method: 'POST',
-        body: JSON.stringify({
-            "topic": "mytopic",
-            "message": "Disk space is low at 5.1 GB",
-            "title": "Low disk space alert",
-            "tags": ["warning","cd"],
-            "priority": 4,
-            "attach": "https://filesrv.lan/space.jpg",
-            "filename": "diskspace.jpg",
-            "click": "https://homecamera.lan/xasds1h2xsSsa/",
-            "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
-        })
-    })
-    ```
-
-=== "Go"
-    ``` go
-    // You should probably use json.Marshal() instead and make a proper struct,
-    // or even just use req.Header.Set() like in the other examples, but for the 
-    // sake of the example, this is easier.
-    
-    body := `{
-        "topic": "mytopic",
-        "message": "Disk space is low at 5.1 GB",
-        "title": "Low disk space alert",
-        "tags": ["warning","cd"],
-        "priority": 4,
-        "attach": "https://filesrv.lan/space.jpg",
-        "filename": "diskspace.jpg",
-        "click": "https://homecamera.lan/xasds1h2xsSsa/",
-        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
-    }`
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mydownloads", file)
+    req.Header.Set("Attach", "https://f-droid.org/F-Droid.apk")
     http.DefaultClient.Do(req)
     ```
 
@@ -1353,87 +1090,34 @@ is the only required one:
     ``` powershell
     $Request = @{
       Method = "POST"
-      URI = "https://ntfy.sh"
-      Body = ConvertTo-JSON @{
-        Topic    = "mytopic"
-        Title    = "Low disk space alert"
-        Message  = "Disk space is low at 5.1 GB"
-        Priority = 4
-        Attach   = "https://filesrv.lan/space.jpg"
-        FileName = "diskspace.jpg"
-        Tags     = @("warning", "cd")
-        Click    = "https://homecamera.lan/xasds1h2xsSsa/"
-        Actions  = @(
-          @{ 
-            Action = "view"
-            Label  = "Admin panel"
-            URL    = "https://filesrv.lan/admin"
-          }
-        )
-      }
-      ContentType = "application/json"
+      URI = "https://ntfy.sh/mydownloads"
+      Headers = @{ Attach="https://f-droid.org/F-Droid.apk" }
     }
     Invoke-RestMethod @Request
     ```
 
 === "Python"
     ``` python
-    requests.post("https://ntfy.sh/",
-        data=json.dumps({
-            "topic": "mytopic",
-            "message": "Disk space is low at 5.1 GB",
-            "title": "Low disk space alert",
-            "tags": ["warning","cd"],
-            "priority": 4,
-            "attach": "https://filesrv.lan/space.jpg",
-            "filename": "diskspace.jpg",
-            "click": "https://homecamera.lan/xasds1h2xsSsa/",
-            "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
-        })
-    )
+    requests.put("https://ntfy.sh/mydownloads",
+        headers={ "Attach": "https://f-droid.org/F-Droid.apk" })
     ```
 
 === "PHP"
     ``` php-inline
-    file_get_contents('https://ntfy.sh/', false, stream_context_create([
+    file_get_contents('https://ntfy.sh/mydownloads', false, stream_context_create([
         'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json",
-            'content' => json_encode([
-                "topic": "mytopic",
-                "message": "Disk space is low at 5.1 GB",
-                "title": "Low disk space alert",
-                "tags": ["warning","cd"],
-                "priority": 4,
-                "attach": "https://filesrv.lan/space.jpg",
-                "filename": "diskspace.jpg",
-                "click": "https://homecamera.lan/xasds1h2xsSsa/",
-                "actions": [["action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" ]]
-            ])
+        'method' => 'PUT',
+        'header' =>
+            "Content-Type: text/plain\r\n" . // Does not matter
+            "Attach: https://f-droid.org/F-Droid.apk",
         ]
     ]));
     ```
 
-The JSON message format closely mirrors the format of the message you can consume when you [subscribe via the API](subscribe/api.md) 
-(see [JSON message format](subscribe/api.md#json-message-format) for details), but is not exactly identical. Here's an overview of
-all the supported fields:
-
-| Field      | Required | Type                             | Example                                   | Description                                                           |
-|------------|----------|----------------------------------|-------------------------------------------|-----------------------------------------------------------------------|
-| `topic`    | ✔️       | *string*                         | `topic1`                                  | Target topic name                                                     |
-| `message`  | -        | *string*                         | `Some message`                            | Message body; set to `triggered` if empty or not passed               |
-| `title`    | -        | *string*                         | `Some title`                              | Message [title](#message-title)                                       |
-| `tags`     | -        | *string array*                   | `["tag1","tag2"]`                         | List of [tags](#tags-emojis) that may or not map to emojis            |
-| `priority` | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                                       | Message [priority](#message-priority) with 1=min, 3=default and 5=max |
-| `actions`  | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications       |
-| `click`    | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)          |
-| `attach`   | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-a-url)   |
-| `markdown` | -        | *bool*                           | `true`                                    | Set to true if the `message` is Markdown-formatted                    |
-| `icon`     | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                             |
-| `filename` | -        | *string*                         | `file.jpg`                                | File name of the attachment                                           |
-| `delay`    | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                            |
-| `email`    | -        | *e-mail address*                 | `phil@example.com`                        | E-mail address for e-mail notifications                               |
-| `call`     | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                    |
+<figure markdown>
+  ![file attachment](static/img/android-screenshot-attachment-file.png){ width=500 }
+  <figcaption>File attachment sent from an external URL</figcaption>
+</figure>
 
 ## Action buttons
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -1450,6 +1134,7 @@ As of today, the following actions are supported:
 * [`broadcast`](#send-android-broadcast): Sends an [Android broadcast](https://developer.android.com/guide/components/broadcasts) intent
   when the action button is tapped (only supported on Android)
 * [`http`](#send-http-request): Sends HTTP POST/GET/PUT request when the action button is tapped
+* [`copy`](#copy-to-clipboard): Copies a given value to the clipboard when the action button is tapped
 
 Here's an example of what a notification with actions can look like:
 
@@ -1480,9 +1165,12 @@ To define actions using the `X-Actions` header (or any of its aliases: `Actions`
 Multiple actions are separated by a semicolon (`;`), and key/value pairs are separated by commas (`,`). Values may be 
 quoted with double quotes (`"`) or single quotes (`'`) if the value itself contains commas or semicolons. 
 
-The `action=` and `label=` prefix are optional in all actions, and the `url=` prefix is optional in the `view` and 
-`http` action. The only limitation of this format is that depending on your language/library, UTF-8 characters may not 
-work. If they don't, use the [JSON array format](#using-a-json-array) instead.
+Each action type has a short format where some key prefixes can be omitted:
+
+* [`view`](#open-websiteapp): `view, <label>, <url>[, clear=true]`
+* [`broadcast`](#send-android-broadcast):`broadcast, <label>[, extras.<param>=<value>][, intent=<intent>][, clear=true]`
+* [`http`](#send-http-request): `http, <label>, <url>[, method=<method>][, headers.<header>=<value>][, body=<body>][, clear=true]`
+* [`copy`](#copy-to-clipboard): `copy, <label>, <value>[, clear=true]`
 
 As an example, here's how you can create the above notification using this format. Refer to the [`view` action](#open-websiteapp) and 
 [`http` action](#send-http-request) section for details on the specific actions:
@@ -1782,8 +1470,8 @@ Alternatively, the same actions can be defined as **JSON array**, if the notific
     ```
 
 The required/optional fields for each action depend on the type of the action itself. Please refer to 
-[`view` action](#open-websiteapp), [`broadcast` action](#send-android-broadcast), and [`http` action](#send-http-request) 
-for details.
+[`view` action](#open-websiteapp), [`broadcast` action](#send-android-broadcast), [`http` action](#send-http-request),
+and [`copy` action](#copy-to-clipboard) for details.
 
 ### Open website/app
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -1935,7 +1623,7 @@ And the same example using [JSON publishing](#publish-as-json):
         method: 'POST',
         body: JSON.stringify({
             topic: "myhome",
-            message": "Somebody retweeted your tweet.",
+            message: "Somebody retweeted your tweet.",
             actions: [
                 {
                     action: "view",
@@ -2025,6 +1713,9 @@ And the same example using [JSON publishing](#publish-as-json):
         ]
     ]));
     ```
+
+The short format for the `view` action is `view, <label>, <url>` (e.g. `view, Open Google, https://google.com`),
+but you can always just use the `<key>=<value>` notation as well (e.g. `action=view, url=https://google.com, label=Open Google`).
 
 The `view` action supports the following fields:
 
@@ -2195,7 +1886,7 @@ And the same example using [JSON publishing](#publish-as-json):
         method: 'POST',
         body: JSON.stringify({
             topic: "wifey",
-            message": "Your wife requested you send a picture of yourself.",
+            message: "Your wife requested you send a picture of yourself.",
             actions: [
                 {
                     "action": "broadcast",
@@ -2301,6 +1992,9 @@ And the same example using [JSON publishing](#publish-as-json):
         ]
     ]));
     ```
+
+The short format for the `broadcast` action is `broadcast, <label>, <url>` (e.g. `broadcast, Take picture, extras.cmd=pic`),
+but you can always just use the `<key>=<value>` notation as well (e.g. `action=broadcast, label=Take picture, extras.cmd=pic`).
 
 The `broadcast` action supports the following fields:
 
@@ -2470,7 +2164,7 @@ And the same example using [JSON publishing](#publish-as-json):
         method: 'POST',
         body: JSON.stringify({
             topic: "myhome",
-            message": "Garage door has been open for 15 minutes. Close it?",
+            message: "Garage door has been open for 15 minutes. Close it?",
             actions: [
               {
                 "action": "http",
@@ -2589,6 +2283,9 @@ And the same example using [JSON publishing](#publish-as-json):
     ]));
     ```
 
+The short format for the `http` action is `http, <label>, <url>` (e.g. `http, Close door, https://api.mygarage.lan/close`),
+but you can always just use the `<key>=<value>` notation as well (e.g. `action=http, label=Close door, url=https://api.mygarage.lan/close`).
+
 The `http` action supports the following fields:
 
 | Field     | Required | Type               | Default   | Example                   | Description                                                                                                                                             |
@@ -2601,65 +2298,59 @@ The `http` action supports the following fields:
 | `body`    | -️       | *string*           | *empty*   | `some body, somebody?`    | HTTP body                                                                                                                                               |
 | `clear`   | -️       | *boolean*          | `false`   | `true`                    | Clear notification after HTTP request succeeds. If the request fails, the notification is not cleared.                                                  |
 
-## Click action
-_Supported on:_ :material-android: :material-apple: :material-firefox:
+### Copy to clipboard
+_Supported on:_ :material-android: :material-firefox:
 
-You can define which URL to open when a notification is clicked. This may be useful if your notification is related 
-to a Zabbix alert or a transaction that you'd like to provide the deep-link for. Tapping the notification will open
-the web browser (or the app) and open the website.
+The `copy` action **copies a given value to the clipboard when the action button is tapped**. This is useful for 
+one-time passcodes, tokens, or any other value you want to quickly copy without opening the full notification.
 
-To define a click action for the notification, pass a URL as the value of the `X-Click` header (or its alias `Click`).
-If you pass a website URL (`http://` or `https://`) the web browser will open. If you pass another URI that can be handled
-by another app, the responsible app may open. 
+!!! info
+    The copy action button is only shown in the web app and Android app notification list, **not** in browser desktop
+    notifications. This is because browsers do not allow clipboard access from notification actions without direct 
+    user interaction with the page.
 
-Examples:
-
-* `http://` or `https://` will open your browser (or an app if it registered for a URL)
-* `mailto:` links will open your mail app, e.g. `mailto:phil@example.com`
-* `geo:` links will open Google Maps, e.g. `geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+CA`
-* `ntfy://` links will open ntfy (see [ntfy:// links](subscribe/phone.md#ntfy-links)), e.g. `ntfy://ntfy.sh/stats`
-* `twitter://` links will open Twitter, e.g. `twitter://user?screen_name=..`
-* ...
-
-Here's an example that will open Reddit when the notification is clicked:
+Here's an example using the [`X-Actions` header](#using-a-header):
 
 === "Command line (curl)"
     ```
     curl \
-        -d "New messages on Reddit" \
-        -H "Click: https://www.reddit.com/message/messages" \
-        ntfy.sh/reddit_alerts
+        -d "Your one-time passcode is 123456" \
+        -H "Actions: copy, Copy code, 123456" \
+        ntfy.sh/myhome
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        --click="https://www.reddit.com/message/messages" \
-        reddit_alerts "New messages on Reddit"
+        --actions="copy, Copy code, 123456" \
+        myhome \
+        "Your one-time passcode is 123456"
     ```
 
 === "HTTP"
     ``` http
-    POST /reddit_alerts HTTP/1.1
+    POST /myhome HTTP/1.1
     Host: ntfy.sh
-    Click: https://www.reddit.com/message/messages 
+    Actions: copy, Copy code, 123456
 
-    New messages on Reddit
+    Your one-time passcode is 123456
     ```
 
 === "JavaScript"
     ``` javascript
-    fetch('https://ntfy.sh/reddit_alerts', {
+    fetch('https://ntfy.sh/myhome', {
         method: 'POST',
-        body: 'New messages on Reddit',
-        headers: { 'Click': 'https://www.reddit.com/message/messages' }
+        body: 'Your one-time passcode is 123456',
+        headers: { 
+            'Actions': 'copy, Copy code, 123456' 
+        }
     })
     ```
 
 === "Go"
     ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/reddit_alerts", strings.NewReader("New messages on Reddit"))
-    req.Header.Set("Click", "https://www.reddit.com/message/messages")
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/myhome", strings.NewReader("Your one-time passcode is 123456"))
+    req.Header.Set("Actions", "copy, Copy code, 123456")
     http.DefaultClient.Do(req)
     ```
 
@@ -2667,331 +2358,853 @@ Here's an example that will open Reddit when the notification is clicked:
     ``` powershell
     $Request = @{
       Method = "POST"
-      URI = "https://ntfy.sh/reddit_alerts"
-      Headers = @{ Click="https://www.reddit.com/message/messages" }
-      Body = "New messages on Reddit"
+      URI = "https://ntfy.sh/myhome"
+      Headers = @{
+        Actions = "copy, Copy code, 123456"
+      }
+      Body = "Your one-time passcode is 123456"
     }
     Invoke-RestMethod @Request
     ```
 
 === "Python"
     ``` python
-    requests.post("https://ntfy.sh/reddit_alerts",
-        data="New messages on Reddit",
-        headers={ "Click": "https://www.reddit.com/message/messages" })
+    requests.post("https://ntfy.sh/myhome",
+        data="Your one-time passcode is 123456",
+        headers={ "Actions": "copy, Copy code, 123456" })
     ```
 
 === "PHP"
     ``` php-inline
-    file_get_contents('https://ntfy.sh/reddit_alerts', false, stream_context_create([
+    file_get_contents('https://ntfy.sh/myhome', false, stream_context_create([
         'http' => [
             'method' => 'POST',
             'header' =>
                 "Content-Type: text/plain\r\n" .
-                "Click: https://www.reddit.com/message/messages",
-            'content' => 'New messages on Reddit'
+                "Actions: copy, Copy code, 123456",
+            'content' => 'Your one-time passcode is 123456'
         ]
     ]));
     ```
 
-## Attachments
-_Supported on:_ :material-android: :material-firefox:
-
-You can **send images and other files to your phone** as attachments to a notification. The attachments are then downloaded
-onto your phone (depending on size and setting automatically), and can be used from the Downloads folder.
-
-There are two different ways to send attachments: 
-
-* sending [a local file](#attach-local-file) via PUT, e.g. from `~/Flowers/flower.jpg` or `ringtone.mp3`
-* or by [passing an external URL](#attach-file-from-a-url) as an attachment, e.g. `https://f-droid.org/F-Droid.apk` 
-
-### Attach local file
-To **send a file from your computer** as an attachment, you can send it as the PUT request body. If a message is greater 
-than the maximum message size (4,096 bytes) or consists of non UTF-8 characters, the ntfy server will automatically 
-detect the mime type and size, and send the message as an attachment file. To send smaller text-only messages or files 
-as attachments, you must pass a filename by passing the `X-Filename` header or query parameter (or any of its aliases 
-`Filename`, `File` or `f`). 
-
-By default, and how ntfy.sh is configured, the **max attachment size is 15 MB** (with 100 MB total per visitor). 
-Attachments **expire after 3 hours**, which typically is plenty of time for the user to download it, or for the Android app
-to auto-download it. Please also check out the [other limits below](#limitations).
-
-Here's an example showing how to upload an image:
+And the same example using [JSON publishing](#publish-as-json):
 
 === "Command line (curl)"
     ```
-    curl \
-        -T flower.jpg \
-        -H "Filename: flower.jpg" \
-        ntfy.sh/flowers
+    curl ntfy.sh \
+      -d '{
+        "topic": "myhome",
+        "message": "Your one-time passcode is 123456",
+        "actions": [
+          {
+            "action": "copy",
+            "label": "Copy code",
+            "value": "123456"
+          }
+        ]
+      }'
     ```
 
 === "ntfy CLI"
     ```
     ntfy publish \
-        --file=flower.jpg \
-        flowers
+        --actions '[
+            {
+                "action": "copy",
+                "label": "Copy code",
+                "value": "123456"
+            }
+        ]' \
+        myhome \
+        "Your one-time passcode is 123456"
     ```
 
 === "HTTP"
     ``` http
-    PUT /flowers HTTP/1.1
+    POST / HTTP/1.1
     Host: ntfy.sh
-    Filename: flower.jpg
-    Content-Type: 52312
-     
-    (binary JPEG data)
-    ```
 
-=== "JavaScript"
-    ``` javascript
-    fetch('https://ntfy.sh/flowers', {
-        method: 'PUT',
-        body: document.getElementById("file").files[0],
-        headers: { 'Filename': 'flower.jpg' }
-    })
-    ```
-
-=== "Go"
-    ``` go
-    file, _ := os.Open("flower.jpg")
-    req, _ := http.NewRequest("PUT", "https://ntfy.sh/flowers", file)
-    req.Header.Set("Filename", "flower.jpg")
-    http.DefaultClient.Do(req)
-    ```
-
-=== "PowerShell"
-    ``` powershell
-    $Request = @{
-      Method = "POST"
-      Uri = "ntfy.sh/flowers"
-      InFile = "flower.jpg"
-      Headers = @{"Filename" = "flower.jpg"}
+    {
+        "topic": "myhome",
+        "message": "Your one-time passcode is 123456",
+        "actions": [
+          {
+            "action": "copy",
+            "label": "Copy code",
+            "value": "123456"
+          }
+        ]
     }
-    Invoke-RestMethod @Request
-    ```
-
-=== "Python"
-    ``` python
-    requests.put("https://ntfy.sh/flowers",
-        data=open("flower.jpg", 'rb'),
-        headers={ "Filename": "flower.jpg" })
-    ```
-
-=== "PHP"
-    ``` php-inline
-    file_get_contents('https://ntfy.sh/flowers', false, stream_context_create([
-        'http' => [
-            'method' => 'PUT',
-            'header' =>
-                "Content-Type: application/octet-stream\r\n" . // Does not matter
-                "Filename: flower.jpg",
-            'content' => file_get_contents('flower.jpg') // Dangerous for large files 
-        ]
-    ]));
-    ```
-
-Here's what that looks like on Android:
-
-<figure markdown>
-  ![image attachment](static/img/android-screenshot-attachment-image.png){ width=500 }
-  <figcaption>Image attachment sent from a local file</figcaption>
-</figure>
-
-### Attach file from a URL
-Instead of sending a local file to your phone, you can use **an external URL** to specify where the attachment is hosted.
-This could be a Dropbox link, a file from social media, or any other publicly available URL. Since the files are 
-externally hosted, the expiration or size limits from above do not apply here.
-
-To attach an external file, simple pass the `X-Attach` header or query parameter (or any of its aliases `Attach` or `a`)
-to specify the attachment URL. It can be any type of file. 
-
-ntfy will automatically try to derive the file name from the URL (e.g `https://example.com/flower.jpg` will yield a 
-filename `flower.jpg`). To override this filename, you may send the `X-Filename` header or query parameter (or any of its
-aliases `Filename`, `File` or `f`).
-
-Here's an example showing how to attach an APK file:
-
-=== "Command line (curl)"
-    ```
-    curl \
-        -X POST \
-        -H "Attach: https://f-droid.org/F-Droid.apk" \
-        ntfy.sh/mydownloads
-    ```
-
-=== "ntfy CLI"
-    ```
-    ntfy publish \
-        --attach="https://f-droid.org/F-Droid.apk" \
-        mydownloads
-    ```
-
-=== "HTTP"
-    ``` http
-    POST /mydownloads HTTP/1.1
-    Host: ntfy.sh
-    Attach: https://f-droid.org/F-Droid.apk
     ```
 
 === "JavaScript"
     ``` javascript
-    fetch('https://ntfy.sh/mydownloads', {
+    fetch('https://ntfy.sh', {
         method: 'POST',
-        headers: { 'Attach': 'https://f-droid.org/F-Droid.apk' }
-    })
-    ```
-
-=== "Go"
-    ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/mydownloads", file)
-    req.Header.Set("Attach", "https://f-droid.org/F-Droid.apk")
-    http.DefaultClient.Do(req)
-    ```
-
-=== "PowerShell"
-    ``` powershell
-    $Request = @{
-      Method = "POST"
-      URI = "https://ntfy.sh/mydownloads"
-      Headers = @{ Attach="https://f-droid.org/F-Droid.apk" }
-    }
-    Invoke-RestMethod @Request
-    ```
-
-=== "Python"
-    ``` python
-    requests.put("https://ntfy.sh/mydownloads",
-        headers={ "Attach": "https://f-droid.org/F-Droid.apk" })
-    ```
-
-=== "PHP"
-    ``` php-inline
-    file_get_contents('https://ntfy.sh/mydownloads', false, stream_context_create([
-        'http' => [
-        'method' => 'PUT',
-        'header' =>
-            "Content-Type: text/plain\r\n" . // Does not matter
-            "Attach: https://f-droid.org/F-Droid.apk",
-        ]
-    ]));
-    ```
-
-<figure markdown>
-  ![file attachment](static/img/android-screenshot-attachment-file.png){ width=500 }
-  <figcaption>File attachment sent from an external URL</figcaption>
-</figure>
-
-## Icons
-_Supported on:_ :material-android:
-
-You can include an icon that will appear next to the text of the notification. Simply pass the `X-Icon` header or query
-parameter (or its alias `Icon`) to specify the URL that the icon is located at. The client will automatically download
-the icon (unless it is already cached locally, and less than 24 hours old), and show it in the notification. Icons are 
-cached locally in the client until the notification is deleted. **Only JPEG and PNG images are supported at this time**.
-
-Here's an example showing how to include an icon:
-
-=== "Command line (curl)"
-    ```
-    curl \
-        -H "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
-        -H "Title: Kodi: Resuming Playback" \
-        -H "Tags: arrow_forward" \
-        -d "The Wire, S01E01" \
-        ntfy.sh/tvshows
-    ```
-
-=== "ntfy CLI"
-    ```
-    ntfy publish \
-        --icon="https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png" \
-        --title="Kodi: Resuming Playback" \
-        --tags="arrow_forward" \
-        tvshows \
-        "The Wire, S01E01"
-    ```
-
-=== "HTTP"
-    ``` http
-    POST /tvshows HTTP/1.1
-    Host: ntfy.sh
-    Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png
-    Tags: arrow_forward
-    Title: Kodi: Resuming Playback
-
-    The Wire, S01E01
-    ```
-
-=== "JavaScript"
-    ``` javascript
-    fetch('https://ntfy.sh/tvshows', {
-        method: 'POST',
-        headers: { 
-            'Icon': 'https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png',
-            'Title': 'Kodi: Resuming Playback',
-            'Tags': 'arrow_forward'
-        },
-        body: "The Wire, S01E01"
-    })
-    ```
-
-=== "Go"
-    ``` go
-    req, _ := http.NewRequest("POST", "https://ntfy.sh/tvshows", strings.NewReader("The Wire, S01E01"))
-    req.Header.Set("Icon", "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png")
-    req.Header.Set("Tags", "arrow_forward")
-    req.Header.Set("Title", "Kodi: Resuming Playback")
-    http.DefaultClient.Do(req)
-    ```
-
-=== "PowerShell"
-    ``` powershell
-    $Request = @{
-      Method = "POST"
-      URI = "https://ntfy.sh/tvshows"
-      Headers = @{
-        Title = "Kodi: Resuming Playback"
-        Tags = "arrow_forward"
-        Icon = "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png"
-      }
-      Body = "The Wire, S01E01"
-    }
-    Invoke-RestMethod @Request
-    ```
-
-=== "Python"
-    ``` python
-    requests.post("https://ntfy.sh/tvshows",
-        data="The Wire, S01E01",
-        headers={
-            "Title": "Kodi: Resuming Playback",
-            "Tags": "arrow_forward",
-            "Icon": "https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png"
+        body: JSON.stringify({
+            topic: "myhome",
+            message: "Your one-time passcode is 123456",
+            actions: [
+                {
+                    action: "copy",
+                    label: "Copy code",
+                    value: "123456"
+                }
+            ]
         })
+    })
+    ```
+
+=== "Go"
+    ``` go
+    // You should probably use json.Marshal() instead and make a proper struct,
+    // but for the sake of the example, this is easier.
+    
+    body := `{
+        "topic": "myhome",
+        "message": "Your one-time passcode is 123456",
+        "actions": [
+          {
+            "action": "copy",
+            "label": "Copy code",
+            "value": "123456"
+          }
+        ]
+    }`
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-JSON @{
+        Topic = "myhome"
+        Message = "Your one-time passcode is 123456"
+        Actions = @(
+          @{
+            Action = "copy"
+            Label  = "Copy code"
+            Value  = "123456"
+          }
+        )
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/",
+        data=json.dumps({
+            "topic": "myhome",
+            "message": "Your one-time passcode is 123456",
+            "actions": [
+                {
+                    "action": "copy",
+                    "label": "Copy code",
+                    "value": "123456"
+                }
+            ]
+        })
+    )
     ```
 
 === "PHP"
     ``` php-inline
-    file_get_contents('https://ntfy.sh/tvshows', false, stream_context_create([
+    file_get_contents('https://ntfy.sh/', false, stream_context_create([
         'http' => [
-        'method' => 'PUT',
-        'header' =>
-            "Content-Type: text/plain\r\n" . // Does not matter
-            "Title: Kodi: Resuming Playback\r\n" .
-            "Tags: arrow_forward\r\n" .
-            "Icon: https://styles.redditmedia.com/t5_32uhe/styles/communityIcon_xnt6chtnr2j21.png",
-        ],
-        'content' => "The Wire, S01E01"
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => json_encode([
+                "topic": "myhome",
+                "message": "Your one-time passcode is 123456",
+                "actions": [
+                    [
+                        "action": "copy",
+                        "label": "Copy code",
+                        "value": "123456"
+                    ]
+                ]
+            ])
+        ]
     ]));
     ```
 
-Here's an example of how it will look on Android:
+The short format for the `copy` action is `copy, <label>, <value>` (e.g. `copy, Copy code, 123456`),
+but you can always just use the `<key>=<value>` notation as well (e.g. `action=copy, label=Copy code, value=123456`).
+
+The `copy` action supports the following fields:
+
+| Field    | Required | Type      | Default | Example         | Description                                      |
+|----------|----------|-----------|---------|-----------------|--------------------------------------------------|
+| `action` | ✔️       | *string*  | -       | `copy`          | Action type (**must be `copy`**)                 |
+| `label`  | ✔️       | *string*  | -       | `Copy code`     | Label of the action button in the notification   |
+| `value`  | ✔️       | *string*  | -       | `123456`        | Value to copy to the clipboard                   |
+| `clear`  | -️       | *boolean* | `false` | `true`          | Clear notification after action button is tapped |
+
+## Scheduled delivery
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
+You can delay the delivery of messages and let ntfy send them at a later date. This can be used to send yourself 
+reminders or even to execute commands at a later date (if your subscriber acts on messages).
+
+Usage is pretty straight forward. You can set the delivery time using the `X-Delay` header (or any of its aliases: `Delay`, 
+`X-At`, `At`, `X-In` or `In`), either by specifying a Unix timestamp (e.g. `1639194738`), a duration (e.g. `30m`, 
+`3h`, `2 days`), or a natural language time string (e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`, 
+[and more](https://github.com/olebedev/when)). 
+
+As of today, the minimum delay you can set is **10 seconds** and the maximum delay is **3 days**. This can be configured
+with the `message-delay-limit` option.
+
+For the purposes of [message caching](config.md#message-cache), scheduled messages are kept in the cache until 12 hours 
+after they were delivered (or whatever the server-side cache duration is set to). For instance, if a message is scheduled
+to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Also note that naturally, 
+[turning off server-side caching](#message-caching) is not possible in combination with this feature.  
+
+=== "Command line (curl)"
+    ```
+    curl -H "At: tomorrow, 10am" -d "Good morning" ntfy.sh/hello
+    curl -H "In: 30min" -d "It's 30 minutes later now" ntfy.sh/reminder
+    curl -H "Delay: 1639194738" -d "Unix timestamps are awesome" ntfy.sh/itsaunixsystem
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --at="tomorrow, 10am" \
+        hello "Good morning"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /hello HTTP/1.1
+    Host: ntfy.sh
+    At: tomorrow, 10am
+
+    Good morning
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/hello', {
+        method: 'POST',
+        body: 'Good morning',
+        headers: { 'At': 'tomorrow, 10am' }
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/hello", strings.NewReader("Good morning"))
+    req.Header.Set("At", "tomorrow, 10am")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/hello"
+      Headers = @{
+        At = "tomorrow, 10am"
+      }
+      Body = "Good morning"
+    }
+    Invoke-RestMethod @Request
+    ```
+    
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/hello",
+        data="Good morning",
+        headers={ "At": "tomorrow, 10am" })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/backups', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' =>
+                "Content-Type: text/plain\r\n" .
+                "At: tomorrow, 10am",
+            'content' => 'Good morning'
+        ]
+    ]));
+    ```
+
+Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Time Zone**):
+
+<table class="remove-md-box"><tr>
+<td>
+    <table><thead><tr><th><code>Delay/At/In</code> header</th><th>Message will be delivered at</th><th>Explanation</th></tr></thead><tbody>
+    <tr><td><code>30m</code></td><td>12/10/2021, 9:<b>30</b>am</td><td>30 minutes from now</td></tr>
+    <tr><td><code>2 hours</code></td><td>12/10/2021, <b>11:30</b>am</td><td>2 hours from now</td></tr>
+    <tr><td><code>1 day</code></td><td>12/<b>11</b>/2021, 9am</td><td>24 hours from now</td></tr>
+    <tr><td><code>10am</code></td><td>12/10/2021, <b>10am</b></td><td>Today at 10am (same day, because it's only 9am)</td></tr>
+    <tr><td><code>8am</code></td><td>12/<b>11</b>/2021, <b>8am</b></td><td>Tomorrow at 8am (because it's 9am already)</td></tr>
+    <tr><td><code>1639152000</code></td><td>12/10/2021, 11am (EST)</td><td> Today at 11am (EST)</td></tr>
+    </tbody></table>
+</td>
+</tr></table>
+
+### Updating scheduled notifications
+
+You can update or replace a scheduled message before it is delivered by publishing a new message with the same 
+[sequence ID](#updating-deleting-notifications). When you do this, the **original scheduled message is deleted** 
+from the server and replaced with the new one. This is different from [updating notifications](#updating-notifications) 
+after delivery, where both messages are kept in the cache.
+
+This is particularly useful for implementing a **watchdog that triggers when your script stops sending heartbeat messages**.
+This mechanism is also called a [dead man's switch](https://en.wikipedia.org/wiki/Dead_man%27s_switch).
+
+For example, you could schedule a message to be delivered in 5 minutes, but continuously update it every minute to push
+the delivery time further into the future. If your script or system stops running, the message will eventually be delivered as an alert.
+
+Here's an example of a dead man's switch that sends an alert if the script stops running for more than 5 minutes:
+
+=== "Command line (curl)"
+    ```bash
+    # Dead man's switch: keeps pushing a scheduled message into the future
+    # If this script stops, the alert will be delivered after 5 minutes
+    while true; do
+        curl -H "In: 5m" -d "Warning: Server heartbeat stopped!" \
+            ntfy.sh/mytopic/heartbeat-check
+        sleep 60  # Update every minute
+    done
+    ```
+
+=== "ntfy CLI"
+    ```bash
+    # Dead man's switch: keeps pushing a scheduled message into the future
+    # If this script stops, the alert will be delivered after 5 minutes
+    while true; do
+        ntfy publish \
+            --in="5m" \
+            --sequence-id="heartbeat-check" \
+            mytopic "Warning: Server heartbeat stopped!"
+        sleep 60  # Update every minute
+    done
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mytopic/heartbeat-check HTTP/1.1
+    Host: ntfy.sh
+    In: 5m
+
+    Warning: Server heartbeat stopped!
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    // Dead man's switch: keeps pushing a scheduled message into the future
+    // If this script stops, the alert will be delivered after 5 minutes
+    setInterval(() => {
+        fetch('https://ntfy.sh/mytopic/heartbeat-check', {
+            method: 'POST',
+            body: 'Warning: Server heartbeat stopped!',
+            headers: { 'In': '5m' }
+        })
+    }, 60000) // Update every minute
+    ```
+
+=== "Go"
+    ``` go
+    // Dead man's switch: keeps pushing a scheduled message into the future
+    // If this script stops, the alert will be delivered after 5 minutes
+    for {
+        req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic/heartbeat-check",
+            strings.NewReader("Warning: Server heartbeat stopped!"))
+        req.Header.Set("In", "5m")
+        http.DefaultClient.Do(req)
+        time.Sleep(60 * time.Second) // Update every minute
+    }
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    # Dead man's switch: keeps pushing a scheduled message into the future
+    # If this script stops, the alert will be delivered after 5 minutes
+    while ($true) {
+        $Request = @{
+            Method = "POST"
+            URI = "https://ntfy.sh/mytopic/heartbeat-check"
+            Headers = @{ In = "5m" }
+            Body = "Warning: Server heartbeat stopped!"
+        }
+        Invoke-RestMethod @Request
+        Start-Sleep -Seconds 60  # Update every minute
+    }
+    ```
+
+=== "Python"
+    ``` python
+    import requests
+    import time
+
+    # Dead man's switch: keeps pushing a scheduled message into the future
+    # If this script stops, the alert will be delivered after 5 minutes
+    while True:
+        requests.post(
+            "https://ntfy.sh/mytopic/heartbeat-check",
+            data="Warning: Server heartbeat stopped!",
+            headers={"In": "5m"}
+        )
+        time.sleep(60) # Update every minute
+    ```
+
+=== "PHP"
+    ``` php-inline
+    // Dead man's switch: keeps pushing a scheduled message into the future
+    // If this script stops, the alert will be delivered after 5 minutes
+    while (true) {
+        file_get_contents('https://ntfy.sh/mytopic/heartbeat-check', false, stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => "Content-Type: text/plain\r\nIn: 5m",
+                'content' => 'Warning: Server heartbeat stopped!'
+            ]
+        ]));
+        sleep(60); // Update every minute
+    }
+    ```
+
+### Canceling scheduled notifications
+
+You can cancel a scheduled message before it is delivered by sending a DELETE request to the 
+`/<topic>/<sequence_id>` endpoint, just like [deleting notifications](#deleting-notifications). This will remove the 
+scheduled message from the server so it will never be delivered, and emit a `message_delete` event to any subscribers.
+
+=== "Command line (curl)"
+    ```bash
+    # Schedule a reminder for 2 hours from now
+    curl -H "In: 2h" -d "Take a break!" ntfy.sh/mytopic/break-reminder
+
+    # Changed your mind? Cancel the scheduled message
+    curl -X DELETE ntfy.sh/mytopic/break-reminder
+    ```
+
+=== "ntfy CLI"
+    ```bash
+    # Schedule a reminder for 2 hours from now
+    ntfy publish --in="2h" mytopic/break-reminder "Take a break!"
+
+    # Changed your mind? Cancel the scheduled message
+    # (ntfy CLI does not support DELETE, use curl instead)
+    curl -X DELETE ntfy.sh/mytopic/break-reminder
+    ```
+
+=== "HTTP"
+    ``` http
+    DELETE /mytopic/break-reminder HTTP/1.1
+    Host: ntfy.sh
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    // Schedule a reminder for 2 hours from now
+    await fetch('https://ntfy.sh/mytopic/break-reminder', {
+        method: 'POST',
+        body: 'Take a break!',
+        headers: { 'In': '2h' }
+    });
+
+    // Changed your mind? Cancel the scheduled message
+    await fetch('https://ntfy.sh/mytopic/break-reminder', {
+        method: 'DELETE'
+    });
+    ```
+
+=== "Go"
+    ``` go
+    // Schedule a reminder for 2 hours from now
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic/break-reminder",
+        strings.NewReader("Take a break!"))
+    req.Header.Set("In", "2h")
+    http.DefaultClient.Do(req)
+
+    // Changed your mind? Cancel the scheduled message
+    req, _ = http.NewRequest("DELETE", "https://ntfy.sh/mytopic/break-reminder", nil)
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    # Schedule a reminder for 2 hours from now
+    $Request = @{
+        Method = "POST"
+        URI = "https://ntfy.sh/mytopic/break-reminder"
+        Headers = @{ In = "2h" }
+        Body = "Take a break!"
+    }
+    Invoke-RestMethod @Request
+
+    # Changed your mind? Cancel the scheduled message
+    Invoke-RestMethod -Method DELETE -Uri "https://ntfy.sh/mytopic/break-reminder"
+    ```
+
+=== "Python"
+    ``` python
+    import requests
+
+    # Schedule a reminder for 2 hours from now
+    requests.post(
+        "https://ntfy.sh/mytopic/break-reminder",
+        data="Take a break!",
+        headers={"In": "2h"}
+    )
+
+    # Changed your mind? Cancel the scheduled message
+    requests.delete("https://ntfy.sh/mytopic/break-reminder")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    // Schedule a reminder for 2 hours from now
+    file_get_contents('https://ntfy.sh/mytopic/break-reminder', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: text/plain\r\nIn: 2h",
+            'content' => 'Take a break!'
+        ]
+    ]));
+
+    // Changed your mind? Cancel the scheduled message
+    file_get_contents('https://ntfy.sh/mytopic/break-reminder', false, stream_context_create([
+        'http' => ['method' => 'DELETE']
+    ]));
+    ```
+
+## Message templating
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
+Templating lets you **format a JSON message body into human-friendly message and title text** using
+[Go templates](https://pkg.go.dev/text/template) (see tutorials [here](https://blog.gopheracademy.com/advent-2017/using-go-templates/), 
+[here](https://www.digitalocean.com/community/tutorials/how-to-use-templates-in-go), and
+[here](https://developer.hashicorp.com/nomad/tutorials/templates/go-template-syntax)). This is specifically useful when
+**combined with webhooks** from services such as [GitHub](https://docs.github.com/en/webhooks/about-webhooks),
+[Grafana](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/),
+[Alertmanager](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config), or other services that emit JSON webhooks.
+
+Instead of using a separate bridge program to parse the webhook body into the format ntfy expects, you can include a templated
+message and/or a templated title which will be populated based on the fields of the webhook body (so long as the webhook body
+is valid JSON).
+
+You can enable templating by setting the `X-Template` header (or its aliases `Template` or `tpl`, or the query parameter `?template=...`):
+
+* **Pre-defined template files**: Setting the `X-Template` header or query parameter to a pre-defined template name (one of `github`,
+  `grafana`, or `alertmanager`, such as `?template=github`) will use the built-in template with that name.
+  See [pre-defined templates](#pre-defined-templates) for more details.
+* **Custom template files**: Setting the `X-Template` header or query parameter to a custom template name (e.g. `?template=myapp`)
+  will use a custom template file from the template directory (defaults to `/etc/ntfy/templates`, can be overridden with `template-dir`).
+  See [custom templates](#custom-templates) for more details.
+* **Inline templating**: Setting the `X-Template` header or query parameter to `yes` or `1` (e.g. `?template=yes`)
+  will enable inline templating, which means that the `message`, `title`, and/or `priority` will be parsed as a Go template.
+  See [inline templating](#inline-templating) for more details.
+
+To learn the basics of Go's templating language, please see [template syntax](#template-syntax).
+
+### Pre-defined templates
+
+When `X-Template: <name>` (aliases: `Template: <name>`, `Tpl: <name>`) or `?template=<name>` is set, ntfy will transform the
+message and/or title based on one of the built-in pre-defined templates.
+
+The following **pre-defined templates** are available:
+
+* `github`: Formats a subset of [GitHub webhook](https://docs.github.com/en/webhooks/about-webhooks) payloads (PRs, issues, new star, new watcher, new comment). See [github.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/github.yml).
+* `grafana`: Formats [Grafana webhook](https://grafana.com/docs/grafana/latest/alerting/configure-notifications/manage-contact-points/integrations/webhook-notifier/) payloads (firing/resolved alerts). See [grafana.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/grafana.yml).
+* `alertmanager`: Formats [Alertmanager webhook](https://prometheus.io/docs/alerting/latest/configuration/#webhook_config) payloads (firing/resolved alerts). See [alertmanager.yml](https://github.com/binwiederhier/ntfy/blob/main/server/templates/alertmanager.yml).
+
+To override the pre-defined templates, you can place a file with the same name in the template directory (defaults to `/etc/ntfy/templates`,
+can be overridden with `template-dir`). See [custom templates](#custom-templates) for more details.
+
+Here's an example of how to use the **pre-defined `github` template**: 
+
+First, configure the webhook in GitHub to send a webhook to your ntfy topic, e.g. `https://ntfy.sh/mytopic?template=github`.
+<figure markdown>
+  ![GitHub webhook config](static/img/screenshot-github-webhook-config.png){ width=600 }
+  <figcaption>GitHub webhook configuration</figcaption>
+</figure>
+
+After that, when GitHub publishes a JSON webhook to the topic, ntfy will transform it according to the template rules
+and you'll receive notifications in the ntfy app. Here's an example for when somebody stars your repository:
 
 <figure markdown>
-  ![file attachment](static/img/android-screenshot-icon.png){ width=500 }
-  <figcaption>Custom icon from an external URL</figcaption>
+  ![pre-defined template](static/img/android-screenshot-template-predefined.png){ width=500 }
+  <figcaption>Receiving a webhook, formatted using the pre-defined "github" template</figcaption>
 </figure>
+
+### Custom templates
+
+To define **your own custom templates**, place a template file in the template directory (defaults to `/etc/ntfy/templates`, can be overridden with `template-dir`)
+and set the `X-Template` header or query parameter to the name of the template file (without the `.yml` extension). 
+
+For example, if you have a template file `/etc/ntfy/templates/myapp.yml`, you can set the header `X-Template: myapp` or
+the query parameter `?template=myapp` to use it.
+
+Template files must have the `.yml` (not: `.yaml`!) extension and must be formatted as YAML. They may contain `title`, `message`, and `priority` keys,
+which are interpreted as Go templates.
+
+Here's an **example custom template**:
+
+=== "Custom template (/etc/ntfy/templates/myapp.yml)"
+    ```yaml
+    title: |
+      {{- if eq .status "firing" }}
+        {{- if gt .percent 90.0 }}🚨 Critical alert
+        {{- else }}⚠️ Alert{{- end }}
+      {{- else if eq .status "resolved" }}
+      ✅ Alert resolved
+      {{- end }}
+    message: |
+      Status: {{ .status }}
+      Type: {{ .type | upper }} ({{ .percent }}%)
+      Server: {{ .server }}
+    priority: |
+      {{ if gt .percent 90.0 }}5
+      {{ else if gt .percent 75.0 }}4
+      {{ else }}3
+      {{ end }}
+    ```
+
+Once you have the template file in place, you can send the payload to your topic using the `X-Template`
+header or query parameter:
+
+=== "Command line (curl)"
+    ```
+    echo '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}' | \
+      curl -sT- "https://ntfy.example.com/mytopic?template=myapp"
+    ```
+
+=== "ntfy CLI"
+    ```
+    echo '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}' | \
+      ntfy publish --template=myapp https://ntfy.example.com/mytopic 
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mytopic?template=myapp HTTP/1.1
+    Host: ntfy.example.com
+
+    {
+      "status": "firing",
+      "type": "cpu",
+      "server": "ntfy.sh",
+      "percent": 99
+    }
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.example.com/mytopic?template=myapp', {
+        method: 'POST',
+        body: '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+    })
+    ```
+
+=== "Go"
+    ``` go
+    payload := `{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}`
+    req, _ := http.NewRequest("POST", "https://ntfy.example.com/mytopic?template=myapp", strings.NewReader(payload))
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      Uri = "https://ntfy.example.com/mytopic?template=myapp"
+      Body = '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.example.com/mytopic?template=myapp",
+      json={"status":"firing","type":"cpu","server":"ntfy.sh","percent":99})
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.example.com/mytopic?template=myapp', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
+        ]
+    ]));
+    ```
+
+Which will result in a notification that looks like this:
+
+<figure markdown>
+  ![notification from custom JSON webhook template](static/img/android-screenshot-template-custom.png){ width=500 }
+  <figcaption>JSON webhook, transformed using a custom template</figcaption>
+</figure>
+
+### Inline templating
+
+When `X-Template: yes` (aliases: `Template: yes`, `Tpl: yes`) or `?template=yes` is set, you can use Go templates in the `message`, `title`, and `priority` fields of your
+webhook payload. 
+
+Inline templates are most useful for templated one-off messages, or if you do not control the ntfy server (e.g., if you're using ntfy.sh).
+Consider using [pre-defined templates](#pre-defined-templates) or [custom templates](#custom-templates) instead, 
+if you control the ntfy server, as templates are much easier to maintain.
+
+Here's an **example for a Grafana alert**:
+
+<figure markdown>
+  ![notification with actions](static/img/android-screenshot-template.jpg){ width=500 }
+  <figcaption>Grafana webhook, formatted using templates</figcaption>
+</figure>
+
+This was sent using the following templates and payloads
+
+=== "Message template"
+    ```
+    {{range .alerts}}
+      {{.annotations.summary}}
+      
+      Values:
+      {{range $k,$v := .values}}
+        - {{$k}}={{$v}}
+      {{end}}
+    {{end}}
+    ```
+
+=== "Title template"
+    ```
+    {{.title}}
+    ```
+
+=== "Encoded webhook URL"
+    ```
+    # Additional URL encoding (see https://www.urlencoder.org/) is necessary for Grafana, 
+    # and may be required for other tools too
+
+    https://ntfy.sh/mytopic?tpl=1&t=%7B%7B.title%7D%7D&m=%7B%7Brange%20.alerts%7D%7D%7B%7B.annotations.summary%7D%7D%5Cn%5CnValues%3A%5Cn%7B%7Brange%20%24k%2C%24v%20%3A%3D%20.values%7D%7D-%20%7B%7B%24k%7D%7D%3D%7B%7B%24v%7D%7D%5Cn%7B%7Bend%7D%7D%7B%7Bend%7D%7D
+    ```
+
+=== "Grafana-sent payload"
+    ```
+    {"receiver":"ntfy\\.example\\.com/alerts","status":"resolved","alerts":[{"status":"resolved","labels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts","instance":"10.108.0.2:9100","job":"node-exporter"},"annotations":{"summary":"15m load average too high"},"startsAt":"2024-03-15T02:28:00Z","endsAt":"2024-03-15T02:42:00Z","generatorURL":"localhost:3000/alerting/grafana/NW9oDw-4z/view","fingerprint":"becbfb94bd81ef48","silenceURL":"localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter","dashboardURL":"","panelURL":"","values":{"B":18.98211314475876,"C":0},"valueString":"[ var='B' labels={__name__=node_load15, instance=10.108.0.2:9100, job=node-exporter} value=18.98211314475876 ], [ var='C' labels={__name__=node_load15, instance=10.108.0.2:9100, job=node-exporter} value=0 ]"}],"groupLabels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts"},"commonLabels":{"alertname":"Load avg 15m too high","grafana_folder":"Node alerts","instance":"10.108.0.2:9100","job":"node-exporter"},"commonAnnotations":{"summary":"15m load average too high"},"externalURL":"localhost:3000/","version":"1","groupKey":"{}:{alertname=\"Load avg 15m too high\", grafana_folder=\"Node alerts\"}","truncatedAlerts":0,"orgId":1,"title":"[RESOLVED] Load avg 15m too high Node alerts (10.108.0.2:9100 node-exporter)","state":"ok","message":"**Resolved**\n\nValue: B=18.98211314475876, C=0\nLabels:\n - alertname = Load avg 15m too high\n - grafana_folder = Node alerts\n - instance = 10.108.0.2:9100\n - job = node-exporter\nAnnotations:\n - summary = 15m load average too high\nSource: localhost:3000/alerting/grafana/NW9oDw-4z/view\nSilence: localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=alertname%3DLoad+avg+15m+too+high&matcher=grafana_folder%3DNode+alerts&matcher=instance%3D10.108.0.2%3A9100&matcher=job%3Dnode-exporter\n"}
+    ```
+
+Here's an **easier example with a shorter JSON payload**:
+
+=== "Command line (curl)"
+    ```
+    # To use { and } in the URL without encoding, we need to turn off
+    # curl's globbing using --globoff
+
+    curl \
+        --globoff \
+        -d '{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}' \
+        'ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}&p={{if+eq+.error.level+"severe"}}5{{else}}3{{end}}'
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}&p={{if+eq+.error.level+"severe"}}5{{else}}3{{end}} HTTP/1.1
+    Host: ntfy.sh
+
+    {"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}&p={{if+eq+.error.level+"severe"}}5{{else}}3{{end}}', {
+        method: 'POST',
+        body: '{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}'
+    })
+    ```
+
+=== "Go"
+    ``` go
+    body := `{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}`
+    uri := `https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}&p={{if eq .error.level "severe"}}5{{else}}3{{end}}`
+    req, _ := http.NewRequest("POST", uri, strings.NewReader(body))
+    http.DefaultClient.Do(req)
+    ```
+
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+        Method = "POST"
+        URI = 'https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}&p={{if+eq+.error.level+"severe"}}5{{else}}3{{end}}'
+        Body = '{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}'
+        ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post(
+        'https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}&p={{if+eq+.error.level+"severe"}}5{{else}}3{{end}}',
+        data='{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}'
+    )
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mytopic?tpl=yes&t={{.hostname}}:+A+{{.error.level}}+error+has+occurred&m=Error+message:+{{.error.desc}}&p={{if+eq+.error.level+"severe"}}5{{else}}3{{end}}', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => '{"hostname": "phil-pc", "error": {"level": "severe", "desc": "Disk has run out of space"}}'
+        ]
+    ]));
+    ```
+
+This example uses the `message`/`m`, `title`/`t`, and `priority`/`p` query parameters, but obviously this also works with the 
+corresponding headers. It will send a notification with a title `phil-pc: A severe error has occurred`, a message
+`Error message: Disk has run out of space`, and priority `5` (max) if the level is "severe", or `3` (default) otherwise.
+
+### Template syntax
+ntfy uses [Go templates](https://pkg.go.dev/text/template) for its templates, which is arguably one of the most powerful,
+yet also one of the worst templating languages out there.
+
+You can use the following features in your templates:
+
+* Variables, e.g. `{{.alert.title}}` or `An error occurred: {{.error.desc}}`
+* Conditionals (if/else, e.g. `{{if eq .action "opened"}}..{{else}}..{{end}}`, see [example](https://repeatit.io/#/share/eyJ0ZW1wbGF0ZSI6Ilt7ey5wdWxsX3JlcXVlc3QuaGVhZC5yZXBvLmZ1bGxfbmFtZX19XSBQdWxsIHJlcXVlc3Qge3tpZiBlcSAuYWN0aW9uIFwib3BlbmVkXCJ9fU9QRU5FRHt7ZWxzZX19Q0xPU0VEe3tlbmR9fToge3sucHVsbF9yZXF1ZXN0LnRpdGxlfX0iLCJpbnB1dCI6IntcbiAgXCJhY3Rpb25cIjogXCJvcGVuZWRcIixcbiAgXCJudW1iZXJcIjogMSxcbiAgXCJwdWxsX3JlcXVlc3RcIjoge1xuICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9wdWxscy8xXCIsXG4gICAgXCJpZFwiOiAxNzgzNDIwOTcyLFxuICAgIFwibm9kZV9pZFwiOiBcIlBSX2t3RE9IQWJkbzg1cVROZ3NcIixcbiAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGwvMVwiLFxuICAgIFwiZGlmZl91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllci9kYWJibGUvcHVsbC8xLmRpZmZcIixcbiAgICBcInBhdGNoX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZS9wdWxsLzEucGF0Y2hcIixcbiAgICBcImlzc3VlX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzLzFcIixcbiAgICBcIm51bWJlclwiOiAxLFxuICAgIFwic3RhdGVcIjogXCJvcGVuXCIsXG4gICAgXCJsb2NrZWRcIjogZmFsc2UsXG4gICAgXCJ0aXRsZVwiOiBcIkEgc2FtcGxlIFBSIGZyb20gUGhpbFwiLFxuICAgIFwidXNlclwiOiB7XG4gICAgICBcImxvZ2luXCI6IFwiYmlud2llZGVyaGllclwiLFxuICAgICAgXCJpZFwiOiA2NjQ1OTcsXG4gICAgICBcIm5vZGVfaWRcIjogXCJNRFE2VlhObGNqWTJORFU1Tnc9PVwiLFxuICAgICAgXCJhdmF0YXJfdXJsXCI6IFwiaHR0cHM6Ly9hdmF0YXJzLmdpdGh1YnVzZXJjb250ZW50LmNvbS91LzY2NDU5Nz92PTRcIixcbiAgICAgIFwiZ3JhdmF0YXJfaWRcIjogXCJcIixcbiAgICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyXCIsXG4gICAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXJcIixcbiAgICAgIFwiZm9sbG93ZXJzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dlcnNcIixcbiAgICAgIFwiZm9sbG93aW5nX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dpbmd7L290aGVyX3VzZXJ9XCIsXG4gICAgICBcImdpc3RzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9naXN0c3svZ2lzdF9pZH1cIixcbiAgICAgIFwic3RhcnJlZF91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3RhcnJlZHsvb3duZXJ9ey9yZXBvfVwiLFxuICAgICAgXCJzdWJzY3JpcHRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdWJzY3JpcHRpb25zXCIsXG4gICAgICBcIm9yZ2FuaXphdGlvbnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL29yZ3NcIixcbiAgICAgIFwicmVwb3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlcG9zXCIsXG4gICAgICBcImV2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZXZlbnRzey9wcml2YWN5fVwiLFxuICAgICAgXCJyZWNlaXZlZF9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlY2VpdmVkX2V2ZW50c1wiLFxuICAgICAgXCJ0eXBlXCI6IFwiVXNlclwiLFxuICAgICAgXCJzaXRlX2FkbWluXCI6IGZhbHNlXG4gICAgfSxcbiAgICBcImJvZHlcIjogbnVsbCxcbiAgICBcImNyZWF0ZWRfYXRcIjogXCIyMDI0LTAzLTIxVDAyOjUyOjA5WlwiLFxuICAgIFwidXBkYXRlZF9hdFwiOiBcIjIwMjQtMDMtMjFUMDI6NTI6MDlaXCIsXG4gICAgXCJjbG9zZWRfYXRcIjogbnVsbCxcbiAgICBcIm1lcmdlZF9hdFwiOiBudWxsLFxuICAgIFwibWVyZ2VfY29tbWl0X3NoYVwiOiBudWxsLFxuICAgIFwiYXNzaWduZWVcIjogbnVsbCxcbiAgICBcImFzc2lnbmVlc1wiOiBbXSxcbiAgICBcInJlcXVlc3RlZF9yZXZpZXdlcnNcIjogW10sXG4gICAgXCJyZXF1ZXN0ZWRfdGVhbXNcIjogW10sXG4gICAgXCJsYWJlbHNcIjogW10sXG4gICAgXCJtaWxlc3RvbmVcIjogbnVsbCxcbiAgICBcImRyYWZ0XCI6IGZhbHNlLFxuICAgIFwiY29tbWl0c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGxzLzEvY29tbWl0c1wiLFxuICAgIFwicmV2aWV3X2NvbW1lbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvMS9jb21tZW50c1wiLFxuICAgIFwicmV2aWV3X2NvbW1lbnRfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9wdWxscy9jb21tZW50c3svbnVtYmVyfVwiLFxuICAgIFwiY29tbWVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9pc3N1ZXMvMS9jb21tZW50c1wiLFxuICAgIFwic3RhdHVzZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdGF0dXNlcy81NzAzODQyY2M1NzE1ZWQxZTM1OGQyM2ViYjY5M2RiMDk3NDdhZTliXCIsXG4gICAgXCJoZWFkXCI6IHtcbiAgICAgIFwibGFiZWxcIjogXCJiaW53aWVkZXJoaWVyOmFhXCIsXG4gICAgICBcInJlZlwiOiBcImFhXCIsXG4gICAgICBcInNoYVwiOiBcIjU3MDM4NDJjYzU3MTVlZDFlMzU4ZDIzZWJiNjkzZGIwOTc0N2FlOWJcIixcbiAgICAgIFwidXNlclwiOiB7XG4gICAgICAgIFwibG9naW5cIjogXCJiaW53aWVkZXJoaWVyXCIsXG4gICAgICAgIFwiaWRcIjogNjY0NTk3LFxuICAgICAgICBcIm5vZGVfaWRcIjogXCJNRFE2VlhObGNqWTJORFU1Tnc9PVwiLFxuICAgICAgICBcImF2YXRhcl91cmxcIjogXCJodHRwczovL2F2YXRhcnMuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3UvNjY0NTk3P3Y9NFwiLFxuICAgICAgICBcImdyYXZhdGFyX2lkXCI6IFwiXCIsXG4gICAgICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyXCIsXG4gICAgICAgIFwiaHRtbF91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllclwiLFxuICAgICAgICBcImZvbGxvd2Vyc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93ZXJzXCIsXG4gICAgICAgIFwiZm9sbG93aW5nX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dpbmd7L290aGVyX3VzZXJ9XCIsXG4gICAgICAgIFwiZ2lzdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2dpc3Rzey9naXN0X2lkfVwiLFxuICAgICAgICBcInN0YXJyZWRfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3N0YXJyZWR7L293bmVyfXsvcmVwb31cIixcbiAgICAgICAgXCJzdWJzY3JpcHRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdWJzY3JpcHRpb25zXCIsXG4gICAgICAgIFwib3JnYW5pemF0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvb3Jnc1wiLFxuICAgICAgICBcInJlcG9zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZXBvc1wiLFxuICAgICAgICBcImV2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZXZlbnRzey9wcml2YWN5fVwiLFxuICAgICAgICBcInJlY2VpdmVkX2V2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvcmVjZWl2ZWRfZXZlbnRzXCIsXG4gICAgICAgIFwidHlwZVwiOiBcIlVzZXJcIixcbiAgICAgICAgXCJzaXRlX2FkbWluXCI6IGZhbHNlXG4gICAgICB9LFxuICAgICAgXCJyZXBvXCI6IHtcbiAgICAgICAgXCJpZFwiOiA0NzAyMTIwMDMsXG4gICAgICAgIFwibm9kZV9pZFwiOiBcIlJfa2dET0hBYmRvd1wiLFxuICAgICAgICBcIm5hbWVcIjogXCJkYWJibGVcIixcbiAgICAgICAgXCJmdWxsX25hbWVcIjogXCJiaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgICAgICBcInByaXZhdGVcIjogZmFsc2UsXG4gICAgICAgIFwib3duZXJcIjoge1xuICAgICAgICAgIFwibG9naW5cIjogXCJiaW53aWVkZXJoaWVyXCIsXG4gICAgICAgICAgXCJpZFwiOiA2NjQ1OTcsXG4gICAgICAgICAgXCJub2RlX2lkXCI6IFwiTURRNlZYTmxjalkyTkRVNU53PT1cIixcbiAgICAgICAgICBcImF2YXRhcl91cmxcIjogXCJodHRwczovL2F2YXRhcnMuZ2l0aHVidXNlcmNvbnRlbnQuY29tL3UvNjY0NTk3P3Y9NFwiLFxuICAgICAgICAgIFwiZ3JhdmF0YXJfaWRcIjogXCJcIixcbiAgICAgICAgICBcInVybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllclwiLFxuICAgICAgICAgIFwiaHRtbF91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllclwiLFxuICAgICAgICAgIFwiZm9sbG93ZXJzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dlcnNcIixcbiAgICAgICAgICBcImZvbGxvd2luZ191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93aW5ney9vdGhlcl91c2VyfVwiLFxuICAgICAgICAgIFwiZ2lzdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2dpc3Rzey9naXN0X2lkfVwiLFxuICAgICAgICAgIFwic3RhcnJlZF91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3RhcnJlZHsvb3duZXJ9ey9yZXBvfVwiLFxuICAgICAgICAgIFwic3Vic2NyaXB0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3Vic2NyaXB0aW9uc1wiLFxuICAgICAgICAgIFwib3JnYW5pemF0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvb3Jnc1wiLFxuICAgICAgICAgIFwicmVwb3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlcG9zXCIsXG4gICAgICAgICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2V2ZW50c3svcHJpdmFjeX1cIixcbiAgICAgICAgICBcInJlY2VpdmVkX2V2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvcmVjZWl2ZWRfZXZlbnRzXCIsXG4gICAgICAgICAgXCJ0eXBlXCI6IFwiVXNlclwiLFxuICAgICAgICAgIFwic2l0ZV9hZG1pblwiOiBmYWxzZVxuICAgICAgICB9LFxuICAgICAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlXCIsXG4gICAgICAgIFwiZGVzY3JpcHRpb25cIjogXCJBIHJlcG8gZm9yIGRhYmJsaW5nXCIsXG4gICAgICAgIFwiZm9ya1wiOiBmYWxzZSxcbiAgICAgICAgXCJ1cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlXCIsXG4gICAgICAgIFwiZm9ya3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9mb3Jrc1wiLFxuICAgICAgICBcImtleXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9rZXlzey9rZXlfaWR9XCIsXG4gICAgICAgIFwiY29sbGFib3JhdG9yc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbGxhYm9yYXRvcnN7L2NvbGxhYm9yYXRvcn1cIixcbiAgICAgICAgXCJ0ZWFtc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3RlYW1zXCIsXG4gICAgICAgIFwiaG9va3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9ob29rc1wiLFxuICAgICAgICBcImlzc3VlX2V2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2lzc3Vlcy9ldmVudHN7L251bWJlcn1cIixcbiAgICAgICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9ldmVudHNcIixcbiAgICAgICAgXCJhc3NpZ25lZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9hc3NpZ25lZXN7L3VzZXJ9XCIsXG4gICAgICAgIFwiYnJhbmNoZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9icmFuY2hlc3svYnJhbmNofVwiLFxuICAgICAgICBcInRhZ3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS90YWdzXCIsXG4gICAgICAgIFwiYmxvYnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvYmxvYnN7L3NoYX1cIixcbiAgICAgICAgXCJnaXRfdGFnc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2dpdC90YWdzey9zaGF9XCIsXG4gICAgICAgIFwiZ2l0X3JlZnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvcmVmc3svc2hhfVwiLFxuICAgICAgICBcInRyZWVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZ2l0L3RyZWVzey9zaGF9XCIsXG4gICAgICAgIFwic3RhdHVzZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdGF0dXNlcy97c2hhfVwiLFxuICAgICAgICBcImxhbmd1YWdlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2xhbmd1YWdlc1wiLFxuICAgICAgICBcInN0YXJnYXplcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdGFyZ2F6ZXJzXCIsXG4gICAgICAgIFwiY29udHJpYnV0b3JzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29udHJpYnV0b3JzXCIsXG4gICAgICAgIFwic3Vic2NyaWJlcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdWJzY3JpYmVyc1wiLFxuICAgICAgICBcInN1YnNjcmlwdGlvbl91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3N1YnNjcmlwdGlvblwiLFxuICAgICAgICBcImNvbW1pdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb21taXRzey9zaGF9XCIsXG4gICAgICAgIFwiZ2l0X2NvbW1pdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvY29tbWl0c3svc2hhfVwiLFxuICAgICAgICBcImNvbW1lbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29tbWVudHN7L251bWJlcn1cIixcbiAgICAgICAgXCJpc3N1ZV9jb21tZW50X3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzL2NvbW1lbnRzey9udW1iZXJ9XCIsXG4gICAgICAgIFwiY29udGVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb250ZW50cy97K3BhdGh9XCIsXG4gICAgICAgIFwiY29tcGFyZV91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbXBhcmUve2Jhc2V9Li4ue2hlYWR9XCIsXG4gICAgICAgIFwibWVyZ2VzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbWVyZ2VzXCIsXG4gICAgICAgIFwiYXJjaGl2ZV91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3thcmNoaXZlX2Zvcm1hdH17L3JlZn1cIixcbiAgICAgICAgXCJkb3dubG9hZHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9kb3dubG9hZHNcIixcbiAgICAgICAgXCJpc3N1ZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9pc3N1ZXN7L251bWJlcn1cIixcbiAgICAgICAgXCJwdWxsc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGxzey9udW1iZXJ9XCIsXG4gICAgICAgIFwibWlsZXN0b25lc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL21pbGVzdG9uZXN7L251bWJlcn1cIixcbiAgICAgICAgXCJub3RpZmljYXRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbm90aWZpY2F0aW9uc3s/c2luY2UsYWxsLHBhcnRpY2lwYXRpbmd9XCIsXG4gICAgICAgIFwibGFiZWxzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbGFiZWxzey9uYW1lfVwiLFxuICAgICAgICBcInJlbGVhc2VzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcmVsZWFzZXN7L2lkfVwiLFxuICAgICAgICBcImRlcGxveW1lbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZGVwbG95bWVudHNcIixcbiAgICAgICAgXCJjcmVhdGVkX2F0XCI6IFwiMjAyMi0wMy0xNVQxNTowNjoxN1pcIixcbiAgICAgICAgXCJ1cGRhdGVkX2F0XCI6IFwiMjAyMi0wMy0xNVQxNTowNjoxN1pcIixcbiAgICAgICAgXCJwdXNoZWRfYXRcIjogXCIyMDI0LTAzLTIxVDAyOjUyOjEwWlwiLFxuICAgICAgICBcImdpdF91cmxcIjogXCJnaXQ6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgICAgICBcInNzaF91cmxcIjogXCJnaXRAZ2l0aHViLmNvbTpiaW53aWVkZXJoaWVyL2RhYmJsZS5naXRcIixcbiAgICAgICAgXCJjbG9uZV91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllci9kYWJibGUuZ2l0XCIsXG4gICAgICAgIFwic3ZuX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgICAgICBcImhvbWVwYWdlXCI6IG51bGwsXG4gICAgICAgIFwic2l6ZVwiOiAxLFxuICAgICAgICBcInN0YXJnYXplcnNfY291bnRcIjogMCxcbiAgICAgICAgXCJ3YXRjaGVyc19jb3VudFwiOiAwLFxuICAgICAgICBcImxhbmd1YWdlXCI6IG51bGwsXG4gICAgICAgIFwiaGFzX2lzc3Vlc1wiOiB0cnVlLFxuICAgICAgICBcImhhc19wcm9qZWN0c1wiOiB0cnVlLFxuICAgICAgICBcImhhc19kb3dubG9hZHNcIjogdHJ1ZSxcbiAgICAgICAgXCJoYXNfd2lraVwiOiB0cnVlLFxuICAgICAgICBcImhhc19wYWdlc1wiOiBmYWxzZSxcbiAgICAgICAgXCJoYXNfZGlzY3Vzc2lvbnNcIjogZmFsc2UsXG4gICAgICAgIFwiZm9ya3NfY291bnRcIjogMCxcbiAgICAgICAgXCJtaXJyb3JfdXJsXCI6IG51bGwsXG4gICAgICAgIFwiYXJjaGl2ZWRcIjogZmFsc2UsXG4gICAgICAgIFwiZGlzYWJsZWRcIjogZmFsc2UsXG4gICAgICAgIFwib3Blbl9pc3N1ZXNfY291bnRcIjogMSxcbiAgICAgICAgXCJsaWNlbnNlXCI6IG51bGwsXG4gICAgICAgIFwiYWxsb3dfZm9ya2luZ1wiOiB0cnVlLFxuICAgICAgICBcImlzX3RlbXBsYXRlXCI6IGZhbHNlLFxuICAgICAgICBcIndlYl9jb21taXRfc2lnbm9mZl9yZXF1aXJlZFwiOiBmYWxzZSxcbiAgICAgICAgXCJ0b3BpY3NcIjogW10sXG4gICAgICAgIFwidmlzaWJpbGl0eVwiOiBcInB1YmxpY1wiLFxuICAgICAgICBcImZvcmtzXCI6IDAsXG4gICAgICAgIFwib3Blbl9pc3N1ZXNcIjogMSxcbiAgICAgICAgXCJ3YXRjaGVyc1wiOiAwLFxuICAgICAgICBcImRlZmF1bHRfYnJhbmNoXCI6IFwibWFpblwiLFxuICAgICAgICBcImFsbG93X3NxdWFzaF9tZXJnZVwiOiB0cnVlLFxuICAgICAgICBcImFsbG93X21lcmdlX2NvbW1pdFwiOiB0cnVlLFxuICAgICAgICBcImFsbG93X3JlYmFzZV9tZXJnZVwiOiB0cnVlLFxuICAgICAgICBcImFsbG93X2F1dG9fbWVyZ2VcIjogZmFsc2UsXG4gICAgICAgIFwiZGVsZXRlX2JyYW5jaF9vbl9tZXJnZVwiOiBmYWxzZSxcbiAgICAgICAgXCJhbGxvd191cGRhdGVfYnJhbmNoXCI6IGZhbHNlLFxuICAgICAgICBcInVzZV9zcXVhc2hfcHJfdGl0bGVfYXNfZGVmYXVsdFwiOiBmYWxzZSxcbiAgICAgICAgXCJzcXVhc2hfbWVyZ2VfY29tbWl0X21lc3NhZ2VcIjogXCJDT01NSVRfTUVTU0FHRVNcIixcbiAgICAgICAgXCJzcXVhc2hfbWVyZ2VfY29tbWl0X3RpdGxlXCI6IFwiQ09NTUlUX09SX1BSX1RJVExFXCIsXG4gICAgICAgIFwibWVyZ2VfY29tbWl0X21lc3NhZ2VcIjogXCJQUl9USVRMRVwiLFxuICAgICAgICBcIm1lcmdlX2NvbW1pdF90aXRsZVwiOiBcIk1FUkdFX01FU1NBR0VcIlxuICAgICAgfVxuICAgIH0sXG4gICAgXCJiYXNlXCI6IHtcbiAgICAgIFwibGFiZWxcIjogXCJiaW53aWVkZXJoaWVyOm1haW5cIixcbiAgICAgIFwicmVmXCI6IFwibWFpblwiLFxuICAgICAgXCJzaGFcIjogXCI3MmQ5MzFhMjBiYjgzZDEyM2FiNDVhY2NhZjc2MTE1MGM4YjAxMjExXCIsXG4gICAgICBcInVzZXJcIjoge1xuICAgICAgICBcImxvZ2luXCI6IFwiYmlud2llZGVyaGllclwiLFxuICAgICAgICBcImlkXCI6IDY2NDU5NyxcbiAgICAgICAgXCJub2RlX2lkXCI6IFwiTURRNlZYTmxjalkyTkRVNU53PT1cIixcbiAgICAgICAgXCJhdmF0YXJfdXJsXCI6IFwiaHR0cHM6Ly9hdmF0YXJzLmdpdGh1YnVzZXJjb250ZW50LmNvbS91LzY2NDU5Nz92PTRcIixcbiAgICAgICAgXCJncmF2YXRhcl9pZFwiOiBcIlwiLFxuICAgICAgICBcInVybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllclwiLFxuICAgICAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXJcIixcbiAgICAgICAgXCJmb2xsb3dlcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2ZvbGxvd2Vyc1wiLFxuICAgICAgICBcImZvbGxvd2luZ191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93aW5ney9vdGhlcl91c2VyfVwiLFxuICAgICAgICBcImdpc3RzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9naXN0c3svZ2lzdF9pZH1cIixcbiAgICAgICAgXCJzdGFycmVkX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdGFycmVkey9vd25lcn17L3JlcG99XCIsXG4gICAgICAgIFwic3Vic2NyaXB0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3Vic2NyaXB0aW9uc1wiLFxuICAgICAgICBcIm9yZ2FuaXphdGlvbnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL29yZ3NcIixcbiAgICAgICAgXCJyZXBvc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvcmVwb3NcIixcbiAgICAgICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2V2ZW50c3svcHJpdmFjeX1cIixcbiAgICAgICAgXCJyZWNlaXZlZF9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlY2VpdmVkX2V2ZW50c1wiLFxuICAgICAgICBcInR5cGVcIjogXCJVc2VyXCIsXG4gICAgICAgIFwic2l0ZV9hZG1pblwiOiBmYWxzZVxuICAgICAgfSxcbiAgICAgIFwicmVwb1wiOiB7XG4gICAgICAgIFwiaWRcIjogNDcwMjEyMDAzLFxuICAgICAgICBcIm5vZGVfaWRcIjogXCJSX2tnRE9IQWJkb3dcIixcbiAgICAgICAgXCJuYW1lXCI6IFwiZGFiYmxlXCIsXG4gICAgICAgIFwiZnVsbF9uYW1lXCI6IFwiYmlud2llZGVyaGllci9kYWJibGVcIixcbiAgICAgICAgXCJwcml2YXRlXCI6IGZhbHNlLFxuICAgICAgICBcIm93bmVyXCI6IHtcbiAgICAgICAgICBcImxvZ2luXCI6IFwiYmlud2llZGVyaGllclwiLFxuICAgICAgICAgIFwiaWRcIjogNjY0NTk3LFxuICAgICAgICAgIFwibm9kZV9pZFwiOiBcIk1EUTZWWE5sY2pZMk5EVTVOdz09XCIsXG4gICAgICAgICAgXCJhdmF0YXJfdXJsXCI6IFwiaHR0cHM6Ly9hdmF0YXJzLmdpdGh1YnVzZXJjb250ZW50LmNvbS91LzY2NDU5Nz92PTRcIixcbiAgICAgICAgICBcImdyYXZhdGFyX2lkXCI6IFwiXCIsXG4gICAgICAgICAgXCJ1cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXJcIixcbiAgICAgICAgICBcImh0bWxfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXJcIixcbiAgICAgICAgICBcImZvbGxvd2Vyc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93ZXJzXCIsXG4gICAgICAgICAgXCJmb2xsb3dpbmdfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2ZvbGxvd2luZ3svb3RoZXJfdXNlcn1cIixcbiAgICAgICAgICBcImdpc3RzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9naXN0c3svZ2lzdF9pZH1cIixcbiAgICAgICAgICBcInN0YXJyZWRfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3N0YXJyZWR7L293bmVyfXsvcmVwb31cIixcbiAgICAgICAgICBcInN1YnNjcmlwdGlvbnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3N1YnNjcmlwdGlvbnNcIixcbiAgICAgICAgICBcIm9yZ2FuaXphdGlvbnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL29yZ3NcIixcbiAgICAgICAgICBcInJlcG9zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZXBvc1wiLFxuICAgICAgICAgIFwiZXZlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9ldmVudHN7L3ByaXZhY3l9XCIsXG4gICAgICAgICAgXCJyZWNlaXZlZF9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3JlY2VpdmVkX2V2ZW50c1wiLFxuICAgICAgICAgIFwidHlwZVwiOiBcIlVzZXJcIixcbiAgICAgICAgICBcInNpdGVfYWRtaW5cIjogZmFsc2VcbiAgICAgICAgfSxcbiAgICAgICAgXCJodG1sX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgICAgICBcImRlc2NyaXB0aW9uXCI6IFwiQSByZXBvIGZvciBkYWJibGluZ1wiLFxuICAgICAgICBcImZvcmtcIjogZmFsc2UsXG4gICAgICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgICAgICBcImZvcmtzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZm9ya3NcIixcbiAgICAgICAgXCJrZXlzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUva2V5c3sva2V5X2lkfVwiLFxuICAgICAgICBcImNvbGxhYm9yYXRvcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb2xsYWJvcmF0b3Jzey9jb2xsYWJvcmF0b3J9XCIsXG4gICAgICAgIFwidGVhbXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS90ZWFtc1wiLFxuICAgICAgICBcImhvb2tzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaG9va3NcIixcbiAgICAgICAgXCJpc3N1ZV9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9pc3N1ZXMvZXZlbnRzey9udW1iZXJ9XCIsXG4gICAgICAgIFwiZXZlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZXZlbnRzXCIsXG4gICAgICAgIFwiYXNzaWduZWVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvYXNzaWduZWVzey91c2VyfVwiLFxuICAgICAgICBcImJyYW5jaGVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvYnJhbmNoZXN7L2JyYW5jaH1cIixcbiAgICAgICAgXCJ0YWdzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvdGFnc1wiLFxuICAgICAgICBcImJsb2JzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZ2l0L2Jsb2Jzey9zaGF9XCIsXG4gICAgICAgIFwiZ2l0X3RhZ3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvdGFnc3svc2hhfVwiLFxuICAgICAgICBcImdpdF9yZWZzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZ2l0L3JlZnN7L3NoYX1cIixcbiAgICAgICAgXCJ0cmVlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2dpdC90cmVlc3svc2hhfVwiLFxuICAgICAgICBcInN0YXR1c2VzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3RhdHVzZXMve3NoYX1cIixcbiAgICAgICAgXCJsYW5ndWFnZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9sYW5ndWFnZXNcIixcbiAgICAgICAgXCJzdGFyZ2F6ZXJzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3RhcmdhemVyc1wiLFxuICAgICAgICBcImNvbnRyaWJ1dG9yc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbnRyaWJ1dG9yc1wiLFxuICAgICAgICBcInN1YnNjcmliZXJzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3Vic2NyaWJlcnNcIixcbiAgICAgICAgXCJzdWJzY3JpcHRpb25fdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdWJzY3JpcHRpb25cIixcbiAgICAgICAgXCJjb21taXRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29tbWl0c3svc2hhfVwiLFxuICAgICAgICBcImdpdF9jb21taXRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZ2l0L2NvbW1pdHN7L3NoYX1cIixcbiAgICAgICAgXCJjb21tZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbW1lbnRzey9udW1iZXJ9XCIsXG4gICAgICAgIFwiaXNzdWVfY29tbWVudF91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2lzc3Vlcy9jb21tZW50c3svbnVtYmVyfVwiLFxuICAgICAgICBcImNvbnRlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29udGVudHMveytwYXRofVwiLFxuICAgICAgICBcImNvbXBhcmVfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb21wYXJlL3tiYXNlfS4uLntoZWFkfVwiLFxuICAgICAgICBcIm1lcmdlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL21lcmdlc1wiLFxuICAgICAgICBcImFyY2hpdmVfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS97YXJjaGl2ZV9mb3JtYXR9ey9yZWZ9XCIsXG4gICAgICAgIFwiZG93bmxvYWRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvZG93bmxvYWRzXCIsXG4gICAgICAgIFwiaXNzdWVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzey9udW1iZXJ9XCIsXG4gICAgICAgIFwicHVsbHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9wdWxsc3svbnVtYmVyfVwiLFxuICAgICAgICBcIm1pbGVzdG9uZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9taWxlc3RvbmVzey9udW1iZXJ9XCIsXG4gICAgICAgIFwibm90aWZpY2F0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL25vdGlmaWNhdGlvbnN7P3NpbmNlLGFsbCxwYXJ0aWNpcGF0aW5nfVwiLFxuICAgICAgICBcImxhYmVsc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2xhYmVsc3svbmFtZX1cIixcbiAgICAgICAgXCJyZWxlYXNlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3JlbGVhc2Vzey9pZH1cIixcbiAgICAgICAgXCJkZXBsb3ltZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2RlcGxveW1lbnRzXCIsXG4gICAgICAgIFwiY3JlYXRlZF9hdFwiOiBcIjIwMjItMDMtMTVUMTU6MDY6MTdaXCIsXG4gICAgICAgIFwidXBkYXRlZF9hdFwiOiBcIjIwMjItMDMtMTVUMTU6MDY6MTdaXCIsXG4gICAgICAgIFwicHVzaGVkX2F0XCI6IFwiMjAyNC0wMy0yMVQwMjo1MjoxMFpcIixcbiAgICAgICAgXCJnaXRfdXJsXCI6IFwiZ2l0Oi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZS5naXRcIixcbiAgICAgICAgXCJzc2hfdXJsXCI6IFwiZ2l0QGdpdGh1Yi5jb206Ymlud2llZGVyaGllci9kYWJibGUuZ2l0XCIsXG4gICAgICAgIFwiY2xvbmVfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgICAgICBcInN2bl91cmxcIjogXCJodHRwczovL2dpdGh1Yi5jb20vYmlud2llZGVyaGllci9kYWJibGVcIixcbiAgICAgICAgXCJob21lcGFnZVwiOiBudWxsLFxuICAgICAgICBcInNpemVcIjogMSxcbiAgICAgICAgXCJzdGFyZ2F6ZXJzX2NvdW50XCI6IDAsXG4gICAgICAgIFwid2F0Y2hlcnNfY291bnRcIjogMCxcbiAgICAgICAgXCJsYW5ndWFnZVwiOiBudWxsLFxuICAgICAgICBcImhhc19pc3N1ZXNcIjogdHJ1ZSxcbiAgICAgICAgXCJoYXNfcHJvamVjdHNcIjogdHJ1ZSxcbiAgICAgICAgXCJoYXNfZG93bmxvYWRzXCI6IHRydWUsXG4gICAgICAgIFwiaGFzX3dpa2lcIjogdHJ1ZSxcbiAgICAgICAgXCJoYXNfcGFnZXNcIjogZmFsc2UsXG4gICAgICAgIFwiaGFzX2Rpc2N1c3Npb25zXCI6IGZhbHNlLFxuICAgICAgICBcImZvcmtzX2NvdW50XCI6IDAsXG4gICAgICAgIFwibWlycm9yX3VybFwiOiBudWxsLFxuICAgICAgICBcImFyY2hpdmVkXCI6IGZhbHNlLFxuICAgICAgICBcImRpc2FibGVkXCI6IGZhbHNlLFxuICAgICAgICBcIm9wZW5faXNzdWVzX2NvdW50XCI6IDEsXG4gICAgICAgIFwibGljZW5zZVwiOiBudWxsLFxuICAgICAgICBcImFsbG93X2ZvcmtpbmdcIjogdHJ1ZSxcbiAgICAgICAgXCJpc190ZW1wbGF0ZVwiOiBmYWxzZSxcbiAgICAgICAgXCJ3ZWJfY29tbWl0X3NpZ25vZmZfcmVxdWlyZWRcIjogZmFsc2UsXG4gICAgICAgIFwidG9waWNzXCI6IFtdLFxuICAgICAgICBcInZpc2liaWxpdHlcIjogXCJwdWJsaWNcIixcbiAgICAgICAgXCJmb3Jrc1wiOiAwLFxuICAgICAgICBcIm9wZW5faXNzdWVzXCI6IDEsXG4gICAgICAgIFwid2F0Y2hlcnNcIjogMCxcbiAgICAgICAgXCJkZWZhdWx0X2JyYW5jaFwiOiBcIm1haW5cIixcbiAgICAgICAgXCJhbGxvd19zcXVhc2hfbWVyZ2VcIjogdHJ1ZSxcbiAgICAgICAgXCJhbGxvd19tZXJnZV9jb21taXRcIjogdHJ1ZSxcbiAgICAgICAgXCJhbGxvd19yZWJhc2VfbWVyZ2VcIjogdHJ1ZSxcbiAgICAgICAgXCJhbGxvd19hdXRvX21lcmdlXCI6IGZhbHNlLFxuICAgICAgICBcImRlbGV0ZV9icmFuY2hfb25fbWVyZ2VcIjogZmFsc2UsXG4gICAgICAgIFwiYWxsb3dfdXBkYXRlX2JyYW5jaFwiOiBmYWxzZSxcbiAgICAgICAgXCJ1c2Vfc3F1YXNoX3ByX3RpdGxlX2FzX2RlZmF1bHRcIjogZmFsc2UsXG4gICAgICAgIFwic3F1YXNoX21lcmdlX2NvbW1pdF9tZXNzYWdlXCI6IFwiQ09NTUlUX01FU1NBR0VTXCIsXG4gICAgICAgIFwic3F1YXNoX21lcmdlX2NvbW1pdF90aXRsZVwiOiBcIkNPTU1JVF9PUl9QUl9USVRMRVwiLFxuICAgICAgICBcIm1lcmdlX2NvbW1pdF9tZXNzYWdlXCI6IFwiUFJfVElUTEVcIixcbiAgICAgICAgXCJtZXJnZV9jb21taXRfdGl0bGVcIjogXCJNRVJHRV9NRVNTQUdFXCJcbiAgICAgIH1cbiAgICB9LFxuICAgIFwiX2xpbmtzXCI6IHtcbiAgICAgIFwic2VsZlwiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvMVwiXG4gICAgICB9LFxuICAgICAgXCJodG1sXCI6IHtcbiAgICAgICAgXCJocmVmXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGwvMVwiXG4gICAgICB9LFxuICAgICAgXCJpc3N1ZVwiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzLzFcIlxuICAgICAgfSxcbiAgICAgIFwiY29tbWVudHNcIjoge1xuICAgICAgICBcImhyZWZcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2lzc3Vlcy8xL2NvbW1lbnRzXCJcbiAgICAgIH0sXG4gICAgICBcInJldmlld19jb21tZW50c1wiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvMS9jb21tZW50c1wiXG4gICAgICB9LFxuICAgICAgXCJyZXZpZXdfY29tbWVudFwiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvY29tbWVudHN7L251bWJlcn1cIlxuICAgICAgfSxcbiAgICAgIFwiY29tbWl0c1wiOiB7XG4gICAgICAgIFwiaHJlZlwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvcHVsbHMvMS9jb21taXRzXCJcbiAgICAgIH0sXG4gICAgICBcInN0YXR1c2VzXCI6IHtcbiAgICAgICAgXCJocmVmXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdGF0dXNlcy81NzAzODQyY2M1NzE1ZWQxZTM1OGQyM2ViYjY5M2RiMDk3NDdhZTliXCJcbiAgICAgIH1cbiAgICB9LFxuICAgIFwiYXV0aG9yX2Fzc29jaWF0aW9uXCI6IFwiT1dORVJcIixcbiAgICBcImF1dG9fbWVyZ2VcIjogbnVsbCxcbiAgICBcImFjdGl2ZV9sb2NrX3JlYXNvblwiOiBudWxsLFxuICAgIFwibWVyZ2VkXCI6IGZhbHNlLFxuICAgIFwibWVyZ2VhYmxlXCI6IG51bGwsXG4gICAgXCJyZWJhc2VhYmxlXCI6IG51bGwsXG4gICAgXCJtZXJnZWFibGVfc3RhdGVcIjogXCJ1bmtub3duXCIsXG4gICAgXCJtZXJnZWRfYnlcIjogbnVsbCxcbiAgICBcImNvbW1lbnRzXCI6IDAsXG4gICAgXCJyZXZpZXdfY29tbWVudHNcIjogMCxcbiAgICBcIm1haW50YWluZXJfY2FuX21vZGlmeVwiOiBmYWxzZSxcbiAgICBcImNvbW1pdHNcIjogMSxcbiAgICBcImFkZGl0aW9uc1wiOiAxLFxuICAgIFwiZGVsZXRpb25zXCI6IDEsXG4gICAgXCJjaGFuZ2VkX2ZpbGVzXCI6IDFcbiAgfSxcbiAgXCJyZXBvc2l0b3J5XCI6IHtcbiAgICBcImlkXCI6IDQ3MDIxMjAwMyxcbiAgICBcIm5vZGVfaWRcIjogXCJSX2tnRE9IQWJkb3dcIixcbiAgICBcIm5hbWVcIjogXCJkYWJibGVcIixcbiAgICBcImZ1bGxfbmFtZVwiOiBcImJpbndpZWRlcmhpZXIvZGFiYmxlXCIsXG4gICAgXCJwcml2YXRlXCI6IGZhbHNlLFxuICAgIFwib3duZXJcIjoge1xuICAgICAgXCJsb2dpblwiOiBcImJpbndpZWRlcmhpZXJcIixcbiAgICAgIFwiaWRcIjogNjY0NTk3LFxuICAgICAgXCJub2RlX2lkXCI6IFwiTURRNlZYTmxjalkyTkRVNU53PT1cIixcbiAgICAgIFwiYXZhdGFyX3VybFwiOiBcImh0dHBzOi8vYXZhdGFycy5naXRodWJ1c2VyY29udGVudC5jb20vdS82NjQ1OTc/dj00XCIsXG4gICAgICBcImdyYXZhdGFyX2lkXCI6IFwiXCIsXG4gICAgICBcInVybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllclwiLFxuICAgICAgXCJodG1sX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyXCIsXG4gICAgICBcImZvbGxvd2Vyc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93ZXJzXCIsXG4gICAgICBcImZvbGxvd2luZ191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZm9sbG93aW5ney9vdGhlcl91c2VyfVwiLFxuICAgICAgXCJnaXN0c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZ2lzdHN7L2dpc3RfaWR9XCIsXG4gICAgICBcInN0YXJyZWRfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL3N0YXJyZWR7L293bmVyfXsvcmVwb31cIixcbiAgICAgIFwic3Vic2NyaXB0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvc3Vic2NyaXB0aW9uc1wiLFxuICAgICAgXCJvcmdhbml6YXRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9vcmdzXCIsXG4gICAgICBcInJlcG9zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZXBvc1wiLFxuICAgICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2V2ZW50c3svcHJpdmFjeX1cIixcbiAgICAgIFwicmVjZWl2ZWRfZXZlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZWNlaXZlZF9ldmVudHNcIixcbiAgICAgIFwidHlwZVwiOiBcIlVzZXJcIixcbiAgICAgIFwic2l0ZV9hZG1pblwiOiBmYWxzZVxuICAgIH0sXG4gICAgXCJodG1sX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgIFwiZGVzY3JpcHRpb25cIjogXCJBIHJlcG8gZm9yIGRhYmJsaW5nXCIsXG4gICAgXCJmb3JrXCI6IGZhbHNlLFxuICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgIFwiZm9ya3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9mb3Jrc1wiLFxuICAgIFwia2V5c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2tleXN7L2tleV9pZH1cIixcbiAgICBcImNvbGxhYm9yYXRvcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb2xsYWJvcmF0b3Jzey9jb2xsYWJvcmF0b3J9XCIsXG4gICAgXCJ0ZWFtc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3RlYW1zXCIsXG4gICAgXCJob29rc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2hvb2tzXCIsXG4gICAgXCJpc3N1ZV9ldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9pc3N1ZXMvZXZlbnRzey9udW1iZXJ9XCIsXG4gICAgXCJldmVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9ldmVudHNcIixcbiAgICBcImFzc2lnbmVlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2Fzc2lnbmVlc3svdXNlcn1cIixcbiAgICBcImJyYW5jaGVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvYnJhbmNoZXN7L2JyYW5jaH1cIixcbiAgICBcInRhZ3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS90YWdzXCIsXG4gICAgXCJibG9ic191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2dpdC9ibG9ic3svc2hhfVwiLFxuICAgIFwiZ2l0X3RhZ3NfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvdGFnc3svc2hhfVwiLFxuICAgIFwiZ2l0X3JlZnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvcmVmc3svc2hhfVwiLFxuICAgIFwidHJlZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvdHJlZXN7L3NoYX1cIixcbiAgICBcInN0YXR1c2VzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3RhdHVzZXMve3NoYX1cIixcbiAgICBcImxhbmd1YWdlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2xhbmd1YWdlc1wiLFxuICAgIFwic3RhcmdhemVyc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3N0YXJnYXplcnNcIixcbiAgICBcImNvbnRyaWJ1dG9yc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2NvbnRyaWJ1dG9yc1wiLFxuICAgIFwic3Vic2NyaWJlcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9zdWJzY3JpYmVyc1wiLFxuICAgIFwic3Vic2NyaXB0aW9uX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvc3Vic2NyaXB0aW9uXCIsXG4gICAgXCJjb21taXRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29tbWl0c3svc2hhfVwiLFxuICAgIFwiZ2l0X2NvbW1pdHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9naXQvY29tbWl0c3svc2hhfVwiLFxuICAgIFwiY29tbWVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb21tZW50c3svbnVtYmVyfVwiLFxuICAgIFwiaXNzdWVfY29tbWVudF91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2lzc3Vlcy9jb21tZW50c3svbnVtYmVyfVwiLFxuICAgIFwiY29udGVudHNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9jb250ZW50cy97K3BhdGh9XCIsXG4gICAgXCJjb21wYXJlX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvY29tcGFyZS97YmFzZX0uLi57aGVhZH1cIixcbiAgICBcIm1lcmdlc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL21lcmdlc1wiLFxuICAgIFwiYXJjaGl2ZV91cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3thcmNoaXZlX2Zvcm1hdH17L3JlZn1cIixcbiAgICBcImRvd25sb2Fkc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2Rvd25sb2Fkc1wiLFxuICAgIFwiaXNzdWVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvaXNzdWVzey9udW1iZXJ9XCIsXG4gICAgXCJwdWxsc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL3B1bGxzey9udW1iZXJ9XCIsXG4gICAgXCJtaWxlc3RvbmVzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbWlsZXN0b25lc3svbnVtYmVyfVwiLFxuICAgIFwibm90aWZpY2F0aW9uc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL25vdGlmaWNhdGlvbnN7P3NpbmNlLGFsbCxwYXJ0aWNpcGF0aW5nfVwiLFxuICAgIFwibGFiZWxzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vcmVwb3MvYmlud2llZGVyaGllci9kYWJibGUvbGFiZWxzey9uYW1lfVwiLFxuICAgIFwicmVsZWFzZXNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS9yZXBvcy9iaW53aWVkZXJoaWVyL2RhYmJsZS9yZWxlYXNlc3svaWR9XCIsXG4gICAgXCJkZXBsb3ltZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3JlcG9zL2JpbndpZWRlcmhpZXIvZGFiYmxlL2RlcGxveW1lbnRzXCIsXG4gICAgXCJjcmVhdGVkX2F0XCI6IFwiMjAyMi0wMy0xNVQxNTowNjoxN1pcIixcbiAgICBcInVwZGF0ZWRfYXRcIjogXCIyMDIyLTAzLTE1VDE1OjA2OjE3WlwiLFxuICAgIFwicHVzaGVkX2F0XCI6IFwiMjAyNC0wMy0yMVQwMjo1MjoxMFpcIixcbiAgICBcImdpdF91cmxcIjogXCJnaXQ6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgIFwic3NoX3VybFwiOiBcImdpdEBnaXRodWIuY29tOmJpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgIFwiY2xvbmVfdXJsXCI6IFwiaHR0cHM6Ly9naXRodWIuY29tL2JpbndpZWRlcmhpZXIvZGFiYmxlLmdpdFwiLFxuICAgIFwic3ZuX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyL2RhYmJsZVwiLFxuICAgIFwiaG9tZXBhZ2VcIjogbnVsbCxcbiAgICBcInNpemVcIjogMSxcbiAgICBcInN0YXJnYXplcnNfY291bnRcIjogMCxcbiAgICBcIndhdGNoZXJzX2NvdW50XCI6IDAsXG4gICAgXCJsYW5ndWFnZVwiOiBudWxsLFxuICAgIFwiaGFzX2lzc3Vlc1wiOiB0cnVlLFxuICAgIFwiaGFzX3Byb2plY3RzXCI6IHRydWUsXG4gICAgXCJoYXNfZG93bmxvYWRzXCI6IHRydWUsXG4gICAgXCJoYXNfd2lraVwiOiB0cnVlLFxuICAgIFwiaGFzX3BhZ2VzXCI6IGZhbHNlLFxuICAgIFwiaGFzX2Rpc2N1c3Npb25zXCI6IGZhbHNlLFxuICAgIFwiZm9ya3NfY291bnRcIjogMCxcbiAgICBcIm1pcnJvcl91cmxcIjogbnVsbCxcbiAgICBcImFyY2hpdmVkXCI6IGZhbHNlLFxuICAgIFwiZGlzYWJsZWRcIjogZmFsc2UsXG4gICAgXCJvcGVuX2lzc3Vlc19jb3VudFwiOiAxLFxuICAgIFwibGljZW5zZVwiOiBudWxsLFxuICAgIFwiYWxsb3dfZm9ya2luZ1wiOiB0cnVlLFxuICAgIFwiaXNfdGVtcGxhdGVcIjogZmFsc2UsXG4gICAgXCJ3ZWJfY29tbWl0X3NpZ25vZmZfcmVxdWlyZWRcIjogZmFsc2UsXG4gICAgXCJ0b3BpY3NcIjogW10sXG4gICAgXCJ2aXNpYmlsaXR5XCI6IFwicHVibGljXCIsXG4gICAgXCJmb3Jrc1wiOiAwLFxuICAgIFwib3Blbl9pc3N1ZXNcIjogMSxcbiAgICBcIndhdGNoZXJzXCI6IDAsXG4gICAgXCJkZWZhdWx0X2JyYW5jaFwiOiBcIm1haW5cIlxuICB9LFxuICBcInNlbmRlclwiOiB7XG4gICAgXCJsb2dpblwiOiBcImJpbndpZWRlcmhpZXJcIixcbiAgICBcImlkXCI6IDY2NDU5NyxcbiAgICBcIm5vZGVfaWRcIjogXCJNRFE2VlhObGNqWTJORFU1Tnc9PVwiLFxuICAgIFwiYXZhdGFyX3VybFwiOiBcImh0dHBzOi8vYXZhdGFycy5naXRodWJ1c2VyY29udGVudC5jb20vdS82NjQ1OTc/dj00XCIsXG4gICAgXCJncmF2YXRhcl9pZFwiOiBcIlwiLFxuICAgIFwidXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyXCIsXG4gICAgXCJodG1sX3VybFwiOiBcImh0dHBzOi8vZ2l0aHViLmNvbS9iaW53aWVkZXJoaWVyXCIsXG4gICAgXCJmb2xsb3dlcnNfdXJsXCI6IFwiaHR0cHM6Ly9hcGkuZ2l0aHViLmNvbS91c2Vycy9iaW53aWVkZXJoaWVyL2ZvbGxvd2Vyc1wiLFxuICAgIFwiZm9sbG93aW5nX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9mb2xsb3dpbmd7L290aGVyX3VzZXJ9XCIsXG4gICAgXCJnaXN0c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZ2lzdHN7L2dpc3RfaWR9XCIsXG4gICAgXCJzdGFycmVkX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdGFycmVkey9vd25lcn17L3JlcG99XCIsXG4gICAgXCJzdWJzY3JpcHRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9zdWJzY3JpcHRpb25zXCIsXG4gICAgXCJvcmdhbml6YXRpb25zX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9vcmdzXCIsXG4gICAgXCJyZXBvc191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvcmVwb3NcIixcbiAgICBcImV2ZW50c191cmxcIjogXCJodHRwczovL2FwaS5naXRodWIuY29tL3VzZXJzL2JpbndpZWRlcmhpZXIvZXZlbnRzey9wcml2YWN5fVwiLFxuICAgIFwicmVjZWl2ZWRfZXZlbnRzX3VybFwiOiBcImh0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMvYmlud2llZGVyaGllci9yZWNlaXZlZF9ldmVudHNcIixcbiAgICBcInR5cGVcIjogXCJVc2VyXCIsXG4gICAgXCJzaXRlX2FkbWluXCI6IGZhbHNlXG4gIH1cbn1cbiIsImNvbmZpZyI6eyJ0ZW1wbGF0ZSI6InRleHQiLCJmdWxsU2NyZWVuSFRNTCI6ZmFsc2UsImZ1bmN0aW9ucyI6WyJzcHJpZyJdLCJvcHRpb25zIjpbImxpdmUiXSwiaW5wdXRUeXBlIjoieWFtbCJ9fQ==))
+* Loops (e.g. `{{range .errors}}..{{end}}`, see [example](https://repeatit.io/#/share/eyJ0ZW1wbGF0ZSI6IlNldmVyZSBVUkxzOlxue3tyYW5nZSAuZXJyb3JzfX17e2lmIGVxIC5sZXZlbCBcInNldmVyZVwifX0tIHt7LnVybH19XG57e2VuZH19e3tlbmR9fSIsImlucHV0Ijoie1wiZm9vXCI6IFwiYmFyXCIsIFwiZXJyb3JzXCI6IFt7XCJsZXZlbFwiOiBcInNldmVyZVwiLCBcInVybFwiOiBcImh0dHBzOi8vc2V2ZXJlMS5jb21cIn0se1wibGV2ZWxcIjogXCJ3YXJuaW5nXCIsIFwidXJsXCI6IFwiaHR0cHM6Ly93YXJuaW5nLmNvbVwifSx7XCJsZXZlbFwiOiBcInNldmVyZVwiLCBcInVybFwiOiBcImh0dHBzOi8vc2V2ZXJlMi5jb21cIn1dfSIsImNvbmZpZyI6eyJ0ZW1wbGF0ZSI6InRleHQiLCJmdWxsU2NyZWVuSFRNTCI6ZmFsc2UsImZ1bmN0aW9ucyI6WyJzcHJpZyJdLCJvcHRpb25zIjpbImxpdmUiXSwiaW5wdXRUeXBlIjoieWFtbCJ9fQ==))
+
+A good way to experiment with Go templates is the **[Go Template Playground](https://repeatit.io)**. It is _highly recommended_ to test
+your templates there first ([example for Grafana alert](https://repeatit.io/#/share/eyJ0ZW1wbGF0ZSI6InRpdGxlPUdyYWZhbmErYWxlcnQ6K3t7LnRpdGxlfX0mbWVzc2FnZT17ey5tZXNzYWdlfX0iLCJpbnB1dCI6IntcbiAgXCJyZWNlaXZlclwiOiBcIm50ZnlcXFxcLmV4YW1wbGVcXFxcLmNvbS9hbGVydHNcIixcbiAgXCJzdGF0dXNcIjogXCJyZXNvbHZlZFwiLFxuICBcImFsZXJ0c1wiOiBbXG4gICAge1xuICAgICAgXCJzdGF0dXNcIjogXCJyZXNvbHZlZFwiLFxuICAgICAgXCJsYWJlbHNcIjoge1xuICAgICAgICBcImFsZXJ0bmFtZVwiOiBcIkxvYWQgYXZnIDE1bSB0b28gaGlnaFwiLFxuICAgICAgICBcImdyYWZhbmFfZm9sZGVyXCI6IFwiTm9kZSBhbGVydHNcIixcbiAgICAgICAgXCJpbnN0YW5jZVwiOiBcIjEwLjEwOC4wLjI6OTEwMFwiLFxuICAgICAgICBcImpvYlwiOiBcIm5vZGUtZXhwb3J0ZXJcIlxuICAgICAgfSxcbiAgICAgIFwiYW5ub3RhdGlvbnNcIjoge1xuICAgICAgICBcInN1bW1hcnlcIjogXCIxNW0gbG9hZCBhdmVyYWdlIHRvbyBoaWdoXCJcbiAgICAgIH0sXG4gICAgICBcInN0YXJ0c0F0XCI6IFwiMjAyNC0wMy0xNVQwMjoyODowMFpcIixcbiAgICAgIFwiZW5kc0F0XCI6IFwiMjAyNC0wMy0xNVQwMjo0MjowMFpcIixcbiAgICAgIFwiZ2VuZXJhdG9yVVJMXCI6IFwibG9jYWxob3N0OjMwMDAvYWxlcnRpbmcvZ3JhZmFuYS9OVzlvRHctNHovdmlld1wiLFxuICAgICAgXCJmaW5nZXJwcmludFwiOiBcImJlY2JmYjk0YmQ4MWVmNDhcIixcbiAgICAgIFwic2lsZW5jZVVSTFwiOiBcImxvY2FsaG9zdDozMDAwL2FsZXJ0aW5nL3NpbGVuY2UvbmV3P2FsZXJ0bWFuYWdlcj1ncmFmYW5hJm1hdGNoZXI9YWxlcnRuYW1lJTNETG9hZCthdmcrMTVtK3RvbytoaWdoJm1hdGNoZXI9Z3JhZmFuYV9mb2xkZXIlM0ROb2RlK2FsZXJ0cyZtYXRjaGVyPWluc3RhbmNlJTNEMTAuMTA4LjAuMiUzQTkxMDAmbWF0Y2hlcj1qb2IlM0Rub2RlLWV4cG9ydGVyXCIsXG4gICAgICBcImRhc2hib2FyZFVSTFwiOiBcIlwiLFxuICAgICAgXCJwYW5lbFVSTFwiOiBcIlwiLFxuICAgICAgXCJ2YWx1ZXNcIjoge1xuICAgICAgICBcIkJcIjogMTguOTgyMTEzMTQ0NzU4NzYsXG4gICAgICAgIFwiQ1wiOiAwXG4gICAgICB9LFxuICAgICAgXCJ2YWx1ZVN0cmluZ1wiOiBcIlsgdmFyPSdCJyBsYWJlbHM9e19fbmFtZV9fPW5vZGVfbG9hZDE1LCBpbnN0YW5jZT0xMC4xMDguMC4yOjkxMDAsIGpvYj1ub2RlLWV4cG9ydGVyfSB2YWx1ZT0xOC45ODIxMTMxNDQ3NTg3NiBdLCBbIHZhcj0nQycgbGFiZWxzPXtfX25hbWVfXz1ub2RlX2xvYWQxNSwgaW5zdGFuY2U9MTAuMTA4LjAuMjo5MTAwLCBqb2I9bm9kZS1leHBvcnRlcn0gdmFsdWU9MCBdXCJcbiAgICB9XG4gIF0sXG4gIFwiZ3JvdXBMYWJlbHNcIjoge1xuICAgIFwiYWxlcnRuYW1lXCI6IFwiTG9hZCBhdmcgMTVtIHRvbyBoaWdoXCIsXG4gICAgXCJncmFmYW5hX2ZvbGRlclwiOiBcIk5vZGUgYWxlcnRzXCJcbiAgfSxcbiAgXCJjb21tb25MYWJlbHNcIjoge1xuICAgIFwiYWxlcnRuYW1lXCI6IFwiTG9hZCBhdmcgMTVtIHRvbyBoaWdoXCIsXG4gICAgXCJncmFmYW5hX2ZvbGRlclwiOiBcIk5vZGUgYWxlcnRzXCIsXG4gICAgXCJpbnN0YW5jZVwiOiBcIjEwLjEwOC4wLjI6OTEwMFwiLFxuICAgIFwiam9iXCI6IFwibm9kZS1leHBvcnRlclwiXG4gIH0sXG4gIFwiY29tbW9uQW5ub3RhdGlvbnNcIjoge1xuICAgIFwic3VtbWFyeVwiOiBcIjE1bSBsb2FkIGF2ZXJhZ2UgdG9vIGhpZ2hcIlxuICB9LFxuICBcImV4dGVybmFsVVJMXCI6IFwibG9jYWxob3N0OjMwMDAvXCIsXG4gIFwidmVyc2lvblwiOiBcIjFcIixcbiAgXCJncm91cEtleVwiOiBcInt9OnthbGVydG5hbWU9XFxcIkxvYWQgYXZnIDE1bSB0b28gaGlnaFxcXCIsIGdyYWZhbmFfZm9sZGVyPVxcXCJOb2RlIGFsZXJ0c1xcXCJ9XCIsXG4gIFwidHJ1bmNhdGVkQWxlcnRzXCI6IDAsXG4gIFwib3JnSWRcIjogMSxcbiAgXCJ0aXRsZVwiOiBcIltSRVNPTFZFRF0gTG9hZCBhdmcgMTVtIHRvbyBoaWdoIE5vZGUgYWxlcnRzICgxMC4xMDguMC4yOjkxMDAgbm9kZS1leHBvcnRlcilcIixcbiAgXCJzdGF0ZVwiOiBcIm9rXCIsXG4gIFwibWVzc2FnZVwiOiBcIioqUmVzb2x2ZWQqKlxcblxcblZhbHVlOiBCPTE4Ljk4MjExMzE0NDc1ODc2LCBDPTBcXG5MYWJlbHM6XFxuIC0gYWxlcnRuYW1lID0gTG9hZCBhdmcgMTVtIHRvbyBoaWdoXFxuIC0gZ3JhZmFuYV9mb2xkZXIgPSBOb2RlIGFsZXJ0c1xcbiAtIGluc3RhbmNlID0gMTAuMTA4LjAuMjo5MTAwXFxuIC0gam9iID0gbm9kZS1leHBvcnRlclxcbkFubm90YXRpb25zOlxcbiAtIHN1bW1hcnkgPSAxNW0gbG9hZCBhdmVyYWdlIHRvbyBoaWdoXFxuU291cmNlOiBsb2NhbGhvc3Q6MzAwMC9hbGVydGluZy9ncmFmYW5hL05XOW9Edy00ei92aWV3XFxuU2lsZW5jZTogbG9jYWxob3N0OjMwMDAvYWxlcnRpbmcvc2lsZW5jZS9uZXc/YWxlcnRtYW5hZ2VyPWdyYWZhbmEmbWF0Y2hlcj1hbGVydG5hbWUlM0RMb2FkK2F2ZysxNW0rdG9vK2hpZ2gmbWF0Y2hlcj1ncmFmYW5hX2ZvbGRlciUzRE5vZGUrYWxlcnRzJm1hdGNoZXI9aW5zdGFuY2UlM0QxMC4xMDguMC4yJTNBOTEwMCZtYXRjaGVyPWpvYiUzRG5vZGUtZXhwb3J0ZXJcXG5cIlxufVxuIiwiY29uZmlnIjp7InRlbXBsYXRlIjoidGV4dCIsImZ1bGxTY3JlZW5IVE1MIjpmYWxzZSwiZnVuY3Rpb25zIjpbInNwcmlnIl0sIm9wdGlvbnMiOlsibGl2ZSJdLCJpbnB1dFR5cGUiOiJ5YW1sIn19)).
+
+### Template functions
+ntfy supports a subset of the **[Sprig template functions](publish/template-functions.md)** (originally copied from [Sprig](https://github.com/Masterminds/sprig),
+thank you to the Sprig developers 🙏). This is useful for advanced message templating and for transforming the data provided through the JSON payload.
+
+Below are the functions that are available to use inside your message, title, and priority templates.
+
+* [String Functions](publish/template-functions.md#string-functions): `trim`, `trunc`, `substr`, `plural`, etc.
+* [String List Functions](publish/template-functions.md#string-list-functions): `splitList`, `sortAlpha`, etc.
+* [Integer Math Functions](publish/template-functions.md#integer-math-functions): `add`, `max`, `mul`, etc.
+* [Integer List Functions](publish/template-functions.md#integer-list-functions): `until`, `untilStep`
+* [Float Math Functions](publish/template-functions.md#float-math-functions): `maxf`, `minf`
+* [Date Functions](publish/template-functions.md#date-functions): `now`, `date`, etc.
+* [Defaults Functions](publish/template-functions.md#default-functions): `default`, `empty`, `coalesce`, `fromJSON`, `toJSON`, `toPrettyJSON`, `toRawJSON`, `ternary`
+* [Encoding Functions](publish/template-functions.md#encoding-functions): `b64enc`, `b64dec`, etc.
+* [Lists and List Functions](publish/template-functions.md#lists-and-list-functions): `list`, `first`, `uniq`, etc.
+* [Dictionaries and Dict Functions](publish/template-functions.md#dictionaries-and-dict-functions): `get`, `set`, `dict`, `hasKey`, `pluck`, `dig`, etc.
+* [Type Conversion Functions](publish/template-functions.md#type-conversion-functions): `atoi`, `int64`, `toString`, etc.
+* [Path and Filepath Functions](publish/template-functions.md#path-and-filepath-functions): `base`, `dir`, `ext`, `clean`, `isAbs`, `osBase`, `osDir`, `osExt`, `osClean`, `osIsAbs`
+* [Flow Control Functions](publish/template-functions.md#flow-control-functions): `fail`
+* Advanced Functions
+    * [Reflection](publish/template-functions.md#reflection-functions): `typeOf`, `kindIs`, `typeIsLike`, etc.
+    * [Cryptographic and Security Functions](publish/template-functions.md#cryptographic-and-security-functions): `sha256sum`, etc.
+    * [URL](publish/template-functions.md#url-functions): `urlParse`, `urlJoin`
 
 ## E-mail notifications
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -3000,11 +3213,17 @@ You can forward messages to e-mail by specifying an address in the header. This 
 you'd like to persist longer, or to blast-notify yourself on all possible channels. 
 
 Usage is easy: Simply pass the `X-Email` header (or any of its aliases: `X-E-mail`, `Email`, `E-mail`, `Mail`, or `e`).
-Only one e-mail address is supported.
+Only one e-mail address is supported. If the server has [`smtp-sender-verify`](config.md#e-mail-notifications) enabled (ntfy.sh has this enabled),
+you can also pass `yes`, `true`, or `1` to send to your first verified email address.
 
-Since ntfy does not provide auth (yet), the rate limiting is pretty strict (see [limitations](#limitations)). In the 
-default configuration, you get **16 e-mails per visitor** (IP address) and then after that one per hour. On top of 
+ntfy allows anonymous email sending (if enabled), so the rate limiting is pretty strict (see [limitations](#limitations)). In the
+default configuration, you get **16 e-mails per visitor** (IP address) and then after that one per hour. On top of
 that, your IP address appears in the e-mail body. This is to prevent abuse.
+
+!!! info
+    On ntfy.sh, anonymous email sending was disabled due to abuse. To use the email notification feature,
+    you must verify your email in the web app's [Account section](https://ntfy.sh/account). The daily limit for
+    free users is **5 emails per visitor per day**.
 
 === "Command line (curl)"
     ```
@@ -3268,9 +3487,726 @@ Here's what a phone call from ntfy sounds like:
 
 Audio transcript:
 
-> You have a notification from ntfy on topic alerts.        
+> You have a notification from ntfy on topic alerts.
 > Message: Your garage seems to be on fire. You should probably check that out. End message.   
 > This message was sent by user phil. It will be repeated up to three times.
+
+## Publish as JSON
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
+For some integrations with other tools (e.g. [Jellyfin](https://jellyfin.org/), [overseerr](https://overseerr.dev/)), 
+adding custom headers to HTTP requests may be tricky or impossible, so ntfy also allows publishing the entire message 
+as JSON in the request body.
+
+To publish as JSON, simple PUT/POST the JSON object directly to the ntfy root URL. The message format is described below
+the example.
+
+!!! info
+    To publish as JSON, you must **PUT/POST to the ntfy root URL**, not to the topic URL. Be sure to check that you're
+    POST-ing to `https://ntfy.sh/` (correct), and not to `https://ntfy.sh/mytopic` (incorrect). 
+
+Here's an example using most supported parameters. Check the table below for a complete list. The `topic` parameter 
+is the only required one:
+
+=== "Command line (curl)"
+    ```
+    curl ntfy.sh \
+      -d '{
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "attach": "https://filesrv.lan/space.jpg",
+        "filename": "diskspace.jpg",
+        "click": "https://homecamera.lan/xasds1h2xsSsa/",
+        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
+      }'
+    ```
+
+=== "HTTP"
+    ``` http
+    POST / HTTP/1.1
+    Host: ntfy.sh
+
+    {
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "attach": "https://filesrv.lan/space.jpg",
+        "filename": "diskspace.jpg",
+        "click": "https://homecamera.lan/xasds1h2xsSsa/",
+        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
+    }
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh', {
+        method: 'POST',
+        body: JSON.stringify({
+            "topic": "mytopic",
+            "message": "Disk space is low at 5.1 GB",
+            "title": "Low disk space alert",
+            "tags": ["warning","cd"],
+            "priority": 4,
+            "attach": "https://filesrv.lan/space.jpg",
+            "filename": "diskspace.jpg",
+            "click": "https://homecamera.lan/xasds1h2xsSsa/",
+            "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
+        })
+    })
+    ```
+
+=== "Go"
+    ``` go
+    // You should probably use json.Marshal() instead and make a proper struct,
+    // or even just use req.Header.Set() like in the other examples, but for the 
+    // sake of the example, this is easier.
+    
+    body := `{
+        "topic": "mytopic",
+        "message": "Disk space is low at 5.1 GB",
+        "title": "Low disk space alert",
+        "tags": ["warning","cd"],
+        "priority": 4,
+        "attach": "https://filesrv.lan/space.jpg",
+        "filename": "diskspace.jpg",
+        "click": "https://homecamera.lan/xasds1h2xsSsa/",
+        "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
+    }`
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/", strings.NewReader(body))
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh"
+      Body = ConvertTo-JSON @{
+        Topic    = "mytopic"
+        Title    = "Low disk space alert"
+        Message  = "Disk space is low at 5.1 GB"
+        Priority = 4
+        Attach   = "https://filesrv.lan/space.jpg"
+        FileName = "diskspace.jpg"
+        Tags     = @("warning", "cd")
+        Click    = "https://homecamera.lan/xasds1h2xsSsa/"
+        Actions  = @(
+          @{ 
+            Action = "view"
+            Label  = "Admin panel"
+            URL    = "https://filesrv.lan/admin"
+          }
+        )
+      }
+      ContentType = "application/json"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/",
+        data=json.dumps({
+            "topic": "mytopic",
+            "message": "Disk space is low at 5.1 GB",
+            "title": "Low disk space alert",
+            "tags": ["warning","cd"],
+            "priority": 4,
+            "attach": "https://filesrv.lan/space.jpg",
+            "filename": "diskspace.jpg",
+            "click": "https://homecamera.lan/xasds1h2xsSsa/",
+            "actions": [{ "action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" }]
+        })
+    )
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json",
+            'content' => json_encode([
+                "topic": "mytopic",
+                "message": "Disk space is low at 5.1 GB",
+                "title": "Low disk space alert",
+                "tags": ["warning","cd"],
+                "priority": 4,
+                "attach": "https://filesrv.lan/space.jpg",
+                "filename": "diskspace.jpg",
+                "click": "https://homecamera.lan/xasds1h2xsSsa/",
+                "actions": [["action": "view", "label": "Admin panel", "url": "https://filesrv.lan/admin" ]]
+            ])
+        ]
+    ]));
+    ```
+
+The JSON message format closely mirrors the format of the message you can consume when you [subscribe via the API](subscribe/api.md) 
+(see [JSON message format](subscribe/api.md#json-message-format) for details), but is not exactly identical. Here's an overview of
+all the supported fields:
+
+| Field         | Required | Type                             | Example                                   | Description                                                                               |
+|---------------|----------|----------------------------------|-------------------------------------------|-------------------------------------------------------------------------------------------|
+| `topic`       | ✔️       | *string*                         | `topic1`                                  | Target topic name                                                                         |
+| `message`     | -        | *string*                         | `Some message`                            | Message body; set to `triggered` if empty or not passed                                   |
+| `title`       | -        | *string*                         | `Some title`                              | Message [title](#message-title)                                                           |
+| `tags`        | -        | *string array*                   | `["tag1","tag2"]`                         | List of [tags](#tags-emojis) that may or not map to emojis                                |
+| `priority`    | -        | *int (one of: 1, 2, 3, 4, or 5)* | `4`                                       | Message [priority](#message-priority) with 1=min, 3=default and 5=max                     |
+| `actions`     | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications                           |
+| `click`       | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)                              |
+| `attach`      | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-a-url)                       |
+| `markdown`    | -        | *bool*                           | `true`                                    | Set to true if the `message` is Markdown-formatted                                        |
+| `icon`        | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                                                 |
+| `filename`    | -        | *string*                         | `file.jpg`                                | File name of the attachment                                                               |
+| `delay`       | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                                                |
+| `email`       | -        | *e-mail address or 'yes'*        | `phil@example.com` or `yes`               | E-mail address for e-mail notifications, or `yes` to use first verified address           |
+| `call`        | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                                        |
+| `sequence_id` | -        | *string*                         | `my-sequence-123`                         | Sequence ID for [updating/deleting notifications](#updating-deleting-notifications)   |
+
+## Webhooks (publish via GET) 
+_Supported on:_ :material-android: :material-apple: :material-firefox:
+
+In addition to using PUT/POST, you can also send to topics via simple HTTP GET requests. This makes it easy to use 
+a ntfy topic as a [webhook](https://en.wikipedia.org/wiki/Webhook), or if your client has limited HTTP support.
+
+To send messages via HTTP GET, simply call the `/publish` endpoint (or its aliases `/send` and `/trigger`). Without 
+any arguments, this will send the message `triggered` to the topic. However, you can provide all arguments that are 
+also supported as HTTP headers as URL-encoded arguments. Be sure to check the list of all 
+[supported parameters and headers](#list-of-all-parameters) for details.
+
+For instance, assuming your topic is `mywebhook`, you can simply call `/mywebhook/trigger` to send a message 
+(aka trigger the webhook):
+
+=== "Command line (curl)"
+    ```
+    curl ntfy.sh/mywebhook/trigger
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy trigger mywebhook
+    ```
+
+=== "HTTP"
+    ``` http
+    GET /mywebhook/trigger HTTP/1.1
+    Host: ntfy.sh
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mywebhook/trigger')
+    ```
+
+=== "Go"
+    ``` go
+    http.Get("https://ntfy.sh/mywebhook/trigger")
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    Invoke-RestMethod "ntfy.sh/mywebhook/trigger"
+    ```    
+
+=== "Python"
+    ``` python
+    requests.get("https://ntfy.sh/mywebhook/trigger")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mywebhook/trigger');
+    ```
+
+To add a custom message, simply append the `message=` URL parameter. And of course you can set the 
+[message priority](#message-priority), the [message title](#message-title), and [tags](#tags-emojis) as well. 
+For a full list of possible parameters, check the list of [supported parameters and headers](#list-of-all-parameters).
+
+Here's an example with a custom message, tags and a priority:
+
+=== "Command line (curl)"
+    ```
+    curl "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        -p 5 --tags=warning,skull \
+        mywebhook "Webhook triggered"
+    ```
+
+=== "HTTP"
+    ``` http
+    GET /mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull HTTP/1.1
+    Host: ntfy.sh
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull')
+    ```
+
+=== "Go"
+    ``` go
+    http.Get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    Invoke-RestMethod "ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull"
+    ```
+
+=== "Python"
+    ``` python
+    requests.get("https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mywebhook/publish?message=Webhook+triggered&priority=high&tags=warning,skull');
+    ```
+
+## Updating + deleting notifications
+_Supported on:_ :material-android: :material-firefox:
+
+You can **update, clear (mark as read and dismiss), or delete notifications** that have already been delivered. This is useful for scenarios
+like download progress updates, replacing outdated information, or dismissing notifications that are no longer relevant.
+
+* [Updating notifications](#updating-notifications) will alter the content of an existing notification.
+* [Clearing notifications](#clearing-notifications) will mark them as read and dismiss them from the notification drawer.
+* [Deleting notifications](#deleting-notifications) will remove them from the notification drawer and remove them in the clients as well (if supported).
+
+Here's an example of a download progress notification being updated over time on Android:
+
+<div id="updating-notifications-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-notification-update-1.png"><img src="../../static/img/android-screenshot-notification-update-1.png"/></a>
+    <a href="../../static/img/android-screenshot-notification-update-2.png"><img src="../../static/img/android-screenshot-notification-update-2.png"/></a>
+</div>
+
+To facilitate updating notifications and altering existing notifications, ntfy messages are linked together in a sequence,
+using a **sequence ID**. When a notification is meant to be updated, cleared, or deleted, you publish a new message with the
+same sequence ID and the clients will perform the appropriate action on the existing notification.
+
+Existing ntfy messages will not be updated on the server or in the message cache. Instead, a new message is created that indicates
+the update, clear, or delete action. This append-only behavior ensures that message history remains intact.
+
+### Updating notifications
+To update an existing notification, publish a new message with the same sequence ID. Clients will replace the previous
+notification with the new one. You can either:
+
+1. **Use the message ID**: First publish like normal to `POST /<topic>` without a sequence ID, then use the returned message `id` as the sequence ID for updates
+2. **Use a custom sequence ID**: Publish directly to `POST /<topic>/<sequence_id>` with your own identifier, or use `POST /<topic>` with the 
+   `X-Sequence-ID` header (or any of its aliases: `Sequence-ID` or`SID`)
+
+If you don't know the sequence ID ahead of time, you can publish a message first and then use the returned 
+message `id` to update it. Here's an example:
+
+=== "Command line (curl)"
+    ```bash
+    # First, publish a message and capture the message ID
+    curl -d "Downloading file..." ntfy.sh/mytopic
+    # Returns: {"id":"xE73Iyuabi","time":1673542291,...}
+
+    # Then use the message ID to update it (via URL path)
+    curl -d "Download 50% ..." ntfy.sh/mytopic/xE73Iyuabi
+
+    # Or update using the X-Sequence-ID header
+    curl -H "X-Sequence-ID: xE73Iyuabi" -d "Download complete" ntfy.sh/mytopic
+    ```
+
+=== "ntfy CLI"
+    ```bash
+    # First, publish a message and capture the message ID
+    ntfy pub mytopic "Downloading file..."
+    # Returns: {"id":"xE73Iyuabi","time":1673542291,...}
+
+    # Then use the message ID to update it
+    ntfy pub --sequence-id=xE73Iyuabi mytopic "Download 50% ..."
+
+    # Update again with the same sequence ID
+    ntfy pub -S xE73Iyuabi mytopic "Download complete"
+    ```
+
+=== "HTTP"
+    ``` http
+    # First, publish a message and capture the message ID
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+
+    Downloading file...
+
+    # Returns: {"id":"xE73Iyuabi","time":1673542291,...}
+
+    # Then use the message ID to update it
+    POST /mytopic/xE73Iyuabi HTTP/1.1
+    Host: ntfy.sh
+
+    Download 50% ...
+
+    # Update again with the same sequence ID, this time using the header
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+    X-Sequence-ID: xE73Iyuabi
+
+    Download complete
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    // First, publish and get the message ID
+    const response = await fetch('https://ntfy.sh/mytopic', {
+      method: 'POST',
+      body: 'Downloading file...'
+    });
+    const { id } = await response.json();
+
+    // Update via URL path
+    await fetch(`https://ntfy.sh/mytopic/${id}`, {
+      method: 'POST',
+      body: 'Download 50% ...'
+    });
+
+    // Or update using the X-Sequence-ID header
+    await fetch('https://ntfy.sh/mytopic', {
+      method: 'POST',
+      headers: { 'X-Sequence-ID': id },
+      body: 'Download complete'
+    });
+    ```
+
+=== "Go"
+    ``` go
+    // Publish and parse the response to get the message ID
+    resp, _ := http.Post("https://ntfy.sh/mytopic", "text/plain",
+        strings.NewReader("Downloading file..."))
+    var msg struct { ID string `json:"id"` }
+    json.NewDecoder(resp.Body).Decode(&msg)
+    
+    // Update via URL path
+    http.Post("https://ntfy.sh/mytopic/"+msg.ID, "text/plain",
+        strings.NewReader("Download 50% ..."))
+
+    // Or update using the X-Sequence-ID header
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic",
+        strings.NewReader("Download complete"))
+    req.Header.Set("X-Sequence-ID", msg.ID)
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    # Publish and get the message ID
+    $response = Invoke-RestMethod -Method POST -Uri "https://ntfy.sh/mytopic" -Body "Downloading file..."
+    $messageId = $response.id
+    
+    # Update via URL path
+    Invoke-RestMethod -Method POST -Uri "https://ntfy.sh/mytopic/$messageId" -Body "Download 50% ..."
+
+    # Or update using the X-Sequence-ID header
+    Invoke-RestMethod -Method POST -Uri "https://ntfy.sh/mytopic" `
+        -Headers @{"X-Sequence-ID"=$messageId} -Body "Download complete"
+    ```
+
+=== "Python"
+    ``` python
+    import requests
+    
+    # Publish and get the message ID
+    response = requests.post("https://ntfy.sh/mytopic", data="Downloading file...")
+    message_id = response.json()["id"]
+    
+    # Update via URL path
+    requests.post(f"https://ntfy.sh/mytopic/{message_id}", data="Download 50% ...")
+
+    # Or update using the X-Sequence-ID header
+    requests.post("https://ntfy.sh/mytopic",
+        headers={"X-Sequence-ID": message_id}, data="Download complete")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    // Publish and get the message ID
+    $response = file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
+        'http' => ['method' => 'POST', 'content' => 'Downloading file...']
+    ]));
+    $messageId = json_decode($response)->id;
+    
+    // Update via URL path
+    file_get_contents("https://ntfy.sh/mytopic/$messageId", false, stream_context_create([
+        'http' => ['method' => 'POST', 'content' => 'Download 50% ...']
+    ]));
+
+    // Or update using the X-Sequence-ID header
+    file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "X-Sequence-ID: $messageId",
+            'content' => 'Download complete'
+        ]
+    ]));
+    ```
+
+You can also use a **custom sequence ID** (e.g., a download ID, job ID, etc.) when publishing the first message. 
+**This is less cumbersome**, since you don't need to capture the message ID first. Just publish directly to
+`/<topic>/<sequence_id>`:
+
+=== "Command line (curl)"
+    ```bash
+    # Publish with a custom sequence ID
+    curl -d "Downloading file..." ntfy.sh/mytopic/my-download-123
+
+    # Update using the same sequence ID (via URL path)
+    curl -d "Download 50% ..." ntfy.sh/mytopic/my-download-123
+
+    # Or update using the X-Sequence-ID header
+    curl -H "X-Sequence-ID: my-download-123" -d "Download complete" ntfy.sh/mytopic
+    ```
+
+=== "ntfy CLI"
+    ```bash
+    # Publish with a sequence ID
+    ntfy pub --sequence-id=my-download-123 mytopic "Downloading file..."
+
+    # Update using the same sequence ID
+    ntfy pub --sequence-id=my-download-123 mytopic "Download 50% ..."
+
+    # Update again
+    ntfy pub -S my-download-123 mytopic "Download complete"
+    ```
+
+=== "HTTP"
+    ``` http
+    # Publish a message with a custom sequence ID
+    POST /mytopic/my-download-123 HTTP/1.1
+    Host: ntfy.sh
+
+    Downloading file...
+
+    # Update again using the X-Sequence-ID header
+    POST /mytopic HTTP/1.1
+    Host: ntfy.sh
+    X-Sequence-ID: my-download-123
+
+    Download complete
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    // First message
+    await fetch('https://ntfy.sh/mytopic/my-download-123', {
+      method: 'POST',
+      body: 'Downloading file...'
+    });
+
+    // Update via URL path
+    await fetch('https://ntfy.sh/mytopic/my-download-123', {
+      method: 'POST',
+      body: 'Download 50% ...'
+    });
+
+    // Or update using the X-Sequence-ID header
+    await fetch('https://ntfy.sh/mytopic', {
+      method: 'POST',
+      headers: { 'X-Sequence-ID': 'my-download-123' },
+      body: 'Download complete'
+    });
+    ```
+
+=== "Go"
+    ``` go
+    // Publish with sequence ID in URL path
+    http.Post("https://ntfy.sh/mytopic/my-download-123", "text/plain",
+        strings.NewReader("Downloading file..."))
+    
+    // Update via URL path
+    http.Post("https://ntfy.sh/mytopic/my-download-123", "text/plain",
+        strings.NewReader("Download 50% ..."))
+
+    // Or update using the X-Sequence-ID header
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/mytopic",
+        strings.NewReader("Download complete"))
+    req.Header.Set("X-Sequence-ID", "my-download-123")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    # Publish with sequence ID
+    Invoke-RestMethod -Method POST -Uri "https://ntfy.sh/mytopic/my-download-123" -Body "Downloading file..."
+    
+    # Update via URL path
+    Invoke-RestMethod -Method POST -Uri "https://ntfy.sh/mytopic/my-download-123" -Body "Download 50% ..."
+
+    # Or update using the X-Sequence-ID header
+    Invoke-RestMethod -Method POST -Uri "https://ntfy.sh/mytopic" `
+        -Headers @{"X-Sequence-ID"="my-download-123"} -Body "Download complete"
+    ```
+
+=== "Python"
+    ``` python
+    import requests
+    
+    # Publish with sequence ID
+    requests.post("https://ntfy.sh/mytopic/my-download-123", data="Downloading file...")
+    
+    # Update via URL path
+    requests.post("https://ntfy.sh/mytopic/my-download-123", data="Download 50% ...")
+
+    # Or update using the X-Sequence-ID header
+    requests.post("https://ntfy.sh/mytopic",
+        headers={"X-Sequence-ID": "my-download-123"}, data="Download complete")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    // Publish with sequence ID
+    file_get_contents('https://ntfy.sh/mytopic/my-download-123', false, stream_context_create([
+        'http' => ['method' => 'POST', 'content' => 'Downloading file...']
+    ]));
+    
+    // Update via URL path
+    file_get_contents('https://ntfy.sh/mytopic/my-download-123', false, stream_context_create([
+        'http' => ['method' => 'POST', 'content' => 'Download 50% ...']
+    ]));
+
+    // Or update using the X-Sequence-ID header
+    file_get_contents('https://ntfy.sh/mytopic', false, stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => 'X-Sequence-ID: my-download-123',
+            'content' => 'Download complete'
+        ]
+    ]));
+    ```
+
+You can also set the sequence ID via the `sequence-id` [query parameter](#list-of-all-parameters), or when
+[publishing as JSON](#publish-as-json) using the `sequence_id` field.
+
+If the message ID (`id`) and the sequence ID (`sequence_id`) are different, the ntfy server will include the `sequence_id`
+field the response. A sequence of updates may look like this (first example from above):
+
+```json
+{"id":"xE73Iyuabi","time":1673542291,"event":"message","topic":"mytopic","message":"Downloading file..."}
+{"id":"yF84Jzvbcj","time":1673542295,"event":"message","topic":"mytopic","sequence_id":"xE73Iyuabi","message":"Download 50% ..."}
+{"id":"zG95Kawdde","time":1673542300,"event":"message","topic":"mytopic","sequence_id":"xE73Iyuabi","message":"Download complete"}
+```
+
+### Clearing notifications
+Clearing a notification means **marking it as read and dismissing it from the notification drawer**. 
+
+To do this, send a PUT request to the `/<topic>/<sequence_id>/clear` endpoint (or `/<topic>/<sequence_id>/read` as an alias). 
+This will then emit a `message_clear` event that is used by the clients (web app and Android app) to update the read status
+and dismiss the notification.
+
+=== "Command line (curl)"
+    ```bash
+    curl -X PUT ntfy.sh/mytopic/my-download-123/clear
+    ```
+
+=== "HTTP"
+    ``` http
+    PUT /mytopic/my-download-123/clear HTTP/1.1
+    Host: ntfy.sh
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    await fetch('https://ntfy.sh/mytopic/my-download-123/clear', {
+      method: 'PUT'
+    });
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("PUT", "https://ntfy.sh/mytopic/my-download-123/clear", nil)
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    Invoke-RestMethod -Method PUT -Uri "https://ntfy.sh/mytopic/my-download-123/clear"
+    ```
+
+=== "Python"
+    ``` python
+    requests.put("https://ntfy.sh/mytopic/my-download-123/clear")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mytopic/my-download-123/clear', false, stream_context_create([
+        'http' => ['method' => 'PUT']
+    ]));
+    ```
+
+An example response from the server with the `message_clear` event may look like this:
+
+```json
+{"id":"jkl012","time":1673542305,"event":"message_clear","topic":"mytopic","sequence_id":"my-download-123"}
+```
+
+### Deleting notifications
+Deleting a notification means **removing it from the notification drawer and from the client's database**.
+
+To do this, send a DELETE request to the `/<topic>/<sequence_id>` endpoint. This will emit a `message_delete` event
+that is used by the clients (web app and Android app) to remove the notification entirely.
+
+=== "Command line (curl)"
+    ```bash
+    curl -X DELETE ntfy.sh/mytopic/my-download-123
+    ```
+
+=== "HTTP"
+    ``` http
+    DELETE /mytopic/my-download-123 HTTP/1.1
+    Host: ntfy.sh
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    await fetch('https://ntfy.sh/mytopic/my-download-123', {
+      method: 'DELETE'
+    });
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("DELETE", "https://ntfy.sh/mytopic/my-download-123", nil)
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    Invoke-RestMethod -Method DELETE -Uri "https://ntfy.sh/mytopic/my-download-123"
+    ```
+
+=== "Python"
+    ``` python
+    requests.delete("https://ntfy.sh/mytopic/my-download-123")
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/mytopic/my-download-123', false, stream_context_create([
+        'http' => ['method' => 'DELETE']
+    ]));
+    ```
+
+An example response from the server with the `message_delete` event may look like this:
+
+```json
+{"id":"mno345","time":1673542400,"event":"message_delete","topic":"mytopic","sequence_id":"my-download-123"}
+```
+
+!!! info
+    Deleted sequences can be revived by publishing a new message with the same sequence ID. The notification will
+    reappear as a new message.
 
 ## Authentication
 Depending on whether the server is configured to support [access control](config.md#access-control), some topics
@@ -3931,6 +4867,7 @@ table in their canonical form.
 |-----------------|--------------------------------------------|-----------------------------------------------------------------------------------------------|
 | `X-Message`     | `Message`, `m`                             | Main body of the message as shown in the notification                                         |
 | `X-Title`       | `Title`, `t`                               | [Message title](#message-title)                                                               |
+| `X-Sequence-ID` | `Sequence-ID`, `SID`                       | [Sequence ID](#updating-deleting-notifications) for updating/clearing/deleting notifications  |
 | `X-Priority`    | `Priority`, `prio`, `p`                    | [Message priority](#message-priority)                                                         |
 | `X-Tags`        | `Tags`, `Tag`, `ta`                        | [Tags and emojis](#tags-emojis)                                                               |
 | `X-Delay`       | `Delay`, `X-At`, `At`, `X-In`, `In`        | Timestamp or duration for [delayed delivery](#scheduled-delivery)                             |
@@ -3940,7 +4877,7 @@ table in their canonical form.
 | `X-Markdown`    | `Markdown`, `md`                           | Enable [Markdown formatting](#markdown-formatting) in the notification body                   |
 | `X-Icon`        | `Icon`                                     | URL to use as notification [icon](#icons)                                                     |
 | `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |
-| `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address for [e-mail notifications](#e-mail-notifications)                              |
+| `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address (or `yes`) for [e-mail notifications](#e-mail-notifications)                   |
 | `X-Call`        | `Call`                                     | Phone number for [phone calls](#phone-calls)                                                  |
 | `X-Cache`       | `Cache`                                    | Allows disabling [message caching](#message-caching)                                          |
 | `X-Firebase`    | `Firebase`                                 | Allows disabling [sending to Firebase](#disable-firebase)                                     |

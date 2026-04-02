@@ -661,6 +661,8 @@ Add the following function and alias to your `.bashrc` or `.bash_profile`:
        local token=$(< ~/.ntfy_token)  # Securely read the token
        local status_icon="$([ $exit_status -eq 0 ] && echo magic_wand || echo warning)"
        local last_command=$(history | tail -n1 | sed -e 's/^[[:space:]]*[0-9]\{1,\}[[:space:]]*//' -e 's/[;&|][[:space:]]*alert$//')
+       # for zsh users, use the same sed pattern but get the history differently.
+       # local last_command=$(history "$HISTCMD" | sed -e 's/^[[:space:]]*[0-9]\{1,\}[[:space:]]*//' -e 's/[;&|][[:space:]]*alert$//')
 
        curl -s -X POST "https://n.example.dev/alerts" \
            -H "Authorization: Bearer $token" \

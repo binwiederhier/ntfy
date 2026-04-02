@@ -73,7 +73,7 @@
     "publish_dialog_tags_placeholder": "Komma-getrennte Liste von Tags, z.B. Warnung, srv1-Backup",
     "publish_dialog_priority_label": "Priorität",
     "publish_dialog_filename_label": "Dateiname",
-    "publish_dialog_title_placeholder": "Benachrichtigungs-Titel, z.B. CPU-Last-Warnung",
+    "publish_dialog_title_placeholder": "Benachrichtigungstitel, z. B. Speicherplatzwarnung",
     "publish_dialog_tags_label": "Tags",
     "publish_dialog_click_label": "Klick-URL",
     "publish_dialog_click_placeholder": "URL die geöffnet werden soll, wenn die Benachrichtigung angeklickt wird",

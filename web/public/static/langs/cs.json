@@ -403,5 +403,7 @@
     "prefs_appearance_theme_light": "Světlý režim",
     "web_push_subscription_expiring_title": "Oznámení budou pozastavena",
     "web_push_unknown_notification_title": "Neznámé oznámení přijaté ze serveru",
-    "web_push_unknown_notification_body": "Možná bude nutné aktualizovat ntfy otevřením webové aplikace"
+    "web_push_unknown_notification_body": "Možná bude nutné aktualizovat ntfy otevřením webové aplikace",
+    "account_basics_cannot_edit_or_delete_provisioned_user": "Přiděleného uživatele nelze upravovat ani odstranit",
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Nelze upravit ani odstranit přidělený token"
 }

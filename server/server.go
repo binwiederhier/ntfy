@@ -33,16 +33,24 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v2"
+	"heckel.io/ntfy/v2/attachment"
+	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/mail"
+	"heckel.io/ntfy/v2/message"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/payments"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"heckel.io/ntfy/v2/util/sprig"
+	"heckel.io/ntfy/v2/webpush"
 )
 
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config            *Config
+	db                *db.DB // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
 	httpServer        *http.Server
 	httpsServer       *http.Server
 	httpMetricsServer *http.Server
@@ -51,15 +59,16 @@ type Server struct {
 	smtpServer        *smtp.Server
 	smtpServerBackend *smtpBackend
 	smtpSender        mailer
+	mailSender        *mail.Sender
 	topics            map[string]*topic
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
 	firebaseClient    *firebaseClient
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
 	userManager       *user.Manager                       // Might be nil!
-	messageCache      *messageCache                       // Database that stores the messages
-	webPush           *webPushStore                       // Database that stores web push subscriptions
-	fileCache         *fileCache                          // File system based cache that stores attachments
+	messageCache      *message.Cache                      // Database that stores the messages
+	webPush           *webpush.Store                      // Database that stores web push subscriptions
+	attachment        *attachment.Store                   // Attachment store (file system or S3)
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
@@ -81,15 +90,18 @@ var (
 	wsPathRegex            = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/ws$`)
 	authPathRegex          = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*/auth$`)
 	publishPathRegex       = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/(publish|send|trigger)$`)
+	updatePathRegex        = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/[-_A-Za-z0-9]{1,64}$`)
+	clearPathRegex         = regexp.MustCompile(`^/[-_A-Za-z0-9]{1,64}/[-_A-Za-z0-9]{1,64}/(read|clear)$`)
+	sequenceIDRegex        = topicRegex
 
 	webConfigPath                                        = "/config.js"
 	webManifestPath                                      = "/manifest.webmanifest"
-	webRootHTMLPath                                      = "/app.html"
-	webServiceWorkerPath                                 = "/sw.js"
 	accountPath                                          = "/account"
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
+	apiVersionPath                                       = "/v1/version"
+	apiConfigPath                                        = "/v1/config"
 	apiStatsPath                                         = "/v1/stats"
 	apiWebPushPath                                       = "/v1/webpush"
 	apiTiersPath                                         = "/v1/tiers"
@@ -103,17 +115,20 @@ var (
 	apiAccountReservationPath                            = "/v1/account/reservation"
 	apiAccountPhonePath                                  = "/v1/account/phone"
 	apiAccountPhoneVerifyPath                            = "/v1/account/phone/verify"
+	apiAccountEmailPath                                  = "/v1/account/email"
+	apiAccountEmailVerifyPath                            = "/v1/account/email/verify"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
 	apiAccountBillingSubscriptionCheckoutSuccessTemplate = "/v1/account/billing/subscription/success/{CHECKOUT_SESSION_ID}"
 	apiAccountBillingSubscriptionCheckoutSuccessRegex    = regexp.MustCompile(`/v1/account/billing/subscription/success/(.+)$`)
 	apiAccountReservationSingleRegex                     = regexp.MustCompile(`/v1/account/reservation/([-_A-Za-z0-9]{1,64})$`)
-	staticRegex                                          = regexp.MustCompile(`^/static/.+`)
+	staticRegex                                          = regexp.MustCompile(`^/(static/.+|app.html|sw.js|sw.js.map)$`)
 	docsRegex                                            = regexp.MustCompile(`^/docs(|/.*)$`)
 	fileRegex                                            = regexp.MustCompile(`^/file/([-_A-Za-z0-9]{1,64})(?:\.[A-Za-z0-9]{1,16})?$`)
 	urlRegex                                             = regexp.MustCompile(`^https?://`)
 	phoneNumberRegex                                     = regexp.MustCompile(`^\+\d{1,100}$`)
+	emailAddressRegex                                    = regexp.MustCompile(`^[^\s,;]+@[^\s,;]+$`)
 
 	//go:embed site
 	webFs       embed.FS
@@ -138,7 +153,7 @@ var (
 const (
 	firebaseControlTopic     = "~control"                // See Android if changed
 	firebasePollTopic        = "~poll"                   // See iOS if changed (DISABLED for now)
-	emptyMessageBody         = "triggered"               // Used if message body is empty
+	emptyMessageBody         = "triggered"               // Used when a message body is empty
 	newMessageBody           = "New message"             // Used in poll requests as generic message
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
@@ -163,43 +178,78 @@ const (
 // subscriber (if configured).
 func New(conf *Config) (*Server, error) {
 	var mailer mailer
+	var mailSender *mail.Sender
 	if conf.SMTPSenderAddr != "" {
-		mailer = &smtpSender{config: conf}
+		mailSender = mail.NewSender(&mail.Config{
+			SMTPAddr: conf.SMTPSenderAddr,
+			SMTPUser: conf.SMTPSenderUser,
+			SMTPPass: conf.SMTPSenderPass,
+			From:     conf.SMTPSenderFrom,
+		})
+		mailer = &smtpSender{config: conf, sender: mailSender}
 	}
 	var stripe stripeAPI
 	if payments.Available && conf.StripeSecretKey != "" {
 		stripe = newStripeAPI()
 	}
-	messageCache, err := createMessageCache(conf)
+	// Open shared PostgreSQL connection pool if configured
+	var pool *db.DB
+	if conf.DatabaseURL != "" {
+		primary, err := pg.Open(conf.DatabaseURL)
+		if err != nil {
+			return nil, err
+		}
+		var replicas []*db.Host
+		for _, replicaURL := range conf.DatabaseReplicaURLs {
+			r, err := pg.OpenReplica(replicaURL)
+			if err != nil {
+				// Close already-opened replicas before returning
+				for _, opened := range replicas {
+					opened.DB.Close()
+				}
+				primary.DB.Close()
+				return nil, fmt.Errorf("failed to open database replica: %w", err)
+			}
+			replicas = append(replicas, r)
+		}
+		pool = db.New(primary, replicas)
+	}
+	messageCache, err := createMessageCache(conf, pool)
 	if err != nil {
 		return nil, err
 	}
-	var webPush *webPushStore
+	var wp *webpush.Store
 	if conf.WebPushPublicKey != "" {
-		webPush, err = newWebPushStore(conf.WebPushFile, conf.WebPushStartupQueries)
+		if pool != nil {
+			wp, err = webpush.NewPostgresStore(pool)
+		} else {
+			wp, err = webpush.NewSQLiteStore(conf.WebPushFile, conf.WebPushStartupQueries)
+		}
 		if err != nil {
 			return nil, err
 		}
 	}
-	topics, err := messageCache.Topics()
+	topicIDs, err := messageCache.Topics()
 	if err != nil {
 		return nil, err
+	}
+	topics := make(map[string]*topic, len(topicIDs))
+	for _, id := range topicIDs {
+		topics[id] = newTopic(id)
 	}
 	messages, err := messageCache.Stats()
 	if err != nil {
 		return nil, err
 	}
-	var fileCache *fileCache
-	if conf.AttachmentCacheDir != "" {
-		fileCache, err = newFileCache(conf.AttachmentCacheDir, conf.AttachmentTotalSizeLimit)
-		if err != nil {
-			return nil, err
-		}
+	attachmentStore, err := createAttachmentStore(conf, messageCache)
+	if err != nil {
+		return nil, err
 	}
 	var userManager *user.Manager
-	if conf.AuthFile != "" {
+	if conf.AuthFile != "" || pool != nil {
 		authConfig := &user.Config{
 			Filename:            conf.AuthFile,
+			DatabaseURL:         conf.DatabaseURL,
 			StartupQueries:      conf.AuthStartupQueries,
 			DefaultAccess:       conf.AuthDefault,
 			ProvisionEnabled:    true, // Enable provisioning of users and access
@@ -209,7 +259,11 @@ func New(conf *Config) (*Server, error) {
 			BcryptCost:          conf.AuthBcryptCost,
 			QueueWriterInterval: conf.AuthStatsQueueWriterInterval,
 		}
-		userManager, err = user.NewManager(authConfig)
+		if pool != nil {
+			userManager, err = user.NewPostgresManager(pool, authConfig)
+		} else {
+			userManager, err = user.NewSQLiteManager(conf.AuthFile, conf.AuthStartupQueries, authConfig)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -230,11 +284,13 @@ func New(conf *Config) (*Server, error) {
 	}
 	s := &Server{
 		config:          conf,
+		db:              pool,
 		messageCache:    messageCache,
-		webPush:         webPush,
-		fileCache:       fileCache,
+		webPush:         wp,
+		attachment:      attachmentStore,
 		firebaseClient:  firebaseClient,
 		smtpSender:      mailer,
+		mailSender:      mailSender,
 		topics:          topics,
 		userManager:     userManager,
 		messages:        messages,
@@ -246,13 +302,24 @@ func New(conf *Config) (*Server, error) {
 	return s, nil
 }
 
-func createMessageCache(conf *Config) (*messageCache, error) {
+func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
 	if conf.CacheDuration == 0 {
-		return newNopCache()
+		return message.NewNopStore()
+	} else if pool != nil {
+		return message.NewPostgresStore(pool, conf.CacheBatchSize, conf.CacheBatchTimeout)
 	} else if conf.CacheFile != "" {
-		return newSqliteCache(conf.CacheFile, conf.CacheStartupQueries, conf.CacheDuration, conf.CacheBatchSize, conf.CacheBatchTimeout, false)
+		return message.NewSQLiteStore(conf.CacheFile, conf.CacheStartupQueries, conf.CacheDuration, conf.CacheBatchSize, conf.CacheBatchTimeout, false)
 	}
-	return newMemCache()
+	return message.NewMemStore()
+}
+
+func createAttachmentStore(conf *Config, messageCache *message.Cache) (*attachment.Store, error) {
+	if strings.HasPrefix(conf.AttachmentCacheDir, "s3://") {
+		return attachment.NewS3Store(conf.AttachmentCacheDir, conf.AttachmentTotalSizeLimit, conf.AttachmentOrphanGracePeriod, messageCache.AttachmentsWithSizes)
+	} else if conf.AttachmentCacheDir != "" {
+		return attachment.NewFileStore(conf.AttachmentCacheDir, conf.AttachmentTotalSizeLimit, conf.AttachmentOrphanGracePeriod, messageCache.AttachmentsWithSizes)
+	}
+	return nil, nil
 }
 
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
@@ -277,9 +344,9 @@ func (s *Server) Run() error {
 	if s.config.ProfileListenHTTP != "" {
 		listenStr += fmt.Sprintf(" %s[http/profile]", s.config.ProfileListenHTTP)
 	}
-	log.Tag(tagStartup).Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.Version, log.CurrentLevel().String())
+	log.Tag(tagStartup).Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.BuildVersion, log.CurrentLevel().String())
 	if log.IsFile() {
-		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s\n", listenStr, s.config.Version)
+		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s\n", listenStr, s.config.BuildVersion)
 		fmt.Fprintf(os.Stderr, "Logs are written to %s\n", log.File())
 	}
 	mux := http.NewServeMux()
@@ -375,17 +442,30 @@ func (s *Server) Stop() {
 	if s.smtpServer != nil {
 		s.smtpServer.Close()
 	}
+	if s.mailSender != nil {
+		s.mailSender.Close()
+	}
+	if s.attachment != nil {
+		s.attachment.Close()
+	}
 	s.closeDatabases()
-	close(s.closeChan)
+	if s.closeChan != nil {
+		close(s.closeChan)
+	}
 }
 
 func (s *Server) closeDatabases() {
 	if s.userManager != nil {
 		s.userManager.Close()
 	}
-	s.messageCache.Close()
+	if s.messageCache != nil {
+		s.messageCache.Close()
+	}
 	if s.webPush != nil {
 		s.webPush.Close()
+	}
+	if s.db != nil {
+		s.db.Close()
 	}
 }
 
@@ -433,8 +513,14 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 		} else {
 			ev.Info("WebSocket error: %s", err.Error())
 		}
-		w.WriteHeader(httpErr.HTTPCode)
-		return // Do not attempt to write any body to upgraded connection
+		// Write error response only if the connection was not hijacked yet. Bytes written to hijacked
+		// connections are WebSocket frames, not HTTP, and will cause "http: response.WriteHeader on hijacked
+		// connection" log spam.
+		var postUpgradeErr *errWebSocketPostUpgrade
+		if !errors.As(err, &postUpgradeErr) {
+			w.WriteHeader(httpErr.HTTPCode)
+		}
+		return
 	}
 	if isNormalError {
 		ev.Debug("Connection closed with HTTP %d (ntfy error %d)", httpErr.HTTPCode, httpErr.Code)
@@ -460,6 +546,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
 		return s.handleHealth(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiVersionPath {
+		return s.ensureAdmin(s.handleVersion)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiConfigPath {
+		return s.handleConfig(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webManifestPath {
@@ -520,6 +610,12 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberAdd)))(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountPhonePath {
 		return s.ensureUser(s.ensureCallsEnabled(s.withAccountSync(s.handleAccountPhoneNumberDelete)))(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountEmailVerifyPath {
+		return s.ensureUser(s.ensureEmailsEnabled(s.withAccountSync(s.handleAccountEmailVerify)))(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAccountEmailPath {
+		return s.ensureUser(s.ensureEmailsEnabled(s.withAccountSync(s.handleAccountEmailAdd)))(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountEmailPath {
+		return s.ensureUser(s.ensureEmailsEnabled(s.withAccountSync(s.handleAccountEmailDelete)))(w, r, v)
 	} else if r.Method == http.MethodPost && apiWebPushPath == r.URL.Path {
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushUpdate))(w, r, v)
 	} else if r.Method == http.MethodDelete && apiWebPushPath == r.URL.Path {
@@ -532,11 +628,11 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
 		return s.handleMetrics(w, r, v)
-	} else if r.Method == http.MethodGet && (staticRegex.MatchString(r.URL.Path) || r.URL.Path == webServiceWorkerPath || r.URL.Path == webRootHTMLPath) {
+	} else if r.Method == http.MethodGet && staticRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleStatic)(w, r, v)
 	} else if r.Method == http.MethodGet && docsRegex.MatchString(r.URL.Path) {
 		return s.ensureWebEnabled(s.handleDocs)(w, r, v)
-	} else if (r.Method == http.MethodGet || r.Method == http.MethodHead) && fileRegex.MatchString(r.URL.Path) && s.config.AttachmentCacheDir != "" {
+	} else if (r.Method == http.MethodGet || r.Method == http.MethodHead) && fileRegex.MatchString(r.URL.Path) && s.attachment != nil {
 		return s.limitRequests(s.handleFile)(w, r, v)
 	} else if r.Method == http.MethodOptions {
 		return s.limitRequests(s.handleOptions)(w, r, v) // Should work even if the web app is not enabled, see #598
@@ -544,8 +640,12 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.transformBodyJSON(s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublish)))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == matrixPushPath {
 		return s.transformMatrixJSON(s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublishMatrix)))(w, r, v)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && topicPathRegex.MatchString(r.URL.Path) {
+	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && (topicPathRegex.MatchString(r.URL.Path) || updatePathRegex.MatchString(r.URL.Path)) {
 		return s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublish))(w, r, v)
+	} else if r.Method == http.MethodDelete && updatePathRegex.MatchString(r.URL.Path) {
+		return s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handleDelete))(w, r, v)
+	} else if r.Method == http.MethodPut && clearPathRegex.MatchString(r.URL.Path) {
+		return s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handleClear))(w, r, v)
 	} else if r.Method == http.MethodGet && publishPathRegex.MatchString(r.URL.Path) {
 		return s.limitRequestsWithTopic(s.authorizeTopicWrite(s.handlePublish))(w, r, v)
 	} else if r.Method == http.MethodGet && jsonPathRegex.MatchString(r.URL.Path) {
@@ -596,23 +696,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor
 	return s.writeJSON(w, response)
 }
 
+func (s *Server) handleConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	w.Header().Set("Cache-Control", "no-cache")
+	return s.writeJSON(w, s.configResponse())
+}
+
 func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	response := &apiConfigResponse{
-		BaseURL:            "", // Will translate to window.location.origin
-		AppRoot:            s.config.WebRoot,
-		EnableLogin:        s.config.EnableLogin,
-		RequireLogin:       s.config.RequireLogin,
-		EnableSignup:       s.config.EnableSignup,
-		EnablePayments:     s.config.StripeSecretKey != "",
-		EnableCalls:        s.config.TwilioAccount != "",
-		EnableEmails:       s.config.SMTPSenderFrom != "",
-		EnableReservations: s.config.EnableReservations,
-		EnableWebPush:      s.config.WebPushPublicKey != "",
-		BillingContact:     s.config.BillingContact,
-		WebPushPublicKey:   s.config.WebPushPublicKey,
-		DisallowedTopics:   s.config.DisallowedTopics,
-	}
-	b, err := json.MarshalIndent(response, "", "  ")
+	b, err := json.MarshalIndent(s.configResponse(), "", "  ")
 	if err != nil {
 		return err
 	}
@@ -622,10 +712,30 @@ func (s *Server) handleWebConfig(w http.ResponseWriter, _ *http.Request, _ *visi
 	return err
 }
 
+func (s *Server) configResponse() *apiConfigResponse {
+	return &apiConfigResponse{
+		BaseURL:            "", // Will translate to window.location.origin
+		AppRoot:            s.config.WebRoot,
+		EnableLogin:        s.config.EnableLogin,
+		RequireLogin:       s.config.RequireLogin,
+		EnableSignup:       s.config.EnableSignup,
+		EnablePayments:     s.config.StripeSecretKey != "",
+		EnableCalls:        s.config.TwilioAccount != "",
+		EnableEmails:       s.config.SMTPSenderFrom != "",
+		EnableEmailVerify:  s.config.SMTPSenderVerify,
+		EnableReservations: s.config.EnableReservations,
+		EnableWebPush:      s.config.WebPushPublicKey != "",
+		BillingContact:     s.config.BillingContact,
+		WebPushPublicKey:   s.config.WebPushPublicKey,
+		DisallowedTopics:   s.config.DisallowedTopics,
+		ConfigHash:         s.config.Hash(),
+	}
+}
+
 // handleWebManifest serves the web app manifest for the progressive web app (PWA)
 func (s *Server) handleWebManifest(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
 	response := &webManifestResponse{
-		Name:            "ntfy web",
+		Name:            "ntfy",
 		Description:     "ntfy lets you send push notifications via scripts from any computer or phone",
 		ShortName:       "ntfy",
 		Scope:           "/",
@@ -680,7 +790,7 @@ func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request, _ *visitor)
 // Before streaming the file to a client, it locates uploader (m.Sender or m.User) in the message cache, so it
 // can associate the download bandwidth with the uploader.
 func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	if s.config.AttachmentCacheDir == "" {
+	if s.attachment == nil {
 		return errHTTPInternalError
 	}
 	matches := fileRegex.FindStringSubmatch(r.URL.Path)
@@ -688,16 +798,16 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 		return errHTTPInternalErrorInvalidPath
 	}
 	messageID := matches[1]
-	file := filepath.Join(s.config.AttachmentCacheDir, messageID)
-	stat, err := os.Stat(file)
+	reader, size, err := s.attachment.Read(messageID)
 	if err != nil {
 		return errHTTPNotFound.Fields(log.Context{
 			"message_id":    messageID,
-			"error_context": "filesystem",
+			"error_context": "attachment_store",
 		})
 	}
+	defer reader.Close()
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", stat.Size()))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", size))
 	if r.Method == http.MethodHead {
 		return nil
 	}
@@ -706,11 +816,11 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	//   - avoid abuse (e.g. 1 uploader, 1k downloaders)
 	//   - and also uses the higher bandwidth limits of a paying user
 	m, err := s.messageCache.Message(messageID)
-	if errors.Is(err, errMessageNotFound) {
+	if errors.Is(err, model.ErrMessageNotFound) {
 		if s.config.CacheBatchTimeout > 0 {
 			// Strange edge case: If we immediately after upload request the file (the web app does this for images),
 			// and messages are persisted asynchronously, retry fetching from the database
-			m, err = util.Retry(func() (*message, error) {
+			m, err = util.Retry(func() (*model.Message, error) {
 				return s.messageCache.Message(messageID)
 			}, s.config.CacheBatchTimeout, 100*time.Millisecond, 300*time.Millisecond, 600*time.Millisecond)
 		}
@@ -733,19 +843,14 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	} else if m.Sender.IsValid() {
 		bandwidthVisitor = s.visitor(m.Sender, nil)
 	}
-	if !bandwidthVisitor.BandwidthAllowed(stat.Size()) {
+	if !bandwidthVisitor.BandwidthAllowed(size) {
 		return errHTTPTooManyRequestsLimitAttachmentBandwidth.With(m)
 	}
 	// Actually send file
-	f, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
 	if m.Attachment.Name != "" {
 		w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(m.Attachment.Name))
 	}
-	_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), f)
+	_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), reader)
 	return err
 }
 
@@ -756,7 +861,7 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
-func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, error) {
+func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
 	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
 	if err != nil {
@@ -770,8 +875,8 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 	if err != nil {
 		return nil, err
 	}
-	m := newDefaultMessage(t.ID, "")
-	cache, firebase, email, call, template, unifiedpush, e := s.parsePublishParams(r, m)
+	m := model.NewDefaultMessage(t.ID, "")
+	cache, firebase, email, call, template, unifiedpush, priorityStr, e := s.parsePublishParams(r, m)
 	if e != nil {
 		return nil, e.With(t)
 	}
@@ -783,9 +888,17 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
-	} else if email != "" && !vrate.EmailAllowed() {
-		return nil, errHTTPTooManyRequestsLimitEmails.With(t)
-	} else if call != "" {
+	}
+	if email != "" {
+		var httpErr *errHTTP
+		email, httpErr = s.convertEmailAddress(v.User(), email)
+		if httpErr != nil {
+			return nil, httpErr.With(t)
+		} else if !vrate.EmailAllowed() {
+			return nil, errHTTPTooManyRequestsLimitEmails.With(t)
+		}
+	}
+	if call != "" {
 		var httpErr *errHTTP
 		call, httpErr = s.convertPhoneNumber(v.User(), call)
 		if httpErr != nil {
@@ -795,19 +908,20 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		}
 	}
 	if m.PollID != "" {
-		m = newPollRequestMessage(t.ID, m.PollID)
+		m = model.NewPollRequestMessage(t.ID, m.PollID)
 	}
 	m.Sender = v.IP()
 	m.User = v.MaybeUserID()
 	if cache {
 		m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
 	}
-	if err := s.handlePublishBody(r, v, m, body, template, unifiedpush); err != nil {
+	if err := s.handlePublishBody(r, v, m, body, template, unifiedpush, priorityStr); err != nil {
 		return nil, err
 	}
 	if m.Message == "" {
 		m.Message = emptyMessageBody
 	}
+	m.SanitizeUTF8()
 	delayed := m.Time > time.Now().Unix()
 	ev := logvrm(v, r, m).
 		Tag(tagPublish).
@@ -847,6 +961,17 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*message, e
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
 	}
 	if cache {
+		// Delete any existing scheduled message with the same sequence ID
+		deletedIDs, err := s.messageCache.DeleteScheduledBySequenceID(t.ID, m.SequenceID)
+		if err != nil {
+			return nil, err
+		}
+		// Delete attachment files for deleted scheduled messages
+		if s.attachment != nil && len(deletedIDs) > 0 {
+			if err := s.attachment.Remove(deletedIDs...); err != nil {
+				logvrm(v, r, m).Tag(tagPublish).Err(err).Warn("Error removing attachments for deleted scheduled messages")
+			}
+		}
 		logvrm(v, r, m).Tag(tagPublish).Debug("Adding message to cache")
 		if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
@@ -873,7 +998,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 		return err
 	}
 	minc(metricMessagesPublishedSuccess)
-	return s.writeJSON(w, m)
+	return s.writeJSON(w, m.ForJSON())
 }
 
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -901,7 +1026,72 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	return writeMatrixSuccess(w)
 }
 
-func (s *Server) sendToFirebase(v *visitor, m *message) {
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	return s.handleActionMessage(w, r, v, model.MessageDeleteEvent)
+}
+
+func (s *Server) handleClear(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	return s.handleActionMessage(w, r, v, model.MessageClearEvent)
+}
+
+func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *visitor, event string) error {
+	t, err := fromContext[*topic](r, contextTopic)
+	if err != nil {
+		return err
+	}
+	vrate, err := fromContext[*visitor](r, contextRateVisitor)
+	if err != nil {
+		return err
+	}
+	if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) && !vrate.MessageAllowed() {
+		return errHTTPTooManyRequestsLimitMessages.With(t)
+	}
+	sequenceID, e := s.sequenceIDFromPath(r.URL.Path)
+	if e != nil {
+		return e.With(t)
+	}
+	// Create an action message with the given event type
+	m := model.NewActionMessage(event, t.ID, sequenceID)
+	m.Sender = v.IP()
+	m.User = v.MaybeUserID()
+	m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
+	// Publish to subscribers
+	if err := t.Publish(v, m); err != nil {
+		return err
+	}
+	// Send to Firebase for Android clients
+	if s.firebaseClient != nil {
+		go s.sendToFirebase(v, m)
+	}
+	// Send to web push endpoints
+	if s.config.WebPushPublicKey != "" {
+		go s.publishToWebPushEndpoints(v, m)
+	}
+	if event == model.MessageDeleteEvent {
+		// Delete any existing scheduled message with the same sequence ID
+		deletedIDs, err := s.messageCache.DeleteScheduledBySequenceID(t.ID, sequenceID)
+		if err != nil {
+			return err
+		}
+		// Delete attachment files for deleted scheduled messages
+		if s.attachment != nil && len(deletedIDs) > 0 {
+			if err := s.attachment.Remove(deletedIDs...); err != nil {
+				logvrm(v, r, m).Tag(tagPublish).Err(err).Warn("Error removing attachments for deleted scheduled messages")
+			}
+		}
+	}
+	// Add to message cache
+	if err := s.messageCache.AddMessage(m); err != nil {
+		return err
+	}
+	logvrm(v, r, m).Tag(tagPublish).Debug("Published %s for sequence ID %s", event, sequenceID)
+	s.mu.Lock()
+	s.messages++
+	s.mu.Unlock()
+	return s.writeJSON(w, m.ForJSON())
+}
+
+func (s *Server) sendToFirebase(v *visitor, m *model.Message) {
 	logvm(v, m).Tag(tagFirebase).Debug("Publishing to Firebase")
 	if err := s.firebaseClient.Send(v, m); err != nil {
 		minc(metricFirebasePublishedFailure)
@@ -915,8 +1105,8 @@ func (s *Server) sendToFirebase(v *visitor, m *message) {
 	minc(metricFirebasePublishedSuccess)
 }
 
-func (s *Server) sendEmail(v *visitor, m *message, email string) {
-	logvm(v, m).Tag(tagEmail).Field("email", email).Debug("Sending email to %s", email)
+func (s *Server) sendEmail(v *visitor, m *model.Message, email string) {
+	logvm(v, m).Tag(tagEmail).Field("email", email).Info("Sending email to %s", email)
 	if err := s.smtpSender.Send(v, m, email); err != nil {
 		logvm(v, m).Tag(tagEmail).Field("email", email).Err(err).Warn("Unable to send email to %s: %v", email, err.Error())
 		minc(metricEmailsPublishedFailure)
@@ -925,7 +1115,7 @@ func (s *Server) sendEmail(v *visitor, m *message, email string) {
 	minc(metricEmailsPublishedSuccess)
 }
 
-func (s *Server) forwardPollRequest(v *visitor, m *message) {
+func (s *Server) forwardPollRequest(v *visitor, m *model.Message) {
 	topicURL := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
 	topicHash := fmt.Sprintf("%x", sha256.Sum256([]byte(topicURL)))
 	forwardURL := fmt.Sprintf("%s/%s", s.config.UpstreamBaseURL, topicHash)
@@ -935,7 +1125,7 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 		logvm(v, m).Err(err).Warn("Unable to publish poll request")
 		return
 	}
-	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
+	req.Header.Set("User-Agent", "ntfy/"+s.config.BuildVersion)
 	req.Header.Set("X-Poll-ID", m.ID)
 	if s.config.UpstreamAccessToken != "" {
 		req.Header.Set("Authorization", util.BearerAuth(s.config.UpstreamAccessToken))
@@ -957,7 +1147,25 @@ func (s *Server) forwardPollRequest(v *visitor, m *message) {
 	}
 }
 
-func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, firebase bool, email, call string, template templateMode, unifiedpush bool, err *errHTTP) {
+func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bool, firebase bool, email, call string, template templateMode, unifiedpush bool, priorityStr string, err *errHTTP) {
+	if r.Method != http.MethodGet && updatePathRegex.MatchString(r.URL.Path) {
+		pathSequenceID, err := s.sequenceIDFromPath(r.URL.Path)
+		if err != nil {
+			return false, false, "", "", "", false, "", err
+		}
+		m.SequenceID = pathSequenceID
+	} else {
+		sequenceID := readParam(r, "x-sequence-id", "sequence-id", "sid")
+		if sequenceID != "" {
+			if sequenceIDRegex.MatchString(sequenceID) {
+				m.SequenceID = sequenceID
+			} else {
+				return false, false, "", "", "", false, "", errHTTPBadRequestSequenceIDInvalid
+			}
+		} else {
+			m.SequenceID = m.ID
+		}
+	}
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
@@ -966,14 +1174,14 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	filename := readParam(r, "x-filename", "filename", "file", "f")
 	attach := readParam(r, "x-attach", "attach", "a")
 	if attach != "" || filename != "" {
-		m.Attachment = &attachment{}
+		m.Attachment = &model.Attachment{}
 	}
 	if filename != "" {
 		m.Attachment.Name = filename
 	}
 	if attach != "" {
 		if !urlRegex.MatchString(attach) {
-			return false, false, "", "", "", false, errHTTPBadRequestAttachmentURLInvalid
+			return false, false, "", "", "", false, "", errHTTPBadRequestAttachmentURLInvalid
 		}
 		m.Attachment.URL = attach
 		if m.Attachment.Name == "" {
@@ -991,19 +1199,22 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	}
 	if icon != "" {
 		if !urlRegex.MatchString(icon) {
-			return false, false, "", "", "", false, errHTTPBadRequestIconURLInvalid
+			return false, false, "", "", "", false, "", errHTTPBadRequestIconURLInvalid
 		}
 		m.Icon = icon
 	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
+	if email != "" && !emailAddressRegex.MatchString(email) && !toBool(email) {
+		return false, false, "", "", "", false, "", errHTTPBadRequestEmailAddressInvalid
+	}
 	if s.smtpSender == nil && email != "" {
-		return false, false, "", "", "", false, errHTTPBadRequestEmailDisabled
+		return false, false, "", "", "", false, "", errHTTPBadRequestEmailDisabled
 	}
 	call = readParam(r, "x-call", "call")
 	if call != "" && (s.config.TwilioAccount == "" || s.userManager == nil) {
-		return false, false, "", "", "", false, errHTTPBadRequestPhoneCallsDisabled
+		return false, false, "", "", "", false, "", errHTTPBadRequestPhoneCallsDisabled
 	} else if call != "" && !isBoolValue(call) && !phoneNumberRegex.MatchString(call) {
-		return false, false, "", "", "", false, errHTTPBadRequestPhoneNumberInvalid
+		return false, false, "", "", "", false, "", errHTTPBadRequestPhoneNumberInvalid
 	}
 	template = templateMode(readParam(r, "x-template", "template", "tpl"))
 	messageStr := readParam(r, "x-message", "message", "m")
@@ -1015,29 +1226,33 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		m.Message = messageStr
 	}
 	var e error
-	m.Priority, e = util.ParsePriority(readParam(r, "x-priority", "priority", "prio", "p"))
-	if e != nil {
-		return false, false, "", "", "", false, errHTTPBadRequestPriorityInvalid
+	priorityStr = readParam(r, "x-priority", "priority", "prio", "p")
+	if !template.Enabled() {
+		m.Priority, e = util.ParsePriority(priorityStr)
+		if e != nil {
+			return false, false, "", "", "", false, "", errHTTPBadRequestPriorityInvalid
+		}
+		priorityStr = "" // Clear since it's already parsed
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayNoCache
+			return false, false, "", "", "", false, "", errHTTPBadRequestDelayNoCache
 		}
 		if email != "" {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
+			return false, false, "", "", "", false, "", errHTTPBadRequestDelayNoEmail // we cannot store the email address (yet)
 		}
 		if call != "" {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayNoCall // we cannot store the phone number (yet)
+			return false, false, "", "", "", false, "", errHTTPBadRequestDelayNoCall // we cannot store the phone number (yet)
 		}
 		delay, err := util.ParseFutureTime(delayStr, time.Now())
 		if err != nil {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayCannotParse
+			return false, false, "", "", "", false, "", errHTTPBadRequestDelayCannotParse
 		} else if delay.Unix() < time.Now().Add(s.config.MessageDelayMin).Unix() {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayTooSmall
+			return false, false, "", "", "", false, "", errHTTPBadRequestDelayTooSmall
 		} else if delay.Unix() > time.Now().Add(s.config.MessageDelayMax).Unix() {
-			return false, false, "", "", "", false, errHTTPBadRequestDelayTooLarge
+			return false, false, "", "", "", false, "", errHTTPBadRequestDelayTooLarge
 		}
 		m.Time = delay.Unix()
 	}
@@ -1045,7 +1260,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 	if actionsStr != "" {
 		m.Actions, e = parseActions(actionsStr)
 		if e != nil {
-			return false, false, "", "", "", false, errHTTPBadRequestActionsInvalid.Wrap("%s", e.Error())
+			return false, false, "", "", "", false, "", errHTTPBadRequestActionsInvalid.Wrap("%s", e.Error())
 		}
 	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
@@ -1064,7 +1279,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 		cache = false
 		email = ""
 	}
-	return cache, firebase, email, call, template, unifiedpush, nil
+	return cache, firebase, email, call, template, unifiedpush, priorityStr, nil
 }
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
@@ -1083,8 +1298,8 @@ func (s *Server) parsePublishParams(r *http.Request, m *message) (cache bool, fi
 //     If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
 //  7. curl -T file.txt ntfy.sh/mytopic
 //     In all other cases, mostly if file.txt is > message limit, treat it as an attachment
-func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser, template templateMode, unifiedpush bool) error {
-	if m.Event == pollRequestEvent { // Case 1
+func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *model.Message, body *util.PeekedReadCloser, template templateMode, unifiedpush bool, priorityStr string) error {
+	if m.Event == model.PollRequestEvent { // Case 1
 		return s.handleBodyDiscard(body)
 	} else if unifiedpush {
 		return s.handleBodyAsMessageAutoDetect(m, body) // Case 2
@@ -1093,7 +1308,7 @@ func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *message, body
 	} else if m.Attachment != nil && m.Attachment.Name != "" {
 		return s.handleBodyAsAttachment(r, v, m, body) // Case 4
 	} else if template.Enabled() {
-		return s.handleBodyAsTemplatedTextMessage(m, template, body) // Case 5
+		return s.handleBodyAsTemplatedTextMessage(m, template, body, priorityStr) // Case 5
 	} else if !body.LimitReached && utf8.Valid(body.PeekedBytes) {
 		return s.handleBodyAsTextMessage(m, body) // Case 6
 	}
@@ -1106,7 +1321,7 @@ func (s *Server) handleBodyDiscard(body *util.PeekedReadCloser) error {
 	return err
 }
 
-func (s *Server) handleBodyAsMessageAutoDetect(m *message, body *util.PeekedReadCloser) error {
+func (s *Server) handleBodyAsMessageAutoDetect(m *model.Message, body *util.PeekedReadCloser) error {
 	if utf8.Valid(body.PeekedBytes) {
 		m.Message = string(body.PeekedBytes) // Do not trim
 	} else {
@@ -1116,7 +1331,7 @@ func (s *Server) handleBodyAsMessageAutoDetect(m *message, body *util.PeekedRead
 	return nil
 }
 
-func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeekedReadCloser) error {
+func (s *Server) handleBodyAsTextMessage(m *model.Message, body *util.PeekedReadCloser) error {
 	if !utf8.Valid(body.PeekedBytes) {
 		return errHTTPBadRequestMessageNotUTF8.With(m)
 	}
@@ -1129,7 +1344,7 @@ func (s *Server) handleBodyAsTextMessage(m *message, body *util.PeekedReadCloser
 	return nil
 }
 
-func (s *Server) handleBodyAsTemplatedTextMessage(m *message, template templateMode, body *util.PeekedReadCloser) error {
+func (s *Server) handleBodyAsTemplatedTextMessage(m *model.Message, template templateMode, body *util.PeekedReadCloser, priorityStr string) error {
 	body, err := util.Peek(body, max(s.config.MessageSizeLimit, jsonBodyBytesLimit))
 	if err != nil {
 		return err
@@ -1142,7 +1357,7 @@ func (s *Server) handleBodyAsTemplatedTextMessage(m *message, template templateM
 			return err
 		}
 	} else {
-		if err := s.renderTemplateFromParams(m, peekedBody); err != nil {
+		if err := s.renderTemplateFromParams(m, peekedBody, priorityStr); err != nil {
 			return err
 		}
 	}
@@ -1154,7 +1369,7 @@ func (s *Server) handleBodyAsTemplatedTextMessage(m *message, template templateM
 
 // renderTemplateFromFile transforms the JSON message body according to a template from the filesystem.
 // The template file must be in the templates directory, or in the configured template directory.
-func (s *Server) renderTemplateFromFile(m *message, templateName, peekedBody string) error {
+func (s *Server) renderTemplateFromFile(m *model.Message, templateName, peekedBody string) error {
 	if !templateNameRegex.MatchString(templateName) {
 		return errHTTPBadRequestTemplateFileNotFound
 	}
@@ -1173,33 +1388,51 @@ func (s *Server) renderTemplateFromFile(m *message, templateName, peekedBody str
 	}
 	var err error
 	if tpl.Message != nil {
-		if m.Message, err = s.renderTemplate(*tpl.Message, peekedBody); err != nil {
+		if m.Message, err = s.renderTemplate(templateName+" (message)", *tpl.Message, peekedBody); err != nil {
 			return err
 		}
 	}
 	if tpl.Title != nil {
-		if m.Title, err = s.renderTemplate(*tpl.Title, peekedBody); err != nil {
+		if m.Title, err = s.renderTemplate(templateName+" (title)", *tpl.Title, peekedBody); err != nil {
 			return err
+		}
+	}
+	if tpl.Priority != nil {
+		renderedPriority, err := s.renderTemplate(templateName+" (priority)", *tpl.Priority, peekedBody)
+		if err != nil {
+			return err
+		}
+		if m.Priority, err = util.ParsePriority(renderedPriority); err != nil {
+			return errHTTPBadRequestPriorityInvalid
 		}
 	}
 	return nil
 }
 
 // renderTemplateFromParams transforms the JSON message body according to the inline template in the
-// message and title parameters.
-func (s *Server) renderTemplateFromParams(m *message, peekedBody string) error {
+// message, title, and priority parameters.
+func (s *Server) renderTemplateFromParams(m *model.Message, peekedBody string, priorityStr string) error {
 	var err error
-	if m.Message, err = s.renderTemplate(m.Message, peekedBody); err != nil {
+	if m.Message, err = s.renderTemplate("priority query parameter", m.Message, peekedBody); err != nil {
 		return err
 	}
-	if m.Title, err = s.renderTemplate(m.Title, peekedBody); err != nil {
+	if m.Title, err = s.renderTemplate("title query parameter", m.Title, peekedBody); err != nil {
 		return err
+	}
+	if priorityStr != "" {
+		renderedPriority, err := s.renderTemplate("priority query parameter", priorityStr, peekedBody)
+		if err != nil {
+			return err
+		}
+		if m.Priority, err = util.ParsePriority(renderedPriority); err != nil {
+			return errHTTPBadRequestPriorityInvalid
+		}
 	}
 	return nil
 }
 
 // renderTemplate renders a template with the given JSON source data.
-func (s *Server) renderTemplate(tpl string, source string) (string, error) {
+func (s *Server) renderTemplate(name, tpl, source string) (string, error) {
 	if templateDisallowedRegex.MatchString(tpl) {
 		return "", errHTTPBadRequestTemplateDisallowedFunctionCalls
 	}
@@ -1214,13 +1447,13 @@ func (s *Server) renderTemplate(tpl string, source string) (string, error) {
 	var buf bytes.Buffer
 	limitWriter := util.NewLimitWriter(util.NewTimeoutWriter(&buf, templateMaxExecutionTime), util.NewFixedLimiter(templateMaxOutputBytes))
 	if err := t.Execute(limitWriter, data); err != nil {
-		return "", errHTTPBadRequestTemplateExecuteFailed.Wrap("%s", err.Error())
+		return "", errHTTPBadRequestTemplateExecuteFailed.Wrap("template %s: %s", name, err.Error())
 	}
 	return strings.TrimSpace(strings.ReplaceAll(buf.String(), "\\n", "\n")), nil // replace any remaining "\n" (those outside of template curly braces) with newlines
 }
 
-func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message, body *util.PeekedReadCloser) error {
-	if s.fileCache == nil || s.config.BaseURL == "" || s.config.AttachmentCacheDir == "" {
+func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *model.Message, body *util.PeekedReadCloser) error {
+	if s.attachment == nil || s.config.BaseURL == "" {
 		return errHTTPBadRequestAttachmentsDisallowed.With(m)
 	}
 	vinfo, err := v.Info()
@@ -1228,22 +1461,22 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		return err
 	}
 	attachmentExpiry := time.Now().Add(vinfo.Limits.AttachmentExpiryDuration).Unix()
+	if m.Expires > 0 && attachmentExpiry > m.Expires {
+		attachmentExpiry = m.Expires // Attachment must never outlive the message
+	}
 	if m.Time > attachmentExpiry {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery.With(m)
 	}
-	contentLengthStr := r.Header.Get("Content-Length")
-	if contentLengthStr != "" { // Early "do-not-trust" check, hard limit see below
-		contentLength, err := strconv.ParseInt(contentLengthStr, 10, 64)
-		if err == nil && (contentLength > vinfo.Stats.AttachmentTotalSizeRemaining || contentLength > vinfo.Limits.AttachmentFileSizeLimit) {
-			return errHTTPEntityTooLargeAttachment.With(m).Fields(log.Context{
-				"message_content_length":          contentLength,
-				"attachment_total_size_remaining": vinfo.Stats.AttachmentTotalSizeRemaining,
-				"attachment_file_size_limit":      vinfo.Limits.AttachmentFileSizeLimit,
-			})
-		}
+	// Early "do-not-trust" check, hard limit see below
+	if r.ContentLength > 0 && (r.ContentLength > vinfo.Stats.AttachmentTotalSizeRemaining || r.ContentLength > vinfo.Limits.AttachmentFileSizeLimit) {
+		return errHTTPEntityTooLargeAttachment.With(m).Fields(log.Context{
+			"message_content_length":          r.ContentLength,
+			"attachment_total_size_remaining": vinfo.Stats.AttachmentTotalSizeRemaining,
+			"attachment_file_size_limit":      vinfo.Limits.AttachmentFileSizeLimit,
+		})
 	}
 	if m.Attachment == nil {
-		m.Attachment = &attachment{}
+		m.Attachment = &model.Attachment{}
 	}
 	var ext string
 	m.Attachment.Expires = attachmentExpiry
@@ -1260,7 +1493,7 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 		util.NewFixedLimiter(vinfo.Limits.AttachmentFileSizeLimit),
 		util.NewFixedLimiter(vinfo.Stats.AttachmentTotalSizeRemaining),
 	}
-	m.Attachment.Size, err = s.fileCache.Write(m.ID, body, limiters...)
+	m.Attachment.Size, err = s.attachment.Write(m.ID, body, r.ContentLength, limiters...)
 	if errors.Is(err, util.ErrLimitReached) {
 		return errHTTPEntityTooLargeAttachment.With(m)
 	} else if err != nil {
@@ -1270,9 +1503,9 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *message,
 }
 
 func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	encoder := func(msg *message) (string, error) {
+	encoder := func(msg *model.Message) (string, error) {
 		var buf bytes.Buffer
-		if err := json.NewEncoder(&buf).Encode(&msg); err != nil {
+		if err := json.NewEncoder(&buf).Encode(msg.ForJSON()); err != nil {
 			return "", err
 		}
 		return buf.String(), nil
@@ -1281,12 +1514,12 @@ func (s *Server) handleSubscribeJSON(w http.ResponseWriter, r *http.Request, v *
 }
 
 func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	encoder := func(msg *message) (string, error) {
+	encoder := func(msg *model.Message) (string, error) {
 		var buf bytes.Buffer
-		if err := json.NewEncoder(&buf).Encode(&msg); err != nil {
+		if err := json.NewEncoder(&buf).Encode(msg.ForJSON()); err != nil {
 			return "", err
 		}
-		if msg.Event != messageEvent {
+		if msg.Event != model.MessageEvent && msg.Event != model.MessageDeleteEvent && msg.Event != model.MessageClearEvent {
 			return fmt.Sprintf("event: %s\ndata: %s\n", msg.Event, buf.String()), nil // Browser's .onmessage() does not fire on this!
 		}
 		return fmt.Sprintf("data: %s\n", buf.String()), nil
@@ -1295,8 +1528,8 @@ func (s *Server) handleSubscribeSSE(w http.ResponseWriter, r *http.Request, v *v
 }
 
 func (s *Server) handleSubscribeRaw(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	encoder := func(msg *message) (string, error) {
-		if msg.Event == messageEvent { // only handle default events
+	encoder := func(msg *model.Message) (string, error) {
+		if msg.Event == model.MessageEvent { // only handle default events
 			return strings.ReplaceAll(msg.Message, "\n", " ") + "\n", nil
 		}
 		return "\n", nil // "keepalive" and "open" events just send an empty line
@@ -1320,14 +1553,18 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		return err
 	}
 	var wlock sync.Mutex
+	var closed bool
 	defer func() {
-		// Hack: This is the fix for a horrible data race that I have not been able to figure out in quite some time.
-		// It appears to be happening when the Go HTTP code reads from the socket when closing the request (i.e. AFTER
-		// this function returns), and causes a data race with the ResponseWriter. Locking wlock here silences the
-		// data race detector. See https://github.com/binwiederhier/ntfy/issues/338#issuecomment-1163425889.
-		wlock.TryLock()
+		// This blocks until any in-flight sub() call finishes writing/flushing the response writer,
+		// then marks the connection as closed so future sub() calls are no-ops. This prevents a panic
+		// from writing to a response writer that has been cleaned up after the handler returns.
+		// See https://github.com/binwiederhier/ntfy/issues/338#issuecomment-1163425889
+		// and https://github.com/binwiederhier/ntfy/pull/1598.
+		wlock.Lock()
+		closed = true
+		wlock.Unlock()
 	}()
-	sub := func(v *visitor, msg *message) error {
+	sub := func(v *visitor, msg *model.Message) error {
 		if !filters.Pass(msg) {
 			return nil
 		}
@@ -1337,6 +1574,9 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		wlock.Lock()
 		defer wlock.Unlock()
+		if closed {
+			return nil
+		}
 		if _, err := w.Write([]byte(m)); err != nil {
 			return err
 		}
@@ -1367,7 +1607,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
-	if err := sub(v, newOpenMessage(topicsStr)); err != nil { // Send out open message
+	if err := sub(v, model.NewOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
 	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
@@ -1390,7 +1630,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			for _, t := range topics {
 				t.Keepalive()
 			}
-			if err := sub(v, newKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
+			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
 		}
@@ -1486,7 +1726,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			}
 		}
 	})
-	sub := func(v *visitor, msg *message) error {
+	sub := func(v *visitor, msg *model.Message) error {
 		if !filters.Pass(msg) {
 			return nil
 		}
@@ -1516,7 +1756,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
-	if err := sub(v, newOpenMessage(topicsStr)); err != nil { // Send out open message
+	if err := sub(v, model.NewOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
 	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
@@ -1527,10 +1767,13 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Trace("WebSocket connection closed")
 		return nil // Normal closures are not errors; note: "1006 (abnormal closure)" is treated as normal, because people disconnect a lot
 	}
-	return err
+	if err != nil {
+		return &errWebSocketPostUpgrade{err}
+	}
+	return nil
 }
 
-func parseSubscribeParams(r *http.Request) (poll bool, since sinceMarker, scheduled bool, filters *queryFilter, err error) {
+func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, scheduled bool, filters *queryFilter, err error) {
 	poll = readBoolParam(r, false, "x-poll", "poll", "po")
 	scheduled = readBoolParam(r, false, "x-scheduled", "scheduled", "sched")
 	since, err = parseSince(r, poll)
@@ -1611,11 +1854,11 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the
 // marker, returning only messages that are newer than the marker.
-func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled bool, v *visitor, sub subscriber) error {
+func (s *Server) sendOldMessages(topics []*topic, since model.SinceMarker, scheduled bool, v *visitor, sub subscriber) error {
 	if since.IsNone() {
 		return nil
 	}
-	messages := make([]*message, 0)
+	messages := make([]*model.Message, 0)
 	for _, t := range topics {
 		topicMessages, err := s.messageCache.Messages(t.ID, since, scheduled)
 		if err != nil {
@@ -1638,32 +1881,32 @@ func (s *Server) sendOldMessages(topics []*topic, since sinceMarker, scheduled b
 //
 // Values in the "since=..." parameter can be either a unix timestamp or a duration (e.g. 12h),
 // "all" for all messages, or "latest" for the most recent message for a topic
-func parseSince(r *http.Request, poll bool) (sinceMarker, error) {
+func parseSince(r *http.Request, poll bool) (model.SinceMarker, error) {
 	since := readParam(r, "x-since", "since", "si")
 
 	// Easy cases (empty, all, none)
 	if since == "" {
 		if poll {
-			return sinceAllMessages, nil
+			return model.SinceAllMessages, nil
 		}
-		return sinceNoMessages, nil
+		return model.SinceNoMessages, nil
 	} else if since == "all" {
-		return sinceAllMessages, nil
+		return model.SinceAllMessages, nil
 	} else if since == "latest" {
-		return sinceLatestMessage, nil
+		return model.SinceLatestMessage, nil
 	} else if since == "none" {
-		return sinceNoMessages, nil
+		return model.SinceNoMessages, nil
 	}
 
 	// ID, timestamp, duration
-	if validMessageID(since) {
-		return newSinceID(since), nil
+	if model.ValidMessageID(since) {
+		return model.NewSinceID(since), nil
 	} else if s, err := strconv.ParseInt(since, 10, 64); err == nil {
-		return newSinceTime(s), nil
+		return model.NewSinceTime(s), nil
 	} else if d, err := time.ParseDuration(since); err == nil {
-		return newSinceTime(time.Now().Add(-1 * d).Unix()), nil
+		return model.NewSinceTime(time.Now().Add(-1 * d).Unix()), nil
 	}
-	return sinceNoMessages, errHTTPBadRequestSinceInvalid
+	return model.SinceNoMessages, errHTTPBadRequestSinceInvalid
 }
 
 func (s *Server) handleOptions(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
@@ -1694,6 +1937,15 @@ func (s *Server) topicsFromPath(path string) ([]*topic, string, error) {
 		return nil, "", errHTTPBadRequestTopicInvalid
 	}
 	return topics, parts[1], nil
+}
+
+// sequenceIDFromPath returns the sequence ID from a path like /mytopic/sequenceIdHere
+func (s *Server) sequenceIDFromPath(path string) (string, *errHTTP) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 {
+		return "", errHTTPBadRequestSequenceIDInvalid
+	}
+	return parts[2], nil
 }
 
 // topicsFromIDs returns the topics with the given IDs, creating them if they don't exist.
@@ -1826,14 +2078,14 @@ func (s *Server) runFirebaseKeepaliver() {
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
-			s.sendToFirebase(v, newKeepaliveMessage(firebaseControlTopic))
+			s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
 		/*
 			FIXME: Disable iOS polling entirely for now due to thundering herd problem (see #677)
 			       To solve this, we'd have to shard the iOS poll topics to spread out the polling evenly.
 			       Given that it's not really necessary to poll, turning it off for now should not have any impact.
 
 			case <-time.After(s.config.FirebasePollInterval):
-				s.sendToFirebase(v, newKeepaliveMessage(firebasePollTopic))
+				s.sendToFirebase(v, model.NewKeepaliveMessage(firebasePollTopic))
 		*/
 		case <-s.closeChan:
 			return
@@ -1876,7 +2128,7 @@ func (s *Server) sendDelayedMessages() error {
 	return nil
 }
 
-func (s *Server) sendDelayedMessage(v *visitor, m *message) error {
+func (s *Server) sendDelayedMessage(v *visitor, m *model.Message) error {
 	logvm(v, m).Debug("Sending delayed message")
 	s.mu.RLock()
 	t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
@@ -1965,6 +2217,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Firebase != "" {
 			r.Header.Set("X-Firebase", m.Firebase)
+		}
+		if m.SequenceID != "" {
+			r.Header.Set("X-Sequence-ID", m.SequenceID)
 		}
 		return next(w, r, v)
 	}
@@ -2146,9 +2401,7 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 		s.messagesHistory = s.messagesHistory[1:]
 	}
 	s.mu.Unlock()
-	go func() {
-		if err := s.messageCache.UpdateStats(messagesCount); err != nil {
-			log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
-		}
-	}()
+	if err := s.messageCache.UpdateStats(messagesCount); err != nil {
+		log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
+	}
 }

@@ -215,5 +215,13 @@
     "alert_notification_permission_denied_title": "Az értesítések blokkolva vannak",
     "alert_notification_permission_denied_description": "Kérjük kapcsold őket vissza a böngésződben",
     "alert_notification_ios_install_required_title": "iOS telepítés szükséges",
-    "alert_not_supported_context_description": "Az értesítések kizárólag HTTPS-en keresztül támogatottak. Ez a <mdnLink>Notifications API</mdnLink> korlátozása."
+    "alert_not_supported_context_description": "Az értesítések kizárólag HTTPS-en keresztül támogatottak. Ez a <mdnLink>Notifications API</mdnLink> korlátozása.",
+    "signup_form_toggle_password_visibility": "Jelszó láthatóságának kapcsolása",
+    "signup_disabled": "A regisztráció le van tiltva",
+    "action_bar_reservation_add": "Téma fenntartása",
+    "action_bar_reservation_edit": "Foglalás módosítása",
+    "action_bar_reservation_delete": "Foglalás törlése",
+    "nav_upgrade_banner_label": "Frissítés ntfy Pro-ra",
+    "nav_upgrade_banner_description": "Témák, több üzenet és e-mail, valamint nagyobb mellékletek megőrzése",
+    "alert_notification_ios_install_required_description": "Kattintson a Megosztás ikonra, majd a Hozzáadás a kezdőképernyőhöz gombra, hogy engedélyezze az értesítéseket iOS rendszeren"
 }

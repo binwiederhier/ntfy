@@ -1,23 +1,23 @@
 import {
-  Drawer,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Toolbar,
-  Divider,
-  List,
   Alert,
   AlertTitle,
   Badge,
+  Box,
+  Button,
   CircularProgress,
+  Divider,
+  Drawer,
+  IconButton,
   Link,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
   ListSubheader,
   Portal,
+  Toolbar,
   Tooltip,
   Typography,
-  Box,
-  IconButton,
-  Button,
   useTheme,
 } from "@mui/material";
 import * as React from "react";
@@ -44,7 +44,7 @@ import UpgradeDialog from "./UpgradeDialog";
 import { AccountContext } from "./App";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { SubscriptionPopup } from "./SubscriptionPopup";
-import { useNotificationPermissionListener } from "./hooks";
+import { useNotificationPermissionListener, useVersionChangeListener } from "./hooks";
 
 const navWidth = 280;
 
@@ -91,6 +91,13 @@ const NavList = (props) => {
   const { account } = useContext(AccountContext);
   const [subscribeDialogKey, setSubscribeDialogKey] = useState(0);
   const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
+  const [versionChanged, setVersionChanged] = useState(false);
+
+  const handleVersionChange = () => {
+    setVersionChanged(true);
+  };
+
+  useVersionChangeListener(handleVersionChange);
 
   const handleSubscribeReset = () => {
     setSubscribeDialogOpen(false);
@@ -110,7 +117,8 @@ const NavList = (props) => {
 
   const isAdmin = account?.role === Role.ADMIN;
   const isPaid = account?.billing?.subscription;
-  const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid;
+  const hasTier = !!account?.tier;
+  const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid && !hasTier;
   const showSubscriptionsList = props.subscriptions?.length > 0;
   const showNotificationPermissionRequired = useNotificationPermissionListener(() => notifier.notRequested());
   const showNotificationPermissionDenied = useNotificationPermissionListener(() => notifier.denied());
@@ -119,6 +127,7 @@ const NavList = (props) => {
   const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
 
   const alertVisible =
+    versionChanged ||
     showNotificationPermissionRequired ||
     showNotificationPermissionDenied ||
     showNotificationIOSInstallRequired ||
@@ -129,6 +138,7 @@ const NavList = (props) => {
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
       <List component="nav" sx={{ paddingTop: { xs: 0, sm: alertVisible ? 0 : "" } }}>
+        {versionChanged && <VersionUpdateBanner />}
         {showNotificationPermissionRequired && <NotificationPermissionRequired />}
         {showNotificationPermissionDenied && <NotificationPermissionDeniedAlert />}
         {showNotificationBrowserNotSupportedBox && <NotificationBrowserNotSupportedAlert />}
@@ -421,6 +431,22 @@ const NotificationContextNotSupportedAlert = () => {
           }}
         />
       </Typography>
+    </Alert>
+  );
+};
+
+const VersionUpdateBanner = () => {
+  const { t } = useTranslation();
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+  return (
+    <Alert severity="info" sx={{ paddingTop: 2 }}>
+      <AlertTitle>{t("version_update_available_title")}</AlertTitle>
+      <Typography gutterBottom>{t("version_update_available_description")}</Typography>
+      <Button sx={{ float: "right" }} color="inherit" size="small" onClick={handleRefresh}>
+        {t("common_refresh")}
+      </Button>
     </Alert>
   );
 };

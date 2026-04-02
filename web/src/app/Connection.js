@@ -1,5 +1,6 @@
 /* eslint-disable max-classes-per-file */
 import { basicAuth, bearerAuth, encodeBase64Url, topicShortUrl, topicUrlWs } from "./utils";
+import { EVENT_OPEN, isNotificationEvent } from "./events";
 
 const retryBackoffSeconds = [5, 10, 20, 30, 60, 120];
 
@@ -48,10 +49,11 @@ class Connection {
       console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Message received from server: ${event.data}`);
       try {
         const data = JSON.parse(event.data);
-        if (data.event === "open") {
+        if (data.event === EVENT_OPEN) {
           return;
         }
-        const relevantAndValid = data.event === "message" && "id" in data && "time" in data && "message" in data;
+        // Accept message, message_delete, and message_clear events
+        const relevantAndValid = isNotificationEvent(data.event) && "id" in data && "time" in data;
         if (!relevantAndValid) {
           console.log(`[Connection, ${this.shortUrl}, ${this.connectionId}] Unexpected message. Ignoring.`);
           return;

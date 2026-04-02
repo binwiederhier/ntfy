@@ -10,6 +10,7 @@ import (
 	"firebase.google.com/go/v4/messaging"
 	"fmt"
 	"google.golang.org/api/option"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"strings"
@@ -43,7 +44,7 @@ func newFirebaseClient(sender firebaseSender, auther user.Auther) *firebaseClien
 	}
 }
 
-func (c *firebaseClient) Send(v *visitor, m *message) error {
+func (c *firebaseClient) Send(v *visitor, m *model.Message) error {
 	if !v.FirebaseAllowed() {
 		return errFirebaseTemporarilyBanned
 	}
@@ -121,11 +122,11 @@ func (c *firebaseSenderImpl) Send(m *messaging.Message) error {
 //     On Android, this will trigger the app to poll the topic and thereby displaying new messages.
 //   - If UpstreamBaseURL is set, messages are forwarded as poll requests to an upstream server and then forwarded
 //     to Firebase here. This is mainly for iOS to support self-hosted servers.
-func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, error) {
+func toFirebaseMessage(m *model.Message, auther user.Auther) (*messaging.Message, error) {
 	var data map[string]string // Mostly matches https://ntfy.sh/docs/subscribe/api/#json-message-format
 	var apnsConfig *messaging.APNSConfig
 	switch m.Event {
-	case keepaliveEvent, openEvent:
+	case model.KeepaliveEvent, model.OpenEvent:
 		data = map[string]string{
 			"id":    m.ID,
 			"time":  fmt.Sprintf("%d", m.Time),
@@ -133,7 +134,7 @@ func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, erro
 			"topic": m.Topic,
 		}
 		apnsConfig = createAPNSBackgroundConfig(data)
-	case pollRequestEvent:
+	case model.PollRequestEvent:
 		data = map[string]string{
 			"id":      m.ID,
 			"time":    fmt.Sprintf("%d", m.Time),
@@ -143,7 +144,16 @@ func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, erro
 			"poll_id": m.PollID,
 		}
 		apnsConfig = createAPNSAlertConfig(m, data)
-	case messageEvent:
+	case model.MessageDeleteEvent, model.MessageClearEvent:
+		data = map[string]string{
+			"id":          m.ID,
+			"time":        fmt.Sprintf("%d", m.Time),
+			"event":       m.Event,
+			"topic":       m.Topic,
+			"sequence_id": m.SequenceID,
+		}
+		apnsConfig = createAPNSBackgroundConfig(data)
+	case model.MessageEvent:
 		if auther != nil {
 			// If "anonymous read" for a topic is not allowed, we cannot send the message along
 			// via Firebase. Instead, we send a "poll_request" message, asking the client to poll.
@@ -161,6 +171,7 @@ func toFirebaseMessage(m *message, auther user.Auther) (*messaging.Message, erro
 			"time":         fmt.Sprintf("%d", m.Time),
 			"event":        m.Event,
 			"topic":        m.Topic,
+			"sequence_id":  m.SequenceID,
 			"priority":     fmt.Sprintf("%d", m.Priority),
 			"tags":         strings.Join(m.Tags, ","),
 			"click":        m.Click,
@@ -225,7 +236,7 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 // createAPNSAlertConfig creates an APNS config for iOS notifications that show up as an alert (only relevant for iOS).
 // We must set the Alert struct ("alert"), and we need to set MutableContent ("mutable-content"), so the Notification Service
 // Extension in iOS can modify the message.
-func createAPNSAlertConfig(m *message, data map[string]string) *messaging.APNSConfig {
+func createAPNSAlertConfig(m *model.Message, data map[string]string) *messaging.APNSConfig {
 	apnsData := make(map[string]any)
 	for k, v := range data {
 		apnsData[k] = v
@@ -286,8 +297,8 @@ func maybeTruncateAPNSBodyMessage(s string) string {
 //
 // This empties all the fields that are not needed for a poll request and just sets the required fields,
 // most importantly, the PollID.
-func toPollRequest(m *message) *message {
-	pr := newPollRequestMessage(m.Topic, m.ID)
+func toPollRequest(m *model.Message) *model.Message {
+	pr := model.NewPollRequestMessage(m.Topic, m.ID)
 	pr.ID = m.ID
 	pr.Time = m.Time
 	pr.Priority = m.Priority // Keep priority

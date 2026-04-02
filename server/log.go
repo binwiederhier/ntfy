@@ -1,14 +1,17 @@
 package server
 
 import (
+	"errors"
 	"fmt"
-	"github.com/emersion/go-smtp"
-	"github.com/gorilla/websocket"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/util"
 	"net/http"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/emersion/go-smtp"
+	"github.com/gorilla/websocket"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/util"
 )
 
 // Log tags
@@ -21,7 +24,6 @@ const (
 	tagSMTP         = "smtp"  // Receive email
 	tagEmail        = "email" // Send email
 	tagTwilio       = "twilio"
-	tagFileCache    = "file_cache"
 	tagMessageCache = "message_cache"
 	tagStripe       = "stripe"
 	tagAccount      = "account"
@@ -33,7 +35,7 @@ const (
 )
 
 var (
-	normalErrorCodes       = []int{http.StatusNotFound, http.StatusBadRequest, http.StatusTooManyRequests, http.StatusUnauthorized, http.StatusForbidden, http.StatusInsufficientStorage}
+	normalErrorCodes       = []int{http.StatusNotFound, http.StatusBadRequest, http.StatusTooManyRequests, http.StatusUnauthorized, http.StatusForbidden, http.StatusInsufficientStorage, http.StatusRequestEntityTooLarge}
 	rateLimitingErrorCodes = []int{http.StatusTooManyRequests, http.StatusRequestEntityTooLarge}
 )
 
@@ -53,12 +55,12 @@ func logvr(v *visitor, r *http.Request) *log.Event {
 }
 
 // logvrm creates a new log event with HTTP request, visitor fields and message fields
-func logvrm(v *visitor, r *http.Request, m *message) *log.Event {
+func logvrm(v *visitor, r *http.Request, m *model.Message) *log.Event {
 	return logvr(v, r).With(m)
 }
 
 // logvrm creates a new log event with visitor fields and message fields
-func logvm(v *visitor, m *message) *log.Event {
+func logvm(v *visitor, m *model.Message) *log.Event {
 	return logv(v).With(m)
 }
 
@@ -83,7 +85,8 @@ func httpContext(r *http.Request) log.Context {
 }
 
 func websocketErrorContext(err error) log.Context {
-	if c, ok := err.(*websocket.CloseError); ok {
+	var c *websocket.CloseError
+	if errors.As(err, &c) {
 		return log.Context{
 			"error":      c.Error(),
 			"error_code": c.Code,

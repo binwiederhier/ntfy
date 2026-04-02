@@ -10,10 +10,9 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
-	"os"
-	"os/signal"
+	"runtime"
 	"strings"
-	"syscall"
+	"text/template"
 	"time"
 
 	"github.com/urfave/cli/v2"
@@ -40,6 +39,8 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"key_file", "K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"cert_file", "E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
+	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
@@ -51,7 +52,7 @@ var flagsServe = append(
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "auth-users", Aliases: []string{"auth_users"}, EnvVars: []string{"NTFY_AUTH_USERS"}, Usage: "pre-provisioned declarative users"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "auth-access", Aliases: []string{"auth_access"}, EnvVars: []string{"NTFY_AUTH_ACCESS"}, Usage: "pre-provisioned declarative access control entries"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "auth-tokens", Aliases: []string{"auth_tokens"}, EnvVars: []string{"NTFY_AUTH_TOKENS"}, Usage: "pre-provisioned declarative access tokens"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", Aliases: []string{"attachment_cache_dir"}, EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", Aliases: []string{"attachment_cache_dir"}, EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files, or S3 URL (s3://ACCESS_KEY:SECRET_KEY@BUCKET[/PREFIX]?region=REGION[&endpoint=ENDPOINT])"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"attachment_total_size_limit", "A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentTotalSizeLimit), Usage: "limit of the on-disk attachment cache"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"attachment_file_size_limit", "Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentFileSizeLimit), Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-expiry-duration", Aliases: []string{"attachment_expiry_duration", "X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultAttachmentExpiryDuration), Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
@@ -70,6 +71,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", Aliases: []string{"smtp_sender_user"}, EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-pass", Aliases: []string{"smtp_sender_pass"}, EnvVars: []string{"NTFY_SMTP_SENDER_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-from", Aliases: []string{"smtp_sender_from"}, EnvVars: []string{"NTFY_SMTP_SENDER_FROM"}, Usage: "SMTP sender address (if e-mail sending is enabled)"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "smtp-sender-verify", Aliases: []string{"smtp_sender_verify"}, EnvVars: []string{"NTFY_SMTP_SENDER_VERIFY"}, Value: false, Usage: "require verified email addresses for sending email notifications"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-listen", Aliases: []string{"smtp_server_listen"}, EnvVars: []string{"NTFY_SMTP_SERVER_LISTEN"}, Usage: "SMTP server address (ip:port) for incoming emails, e.g. :25"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-domain", Aliases: []string{"smtp_server_domain"}, EnvVars: []string{"NTFY_SMTP_SERVER_DOMAIN"}, Usage: "SMTP domain for incoming e-mail, e.g. ntfy.sh"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-addr-prefix", Aliases: []string{"smtp_server_addr_prefix"}, EnvVars: []string{"NTFY_SMTP_SERVER_ADDR_PREFIX"}, Usage: "SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-')"}),
@@ -80,6 +82,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-auth-token", Aliases: []string{"twilio_auth_token"}, EnvVars: []string{"NTFY_TWILIO_AUTH_TOKEN"}, Usage: "Twilio auth token"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-phone-number", Aliases: []string{"twilio_phone_number"}, EnvVars: []string{"NTFY_TWILIO_PHONE_NUMBER"}, Usage: "Twilio number to use for outgoing calls"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-verify-service", Aliases: []string{"twilio_verify_service"}, EnvVars: []string{"NTFY_TWILIO_VERIFY_SERVICE"}, Usage: "Twilio Verify service ID, used for phone number verification"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-call-format", Aliases: []string{"twilio_call_format"}, EnvVars: []string{"NTFY_TWILIO_CALL_FORMAT"}, Usage: "Twilio/TwiML format string for phone calls"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-size-limit", Aliases: []string{"message_size_limit"}, EnvVars: []string{"NTFY_MESSAGE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultMessageSizeLimit), Usage: "size limit for the message (see docs for limitations)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-delay-limit", Aliases: []string{"message_delay_limit"}, EnvVars: []string{"NTFY_MESSAGE_DELAY_LIMIT"}, Value: util.FormatDuration(server.DefaultMessageDelayMax), Usage: "max duration a message can be scheduled into the future"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"global_topic_limit", "T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
@@ -146,6 +149,8 @@ func execServe(c *cli.Context) error {
 	keyFile := c.String("key-file")
 	certFile := c.String("cert-file")
 	firebaseKeyFile := c.String("firebase-key-file")
+	databaseURL := c.String("database-url")
+	databaseReplicaURLs := c.StringSlice("database-replica-urls")
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
 	webPushFile := c.String("web-push-file")
@@ -183,6 +188,7 @@ func execServe(c *cli.Context) error {
 	smtpSenderUser := c.String("smtp-sender-user")
 	smtpSenderPass := c.String("smtp-sender-pass")
 	smtpSenderFrom := c.String("smtp-sender-from")
+	smtpSenderVerify := c.Bool("smtp-sender-verify")
 	smtpServerListen := c.String("smtp-server-listen")
 	smtpServerDomain := c.String("smtp-server-domain")
 	smtpServerAddrPrefix := c.String("smtp-server-addr-prefix")
@@ -193,6 +199,7 @@ func execServe(c *cli.Context) error {
 	twilioAuthToken := c.String("twilio-auth-token")
 	twilioPhoneNumber := c.String("twilio-phone-number")
 	twilioVerifyService := c.String("twilio-verify-service")
+	twilioCallFormat := c.String("twilio-call-format")
 	messageSizeLimitStr := c.String("message-size-limit")
 	messageDelayLimitStr := c.String("message-delay-limit")
 	totalTopicLimit := c.Int("global-topic-limit")
@@ -285,12 +292,18 @@ func execServe(c *cli.Context) error {
 	}
 
 	// Check values
-	if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
+	if databaseURL != "" && !strings.HasPrefix(databaseURL, "postgres://") && !strings.HasPrefix(databaseURL, "postgresql://") {
+		return errors.New("if database-url is set, it must start with postgres:// or postgresql://")
+	} else if databaseURL != "" && (authFile != "" || cacheFile != "" || webPushFile != "") {
+		return errors.New("if database-url is set, auth-file, cache-file, and web-push-file must not be set")
+	} else if len(databaseReplicaURLs) > 0 && databaseURL == "" {
+		return errors.New("database-replica-urls can only be used if database-url is also set")
+	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if firebaseKeyFile != "" && !server.FirebaseAvailable {
 		return errors.New("cannot set firebase-key-file, support for Firebase is not available (nofirebase)")
-	} else if webPushPublicKey != "" && (webPushPrivateKey == "" || webPushFile == "" || webPushEmailAddress == "" || baseURL == "") {
-		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-file, web-push-email-address, and base-url should be set. run 'ntfy webpush keys' to generate keys")
+	} else if webPushPublicKey != "" && (webPushPrivateKey == "" || (webPushFile == "" && databaseURL == "") || webPushEmailAddress == "" || baseURL == "") {
+		return errors.New("if web push is enabled, web-push-private-key, web-push-public-key, web-push-file (or database-url), web-push-email-address, and base-url should be set. run 'ntfy webpush keys' to generate keys")
 	} else if keepaliveInterval < 5*time.Second {
 		return errors.New("keepalive interval cannot be lower than five seconds")
 	} else if managerInterval < 5*time.Second {
@@ -305,6 +318,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if listen-https is set, both key-file and cert-file must be set")
 	} else if smtpSenderAddr != "" && (baseURL == "" || smtpSenderFrom == "") {
 		return errors.New("if smtp-sender-addr is set, base-url, and smtp-sender-from must also be set")
+	} else if smtpSenderVerify && smtpSenderAddr == "" {
+		return errors.New("if smtp-sender-verify is set, smtp-sender-addr must also be set")
 	} else if smtpServerListen != "" && smtpServerDomain == "" {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if (smtpServerCertFile != "" && smtpServerKeyFile == "") || (smtpServerCertFile == "" && smtpServerKeyFile != "") {
@@ -330,8 +345,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if upstream-base-url is set, base-url must also be set")
 	} else if upstreamBaseURL != "" && baseURL != "" && baseURL == upstreamBaseURL {
 		return errors.New("base-url and upstream-base-url cannot be identical, you'll likely want to set upstream-base-url to https://ntfy.sh, see https://ntfy.sh/docs/config/#ios-instant-notifications")
-	} else if authFile == "" && (enableSignup || enableLogin || requireLogin || enableReservations || stripeSecretKey != "") {
-		return errors.New("cannot set enable-signup, enable-login, require-login, enable-reserve-topics, or stripe-secret-key if auth-file is not set")
+	} else if authFile == "" && databaseURL == "" && (enableSignup || enableLogin || requireLogin || enableReservations || stripeSecretKey != "") {
+		return errors.New("cannot set enable-signup, enable-login, require-login, enable-reserve-topics, or stripe-secret-key if auth-file or database-url is not set")
 	} else if enableSignup && !enableLogin {
 		return errors.New("cannot set enable-signup without also setting enable-login")
 	} else if requireLogin && !enableLogin {
@@ -340,8 +355,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("cannot set stripe-secret-key or stripe-webhook-key, support for payments is not available in this build (nopayments)")
 	} else if stripeSecretKey != "" && (stripeWebhookKey == "" || baseURL == "") {
 		return errors.New("if stripe-secret-key is set, stripe-webhook-key and base-url must also be set")
-	} else if twilioAccount != "" && (twilioAuthToken == "" || twilioPhoneNumber == "" || twilioVerifyService == "" || baseURL == "" || authFile == "") {
-		return errors.New("if twilio-account is set, twilio-auth-token, twilio-phone-number, twilio-verify-service, base-url, and auth-file must also be set")
+	} else if twilioAccount != "" && (twilioAuthToken == "" || twilioPhoneNumber == "" || twilioVerifyService == "" || baseURL == "" || (authFile == "" && databaseURL == "")) {
+		return errors.New("if twilio-account is set, twilio-auth-token, twilio-phone-number, twilio-verify-service, base-url, and auth-file (or database-url) must also be set")
 	} else if messageSizeLimit > server.DefaultMessageSizeLimit {
 		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
 		if messageSizeLimit > 5*1024*1024 {
@@ -357,6 +372,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("visitor-prefix-bits-ipv4 must be between 1 and 32")
 	} else if visitorPrefixBitsIPv6 < 1 || visitorPrefixBitsIPv6 > 128 {
 		return errors.New("visitor-prefix-bits-ipv6 must be between 1 and 128")
+	} else if runtime.GOOS == "windows" && listenUnix != "" {
+		return errors.New("listen-unix is not supported on Windows")
 	}
 
 	// Backwards compatibility
@@ -419,6 +436,15 @@ func execServe(c *cli.Context) error {
 		payments.Setup(stripeSecretKey)
 	}
 
+	// Parse Twilio template
+	var twilioCallFormatTemplate *template.Template
+	if twilioCallFormat != "" {
+		twilioCallFormatTemplate, err = template.New("").Parse(twilioCallFormat)
+		if err != nil {
+			return fmt.Errorf("failed to parse twilio-call-format template: %w", err)
+		}
+	}
+
 	// Add default forbidden topics
 	disallowedTopics = append(disallowedTopics, server.DefaultDisallowedTopics...)
 
@@ -459,6 +485,7 @@ func execServe(c *cli.Context) error {
 	conf.SMTPSenderUser = smtpSenderUser
 	conf.SMTPSenderPass = smtpSenderPass
 	conf.SMTPSenderFrom = smtpSenderFrom
+	conf.SMTPSenderVerify = smtpSenderVerify
 	conf.SMTPServerListen = smtpServerListen
 	conf.SMTPServerDomain = smtpServerDomain
 	conf.SMTPServerAddrPrefix = smtpServerAddrPrefix
@@ -469,6 +496,7 @@ func execServe(c *cli.Context) error {
 	conf.TwilioAuthToken = twilioAuthToken
 	conf.TwilioPhoneNumber = twilioPhoneNumber
 	conf.TwilioVerifyService = twilioVerifyService
+	conf.TwilioCallFormat = twilioCallFormatTemplate
 	conf.MessageSizeLimit = int(messageSizeLimit)
 	conf.MessageDelayMax = messageDelayLimit
 	conf.TotalTopicLimit = totalTopicLimit
@@ -497,6 +525,8 @@ func execServe(c *cli.Context) error {
 	conf.EnableMetrics = enableMetrics
 	conf.MetricsListenHTTP = metricsListenHTTP
 	conf.ProfileListenHTTP = profileListenHTTP
+	conf.DatabaseURL = databaseURL
+	conf.DatabaseReplicaURLs = databaseReplicaURLs
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey
 	conf.WebPushFile = webPushFile
@@ -504,7 +534,17 @@ func execServe(c *cli.Context) error {
 	conf.WebPushStartupQueries = webPushStartupQueries
 	conf.WebPushExpiryDuration = webPushExpiryDuration
 	conf.WebPushExpiryWarningDuration = webPushExpiryWarningDuration
-	conf.Version = c.App.Version
+	conf.BuildVersion = c.App.Version
+	conf.BuildDate = maybeFromMetadata(c.App.Metadata, MetadataKeyDate)
+	conf.BuildCommit = maybeFromMetadata(c.App.Metadata, MetadataKeyCommit)
+
+	// Check if we should run as a Windows service
+	if ranAsService, err := maybeRunAsService(conf); err != nil {
+		log.Fatal("%s", err.Error())
+	} else if ranAsService {
+		log.Info("Exiting.")
+		return nil
+	}
 
 	// Set up hot-reloading of config
 	go sigHandlerConfigReload(config)
@@ -518,22 +558,6 @@ func execServe(c *cli.Context) error {
 	}
 	log.Info("Exiting.")
 	return nil
-}
-
-func sigHandlerConfigReload(config string) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGHUP)
-	for range sigs {
-		log.Info("Partially hot reloading configuration ...")
-		inputSource, err := newYamlSourceFromFile(config, flagsServe)
-		if err != nil {
-			log.Warn("Hot reload failed: %s", err.Error())
-			continue
-		}
-		if err := reloadLogLevel(inputSource); err != nil {
-			log.Warn("Reloading log level failed: %s", err.Error())
-		}
-	}
 }
 
 func parseIPHostPrefix(host string) (prefixes []netip.Prefix, err error) {
@@ -667,24 +691,17 @@ func parseTokens(users []*user.User, tokensRaw []string) (map[string][]*user.Tok
 	return tokens, nil
 }
 
-func reloadLogLevel(inputSource altsrc.InputSourceContext) error {
-	newLevelStr, err := inputSource.String("log-level")
-	if err != nil {
-		return fmt.Errorf("cannot load log level: %s", err.Error())
+func maybeFromMetadata(m map[string]any, key string) string {
+	if m == nil {
+		return ""
 	}
-	overrides, err := inputSource.StringSlice("log-level-overrides")
-	if err != nil {
-		return fmt.Errorf("cannot load log level overrides (1): %s", err.Error())
+	v, exists := m[key]
+	if !exists {
+		return ""
 	}
-	log.ResetLevelOverrides()
-	if err := applyLogLevelOverrides(overrides); err != nil {
-		return fmt.Errorf("cannot load log level overrides (2): %s", err.Error())
+	s, ok := v.(string)
+	if !ok {
+		return ""
 	}
-	log.SetLevel(log.ToLevel(newLevelStr))
-	if len(overrides) > 0 {
-		log.Info("Log level is %v, %d override(s) in place", strings.ToUpper(newLevelStr), len(overrides))
-	} else {
-		log.Info("Log level is %v", strings.ToUpper(newLevelStr))
-	}
-	return nil
+	return s
 }

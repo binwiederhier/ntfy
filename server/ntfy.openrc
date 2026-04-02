@@ -1,0 +1,49 @@
+#!/sbin/openrc-run
+
+# OpenRC service configuration for ntfy Server. 
+# Should be placed in /etc/init.d/ as "ntfy" or "ntfy-server" (no extension), owned by root:root and with permissions 755.
+# Assumes an ntfy system user and group have been created, for example using this command:
+# useradd --system --home-dir /var/lib/ntfy --shell /bin/false --comment "User for the simple HTTP-based pub-sub notification service" ntfy
+
+name=$RC_SVCNAME
+description="ntfy server"
+
+command="/usr/local/bin/ntfy"
+command_background=true
+command_args="serve"
+command_user="ntfy:ntfy"
+extra_started_commands="reload"
+
+pidfile="/run/${RC_SVCNAME}/${RC_SVCNAME}.pid"
+
+# Changes the hard number of open files (nofile) limit to 2048 for the service.
+rc_ulimit="-n 2048"
+
+# Allows the service to bind to privileged ports (<1024).
+capabilities="^cap_net_bind_service"
+
+error_log="/var/log/ntfy.log"
+
+# Service dependencies
+depend() {
+	use net
+	after firewall
+}
+
+# Check for - and if necessary - create required files and folders. Might require some adjustment dependings on the content of the server.yml file.
+start_pre() {
+	checkpath -f --owner "$command_user" --mode 0644 \
+		/var/log/ntfy.log
+	checkpath -d --owner "$command_user" --mode 0750 \
+		/run/ntfy/
+	checkpath -d --owner "$command_user" --mode 0755 \
+		/var/lib/ntfy/
+	checkpath -d --owner "$command_user" --mode 0750 \
+		/var/cache/ntfy/
+}
+
+reload() {
+	ebegin "Reloading $RC_SVCNAME's configuration"
+	start-stop-daemon --signal SIGHUP --pidfile "${pidfile}"
+	eend $? "Failed to reload $RC_SVCNAME's configuration"
+}

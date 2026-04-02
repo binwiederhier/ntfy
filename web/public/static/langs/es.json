@@ -120,7 +120,7 @@
     "publish_dialog_priority_low": "Prioridad baja",
     "publish_dialog_priority_high": "Prioridad alta",
     "publish_dialog_delay_label": "Retraso",
-    "publish_dialog_title_placeholder": "Título de la notificación, por ejemplo, Alerta de espacio en disco",
+    "publish_dialog_title_placeholder": "Título de la notificación, ej. Alerta de espacio en disco",
     "publish_dialog_details_examples_description": "Para ver ejemplos y una descripción detallada de todas las funciones de envío, consulte la <docsLink>documentación</docsLink>.",
     "publish_dialog_attach_placeholder": "Adjuntar un archivo por URL, por ejemplo, https://f-droid.org/F-Droid.apk",
     "publish_dialog_filename_placeholder": "Nombre del archivo adjunto",

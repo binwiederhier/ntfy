@@ -103,6 +103,15 @@ func (s *Server) ensureCallsEnabled(next handleFunc) handleFunc {
 	}
 }
 
+func (s *Server) ensureEmailsEnabled(next handleFunc) handleFunc {
+	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
+		if s.mailSender == nil || s.userManager == nil {
+			return errHTTPNotFound
+		}
+		return next(w, r, v)
+	}
+}
+
 func (s *Server) ensurePaymentsEnabled(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if s.config.StripeSecretKey == "" || s.stripe == nil {

@@ -1,10 +1,12 @@
 package user
 
 import (
-	"golang.org/x/crypto/bcrypt"
-	"heckel.io/ntfy/v2/util"
+	"database/sql"
 	"regexp"
 	"strings"
+
+	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/v2/util"
 )
 
 var (
@@ -76,4 +78,38 @@ func hashPassword(password string, cost int) (string, error) {
 		return "", err
 	}
 	return string(hash), nil
+}
+
+func nullString(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
+}
+
+func nullInt64(v int64) sql.NullInt64 {
+	if v == 0 {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: v, Valid: true}
+}
+
+// toSQLWildcard converts a wildcard string to a SQL wildcard string. It only allows '*' as wildcards,
+// and escapes '_', assuming '\' as escape character.
+func toSQLWildcard(s string) string {
+	return escapeUnderscore(strings.ReplaceAll(s, "*", "%"))
+}
+
+// fromSQLWildcard converts a SQL wildcard string to a wildcard string. It converts '%' to '*',
+// and removes the '\_' escape character.
+func fromSQLWildcard(s string) string {
+	return strings.ReplaceAll(unescapeUnderscore(s), "%", "*")
+}
+
+func escapeUnderscore(s string) string {
+	return strings.ReplaceAll(s, "_", "\\_")
+}
+
+func unescapeUnderscore(s string) string {
+	return strings.ReplaceAll(s, "\\_", "_")
 }

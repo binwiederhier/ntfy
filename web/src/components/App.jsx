@@ -11,7 +11,7 @@ import ActionBar from "./ActionBar";
 import Preferences from "./Preferences";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import { expandUrl, getKebabCaseLangStr } from "../app/utils";
+import { expandUrl, getKebabCaseLangStr, darkModeEnabled, updateFavicon } from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import { useAccountListener, useBackgroundProcesses, useConnectionListeners, useWebPushTopics } from "./hooks";
@@ -21,27 +21,13 @@ import Login from "./Login";
 import Signup from "./Signup";
 import Account from "./Account";
 import initI18n from "../app/i18n"; // Translations!
-import prefs, { THEME } from "../app/Prefs";
+import prefs from "../app/Prefs";
 import RTLCacheProvider from "./RTLCacheProvider";
 import session from "../app/Session";
 
 initI18n();
 
 export const AccountContext = createContext(null);
-
-const darkModeEnabled = (prefersDarkMode, themePreference) => {
-  switch (themePreference) {
-    case THEME.DARK:
-      return true;
-
-    case THEME.LIGHT:
-      return false;
-
-    case THEME.SYSTEM:
-    default:
-      return prefersDarkMode;
-  }
-};
 
 const App = () => {
   const { i18n } = useTranslation();
@@ -97,6 +83,7 @@ const App = () => {
 const updateTitle = (newNotificationsCount) => {
   document.title = newNotificationsCount > 0 ? `(${newNotificationsCount}) ntfy` : "ntfy";
   window.navigator.setAppBadge?.(newNotificationsCount);
+  updateFavicon(newNotificationsCount);
 };
 
 const Layout = () => {

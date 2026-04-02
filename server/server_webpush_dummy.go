@@ -4,6 +4,8 @@ package server
 
 import (
 	"net/http"
+
+	"heckel.io/ntfy/v2/model"
 )
 
 const (
@@ -20,7 +22,7 @@ func (s *Server) handleWebPushDelete(w http.ResponseWriter, r *http.Request, _ *
 	return errHTTPNotFound
 }
 
-func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
+func (s *Server) publishToWebPushEndpoints(v *visitor, m *model.Message) {
 	// Nothing to see here
 }
 

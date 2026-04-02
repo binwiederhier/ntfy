@@ -4,7 +4,7 @@ or POST requests. I use it to notify myself when scripts fail, or long-running c
 
 ## Step 1: Get the app
 <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img width="170" src="static/img/badge-googleplay.png"></a>
-<a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img width="170" src="static/img/badge-fdroid.png"></a>
+<a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img width="170" src="static/img/badge-fdroid.svg"></a>
 <a href="https://apps.apple.com/us/app/ntfy/id1625396347"><img width="150" src="static/img/badge-appstore.png"></a>
 
 To [receive notifications on your phone](subscribe/phone.md), install the app, either via Google Play, App Store or F-Droid.

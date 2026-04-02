@@ -1,4 +1,5 @@
 MAKEFLAGS := --jobs=1
+NPM := npm
 PYTHON := python3
 PIP := pip3
 VERSION := $(shell git describe --tag)
@@ -31,6 +32,7 @@ help:
 	@echo "Build server & client (without GoReleaser):"
 	@echo "  make cli-linux-server           - Build client & server (no GoReleaser, current arch, Linux)"
 	@echo "  make cli-darwin-server          - Build client & server (no GoReleaser, current arch, macOS)"
+	@echo "  make cli-windows-server         - Build client & server (no GoReleaser, amd64 only, Windows)"
 	@echo "  make cli-client                 - Build client only (no GoReleaser, current arch, Linux/macOS/Windows)"
 	@echo
 	@echo "Build dev Docker:"
@@ -106,6 +108,7 @@ build-deps-ubuntu:
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
+		gcc-mingw-w64-x86-64 \
 		python3 \
 		python3-venv \
 		jq
@@ -135,7 +138,7 @@ web: web-deps web-build
 
 web-build:
 	cd web \
-		&& npm run build \
+		&& $(NPM) run build \
 		&& mv build/index.html build/app.html \
 		&& rm -rf ../server/site \
 		&& mv build ../server/site \
@@ -143,20 +146,22 @@ web-build:
 			../server/site/config.js
 
 web-deps:
-	cd web && npm install
+	cd web && $(NPM) ci
+	# Use "npm ci" so that we don't change the package lock file
 	# If this fails for .svg files, optimize them with svgo
 
 web-deps-update:
-	cd web && npm update
+	cd web && $(NPM) update
+	cd web && $(NPM) install
 
 web-fmt:
-	cd web && npm run format
+	cd web && $(NPM) run format
 
 web-fmt-check:
-	cd web && npm run format:check
+	cd web && $(NPM) run format:check
 
 web-lint:
-	cd web && npm run lint
+	cd web && $(NPM) run lint
 
 # Main server/client build
 
@@ -201,6 +206,16 @@ cli-darwin-server: cli-deps-static-sites
 		-ldflags \
 		"-linkmode=external -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
 
+cli-windows-server: cli-deps-static-sites
+	# This is a target to build the CLI (including the server) for Windows.
+	# Use this for Windows development, if you really don't want to install GoReleaser ...
+	mkdir -p dist/ntfy_windows_server server/docs
+	CC=x86_64-w64-mingw32-gcc GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build \
+		-o dist/ntfy_windows_server/ntfy.exe \
+		-tags sqlite_omit_load_extension,osusergo,netgo \
+		-ldflags \
+		"-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
+
 cli-client: cli-deps-static-sites
 	# This is a target to build the CLI (excluding the server) manually. This should work on Linux/macOS/Windows.
 	# Use this for development, if you really don't want to install GoReleaser ...
@@ -213,7 +228,7 @@ cli-client: cli-deps-static-sites
 
 cli-deps: cli-deps-static-sites cli-deps-all cli-deps-gcc
 
-cli-deps-gcc: cli-deps-gcc-armv6-armv7 cli-deps-gcc-arm64
+cli-deps-gcc: cli-deps-gcc-armv6-armv7 cli-deps-gcc-arm64 cli-deps-gcc-windows
 
 cli-deps-static-sites:
 	mkdir -p server/docs server/site
@@ -228,8 +243,12 @@ cli-deps-gcc-armv6-armv7:
 cli-deps-gcc-arm64:
 	which aarch64-linux-gnu-gcc || { echo "ERROR: ARM64 cross compiler not installed. On Ubuntu, run: apt install gcc-aarch64-linux-gnu"; exit 1; }
 
+cli-deps-gcc-windows:
+	which x86_64-w64-mingw32-gcc || { echo "ERROR: Windows cross compiler not installed. On Ubuntu, run: apt install gcc-mingw-w64-x86-64"; exit 1; }
+
 cli-deps-update:
 	go get -u
+	go mod tidy
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 	go install golang.org/x/lint/golint@latest
 	go install github.com/goreleaser/goreleaser/v2@latest
@@ -248,23 +267,25 @@ cli-build-results:
 
 check: test web-fmt-check fmt-check vet web-lint lint staticcheck
 
+checkv: testv web-fmt-check fmt-check vet web-lint lint staticcheck
+
 test: .PHONY
-	go test $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go test $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 testv: .PHONY
-	go test -v $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go test -v $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 race: .PHONY
-	go test -v -race $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go test -v -race $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 coverage:
 	mkdir -p build/coverage
-	go test -v -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go test -v -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools|web)')
 	go tool cover -func build/coverage/coverage.txt
 
 coverage-html:
 	mkdir -p build/coverage
-	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list ./... | grep -vE 'ntfy/(test|examples|tools)')
+	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 	go tool cover -html build/coverage/coverage.txt
 
 coverage-upload:

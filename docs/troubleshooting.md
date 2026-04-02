@@ -1,7 +1,7 @@
 # Troubleshooting
 This page lists a few suggestions of what to do when things don't work as expected. This is not a complete list. 
-If this page does not help, feel free to drop by the [Discord](https://discord.gg/cT7ECsZj9w) or [Matrix](https://matrix.to/#/#ntfy:matrix.org)
-and ask there. We're happy to help.
+If this page does not help, feel free to reach out via one of the channels listed on the [contact page](contact.md).
+We're happy to help.
 
 ## ntfy server
 If you host your own ntfy server, and you're having issues with any component, it is always helpful to enable debugging/tracing
@@ -129,3 +129,15 @@ keyboard.
 
 ## iOS app
 Sorry, there is no way to debug or get the logs from the iOS app (yet), outside of running the app in Xcode.
+
+## Other
+
+### "Reconnecting..." / Late notifications on mobile (self-hosted)
+
+If all of your topics are showing as "Reconnecting" and notifications are taking a long time (30+ minutes) to come in, or if you're only getting new pushes with a manual refresh, double-check your configuration:
+
+* If ntfy is behind a reverse proxy (such as Nginx):
+    * Make sure `behind-proxy` is enabled in ntfy's config.
+    * Make sure WebSockets are enabled in the reverse proxy config.
+* Make sure you have granted permission to access all of your topics, either to a logged-in user account or to `everyone`. All subscribed topics are joined into a single WebSocket/JSON request, so a single topic that receives `403 Forbidden` will prevent the entire request from going through.
+    * In particular, double-check that `everyone` has permission to write to `up*` and your user has permission to read `up*` if you are using UnifiedPush.

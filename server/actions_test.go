@@ -1,8 +1,9 @@
 package server
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseActions(t *testing.T) {
@@ -132,6 +133,44 @@ func TestParseActions(t *testing.T) {
 	require.Equal(t, `https://x.org`, actions[1].URL)
 	require.Equal(t, true, actions[1].Clear)
 
+	// Copy action (simple format)
+	actions, err = parseActions("copy, Copy code, 1234")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "copy", actions[0].Action)
+	require.Equal(t, "Copy code", actions[0].Label)
+	require.Equal(t, "1234", actions[0].Value)
+
+	// Copy action (JSON)
+	actions, err = parseActions(`[{"action":"copy","label":"Copy OTP","value":"567890"}]`)
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "copy", actions[0].Action)
+	require.Equal(t, "Copy OTP", actions[0].Label)
+	require.Equal(t, "567890", actions[0].Value)
+
+	// Copy action with clear
+	actions, err = parseActions("copy, Copy code, 1234, clear=true")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "copy", actions[0].Action)
+	require.Equal(t, "Copy code", actions[0].Label)
+	require.Equal(t, "1234", actions[0].Value)
+	require.Equal(t, true, actions[0].Clear)
+
+	// Copy action with explicit value key
+	actions, err = parseActions("action=copy, label=Copy token, clear=true, value=abc-123-def")
+	require.Nil(t, err)
+	require.Equal(t, 1, len(actions))
+	require.Equal(t, "copy", actions[0].Action)
+	require.Equal(t, "Copy token", actions[0].Label)
+	require.Equal(t, "abc-123-def", actions[0].Value)
+	require.True(t, actions[0].Clear)
+
+	// Copy action without value (error)
+	_, err = parseActions("copy, Copy code")
+	require.EqualError(t, err, "parameter 'value' is required for action 'copy'")
+
 	// Invalid syntax
 	_, err = parseActions(`label="Out of order!" x, action="http", url=http://example.com`)
 	require.EqualError(t, err, "unexpected character 'x' at position 22")
@@ -146,7 +185,7 @@ func TestParseActions(t *testing.T) {
 	require.EqualError(t, err, "term 'what is this anyway' unknown")
 
 	_, err = parseActions(`fdsfdsf`)
-	require.EqualError(t, err, "parameter 'action' cannot be 'fdsfdsf', valid values are 'view', 'broadcast' and 'http'")
+	require.EqualError(t, err, "parameter 'action' cannot be 'fdsfdsf', valid values are 'view', 'broadcast', 'http' and 'copy'")
 
 	_, err = parseActions(`aaa=a, "bbb, 'ccc, ddd, eee "`)
 	require.EqualError(t, err, "key 'aaa' unknown")
@@ -173,7 +212,7 @@ func TestParseActions(t *testing.T) {
 	require.EqualError(t, err, "JSON error: invalid character 'i' looking for beginning of value")
 
 	_, err = parseActions(`[ { "some": "object" } ]`)
-	require.EqualError(t, err, "parameter 'action' cannot be '', valid values are 'view', 'broadcast' and 'http'")
+	require.EqualError(t, err, "parameter 'action' cannot be '', valid values are 'view', 'broadcast', 'http' and 'copy'")
 
 	_, err = parseActions("\x00\x01\xFFx\xFE")
 	require.EqualError(t, err, "invalid utf-8 string")

@@ -1174,7 +1174,7 @@ keys $myDict | sortAlpha
 ```
 
 When supplying multiple dictionaries, the keys will be concatenated. Use the `uniq`
-function along with `sortAlpha` to get a unqiue, sorted list of keys.
+function along with `sortAlpha` to get a unique, sorted list of keys.
 
 ```
 keys $myDict $myOtherDict | uniq | sortAlpha

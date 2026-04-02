@@ -90,7 +90,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-desktop](https://github.com/Aetherinox/ntfy-desktop) - Desktop client for Windows, Linux, and MacOS with push notifications
 - [ntfy svelte front-end](https://github.com/novatorem/Ntfy) - Front-end built with svelte
 - [wio-ntfy-ticker](https://github.com/nachotp/wio-ntfy-ticker) - Ticker display for a ntfy.sh topic
-- [ntfysh-windows](https://github.com/lucas-bortoli/ntfysh-windows) - A ntfy client for Windows Desktop
+- [ntfysh-windows](https://github.com/mshafer1/ntfysh-windows) - A ntfy client for Windows Desktop
 - [ntfyr](https://github.com/haxwithaxe/ntfyr) - A simple commandline tool to send notifications to ntfy
 - [ntfy.py](https://github.com/ioqy/ntfy-client-python) - ntfy.py is a simple nfty.sh client for sending notifications
 - [wlzntfy](https://github.com/Walzen-Group/ntfy-toaster) - A minimalistic, receive-only toast notification client for Windows 11
@@ -182,6 +182,10 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-bridge](https://github.com/AlexGaudon/ntfy-bridge) - An application to bridge Discord messages (or webhooks) to ntfy.
 - [ntailfy](https://github.com/leukosaima/ntailfy) - ntfy notifications when Tailscale devices connect/disconnect (Go)
 - [BRun](https://github.com/cbrake/brun) - Native Linux automation platform connecting triggers to actions without containers (Go)
+- [Uptime Monitor](https://uptime-monitor.org) - Self-hosted, enterprise-grade uptime monitoring and alerting system (TS)
+- [send_to_ntfy_extension](https://github.com/TheDuffman85/send_to_ntfy_extension/) ⭐ - A browser extension to send the notifications to ntfy (JS)
+- [SIA-Server](https://github.com/ZebMcKayhan/SIA-Server) - A light weight, self-hosted notification Server for Honywell Galaxy Flex alarm systems (Python)
+- [zabbix-ntfy](https://github.com/torgrimt/zabbix-ntfy) - Zabbix server Mediatype to add support for ntfy.sh services
 
 ## Blog + forum posts
 
@@ -302,7 +306,7 @@ ntfy community. Thanks to everyone running a public server. **You guys rock!**
 | URL                                               | Country            |
 |---------------------------------------------------|--------------------|
 | [ntfy.sh](https://ntfy.sh/) (*Official*)          | 🇺🇸 United States |
-| [ntfy.tedomum.net](https://ntfy.tedomum.net/)     | 🇫🇷 France        |
+| [ntfy.tedomum.fr](https://ntfy.tedomum.fr/)     | 🇫🇷 France        |
 | [ntfy.jae.fi](https://ntfy.jae.fi/)               | 🇫🇮 Finland       |
 | [ntfy.adminforge.de](https://ntfy.adminforge.de/) | 🇩🇪 Germany       |
 | [ntfy.envs.net](https://ntfy.envs.net)            | 🇩🇪 Germany       |

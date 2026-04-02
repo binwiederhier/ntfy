@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 )
 
@@ -95,12 +96,7 @@ func coalesce(v ...any) any {
 // Returns:
 //   - bool: True if all values are non-empty, false otherwise
 func all(v ...any) bool {
-	for _, val := range v {
-		if empty(val) {
-			return false
-		}
-	}
-	return true
+	return !slices.ContainsFunc(v, empty)
 }
 
 // anyNonEmpty checks if at least one value in a list is non-empty.

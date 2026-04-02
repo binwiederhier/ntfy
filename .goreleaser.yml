@@ -48,13 +48,15 @@ builds:
   - id: ntfy_windows_amd64
     binary: ntfy
     env:
-      - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3
-    tags: [ noserver ] # don't include server files
+      - CGO_ENABLED=1 # required for go-sqlite3
+      - CC=x86_64-w64-mingw32-gcc # apt install gcc-mingw-w64-x86-64
+    tags: [ sqlite_omit_load_extension,osusergo,netgo ]
     ldflags:
-      - "-X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+      - "-s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [ windows ]
-    goarch: [ amd64 ]
-  - id: ntfy_darwin_all
+    goarch: [amd64 ]
+  -
+    id: ntfy_darwin_all
     binary: ntfy
     env:
       - CGO_ENABLED=0 # explicitly disable, since we don't need go-sqlite3

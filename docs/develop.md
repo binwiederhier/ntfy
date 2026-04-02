@@ -2,7 +2,7 @@
 Hurray 🥳 🎉, you are interested in writing code for ntfy! **That's awesome.** 😎
 
 I tried my very best to write up detailed instructions, but if at any point in time you run into issues, don't 
-hesitate to **contact me on [Discord](https://discord.gg/cT7ECsZj9w) or [Matrix](https://matrix.to/#/#ntfy:matrix.org)**.
+hesitate to reach out via one of the channels listed on the [contact page](contact.md).
 
 ## ntfy server
 The ntfy server source code is available [on GitHub](https://github.com/binwiederhier/ntfy). The codebase for the
@@ -340,16 +340,14 @@ Then either follow the steps for building with or without Firebase.
 Without Firebase, you may want to still change the default `app_base_url` in [values.xml](https://github.com/binwiederhier/ntfy-android/blob/main/app/src/main/res/values/values.xml)
 if you're self-hosting the server. Then run:
 ```
-# Remove Google dependencies (FCM)
-sed -i -e '/google-services/d' build.gradle
-sed -i -e '/google-services/d' app/build.gradle
-
 # To build an unsigned .apk (app/build/outputs/apk/fdroid/*.apk)
 ./gradlew assembleFdroidRelease
 
 # To build a bundle .aab (app/fdroid/release/*.aab)
 ./gradlew bundleFdroidRelease
 ```
+
+The F-Droid flavor automatically excludes Google Services dependencies.
 
 ### Build Play flavor (FCM)
 !!! info
@@ -441,6 +439,6 @@ To have instant notifications/better notification delivery when using firebase, 
 1. In XCode, find the NTFY app target. **Not** the NSE app target.
 1. Find the Asset/ folder in the project navigator
 1. Drag the `GoogleService-Info.plist` file into the Asset/ folder that you get from the firebase console. It can be 
-   found in the "Project settings" > "General" > "Your apps"  with a button labled "GoogleService-Info.plist"
+   found in the "Project settings" > "General" > "Your apps"  with a button labeled "GoogleService-Info.plist"
 
 After that, you should be all set!

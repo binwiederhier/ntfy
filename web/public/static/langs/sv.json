@@ -403,5 +403,7 @@
     "web_push_subscription_expiring_body": "Öppna ntfy för att fortsätta ta emot notifikationer",
     "web_push_unknown_notification_body": "Du kan behöva uppdatera ntfy genom att öppna webbappen",
     "prefs_notifications_web_push_disabled_description": "Meddelanden tas emot när webbappen körs (via WebSocket)",
-    "web_push_unknown_notification_title": "Okänd notifikation mottagen från server"
+    "web_push_unknown_notification_title": "Okänd notifikation mottagen från server",
+    "account_basics_cannot_edit_or_delete_provisioned_user": "En provisionerad användare kan inte redigeras eller tas bort",
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Kan inte redigera eller ta bort en provisionerad token"
 }

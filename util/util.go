@@ -12,10 +12,12 @@ import (
 	"net/netip"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gabriel-vasile/mimetype"
 	"golang.org/x/term"
@@ -49,12 +51,7 @@ func FileExists(filename string) bool {
 
 // Contains returns true if needle is contained in haystack
 func Contains[T comparable](haystack []T, needle T) bool {
-	for _, s := range haystack {
-		if s == needle {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(haystack, needle)
 }
 
 // ContainsIP returns true if any one of the of prefixes contains the ip.
@@ -437,4 +434,23 @@ func Int(v int) *int {
 // Time turns a time.Time into a pointer
 func Time(v time.Time) *time.Time {
 	return &v
+}
+
+// SanitizeUTF8 ensures a string is safe to store in PostgreSQL by handling two cases:
+//
+//  1. Invalid UTF-8 sequences: Some clients send Latin-1/ISO-8859-1 encoded text (e.g. accented
+//     characters like é, ñ, ß) in HTTP headers or SMTP messages. Go treats these as raw bytes in
+//     strings, but PostgreSQL rejects them. Any invalid UTF-8 byte is replaced with the Unicode
+//     replacement character (U+FFFD, "�") so the message is still delivered rather than lost.
+//
+//  2. NUL bytes (0x00): These are valid in UTF-8 but PostgreSQL TEXT columns reject them.
+//     They are stripped entirely.
+func SanitizeUTF8(s string) string {
+	if !utf8.ValidString(s) {
+		s = strings.ToValidUTF8(s, "\xef\xbf\xbd") // U+FFFD
+	}
+	if strings.ContainsRune(s, 0) {
+		s = strings.ReplaceAll(s, "\x00", "")
+	}
+	return s
 }

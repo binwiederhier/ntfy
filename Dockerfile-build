@@ -1,8 +1,8 @@
-FROM golang:1.24-bullseye as builder
+FROM golang:1.25-bookworm AS builder
 
 ARG VERSION=dev
 ARG COMMIT=unknown
-ARG NODE_MAJOR=18
+ARG NODE_MAJOR=24
 
 RUN apt-get update && apt-get install -y \
        build-essential ca-certificates curl gnupg \
@@ -21,14 +21,14 @@ ADD Makefile .
 
 # docs
 ADD ./requirements.txt .
-RUN make docs-deps
+RUN --mount=type=cache,target=/root/.cache/pip make docs-deps
 ADD ./mkdocs.yml .
 ADD ./docs ./docs
 RUN make docs-build
 
 # web
 ADD ./web/package.json ./web/package-lock.json ./web/
-RUN make web-deps
+RUN --mount=type=cache,target=/root/.npm make web-deps
 ADD ./web ./web
 RUN make web-build
 
@@ -40,7 +40,12 @@ ADD ./log ./log
 ADD ./server ./server
 ADD ./user ./user
 ADD ./util ./util
-RUN make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server
+ADD ./payments ./payments
+ADD ./db ./db
+ADD ./message ./message
+ADD ./model ./model
+ADD ./webpush ./webpush
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server
 
 FROM alpine
 

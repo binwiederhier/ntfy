@@ -11,7 +11,9 @@ import (
 
 	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
+	wpush "heckel.io/ntfy/v2/webpush"
 )
 
 const (
@@ -82,14 +84,14 @@ func (s *Server) handleWebPushDelete(w http.ResponseWriter, r *http.Request, _ *
 	return s.writeJSON(w, newSuccessResponse())
 }
 
-func (s *Server) publishToWebPushEndpoints(v *visitor, m *message) {
+func (s *Server) publishToWebPushEndpoints(v *visitor, m *model.Message) {
 	subscriptions, err := s.webPush.SubscriptionsForTopic(m.Topic)
 	if err != nil {
 		logvm(v, m).Err(err).With(v, m).Warn("Unable to publish web push messages")
 		return
 	}
 	log.Tag(tagWebPush).With(v, m).Debug("Publishing web push message to %d subscribers", len(subscriptions))
-	payload, err := json.Marshal(newWebPushPayload(fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic), m))
+	payload, err := json.Marshal(newWebPushPayload(fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic), m.ForJSON()))
 	if err != nil {
 		log.Tag(tagWebPush).Err(err).With(v, m).Warn("Unable to marshal expiring payload")
 		return
@@ -128,7 +130,7 @@ func (s *Server) pruneAndNotifyWebPushSubscriptionsInternal() error {
 	if err != nil {
 		return err
 	}
-	warningSent := make([]*webPushSubscription, 0)
+	warningSent := make([]*wpush.Subscription, 0)
 	for _, subscription := range subscriptions {
 		if err := s.sendWebPushNotification(subscription, payload); err != nil {
 			log.Tag(tagWebPush).Err(err).With(subscription).Warn("Unable to publish expiry imminent warning")
@@ -143,7 +145,7 @@ func (s *Server) pruneAndNotifyWebPushSubscriptionsInternal() error {
 	return nil
 }
 
-func (s *Server) sendWebPushNotification(sub *webPushSubscription, message []byte, contexters ...log.Contexter) error {
+func (s *Server) sendWebPushNotification(sub *wpush.Subscription, message []byte, contexters ...log.Contexter) error {
 	log.Tag(tagWebPush).With(sub).With(contexters...).Debug("Sending web push message")
 	payload := &webpush.Subscription{
 		Endpoint: sub.Endpoint,

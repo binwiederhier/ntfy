@@ -19,4 +19,5 @@ var config = {
   billing_contact: "",
   web_push_public_key: "",
   disallowed_topics: ["docs", "static", "file", "app", "account", "settings", "signup", "login", "v1"],
+  config_hash: "dev", // Placeholder for development; actual value is generated server-side
 };

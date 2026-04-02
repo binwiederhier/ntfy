@@ -3,6 +3,8 @@ import notifier from "./Notifier";
 import prefs from "./Prefs";
 import db from "./db";
 import { topicUrl } from "./utils";
+import { messageWithSequenceId } from "./notificationUtils";
+import { EVENT_MESSAGE, EVENT_MESSAGE_CLEAR, EVENT_MESSAGE_DELETE } from "./events";
 
 class SubscriptionManager {
   constructor(dbImpl) {
@@ -48,16 +50,17 @@ class SubscriptionManager {
   }
 
   async notify(subscriptionId, notification) {
+    if (notification.event !== EVENT_MESSAGE) {
+      return;
+    }
     const subscription = await this.get(subscriptionId);
     if (subscription.mutedUntil > 0) {
       return;
     }
-
     const priority = notification.priority ?? 3;
     if (priority < (await prefs.minPriority())) {
       return;
     }
-
     await notifier.notify(subscription, notification);
   }
 
@@ -157,7 +160,7 @@ class SubscriptionManager {
     // killing performance. See  https://dexie.org/docs/Collection/Collection.offset()#a-better-paging-approach
 
     return this.db.notifications
-      .orderBy("time") // Sort by time first
+      .orderBy("time") // Sort by time
       .filter((n) => n.subscriptionId === subscriptionId)
       .reverse()
       .toArray();
@@ -173,17 +176,22 @@ class SubscriptionManager {
   /** Adds notification, or returns false if it already exists */
   async addNotification(subscriptionId, notification) {
     const exists = await this.db.notifications.get(notification.id);
-    if (exists) {
+    if (exists || notification.event === EVENT_MESSAGE_DELETE || notification.event === EVENT_MESSAGE_CLEAR) {
       return false;
     }
     try {
-      // sw.js duplicates this logic, so if you change it here, change it there too
+      // Note: Service worker (sw.js) and addNotifications() duplicates this logic,
+      // so if you change it here, change it there too.
+
+      // Add notification to database
       await this.db.notifications.add({
-        ...notification,
+        ...messageWithSequenceId(notification),
         subscriptionId,
-        // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
-        new: 1,
-      }); // FIXME consider put() for double tab
+        new: 1, // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+      });
+
+      // FIXME consider put() for double tab
+      // Update subscription last message id (for ?since=... queries)
       await this.db.subscriptions.update(subscriptionId, {
         last: notification.id,
       });
@@ -195,7 +203,10 @@ class SubscriptionManager {
 
   /** Adds/replaces notifications, will not throw if they exist */
   async addNotifications(subscriptionId, notifications) {
-    const notificationsWithSubscriptionId = notifications.map((notification) => ({ ...notification, subscriptionId }));
+    const notificationsWithSubscriptionId = notifications.map((notification) => ({
+      ...messageWithSequenceId(notification),
+      subscriptionId,
+    }));
     const lastNotificationId = notifications.at(-1).id;
     await this.db.notifications.bulkPut(notificationsWithSubscriptionId);
     await this.db.subscriptions.update(subscriptionId, {
@@ -220,12 +231,20 @@ class SubscriptionManager {
     await this.db.notifications.delete(notificationId);
   }
 
+  async deleteNotificationBySequenceId(subscriptionId, sequenceId) {
+    await this.db.notifications.where({ subscriptionId, sequenceId }).delete();
+  }
+
   async deleteNotifications(subscriptionId) {
     await this.db.notifications.where({ subscriptionId }).delete();
   }
 
   async markNotificationRead(notificationId) {
     await this.db.notifications.where({ id: notificationId }).modify({ new: 0 });
+  }
+
+  async markNotificationReadBySequenceId(subscriptionId, sequenceId) {
+    await this.db.notifications.where({ subscriptionId, sequenceId }).modify({ new: 0 });
   }
 
   async markNotificationsRead(subscriptionId) {

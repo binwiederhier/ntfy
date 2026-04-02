@@ -406,5 +406,7 @@
     "web_push_subscription_expiring_body": "Abrir ntfy para seguir recibindo notificacións",
     "web_push_unknown_notification_title": "Recibida unha notificación descoñecida desde o servidor",
     "web_push_unknown_notification_body": "Poderías ter que actualizar ntfy abrindo a app web",
-    "subscribe_dialog_subscribe_use_another_background_info": "As notificacións procedentes doutros servidores non se van recibir cando a app web estea pechada"
+    "subscribe_dialog_subscribe_use_another_background_info": "As notificacións procedentes doutros servidores non se van recibir cando a app web estea pechada",
+    "account_basics_cannot_edit_or_delete_provisioned_user": "Unha usuaria predefinida non se pode editar ou eliminar",
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Non se pode editar un token de usuaria predefinida"
 }

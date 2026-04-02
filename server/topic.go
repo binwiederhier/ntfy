@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -33,7 +34,7 @@ type topicSubscriber struct {
 }
 
 // subscriber is a function that is called for every new message on a topic
-type subscriber func(v *visitor, msg *message) error
+type subscriber func(v *visitor, msg *model.Message) error
 
 // newTopic creates a new topic
 func newTopic(id string) *topic {
@@ -103,7 +104,7 @@ func (t *topic) Unsubscribe(id int) {
 }
 
 // Publish asynchronously publishes to all subscribers
-func (t *topic) Publish(v *visitor, m *message) error {
+func (t *topic) Publish(v *visitor, m *model.Message) error {
 	go func() {
 		// We want to lock the topic as short as possible, so we make a shallow copy of the
 		// subscribers map here. Actually sending out the messages then doesn't have to lock.

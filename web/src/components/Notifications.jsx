@@ -33,12 +33,14 @@ import {
   maybeActionErrors,
   openUrl,
   shortUrl,
-  topicShortUrl,
+  topicUrl,
   unmatchedTags,
 } from "../app/utils";
+import { ACTION_BROADCAST, ACTION_COPY, ACTION_HTTP, ACTION_VIEW } from "../app/actions";
 import { formatMessage, formatTitle, isImage } from "../app/notificationUtils";
 import { LightboxBackdrop, Paragraph, VerticallyCenteredContainer } from "./styles";
 import subscriptionManager from "../app/SubscriptionManager";
+import notifier from "../app/Notifier";
 import priority1 from "../img/priority-1.svg";
 import priority2 from "../img/priority-2.svg";
 import priority4 from "../img/priority-4.svg";
@@ -188,7 +190,7 @@ const MarkdownContainer = styled("div")`
   }
 
   p {
-    line-height: 1.2;
+    line-height: 1.5;
   }
 
   blockquote,
@@ -303,7 +305,7 @@ const NotificationItem = (props) => {
             {formatTitle(notification)}
           </Typography>
         )}
-        <Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>
+        <Typography variant="body1" sx={{ whiteSpace: "pre-line", overflowX: "auto" }}>
           <NotificationBody notification={notification} />
           {maybeActionErrors(notification)}
         </Typography>
@@ -344,7 +346,7 @@ const NotificationItem = (props) => {
               </Tooltip>
             </>
           )}
-          {hasUserActions && <UserActions notification={notification} />}
+          {hasUserActions && <UserActions notification={notification} onShowSnack={props.onShowSnack} />}
         </CardActions>
       )}
     </Card>
@@ -486,7 +488,7 @@ const Image = (props) => {
 const UserActions = (props) => (
   <>
     {props.notification.actions.map((action) => (
-      <UserAction key={action.id} notification={props.notification} action={action} />
+      <UserAction key={action.id} notification={props.notification} action={action} onShowSnack={props.onShowSnack} />
     ))}
   </>
 );
@@ -508,6 +510,15 @@ const updateActionStatus = (notification, action, progress, error) => {
   });
 };
 
+const clearNotification = async (notification) => {
+  console.log(`[Notifications] Clearing notification ${notification.id}`);
+  const subscription = await subscriptionManager.get(notification.subscriptionId);
+  if (subscription) {
+    await notifier.cancel(subscription, notification);
+  }
+  await subscriptionManager.markNotificationRead(notification.id);
+};
+
 const performHttpAction = async (notification, action) => {
   console.log(`[Notifications] Performing HTTP user action`, action);
   try {
@@ -523,6 +534,9 @@ const performHttpAction = async (notification, action) => {
     const success = response.status >= 200 && response.status <= 299;
     if (success) {
       updateActionStatus(notification, action, ACTION_PROGRESS_SUCCESS, null);
+      if (action.clear) {
+        await clearNotification(notification);
+      }
     } else {
       updateActionStatus(notification, action, ACTION_PROGRESS_FAILED, `${action.label}: Unexpected response HTTP ${response.status}`);
     }
@@ -536,7 +550,7 @@ const UserAction = (props) => {
   const { t } = useTranslation();
   const { notification } = props;
   const { action } = props;
-  if (action.action === "broadcast") {
+  if (action.action === ACTION_BROADCAST) {
     return (
       <Tooltip title={t("notifications_actions_not_supported")}>
         <span>
@@ -547,11 +561,17 @@ const UserAction = (props) => {
       </Tooltip>
     );
   }
-  if (action.action === "view") {
+  if (action.action === ACTION_VIEW) {
+    const handleClick = () => {
+      openUrl(action.url);
+      if (action.clear) {
+        clearNotification(notification);
+      }
+    };
     return (
       <Tooltip title={t("notifications_actions_open_url_title", { url: action.url })}>
         <Button
-          onClick={() => openUrl(action.url)}
+          onClick={handleClick}
           aria-label={t("notifications_actions_open_url_title", {
             url: action.url,
           })}
@@ -561,7 +581,7 @@ const UserAction = (props) => {
       </Tooltip>
     );
   }
-  if (action.action === "http") {
+  if (action.action === ACTION_HTTP) {
     const method = action.method ?? "POST";
     const label = action.label + (ACTION_LABEL_SUFFIX[action.progress ?? 0] ?? "");
     return (
@@ -583,12 +603,28 @@ const UserAction = (props) => {
       </Tooltip>
     );
   }
+  if (action.action === ACTION_COPY) {
+    const handleClick = async () => {
+      await copyToClipboard(action.value);
+      props.onShowSnack();
+      if (action.clear) {
+        await clearNotification(notification);
+      }
+    };
+    return (
+      <Tooltip title={t("common_copy_to_clipboard")}>
+        <Button onClick={handleClick} aria-label={t("common_copy_to_clipboard")}>
+          {action.label}
+        </Button>
+      </Tooltip>
+    );
+  }
   return null; // Others
 };
 
 const NoNotifications = (props) => {
   const { t } = useTranslation();
-  const topicShortUrlResolved = topicShortUrl(props.subscription.baseUrl, props.subscription.topic);
+  const topicUrlResolved = topicUrl(props.subscription.baseUrl, props.subscription.topic);
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
@@ -601,7 +637,7 @@ const NoNotifications = (props) => {
         {t("notifications_example")}:<br />
         <tt>
           {'$ curl -d "Hi" '}
-          {topicShortUrlResolved}
+          {topicUrlResolved}
         </tt>
       </Paragraph>
       <Paragraph>
@@ -614,7 +650,7 @@ const NoNotifications = (props) => {
 const NoNotificationsWithoutSubscription = (props) => {
   const { t } = useTranslation();
   const subscription = props.subscriptions[0];
-  const topicShortUrlResolved = topicShortUrl(subscription.baseUrl, subscription.topic);
+  const topicUrlResolved = topicUrl(subscription.baseUrl, subscription.topic);
   return (
     <VerticallyCenteredContainer maxWidth="xs">
       <Typography variant="h5" align="center" sx={{ paddingBottom: 1 }}>
@@ -627,7 +663,7 @@ const NoNotificationsWithoutSubscription = (props) => {
         {t("notifications_example")}:<br />
         <tt>
           {'$ curl -d "Hi" '}
-          {topicShortUrlResolved}
+          {topicUrlResolved}
         </tt>
       </Paragraph>
       <Paragraph>

@@ -5,7 +5,7 @@ on GitHub ([Android](https://github.com/binwiederhier/ntfy-android), [iOS](https
 contribute, or [build your own](../develop.md).
 
 <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img width="170" src="../../static/img/badge-googleplay.png"></a>
-<a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img width="170" src="../../static/img/badge-fdroid.png"></a>
+<a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img width="170" src="../../static/img/badge-fdroid.svg"></a>
 <a href="https://apps.apple.com/us/app/ntfy/id1625396347"><img width="150" src="../../static/img/badge-appstore.png"></a>
 
 You can get the Android app from [Google Play](https://play.google.com/store/apps/details?id=io.heckel.ntfy), 
@@ -82,9 +82,8 @@ you'll see as a permanent notification that looks like this:
   <figcaption>Instant delivery foreground notification</figcaption>
 </figure>
 
-Android does not allow you to dismiss this notification, unless you turn off the notification channel in the settings.
-To do so, long-press on the foreground notification (screenshot above) and navigate to the settings. Then toggle the 
-"Subscription Service" off:
+To turn off this notification, long-press on the foreground notification (screenshot above) and navigate to the 
+settings. Then toggle the "Subscription Service" off:
 
 <figure markdown>
   ![foreground service](../static/img/notification-settings.png){ width=500 }
@@ -100,7 +99,29 @@ The reason for this is [Firebase Cloud Messaging (FCM)](https://firebase.google.
 notifications. Firebase is overall pretty bad at delivering messages in time, but on Android, most apps are stuck with it.
 
 The ntfy Android app uses Firebase only for the main host `ntfy.sh`, and only in the Google Play flavor of the app.
-It won't use Firebase for any self-hosted servers, and not at all in the the F-Droid flavor.
+It won't use Firebase for any self-hosted servers, and not at all in the F-Droid flavor.
+
+!!! info "F-Droid: Always instant delivery"
+    Since the F-Droid build does not include Firebase, **all subscriptions use instant delivery by default**, and 
+    there is no option to disable it. The F-Droid app hides all mentions of "instant delivery" in the UI, since 
+    showing options that can't be changed would only be confusing.
+
+## Publishing messages
+_Supported on:_ :material-android:
+
+The Android app allows you to **publish messages directly from the app**, without needing to use curl or any other 
+tool. When enabled in the settings (Settings → General → Show message bar), a **message bar** appears at the bottom 
+of the topic view (it's enabled by default). You can type a message and tap the send button to publish it instantly.
+If the message bar is disabled, you can tap the floating action button (FAB) at the bottom right instead.
+
+For more options, tap the expand button next to the send button to open the full **publish dialog**. The dialog lets 
+you compose a full notification with all available options, including title, tags, priority, click URL, email 
+forwarding, delayed delivery, attachments, Markdown formatting, and phone calls.
+
+<div id="publish-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-publish-message-bar.jpg"><img src="../../static/img/android-screenshot-publish-message-bar.jpg"/></a>
+    <a href="../../static/img/android-screenshot-publish-dialog.jpg"><img src="../../static/img/android-screenshot-publish-dialog.jpg"/></a>
+</div>
 
 ## Share to topic
 _Supported on:_ :material-android:
@@ -135,6 +156,67 @@ or to simply directly link to a topic from a mobile website.
 | <span style="white-space: nowrap">`ntfy://<host>/<topic>?display=<name>`</span> | `ntfy://ntfy.sh/mytopic?display=My+Topic` | Same as above, but also defines a display name for the topic.                                                                                                                                       |
 | <span style="white-space: nowrap">`ntfy://<host>/<topic>?secure=false`</span>   | `ntfy://example.com/mytopic?secure=false` | Same as above, except that this will use HTTP instead of HTTPS as topic URL. This is equivalent to the web view `http://example.com/mytopic` (HTTP!)                                                |
 
+## Advanced settings
+
+### Custom headers
+_Supported on:_ :material-android:
+
+If your ntfy server is behind an **authenticated proxy or tunnel** (e.g., Cloudflare Access, Tailscale Funnel, or 
+a reverse proxy with basic auth), you can configure custom HTTP headers that will be sent with every request to 
+that server. You could set headers such as `Authorization`, `CF-Access-Client-Id`, or any other headers required by
+your setup. To add custom headers, go to **Settings → Advanced → Custom headers**.
+
+<div id="custom-headers-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-custom-headers.jpg"><img src="../../static/img/android-screenshot-custom-headers.jpg"/></a>
+    <a href="../../static/img/android-screenshot-custom-headers-add.jpg"><img src="../../static/img/android-screenshot-custom-headers-add.jpg"/></a>
+</div>
+
+!!! warning
+    If you have a user configured for a server, you cannot add an `Authorization` header for that server, as ntfy
+    sets this header automatically. Similarly, if you have a custom `Authorization` header, you cannot add a user
+    for that server.
+
+### Manage certificates
+_Supported on:_ :material-android:
+
+If you're running a self-hosted ntfy server with a **self-signed certificate** or need to use **mutual TLS (mTLS)** 
+for client authentication, you can manage certificates in the app settings.
+
+Go to **Settings → Advanced → Manage certificates** to:
+
+- **Add trusted certificates**: Import a server certificate (PEM format) to trust when connecting to your ntfy server.
+  This is useful for self-signed certificates that are not trusted by the Android system.
+- **Add client certificates**: Import a client certificate (PKCS#12 format) for mutual TLS authentication. This 
+  certificate will be presented to the server when connecting.
+
+When you subscribe to a topic on a server with an untrusted certificate, the app will show a security warning and 
+allow you to review and trust the certificate.
+
+<div id="certificates-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-certs-manage.jpg"><img src="../../static/img/android-screenshot-certs-manage.jpg"/></a>
+    <a href="../../static/img/android-screenshot-certs-warning-dialog.jpg"><img src="../../static/img/android-screenshot-certs-warning-dialog.jpg"/></a>
+</div>
+
+### Language
+_Supported on:_ :material-android:
+
+The Android app supports many languages and uses the **system language by default**. If you'd like to use the app in 
+a different language than your system, you can override it in **Settings → General → Language**.
+
+<div id="language-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-language-selection.jpg"><img src="../../static/img/android-screenshot-language-selection.jpg"/></a>
+    <a href="../../static/img/android-screenshot-language-german.jpg"><img src="../../static/img/android-screenshot-language-german.jpg"/></a>
+    <a href="../../static/img/android-screenshot-language-hebrew.jpg"><img src="../../static/img/android-screenshot-language-hebrew.jpg"/></a>
+    <a href="../../static/img/android-screenshot-language-chinese.jpg"><img src="../../static/img/android-screenshot-language-chinese.jpg"/></a>
+</div>
+
+The app currently supports over 30 languages, including English, German, French, Spanish, Chinese, Japanese, and many
+more. Languages with more than 80% of strings translated are shown in the language picker.
+
+!!! tip "Help translate ntfy"
+    If you'd like to help translate ntfy into your language or improve existing translations, please visit the
+    [ntfy Weblate project](https://hosted.weblate.org/projects/ntfy/). Contributions are very welcome!
+
 ## Integrations
 
 ### UnifiedPush
@@ -168,10 +250,13 @@ Here's an example using [MacroDroid](https://play.google.com/store/apps/details?
 and [Tasker](https://play.google.com/store/apps/details?id=net.dinglisch.android.taskerm), but any app that can catch 
 broadcasts is supported:
 
-<div id="integration-screenshots-receive" class="screenshots">
+<div id="integration-screenshots-receive-1" class="screenshots">
     <a href="../../static/img/android-screenshot-macrodroid-overview.png"><img src="../../static/img/android-screenshot-macrodroid-overview.png"/></a>
     <a href="../../static/img/android-screenshot-macrodroid-trigger.png"><img src="../../static/img/android-screenshot-macrodroid-trigger.png"/></a>
     <a href="../../static/img/android-screenshot-macrodroid-action.png"><img src="../../static/img/android-screenshot-macrodroid-action.png"/></a>
+</div>
+
+<div id="integration-screenshots-receive-2" class="screenshots">
     <a href="../../static/img/android-screenshot-tasker-profiles.png"><img src="../../static/img/android-screenshot-tasker-profiles.png"/></a>
     <a href="../../static/img/android-screenshot-tasker-event-edit.png"><img src="../../static/img/android-screenshot-tasker-event-edit.png"/></a>
     <a href="../../static/img/android-screenshot-tasker-task-edit.png"><img src="../../static/img/android-screenshot-tasker-task-edit.png"/></a>
@@ -239,3 +324,29 @@ The following intent extras are supported when for the intent with the `io.hecke
 | `message` ❤️ | ✔        | *String*                      | `Some message`    | Message body; **you must set this**                                                |
 | `tags`       | -        | *String*                      | `tag1,tag2,..`    | Comma-separated list of [tags](../publish.md#tags-emojis)                          |
 | `priority`   | -        | *String or Int (between 1-5)* | `4`               | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max |
+
+## Troubleshooting
+
+### Connection error dialog
+_Supported on:_ :material-android:
+
+If the app has trouble connecting to a ntfy server, a **warning icon** will appear in the app bar. Tapping it opens
+the **connection error dialog**, which shows detailed information about the connection problem and helps you diagnose
+the issue.
+
+<div id="connection-error-screenshots" class="screenshots">
+    <a href="../../static/img/android-screenshot-connection-error-warning.jpg"><img src="../../static/img/android-screenshot-connection-error-warning.jpg"/></a>
+    <a href="../../static/img/android-screenshot-connection-error-dialog.jpg"><img src="../../static/img/android-screenshot-connection-error-dialog.jpg"/></a>
+</div>
+
+Common connection errors include:
+
+| Error | Description |
+|-------|-------------|
+| Connection refused | The server may be down or the address may be incorrect |
+| WebSocket not supported | The server may not support WebSocket connections, or a proxy is blocking them |
+| Not authorized (401/403) | Username/password may be incorrect, or access credentials have expired |
+| Certificate not trusted | The server is using a self-signed certificate (see [Manage certificates](#manage-certificates)) |
+
+If you're having persistent connection issues, you can also check the app logs under **Settings → Advanced → Record logs**
+and share them for debugging.

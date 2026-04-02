@@ -361,7 +361,7 @@
     "publish_dialog_tags_placeholder": "英文逗號分隔標記列表，例如 warning, srv1-backup",
     "publish_dialog_title_label": "主題",
     "publish_dialog_title_no_topic": "發布通知",
-    "publish_dialog_title_placeholder": "主題標題，例如 磁碟空間警告",
+    "publish_dialog_title_placeholder": "主題標題，例如：磁碟空間警告",
     "publish_dialog_title_topic": "發布到 {{topic}}",
     "publish_dialog_topic_label": "主題名稱",
     "publish_dialog_topic_placeholder": "主題名稱，例如 phil_alerts",
@@ -403,5 +403,7 @@
     "web_push_subscription_expiring_body": "開啟ntfy以繼續接收通知",
     "web_push_subscription_expiring_title": "通知會被暫停",
     "web_push_unknown_notification_body": "你可能需要開啟網頁來更新ntfy",
-    "web_push_unknown_notification_title": "接收到不明通知"
+    "web_push_unknown_notification_title": "接收到不明通知",
+    "account_basics_cannot_edit_or_delete_provisioned_user": "已佈建的使用者無法編輯或刪除",
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "無法編輯或刪除已佈建的權杖"
 }

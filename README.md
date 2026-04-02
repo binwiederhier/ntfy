@@ -35,6 +35,12 @@ available on [Google Play](https://play.google.com/store/apps/details?id=io.heck
 as well as an [open source iOS app](https://github.com/binwiederhier/ntfy-ios) available on the [App Store](https://apps.apple.com/us/app/ntfy/id1625396347).
 
 <p>
+  <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy"><img height="50" src="docs/static/img/badge-googleplay.png"></a>
+  <a href="https://f-droid.org/en/packages/io.heckel.ntfy/"><img width="170" src="docs/static/img/badge-fdroid.svg"></a>
+  <a href="https://apps.apple.com/us/app/ntfy/id1625396347"><img height="50" src="docs/static/img/badge-appstore.png"></a>
+</p>
+
+<p>
   <img src=".github/images/screenshot-curl.png" height="180">
   <img src=".github/images/screenshot-web-detail.png" height="180">
   <img src=".github/images/screenshot-phone-main.jpg" height="180">

@@ -406,5 +406,7 @@
     "web_push_unknown_notification_title": "Neznáme oznámenie prijaté zo servera",
     "web_push_unknown_notification_body": "Možno budete musieť aktualizovať ntfy otvorením webovej aplikácie",
     "alert_notification_permission_required_title": "Oznámenia sú vypnuté",
-    "alert_notification_ios_install_required_description": "Kliknutím na Zdieľať a Pridať na domovskú obrazovku povolíte oznámenia v systéme iOS"
+    "alert_notification_ios_install_required_description": "Kliknutím na Zdieľať a Pridať na domovskú obrazovku povolíte oznámenia v systéme iOS",
+    "account_basics_cannot_edit_or_delete_provisioned_user": "Prideleného používateľa nemožno upraviť ani odstrániť",
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Pridelený token nemožno upraviť ani odstrániť"
 }

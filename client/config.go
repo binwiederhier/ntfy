@@ -11,6 +11,9 @@ const (
 	DefaultBaseURL = "https://ntfy.sh"
 )
 
+// DefaultConfigFile is the default path to the client config file (set in config_*.go)
+var DefaultConfigFile string
+
 // Config is the config struct for a Client
 type Config struct {
 	DefaultHost     string      `yaml:"default-host"`

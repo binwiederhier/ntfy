@@ -38,8 +38,32 @@
 #
 # firebase-key-file: <filename>
 
+# If "database-url" is set, ntfy will use PostgreSQL for all database-backed stores (message cache,
+# user manager, and web push subscriptions) instead of SQLite. When set, the "cache-file",
+# "auth-file", and "web-push-file" options must not be set.
+#
+# Note: Setting "database-url" implicitly enables authentication and access control.
+# The default access is "read-write" (see "auth-default-access").
+#
+# The URL supports standard PostgreSQL parameters (sslmode, connect_timeout, sslcert, etc.),
+# as well as ntfy-specific connection pool parameters:
+#   pool_max_conns=10          - Maximum number of open connections (default: 10)
+#   pool_max_idle_conns=N      - Maximum number of idle connections
+#   pool_conn_max_lifetime=5m  - Maximum lifetime of a connection (Go duration)
+#   pool_conn_max_idle_time=1m - Maximum idle time of a connection (Go duration)
+#
+# See https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
+# for the full list of supported PostgreSQL connection parameters.
+#
+# Examples:
+#   database-url: "postgres://user:pass@host:5432/ntfy"
+#   database-url: "postgres://user:pass@host:5432/ntfy?sslmode=require&pool_max_conns=50"
+#
+# database-url: <connection-string>
+
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.
+# Not required if "database-url" is set (messages are stored in PostgreSQL instead).
 #
 # The "cache-duration" parameter defines the duration for which messages will be buffered
 # before they are deleted. This is required to support the "since=..." and "poll=1" parameter.
@@ -76,6 +100,8 @@
 
 # If set, access to the ntfy server and API can be controlled on a granular level using
 # the 'ntfy user' and 'ntfy access' commands. See the --help pages for details, or check the docs.
+#
+# Note: If "database-url" is set, auth is implicitly enabled and "auth-file" must not be set.
 #
 # - auth-file is the SQLite user/access database; it is created automatically if it doesn't already exist
 # - auth-default-access defines the default/fallback access if no access control entry is found; it can be
@@ -127,7 +153,8 @@
 # If enabled, clients can attach files to notifications as attachments. Minimum settings to enable attachments
 # are "attachment-cache-dir" and "base-url".
 #
-# - attachment-cache-dir is the cache directory for attached files
+# - attachment-cache-dir is the cache directory for attached files, or an S3 URL for object storage
+#   e.g. /var/cache/ntfy/attachments, or s3://ACCESS_KEY:SECRET_KEY@bucket/prefix?region=us-east-1&endpoint=https://...
 # - attachment-total-size-limit is the limit of the on-disk attachment cache directory (total size)
 # - attachment-file-size-limit is the per-file attachment size limit (e.g. 300k, 2M, 100M)
 # - attachment-expiry-duration is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h)
@@ -160,17 +187,20 @@
 # If enabled, allow outgoing e-mail notifications via the 'X-Email' header. If this header is set,
 # messages will additionally be sent out as e-mail using an external SMTP server.
 #
-# As of today, only SMTP servers with plain text auth (or no auth at all), and STARTLS are supported.
+# As of today, only SMTP servers with plain text auth (or no auth at all), and STARTTLS are supported.
 # Please also refer to the rate limiting settings below (visitor-email-limit-burst & visitor-email-limit-burst).
 #
 # - smtp-sender-addr is the hostname:port of the SMTP server
 # - smtp-sender-from is the e-mail address of the sender
 # - smtp-sender-user/smtp-sender-pass are the username and password of the SMTP user (leave blank for no auth)
+# - smtp-sender-verify is a flag that forces email recipient verification when enabled. If set to true,
+#   only verified email recipients can be used in the X-Email header.
 #
 # smtp-sender-addr:
 # smtp-sender-from:
 # smtp-sender-user:
 # smtp-sender-pass:
+# smtp-sender-verify: false
 
 # If enabled, ntfy will launch a lightweight SMTP server for incoming messages. Once configured, users can send
 # emails to a topic e-mail address to publish messages to a topic.
@@ -197,9 +227,10 @@
 # - web-push-public-key is the generated VAPID public key, e.g. AA1234BBCCddvveekaabcdfqwertyuiopasdfghjklzxcvbnm1234567890
 # - web-push-private-key is the generated VAPID private key, e.g. AA2BB1234567890abcdefzxcvbnm1234567890
 # - web-push-file is a database file to keep track of browser subscription endpoints, e.g. /var/cache/ntfy/webpush.db
+#   Not required if "database-url" is set (subscriptions are stored in PostgreSQL instead).
 # - web-push-email-address is the admin email address send to the push provider, e.g. sysadmin@example.com
-# - web-push-startup-queries is an optional list of queries to run on startup`
-# - web-push-expiry-warning-duration defines the duration after which unused subscriptions are sent a warning (default is 55d`)
+# - web-push-startup-queries is an optional list of queries to run on startup
+# - web-push-expiry-warning-duration defines the duration after which unused subscriptions are sent a warning (default is 55d)
 # - web-push-expiry-duration defines the duration after which unused subscriptions will expire (default is 60d)
 #
 # web-push-public-key:
@@ -216,11 +247,13 @@
 # - twilio-auth-token is the Twilio auth token, e.g. affebeef258625862586258625862586
 # - twilio-phone-number is the outgoing phone number you purchased, e.g. +18775132586
 # - twilio-verify-service is the Twilio Verify service SID, e.g. VA12345beefbeef67890beefbeef122586
+# - twilio-call-format is the custom TwiML send to the Call API (optional, see https://www.twilio.com/docs/voice/twiml)
 #
 # twilio-account:
 # twilio-auth-token:
 # twilio-phone-number:
 # twilio-verify-service:
+# twilio-call-format:
 
 # Interval in which keepalive messages are sent to the client. This is to prevent
 # intermediaries closing the connection for inactivity.
@@ -278,7 +311,7 @@
 #
 # - upstream-base-url is the base URL of the upstream server. Should be "https://ntfy.sh".
 # - upstream-access-token is the token used to authenticate with the upstream server. This is only required
-#   if you exceed the upstream rate limits, or the uptream server requires authentication.
+#   if you exceed the upstream rate limits, or the upstream server requires authentication.
 #
 # upstream-base-url:
 # upstream-access-token:

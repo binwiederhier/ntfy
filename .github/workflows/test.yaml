@@ -1,19 +1,39 @@
 name: test
-on: [ push, pull_request ]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ntfy
+          POSTGRES_PASSWORD: ntfy
+          POSTGRES_DB: ntfy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ntfy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NTFY_TEST_DATABASE_URL: "postgres://ntfy:ntfy@localhost:5432/ntfy_test?sslmode=disable"
+      NTFY_TEST_S3_URL: ${{ secrets.NTFY_TEST_S3_URL }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.x'
+          go-version: '1.25.x'
       - name: Install node
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: './web/package-lock.json'
       - name: Install dependencies
@@ -23,8 +43,6 @@ jobs:
       - name: Build web app (required for tests)
         run: make web
       - name: Run tests, formatting, vetting and linting
-        run: make check
+        run: make checkv
       - name: Run coverage
         run: make coverage
-      - name: Upload coverage to codecov.io
-        run: make coverage-upload

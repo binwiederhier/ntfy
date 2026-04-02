@@ -3,13 +3,15 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/user"
-	"heckel.io/ntfy/v2/util"
 	"net/http"
 	"net/netip"
 	"strings"
 	"time"
+
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 )
 
 const (
@@ -156,6 +158,15 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			}
 			if len(phoneNumbers) > 0 {
 				response.PhoneNumbers = phoneNumbers
+			}
+		}
+		if s.mailSender != nil {
+			emails, err := s.userManager.Emails(u.ID)
+			if err != nil {
+				return err
+			}
+			if len(emails) > 0 {
+				response.Emails = emails
 			}
 		}
 	} else {
@@ -454,21 +465,8 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 		return errHTTPUnauthorized
 	} else if err := s.userManager.AllowReservation(u.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
-	} else if u.IsUser() {
-		hasReservation, err := s.userManager.HasReservation(u.Name, req.Topic)
-		if err != nil {
-			return err
-		}
-		if !hasReservation {
-			reservations, err := s.userManager.ReservationsCount(u.Name)
-			if err != nil {
-				return err
-			} else if reservations >= u.Tier.ReservationLimit {
-				return errHTTPTooManyRequestsLimitReservations
-			}
-		}
 	}
-	// Actually add the reservation
+	// Actually add the reservation (with limit check inside the transaction to avoid races)
 	logvr(v, r).
 		Tag(tagAccount).
 		Fields(log.Context{
@@ -476,7 +474,14 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 			"everyone": everyone.String(),
 		}).
 		Debug("Adding topic reservation")
-	if err := s.userManager.AddReservation(u.Name, req.Topic, everyone); err != nil {
+	var limit int64
+	if u.IsUser() && u.Tier != nil {
+		limit = u.Tier.ReservationLimit
+	}
+	if err := s.userManager.AddReservation(u.Name, req.Topic, everyone, limit); err != nil {
+		if errors.Is(err, user.ErrTooManyReservations) {
+			return errHTTPTooManyRequestsLimitReservations
+		}
 		return err
 	}
 	// Kill existing subscribers
@@ -529,22 +534,15 @@ func (s *Server) handleAccountReservationDelete(w http.ResponseWriter, r *http.R
 // and marks associated messages for the topics as deleted. This also eventually deletes attachments.
 // The process relies on the manager to perform the actual deletions (see runManager).
 func (s *Server) maybeRemoveMessagesAndExcessReservations(r *http.Request, v *visitor, u *user.User, reservationsLimit int64) error {
-	reservations, err := s.userManager.Reservations(u.Name)
+	removedTopics, err := s.userManager.RemoveExcessReservations(u.Name, reservationsLimit)
 	if err != nil {
 		return err
-	} else if int64(len(reservations)) <= reservationsLimit {
+	} else if len(removedTopics) == 0 {
 		logvr(v, r).Tag(tagAccount).Debug("No excess reservations to remove")
 		return nil
 	}
-	topics := make([]string, 0)
-	for i := int64(len(reservations)) - 1; i >= reservationsLimit; i-- {
-		topics = append(topics, reservations[i].Topic)
-	}
-	logvr(v, r).Tag(tagAccount).Info("Removing excess reservations for topics %s", strings.Join(topics, ", "))
-	if err := s.userManager.RemoveReservations(u.Name, topics...); err != nil {
-		return err
-	}
-	if err := s.messageCache.ExpireMessages(topics...); err != nil {
+	logvr(v, r).Tag(tagAccount).Info("Removed excess topic reservations, now removing messages for topics %s", strings.Join(removedTopics, ", "))
+	if err := s.messageCache.ExpireMessages(removedTopics...); err != nil {
 		return err
 	}
 	go s.pruneMessages()
@@ -617,6 +615,103 @@ func (s *Server) handleAccountPhoneNumberDelete(w http.ResponseWriter, r *http.R
 	return s.writeJSON(w, newSuccessResponse())
 }
 
+func (s *Server) handleAccountEmailVerify(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountEmailVerifyRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	} else if !emailAddressRegex.MatchString(req.Email) {
+		return errHTTPBadRequestEmailAddressInvalid
+	}
+	// Check user is allowed to add emails
+	if u == nil {
+		return errHTTPUnauthorized
+	} else if u.IsUser() && u.Tier != nil && u.Tier.EmailLimit == 0 {
+		return errHTTPUnauthorized
+	} else if u.IsUser() && u.Tier == nil && s.config.VisitorEmailLimitBurst == 0 {
+		return errHTTPUnauthorized
+	}
+	// Check if email already exists
+	emails, err := s.userManager.Emails(u.ID)
+	if err != nil {
+		return err
+	} else if util.Contains(emails, req.Email) {
+		return errHTTPConflictEmailExists
+	}
+	// Check email rate limit (counts against the user's email quota)
+	if !v.EmailAllowed() {
+		return errHTTPTooManyRequestsLimitEmails
+	}
+	// Send verification email
+	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Sending email verification")
+	if err := s.mailSender.SendVerification(req.Email); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+func (s *Server) handleAccountEmailAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountEmailAddRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	} else if !emailAddressRegex.MatchString(req.Email) {
+		return errHTTPBadRequestEmailAddressInvalid
+	} else if !s.mailSender.CheckVerification(req.Email, req.Code) {
+		return errHTTPBadRequestEmailVerificationCodeInvalid
+	}
+	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Adding email as verified")
+	if err := s.userManager.AddEmail(u.ID, req.Email); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+func (s *Server) handleAccountEmailDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	req, err := readJSONWithLimit[apiAccountEmailVerifyRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	}
+	if !emailAddressRegex.MatchString(req.Email) {
+		return errHTTPBadRequestEmailAddressInvalid
+	}
+	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Debug("Deleting verified email")
+	if err := s.userManager.RemoveEmail(u.ID, req.Email); err != nil {
+		return err
+	}
+	return s.writeJSON(w, newSuccessResponse())
+}
+
+// convertEmailAddress checks the email address against the user's verified email list.
+// If smtp-sender-verify is false (default), the email is passed through as-is for
+// backwards compatibility. If true, the user must be authenticated and the email must be
+// in their verified list. "yes"/"true"/"1" resolves to the first verified email.
+func (s *Server) convertEmailAddress(u *user.User, email string) (string, *errHTTP) {
+	if !s.config.SMTPSenderVerify {
+		if toBool(email) {
+			return "", errHTTPBadRequestEmailAddressInvalid
+		}
+		return email, nil
+	} else if u == nil {
+		return "", errHTTPBadRequestAnonymousEmailNotAllowed
+	} else if s.userManager == nil {
+		return email, nil
+	}
+	emails, err := s.userManager.Emails(u.ID)
+	if err != nil {
+		return "", errHTTPInternalError
+	} else if len(emails) == 0 {
+		return "", errHTTPBadRequestEmailAddressNotVerified
+	}
+	if toBool(email) {
+		return emails[0], nil
+	} else if util.Contains(emails, email) {
+		return email, nil
+	}
+	return "", errHTTPBadRequestEmailAddressNotVerified
+}
+
 // publishSyncEventAsync kicks of a Go routine to publish a sync message to the user's sync topic
 func (s *Server) publishSyncEventAsync(v *visitor) {
 	go func() {
@@ -641,7 +736,7 @@ func (s *Server) publishSyncEvent(v *visitor) error {
 	if err != nil {
 		return err
 	}
-	m := newDefaultMessage(syncTopic.ID, string(messageBytes))
+	m := model.NewDefaultMessage(syncTopic.ID, string(messageBytes))
 	if err := syncTopic.Publish(v, m); err != nil {
 		return err
 	}

@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/model"
 )
 
 func TestTopic_CancelSubscribersExceptUser(t *testing.T) {
-	subFn := func(v *visitor, msg *message) error {
+	subFn := func(v *visitor, msg *model.Message) error {
 		return nil
 	}
 	canceled1 := atomic.Bool{}
@@ -33,7 +34,7 @@ func TestTopic_CancelSubscribersExceptUser(t *testing.T) {
 func TestTopic_CancelSubscribersUser(t *testing.T) {
 	t.Parallel()
 
-	subFn := func(v *visitor, msg *message) error {
+	subFn := func(v *visitor, msg *model.Message) error {
 		return nil
 	}
 	canceled1 := atomic.Bool{}
@@ -76,7 +77,7 @@ func TestTopic_Subscribe_DuplicateID(t *testing.T) {
 		cancel:     func() {},
 	}
 
-	subFn := func(v *visitor, msg *message) error {
+	subFn := func(v *visitor, msg *model.Message) error {
 		return nil
 	}
 

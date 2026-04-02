@@ -19,6 +19,7 @@ import (
 
 	"github.com/emersion/go-smtp"
 	"github.com/microcosm-cc/bluemonday"
+	"heckel.io/ntfy/v2/model"
 )
 
 var (
@@ -33,6 +34,7 @@ var (
 var (
 	onlySpacesRegex          = regexp.MustCompile(`(?m)^\s+$`)
 	consecutiveNewLinesRegex = regexp.MustCompile(`\n{3,}`)
+	htmlLineBreakRegex       = regexp.MustCompile(`(?i)<br\s*/?>`)
 )
 
 const (
@@ -158,7 +160,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if len(body) > conf.MessageSizeLimit {
 			body = body[:conf.MessageSizeLimit]
 		}
-		m := newDefaultMessage(s.topic, body)
+		m := model.NewDefaultMessage(s.topic, body)
 		subject := strings.TrimSpace(msg.Header.Get("Subject"))
 		if subject != "" {
 			dec := mime.WordDecoder{}
@@ -183,7 +185,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 	})
 }
 
-func (s *smtpSession) publishMessage(m *message) error {
+func (s *smtpSession) publishMessage(m *model.Message) error {
 	// Extract remote address (for rate limiting)
 	remoteAddr, _, err := net.SplitHostPort(s.conn.Conn().RemoteAddr().String())
 	if err != nil {
@@ -327,6 +329,9 @@ func readHTMLMailBody(reader io.Reader, transferEncoding string) (string, error)
 	if err != nil {
 		return "", err
 	}
+	// Convert <br> tags to newlines before stripping HTML, so that line breaks
+	// in HTML emails (e.g. from Synology DSM, and other appliances) are preserved.
+	body = htmlLineBreakRegex.ReplaceAllString(body, "\n")
 	stripped := bluemonday.
 		StrictPolicy().
 		AddSpaceWhenStrippingTag(true).

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"mime"
-	"net"
 	"net/smtp"
 	"slices"
 	"strings"
@@ -15,6 +14,8 @@ import (
 	"time"
 
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/mail"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -26,7 +27,7 @@ var (
 )
 
 type mailer interface {
-	Send(v *visitor, m *message, to string) error
+	Send(v *visitor, m *model.Message, to string) error
 	Counts() (total int64, success int64, failure int64)
 }
 
@@ -93,38 +94,30 @@ func (a *plainOrLoginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 
 type smtpSender struct {
 	config  *Config
+	sender  *mail.Sender
 	success int64
 	failure int64
 	mu      sync.Mutex
 }
 
-func (s *smtpSender) Send(v *visitor, m *message, to string) error {
+func (s *smtpSender) Send(v *visitor, m *model.Message, to string) error {
 	return s.withCount(v, m, func() error {
-		host, _, err := net.SplitHostPort(s.config.SMTPSenderAddr)
+		message, err := formatMail(s.config.BaseURL, v.ip.String(), s.sender.From(), to, m)
 		if err != nil {
 			return err
-		}
-		message, err := formatMail(s.config.BaseURL, v.ip.String(), s.config.SMTPSenderFrom, to, m)
-		if err != nil {
-			return err
-		}
-		var auth smtp.Auth
-		if s.config.SMTPSenderUser != "" {
-			auth = PlainOrLoginAuth("", s.config.SMTPSenderUser, s.config.SMTPSenderPass, host)
 		}
 		ev := logvm(v, m).
 			Tag(tagEmail).
 			Fields(log.Context{
-				"email_via":  s.config.SMTPSenderAddr,
-				"email_user": s.config.SMTPSenderUser,
+				"email_via":  s.sender.Addr(),
+				"email_user": s.sender.User(),
 				"email_to":   to,
 			})
 		if ev.IsTrace() {
 			ev.Field("email_body", message).Trace("Sending email")
-		} else if ev.IsDebug() {
-			ev.Debug("Sending email")
 		}
-		return smtp.SendMail(s.config.SMTPSenderAddr, auth, s.config.SMTPSenderFrom, []string{to}, []byte(message))
+		ev.Info("Sending email")
+		return s.sender.SendRaw(to, []byte(message))
 	})
 }
 
@@ -134,7 +127,7 @@ func (s *smtpSender) Counts() (total int64, success int64, failure int64) {
 	return s.success + s.failure, s.success, s.failure
 }
 
-func (s *smtpSender) withCount(v *visitor, m *message, fn func() error) error {
+func (s *smtpSender) withCount(v *visitor, m *model.Message, fn func() error) error {
 	err := fn()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -147,7 +140,7 @@ func (s *smtpSender) withCount(v *visitor, m *message, fn func() error) error {
 	return err
 }
 
-func formatMail(baseURL, senderIP, from, to string, m *message) (string, error) {
+func formatMail(baseURL, senderIP, from, to string, m *model.Message) (string, error) {
 	topicURL := baseURL + "/" + m.Topic
 	subject := m.Title
 	if subject == "" {

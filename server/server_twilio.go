@@ -4,33 +4,50 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/user"
-	"heckel.io/ntfy/v2/util"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"text/template"
+
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 )
 
-const (
-	twilioCallFormat = `
+// defaultTwilioCallFormatTemplate is the default TwiML template used for Twilio calls.
+// It can be overridden in the server configuration's twilio-call-format field.
+//
+// The format uses Go template syntax with the following fields:
+// {{.Topic}}, {{.Title}}, {{.Message}}, {{.Priority}}, {{.Tags}}, {{.Sender}}
+// String fields are automatically XML-escaped.
+var defaultTwilioCallFormatTemplate = template.Must(template.New("twiml").Parse(`
 <Response>
 	<Pause length="1"/>
 	<Say loop="3">
-		You have a message from notify on topic %s. Message:
+		You have a message from notify on topic {{.Topic}}. Message:
 		<break time="1s"/>
-		%s
+		{{.Message}}
 		<break time="1s"/>
 		End of message.
 		<break time="1s"/>
-		This message was sent by user %s. It will be repeated three times.
+		This message was sent by user {{.Sender}}. It will be repeated three times.
 		To unsubscribe from calls like this, remove your phone number in the notify web app.
 		<break time="3s"/>
 	</Say>
 	<Say>Goodbye.</Say>
-</Response>`
-)
+</Response>`))
+
+// twilioCallData holds the data passed to the Twilio call format template
+type twilioCallData struct {
+	Topic    string
+	Title    string
+	Message  string
+	Priority int
+	Tags     []string
+	Sender   string
+}
 
 // convertPhoneNumber checks if the given phone number is verified for the given user, and if so, returns the verified
 // phone number. It also converts a boolean string ("yes", "1", "true") to the first verified phone number.
@@ -60,12 +77,34 @@ func (s *Server) convertPhoneNumber(u *user.User, phoneNumber string) (string, *
 
 // callPhone calls the Twilio API to make a phone call to the given phone number, using the given message.
 // Failures will be logged, but not returned to the caller.
-func (s *Server) callPhone(v *visitor, r *http.Request, m *message, to string) {
+func (s *Server) callPhone(v *visitor, r *http.Request, m *model.Message, to string) {
 	u, sender := v.User(), m.Sender.String()
 	if u != nil {
 		sender = u.Name
 	}
-	body := fmt.Sprintf(twilioCallFormat, xmlEscapeText(m.Topic), xmlEscapeText(m.Message), xmlEscapeText(sender))
+	tmpl := defaultTwilioCallFormatTemplate
+	if s.config.TwilioCallFormat != nil {
+		tmpl = s.config.TwilioCallFormat
+	}
+	tags := make([]string, len(m.Tags))
+	for i, tag := range m.Tags {
+		tags[i] = xmlEscapeText(tag)
+	}
+	templateData := &twilioCallData{
+		Topic:    xmlEscapeText(m.Topic),
+		Title:    xmlEscapeText(m.Title),
+		Message:  xmlEscapeText(m.Message),
+		Priority: m.Priority,
+		Tags:     tags,
+		Sender:   xmlEscapeText(sender),
+	}
+	var bodyBuf bytes.Buffer
+	if err := tmpl.Execute(&bodyBuf, templateData); err != nil {
+		logvrm(v, r, m).Tag(tagTwilio).Err(err).Warn("Error executing Twilio call format template")
+		minc(metricCallsMadeFailure)
+		return
+	}
+	body := bodyBuf.String()
 	data := url.Values{}
 	data.Set("From", s.config.TwilioPhoneNumber)
 	data.Set("To", to)
@@ -87,7 +126,7 @@ func (s *Server) callPhoneInternal(data url.Values) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
+	req.Header.Set("User-Agent", "ntfy/"+s.config.BuildVersion)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
 	resp, err := http.DefaultClient.Do(req)
@@ -111,7 +150,7 @@ func (s *Server) verifyPhoneNumber(v *visitor, r *http.Request, phoneNumber, cha
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
+	req.Header.Set("User-Agent", "ntfy/"+s.config.BuildVersion)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
 	resp, err := http.DefaultClient.Do(req)
@@ -137,7 +176,7 @@ func (s *Server) verifyPhoneNumberCheck(v *visitor, r *http.Request, phoneNumber
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "ntfy/"+s.config.Version)
+	req.Header.Set("User-Agent", "ntfy/"+s.config.BuildVersion)
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", util.BasicAuth(s.config.TwilioAccount, s.config.TwilioAuthToken))
 	resp, err := http.DefaultClient.Do(req)

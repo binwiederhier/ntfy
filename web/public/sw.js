@@ -3,11 +3,17 @@ import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
 import { clientsClaim } from "workbox-core";
-
 import { dbAsync } from "../src/app/db";
-
-import { toNotificationParams, icon, badge } from "../src/app/notificationUtils";
+import { ACTION_HTTP, ACTION_VIEW } from "../src/app/actions";
+import { badge, icon, messageWithSequenceId, notificationTag, toNotificationParams } from "../src/app/notificationUtils";
 import initI18n from "../src/app/i18n";
+import {
+  EVENT_MESSAGE,
+  EVENT_MESSAGE_CLEAR,
+  EVENT_MESSAGE_DELETE,
+  WEBPUSH_EVENT_MESSAGE,
+  WEBPUSH_EVENT_SUBSCRIPTION_EXPIRING,
+} from "../src/app/events";
 
 /**
  * General docs for service workers and PWAs:
@@ -21,25 +27,6 @@ import initI18n from "../src/app/i18n";
 
 const broadcastChannel = new BroadcastChannel("web-push-broadcast");
 
-const addNotification = async ({ subscriptionId, message }) => {
-  const db = await dbAsync();
-
-  await db.notifications.add({
-    ...message,
-    subscriptionId,
-    // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
-    new: 1,
-  });
-
-  await db.subscriptions.update(subscriptionId, {
-    last: message.id,
-  });
-
-  const badgeCount = await db.notifications.where({ new: 1 }).count();
-  console.log("[ServiceWorker] Setting new app badge count", { badgeCount });
-  self.navigator.setAppBadge?.(badgeCount);
-};
-
 /**
  * Handle a received web push message and show notification.
  *
@@ -48,18 +35,119 @@ const addNotification = async ({ subscriptionId, message }) => {
  */
 const handlePushMessage = async (data) => {
   const { subscription_id: subscriptionId, message } = data;
+  const db = await dbAsync();
 
-  broadcastChannel.postMessage(message); // To potentially play sound
+  console.log("[ServiceWorker] Message received", data);
 
-  await addNotification({ subscriptionId, message });
+  // Look up subscription for baseUrl and topic
+  const subscription = await db.subscriptions.get(subscriptionId);
+  if (!subscription) {
+    console.log("[ServiceWorker] Subscription not found", subscriptionId);
+    return;
+  }
+
+  // Delete existing notification with same sequence ID (if any)
+  const sequenceId = message.sequence_id || message.id;
+  if (sequenceId) {
+    await db.notifications.where({ subscriptionId, sequenceId }).delete();
+  }
+
+  // Add notification to database
+  await db.notifications.add({
+    ...messageWithSequenceId(message),
+    subscriptionId,
+    new: 1, // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+  });
+
+  // Update subscription last message id (for ?since=... queries)
+  await db.subscriptions.update(subscriptionId, {
+    last: message.id,
+  });
+
+  // Update badge in PWA
+  const badgeCount = await db.notifications.where({ new: 1 }).count();
+  self.navigator.setAppBadge?.(badgeCount);
+
+  // Broadcast the message to potentially play a sound
+  broadcastChannel.postMessage(message);
+
   await self.registration.showNotification(
     ...toNotificationParams({
-      subscriptionId,
       message,
       defaultTitle: message.topic,
       topicRoute: new URL(message.topic, self.location.origin).toString(),
+      baseUrl: subscription.baseUrl,
+      topic: subscription.topic,
     })
   );
+};
+
+/**
+ * Handle a message_delete event: delete the notification from the database.
+ */
+const handlePushMessageDelete = async (data) => {
+  const { subscription_id: subscriptionId, message } = data;
+  const db = await dbAsync();
+  console.log("[ServiceWorker] Deleting notification sequence", data);
+
+  // Look up subscription for baseUrl and topic
+  const subscription = await db.subscriptions.get(subscriptionId);
+  if (!subscription) {
+    console.log("[ServiceWorker] Subscription not found", subscriptionId);
+    return;
+  }
+
+  // Delete notification with the same sequence_id
+  const sequenceId = message.sequence_id;
+  if (sequenceId) {
+    await db.notifications.where({ subscriptionId, sequenceId }).delete();
+  }
+
+  // Close browser notification with matching tag (scoped by topic)
+  const tag = notificationTag(subscription.baseUrl, subscription.topic, message.sequence_id || message.id);
+  const notifications = await self.registration.getNotifications({ tag });
+  notifications.forEach((notification) => notification.close());
+
+  // Update subscription last message id (for ?since=... queries)
+  await db.subscriptions.update(subscriptionId, {
+    last: message.id,
+  });
+};
+
+/**
+ * Handle a message_clear event: clear/dismiss the notification.
+ */
+const handlePushMessageClear = async (data) => {
+  const { subscription_id: subscriptionId, message } = data;
+  const db = await dbAsync();
+  console.log("[ServiceWorker] Marking notification as read", data);
+
+  // Look up subscription for baseUrl and topic
+  const subscription = await db.subscriptions.get(subscriptionId);
+  if (!subscription) {
+    console.log("[ServiceWorker] Subscription not found", subscriptionId);
+    return;
+  }
+
+  // Mark notification as read (set new = 0)
+  const sequenceId = message.sequence_id;
+  if (sequenceId) {
+    await db.notifications.where({ subscriptionId, sequenceId }).modify({ new: 0 });
+  }
+
+  // Close browser notification with matching tag (scoped by topic)
+  const tag = notificationTag(subscription.baseUrl, subscription.topic, message.sequence_id || message.id);
+  const notifications = await self.registration.getNotifications({ tag });
+  notifications.forEach((notification) => notification.close());
+
+  // Update subscription last message id (for ?since=... queries)
+  await db.subscriptions.update(subscriptionId, {
+    last: message.id,
+  });
+
+  // Update badge count
+  const badgeCount = await db.notifications.where({ new: 1 }).count();
+  self.navigator.setAppBadge?.(badgeCount);
 };
 
 /**
@@ -67,6 +155,7 @@ const handlePushMessage = async (data) => {
  */
 const handlePushSubscriptionExpiring = async (data) => {
   const t = await initI18n();
+  console.log("[ServiceWorker] Handling incoming subscription expiring event", data);
 
   await self.registration.showNotification(t("web_push_subscription_expiring_title"), {
     body: t("web_push_subscription_expiring_body"),
@@ -82,6 +171,7 @@ const handlePushSubscriptionExpiring = async (data) => {
  */
 const handlePushUnknown = async (data) => {
   const t = await initI18n();
+  console.log("[ServiceWorker] Unknown event received", data);
 
   await self.registration.showNotification(t("web_push_unknown_notification_title"), {
     body: t("web_push_unknown_notification_body"),
@@ -96,13 +186,26 @@ const handlePushUnknown = async (data) => {
  * @param {object} data see server/types.go, type webPushPayload
  */
 const handlePush = async (data) => {
-  if (data.event === "message") {
-    await handlePushMessage(data);
-  } else if (data.event === "subscription_expiring") {
-    await handlePushSubscriptionExpiring(data);
-  } else {
-    await handlePushUnknown(data);
+  // This logic is (partially) duplicated in
+  // - Android: SubscriberService::onNotificationReceived()
+  // - Android: FirebaseService::onMessageReceived()
+  // - Web app: hooks.js:handleNotification()
+  // - Web app: sw.js:handleMessage(), sw.js:handleMessageClear(), ...
+
+  if (data.event === WEBPUSH_EVENT_MESSAGE) {
+    const { message } = data;
+    if (message.event === EVENT_MESSAGE) {
+      return await handlePushMessage(data);
+    } else if (message.event === EVENT_MESSAGE_DELETE) {
+      return await handlePushMessageDelete(data);
+    } else if (message.event === EVENT_MESSAGE_CLEAR) {
+      return await handlePushMessageClear(data);
+    }
+  } else if (data.event === WEBPUSH_EVENT_SUBSCRIPTION_EXPIRING) {
+    return await handlePushSubscriptionExpiring(data);
   }
+
+  return await handlePushUnknown(data);
 };
 
 /**
@@ -113,10 +216,8 @@ const handleClick = async (event) => {
   const t = await initI18n();
 
   const clients = await self.clients.matchAll({ type: "window" });
-
   const rootUrl = new URL(self.location.origin);
   const rootClient = clients.find((client) => client.url === rootUrl.toString());
-  // perhaps open on another topic
   const fallbackClient = clients[0];
 
   if (!event.notification.data?.message) {
@@ -137,9 +238,25 @@ const handleClick = async (event) => {
     if (event.action) {
       const action = event.notification.data.message.actions.find(({ label }) => event.action === label);
 
-      if (action.action === "view") {
+      // Helper to clear notification and mark as read
+      const clearNotification = async () => {
+        event.notification.close();
+        const { subscriptionId, message: msg } = event.notification.data;
+        const seqId = msg.sequence_id || msg.id;
+        if (subscriptionId && seqId) {
+          const db = await dbAsync();
+          await db.notifications.where({ subscriptionId, sequenceId: seqId }).modify({ new: 0 });
+          const badgeCount = await db.notifications.where({ new: 1 }).count();
+          self.navigator.setAppBadge?.(badgeCount);
+        }
+      };
+
+      if (action.action === ACTION_VIEW) {
         self.clients.openWindow(action.url);
-      } else if (action.action === "http") {
+        if (action.clear) {
+          await clearNotification();
+        }
+      } else if (action.action === ACTION_HTTP) {
         try {
           const response = await fetch(action.url, {
             method: action.method ?? "POST",
@@ -150,6 +267,11 @@ const handleClick = async (event) => {
           if (!response.ok) {
             throw new Error(`HTTP ${response.status} ${response.statusText}`);
           }
+
+          // Only clear on success
+          if (action.clear) {
+            await clearNotification();
+          }
         } catch (e) {
           console.error("[ServiceWorker] Error performing http action", e);
           self.registration.showNotification(`${t("notifications_actions_failed_notification")}: ${action.label} (${action.action})`, {
@@ -158,10 +280,6 @@ const handleClick = async (event) => {
             badge,
           });
         }
-      }
-
-      if (action.clear) {
-        event.notification.close();
       }
     } else if (message.click) {
       self.clients.openWindow(message.click);
@@ -232,6 +350,7 @@ precacheAndRoute(
 
 // Claim all open windows
 clientsClaim();
+
 // Delete any cached old dist files from previous service worker versions
 cleanupOutdatedCaches();
 

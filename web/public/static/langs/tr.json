@@ -403,5 +403,7 @@
     "web_push_subscription_expiring_body": "Bildirimleri almaya devam etmek için ntfy'yi açın",
     "web_push_unknown_notification_title": "Sunucudan bilinmeyen bildirim alındı",
     "web_push_unknown_notification_body": "Web uygulamasını açarak ntfy'yi güncellemeniz gerekebilir",
-    "subscribe_dialog_subscribe_use_another_background_info": "Web uygulaması açık değilken diğer sunuculardan gelen bildirimler alınmayacaktır"
+    "subscribe_dialog_subscribe_use_another_background_info": "Web uygulaması açık değilken diğer sunuculardan gelen bildirimler alınmayacaktır",
+    "account_basics_cannot_edit_or_delete_provisioned_user": "Yetkilendirilmiş kullanıcı düzenlenemez veya silinemez",
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Sağlanmış belirteci düzenleyemez veya silemezsiniz"
 }

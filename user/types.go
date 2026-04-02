@@ -2,11 +2,12 @@ package user
 
 import (
 	"errors"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/payments"
 	"net/netip"
 	"strings"
 	"time"
+
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/payments"
 )
 
 // User is a struct that represents a user
@@ -242,6 +243,20 @@ const (
 	everyoneID = "u_everyone"
 )
 
+// Config holds the configuration for the user Manager
+type Config struct {
+	Filename            string              // Database filename, e.g. "/var/lib/ntfy/user.db" (SQLite)
+	DatabaseURL         string              // Database connection string (PostgreSQL)
+	StartupQueries      string              // Queries to run on startup, e.g. to create initial users or tiers (SQLite only)
+	DefaultAccess       Permission          // Default permission if no ACL matches
+	ProvisionEnabled    bool                // Hack: Enable auto-provisioning of users and access grants, disabled for "ntfy user" commands
+	Users               []*User             // Predefined users to create on startup
+	Access              map[string][]*Grant // Predefined access grants to create on startup (username -> []*Grant)
+	Tokens              map[string][]*Token // Predefined users to create on startup (username -> []*Token)
+	QueueWriterInterval time.Duration       // Interval for the async queue writer to flush stats and token updates to the database
+	BcryptCost          int                 // Cost of generated passwords; lowering makes testing faster
+}
+
 // Error constants used by the package
 var (
 	ErrUnauthenticated        = errors.New("unauthenticated")
@@ -256,6 +271,85 @@ var (
 	ErrPhoneNumberNotFound    = errors.New("phone number not found")
 	ErrTooManyReservations    = errors.New("new tier has lower reservation limit")
 	ErrPhoneNumberExists      = errors.New("phone number already exists")
+	ErrEmailNotFound          = errors.New("email not found")
+	ErrEmailExists            = errors.New("email already exists")
 	ErrProvisionedUserChange  = errors.New("cannot change or delete provisioned user")
 	ErrProvisionedTokenChange = errors.New("cannot change or delete provisioned token")
 )
+
+// queries holds the database-specific SQL queries
+type queries struct {
+	// User queries
+	selectUserByID               string
+	selectUserByName             string
+	selectUserByToken            string
+	selectUserByStripeCustomerID string
+	selectUsernames              string
+	selectUsers                  string
+	selectUserCount              string
+	selectUserIDFromUsername     string
+	insertUser                   string
+	updateUserPass               string
+	updateUserRole               string
+	updateUserProvisioned        string
+	updateUserPrefs              string
+	updateUserStats              string
+	updateUserStatsResetAll      string
+	updateUserTier               string
+	updateUserDeleted            string
+	deleteUser                   string
+	deleteUserTier               string
+	deleteUsersMarked            string
+	deleteUsersProvisioned       string
+
+	// Access queries
+	selectTopicPerms            string
+	selectUserAllAccess         string
+	selectUserAccess            string
+	selectUserReservations      string
+	selectUserReservationsCount string
+	selectUserReservationsOwner string
+	selectUserHasReservation    string
+	selectOtherAccessCount      string
+	upsertUserAccess            string
+	deleteUserAccess            string
+	deleteUserAccessProvisioned string
+	deleteTopicAccess           string
+	deleteAllAccess             string
+
+	// Token queries
+	selectToken                string
+	selectTokens               string
+	selectTokenCount           string
+	selectAllProvisionedTokens string
+	upsertToken                string
+	updateToken                string
+	updateTokenLastAccess      string
+	deleteToken                string
+	deleteProvisionedToken     string
+	deleteAllProvisionedTokens string
+	deleteAllToken             string
+	deleteExpiredTokens        string
+	deleteExcessTokens         string
+
+	// Tier queries
+	insertTier          string
+	selectTiers         string
+	selectTierByCode    string
+	selectTierByPriceID string
+	updateTier          string
+	deleteTier          string
+
+	// Phone queries
+	selectPhoneNumbers string
+	insertPhoneNumber  string
+	deletePhoneNumber  string
+
+	// Email queries
+	selectEmails string
+	insertEmail  string
+	deleteEmail  string
+
+	// Billing queries
+	updateBilling string
+}

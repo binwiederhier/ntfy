@@ -19,7 +19,11 @@ class Pruner {
   }
 
   stopWorker() {
-    clearTimeout(this.timer);
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    console.log("[Pruner] Stopped worker");
   }
 
   async prune() {

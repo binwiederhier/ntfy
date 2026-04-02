@@ -1,10 +1,10 @@
 :root > * {
-    --md-primary-fg-color:        #338574;
+    --md-primary-fg-color: #338574;
     --md-primary-fg-color--light: #338574;
-    --md-primary-fg-color--dark:  #338574;
-    --md-footer-bg-color:         #353744;
-    --md-text-font:               "Roboto";
-    --md-code-font:               "Roboto Mono";
+    --md-primary-fg-color--dark: #338574;
+    --md-footer-bg-color: #353744;
+    --md-text-font: "Roboto";
+    --md-code-font: "Roboto Mono";
 }
 
 .md-header__button.md-logo :is(img, svg) {
@@ -34,7 +34,7 @@ figure img, figure video {
 }
 
 header {
-    background: linear-gradient(150deg, rgba(51,133,116,1) 0%, rgba(86,189,168,1) 100%);
+    background: linear-gradient(150deg, rgba(51, 133, 116, 1) 0%, rgba(86, 189, 168, 1) 100%);
 }
 
 body[data-md-color-scheme="default"] header {
@@ -92,8 +92,8 @@ figure video {
 }
 
 .screenshots img {
-    max-height: 230px;
-    max-width: 300px;
+    max-height: 350px;
+    max-width: 350px;
     margin: 3px;
     border-radius: 5px;
     filter: drop-shadow(2px 2px 2px #ddd);
@@ -107,7 +107,7 @@ figure video {
     opacity: 0;
     visibility: hidden;
     position: fixed;
-    left:0;
+    left: 0;
     right: 0;
     top: 0;
     bottom: 0;
@@ -119,7 +119,7 @@ figure video {
 }
 
 .lightbox.show {
-    background-color: rgba(0,0,0, 0.75);
+    background-color: rgba(0, 0, 0, 0.75);
     opacity: 1;
     visibility: visible;
     z-index: 1000;
@@ -213,4 +213,31 @@ figure video {
     font-style: normal;
     font-weight: 400;
     src: url('../fonts/roboto-mono-v22-latin-regular.woff2') format('woff2');
+}
+
+/* Community maintained badge */
+.community-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    background-color: rgba(51, 133, 116, 0.1);
+    border: 1px solid rgba(51, 133, 116, 0.3);
+    border-radius: 0.7em;
+    padding: 0.1em 0.7em;
+    font-size: 0.75rem;
+    color: #338574;
+    margin-top: 0;
+    margin-bottom: 0.5em;
+}
+
+.community-badge svg {
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+}
+
+body[data-md-color-scheme="slate"] .community-badge {
+    background-color: rgba(86, 189, 168, 0.15);
+    border-color: rgba(86, 189, 168, 0.4);
+    color: #56bda8;
 }

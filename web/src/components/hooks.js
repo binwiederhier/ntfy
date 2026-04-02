@@ -9,9 +9,11 @@ import poller from "../app/Poller";
 import pruner from "../app/Pruner";
 import session from "../app/Session";
 import accountApi from "../app/AccountApi";
+import versionChecker from "../app/VersionChecker";
 import { UnauthorizedError } from "../app/errors";
 import notifier from "../app/Notifier";
 import prefs from "../app/Prefs";
+import { EVENT_MESSAGE_DELETE, EVENT_MESSAGE_CLEAR } from "../app/events";
 
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
@@ -49,10 +51,29 @@ export const useConnectionListeners = (account, subscriptions, users, webPushTop
         }
       };
 
-      const handleNotification = async (subscriptionId, notification) => {
-        const added = await subscriptionManager.addNotification(subscriptionId, notification);
-        if (added) {
-          await subscriptionManager.notify(subscriptionId, notification);
+      const handleNotification = async (subscription, notification) => {
+        // This logic is (partially) duplicated in
+        // - Android: SubscriberService::onNotificationReceived()
+        // - Android: FirebaseService::onMessageReceived()
+        // - Web app: hooks.js:handleNotification()
+        // - Web app: sw.js:handleMessage(), sw.js:handleMessageClear(), ...
+
+        if (notification.event === EVENT_MESSAGE_DELETE && notification.sequence_id) {
+          await subscriptionManager.deleteNotificationBySequenceId(subscription.id, notification.sequence_id);
+          await notifier.cancel(subscription, notification);
+        } else if (notification.event === EVENT_MESSAGE_CLEAR && notification.sequence_id) {
+          await subscriptionManager.markNotificationReadBySequenceId(subscription.id, notification.sequence_id);
+          await notifier.cancel(subscription, notification);
+        } else {
+          // Regular message: delete existing and add new
+          const sequenceId = notification.sequence_id || notification.id;
+          if (sequenceId) {
+            await subscriptionManager.deleteNotificationBySequenceId(subscription.id, sequenceId);
+          }
+          const added = await subscriptionManager.addNotification(subscription.id, notification);
+          if (added) {
+            await subscriptionManager.notify(subscription.id, notification);
+          }
         }
       };
 
@@ -68,7 +89,7 @@ export const useConnectionListeners = (account, subscriptions, users, webPushTop
         if (subscription.internal) {
           await handleInternalMessage(message);
         } else {
-          await handleNotification(subscriptionId, message);
+          await handleNotification(subscription, message);
         }
       };
 
@@ -231,7 +252,9 @@ export const useIsLaunchedPWA = () => {
 
   useEffect(() => {
     if (isIOSStandalone) {
-      return () => {}; // No need to listen for events on iOS
+      return () => {
+        // No need to listen for events on iOS
+      };
     }
     const handler = (evt) => {
       console.log(`[useIsLaunchedPWA] App is now running ${evt.matches ? "standalone" : "in the browser"}`);
@@ -270,12 +293,14 @@ const startWorkers = () => {
   poller.startWorker();
   pruner.startWorker();
   accountApi.startWorker();
+  versionChecker.startWorker();
 };
 
 const stopWorkers = () => {
   poller.stopWorker();
   pruner.stopWorker();
   accountApi.stopWorker();
+  versionChecker.stopWorker();
 };
 
 export const useBackgroundProcesses = () => {
@@ -300,4 +325,16 @@ export const useAccountListener = (setAccount) => {
       accountApi.resetListener();
     };
   }, []);
+};
+
+/**
+ * Hook to detect version/config changes and call the provided callback when a change is detected.
+ */
+export const useVersionChangeListener = (onVersionChange) => {
+  useEffect(() => {
+    versionChecker.registerListener(onVersionChange);
+    return () => {
+      versionChecker.resetListener();
+    };
+  }, [onVersionChange]);
 };

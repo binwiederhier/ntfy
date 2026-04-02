@@ -11,11 +11,18 @@ const createDatabase = (username) => {
   const dbName = username ? `ntfy-${username}` : "ntfy"; // IndexedDB database is based on the logged-in user
   const db = new Dexie(dbName);
 
-  db.version(2).stores({
+  db.version(3).stores({
     subscriptions: "&id,baseUrl,[baseUrl+mutedUntil]",
-    notifications: "&id,subscriptionId,time,new,[subscriptionId+new]", // compound key for query performance
+    notifications: "&id,sequenceId,subscriptionId,time,new,[subscriptionId+new],[subscriptionId+sequenceId]",
     users: "&baseUrl,username",
     prefs: "&key",
+  });
+
+  // When another connection (e.g., service worker or another tab) wants to upgrade,
+  // close this connection gracefully to allow the upgrade to proceed
+  db.on("versionchange", () => {
+    console.log("[db] versionchange event: closing database");
+    db.close();
   });
 
   return db;

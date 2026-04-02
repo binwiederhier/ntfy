@@ -385,12 +385,16 @@ const UserTable = (props) => {
             <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
               {(!session.exists() || user.baseUrl !== config.base_url) && (
                 <>
-                  <IconButton onClick={() => handleEditClick(user)} aria-label={t("prefs_users_edit_button")}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleDeleteClick(user)} aria-label={t("prefs_users_delete_button")}>
-                    <CloseIcon />
-                  </IconButton>
+                  <Tooltip title={t("prefs_users_edit_button")}>
+                    <IconButton onClick={() => handleEditClick(user)} aria-label={t("prefs_users_edit_button")}>
+                      <EditIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={t("prefs_users_delete_button")}>
+                    <IconButton onClick={() => handleDeleteClick(user)} aria-label={t("prefs_users_delete_button")}>
+                      <CloseIcon />
+                    </IconButton>
+                  </Tooltip>
                 </>
               )}
               {session.exists() && user.baseUrl === config.base_url && (
@@ -429,13 +433,23 @@ const UserDialog = (props) => {
   const [password, setPassword] = useState("");
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const editMode = props.user !== null;
+  const baseUrlValid = baseUrl.length === 0 || validUrl(baseUrl);
+  const baseUrlExists = props.users?.map((user) => user.baseUrl).includes(baseUrl);
+  const baseUrlError = baseUrl.length > 0 && (!baseUrlValid || baseUrlExists);
   const addButtonEnabled = (() => {
     if (editMode) {
       return username.length > 0 && password.length > 0;
     }
-    const baseUrlValid = validUrl(baseUrl);
-    const baseUrlExists = props.users?.map((user) => user.baseUrl).includes(baseUrl);
-    return baseUrlValid && !baseUrlExists && username.length > 0 && password.length > 0;
+    return validUrl(baseUrl) && !baseUrlExists && username.length > 0 && password.length > 0;
+  })();
+  const baseUrlHelperText = (() => {
+    if (baseUrl.length > 0 && !baseUrlValid) {
+      return t("prefs_users_dialog_base_url_invalid");
+    }
+    if (baseUrlExists) {
+      return t("prefs_users_dialog_base_url_exists");
+    }
+    return "";
   })();
   const handleSubmit = async () => {
     props.onSubmit({
@@ -467,6 +481,8 @@ const UserDialog = (props) => {
             type="url"
             fullWidth
             variant="standard"
+            error={baseUrlError}
+            helperText={baseUrlHelperText}
           />
         )}
         <TextField
@@ -726,12 +742,16 @@ const ReservationsTable = (props) => {
                   />
                 </Tooltip>
               )}
-              <IconButton onClick={() => handleEditClick(reservation)} aria-label={t("prefs_reservations_edit_button")}>
-                <EditIcon />
-              </IconButton>
-              <IconButton onClick={() => handleDeleteClick(reservation)} aria-label={t("prefs_reservations_delete_button")}>
-                <CloseIcon />
-              </IconButton>
+              <Tooltip title={t("prefs_reservations_edit_button")}>
+                <IconButton onClick={() => handleEditClick(reservation)} aria-label={t("prefs_reservations_edit_button")}>
+                  <EditIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={t("prefs_reservations_delete_button")}>
+                <IconButton onClick={() => handleDeleteClick(reservation)} aria-label={t("prefs_reservations_delete_button")}>
+                  <CloseIcon />
+                </IconButton>
+              </Tooltip>
             </TableCell>
           </TableRow>
         ))}

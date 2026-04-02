@@ -64,7 +64,7 @@
     "notifications_actions_not_supported": "Cette action n'est pas supportée dans l'application web",
     "notifications_actions_http_request_title": "Envoyer une requête HTTP {{method}} à {{url}}",
     "publish_dialog_attachment_limits_quota_reached": "quota dépassé, {{remainingBytes}} restants",
-    "publish_dialog_tags_placeholder": "Liste d'étiquettes séparée par des virgules, par ex. avertissement,backup-srv1",
+    "publish_dialog_tags_placeholder": "Liste d'étiquettes séparée par des virgules, par ex. avertissement, backup-srv1",
     "publish_dialog_priority_label": "Priorité",
     "publish_dialog_click_label": "URL du clic",
     "publish_dialog_click_placeholder": "URL ouverte lors d'un clic sur la notification",

@@ -6,6 +6,14 @@ import (
 	"net/http"
 )
 
+func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	return s.writeJSON(w, &apiVersionResponse{
+		Version: s.config.BuildVersion,
+		Commit:  s.config.BuildCommit,
+		Date:    s.config.BuildDate,
+	})
+}
+
 func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	users, err := s.userManager.Users()
 	if err != nil {

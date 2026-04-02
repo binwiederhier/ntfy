@@ -4,6 +4,7 @@ package server
 
 import (
 	"errors"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 )
 
@@ -21,7 +22,7 @@ var (
 type firebaseClient struct {
 }
 
-func (c *firebaseClient) Send(v *visitor, m *message) error {
+func (c *firebaseClient) Send(v *visitor, m *model.Message) error {
 	return errFirebaseNotAvailable
 }
 

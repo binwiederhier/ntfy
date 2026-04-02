@@ -1,3 +1,5 @@
+//go:build darwin
+
 package cmd
 
 const (
@@ -10,7 +12,3 @@ or "~/Library/Application Support/ntfy/client.yml" for all other users.`
 var (
 	scriptLauncher = []string{"sh", "-c"}
 )
-
-func defaultClientConfigFile() (string, error) {
-	return defaultClientConfigFileUnix()
-}

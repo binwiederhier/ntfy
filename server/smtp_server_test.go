@@ -694,7 +694,8 @@ home automation setup
 Now the light is on
 
 If you don&#39;t want to receive this message anymore, stop the push
- services in your  FRITZ!Box . 
+ services in your  FRITZ!Box .
+
 Here you can see the active push services: &#34;System &gt; Push Service&#34;.
 
 This mail has ben sent by your  FRITZ!Box  automatically.`
@@ -1354,12 +1355,44 @@ Congratulations! You have successfully set up the email notification on Synology
 	s, c, conf, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/synology", r.URL.Path)
 		require.Equal(t, "[Synology NAS] Test Message from Litts_NAS", r.Header.Get("Title"))
-		actual := readAll(t, r.Body)
-		expected := `Congratulations! You have successfully set up the email notification on Synology_NAS. For further system configurations, please visit http://192.168.1.28:5000/, http://172.16.60.5:5000/. (If you cannot connect to the server, please contact the administrator.)  From Synology_NAS`
-		require.Equal(t, expected, actual)
+		expected := "Congratulations! You have successfully set up the email notification on Synology_NAS.\n" +
+			"For further system configurations, please visit http://192.168.1.28:5000/, http://172.16.60.5:5000/.\n" +
+			"(If you cannot connect to the server, please contact the administrator.)\n\n" +
+			"From Synology_NAS"
+		require.Equal(t, expected, readAll(t, r.Body))
 	})
 	conf.SMTPServerDomain = "mydomain.me"
 	conf.SMTPServerAddrPrefix = ""
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
+func TestSmtpBackend_HTMLEmail_BrTagsPreserved(t *testing.T) {
+	email := `EHLO example.com
+MAIL FROM: nas@example.com
+RCPT TO: ntfy-alerts@ntfy.sh
+DATA
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 8bit
+Subject: Task Scheduler: daily-backup
+
+Task Scheduler has completed a scheduled task.<BR><BR>Task: daily-backup<BR>Start time: Mon, 01 Jan 2026 02:00:00 +0000<BR>Stop time: Mon, 01 Jan 2024 02:03:00 +0000<BR>Current status: 0 (Normal)<BR>Standard output/error:<BR>OK<BR><BR>From MyNAS
+.
+`
+	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/alerts", r.URL.Path)
+		require.Equal(t, "Task Scheduler: daily-backup", r.Header.Get("Title"))
+		expected := "Task Scheduler has completed a scheduled task.\n\n" +
+			"Task: daily-backup\n" +
+			"Start time: Mon, 01 Jan 2026 02:00:00 +0000\n" +
+			"Stop time: Mon, 01 Jan 2024 02:03:00 +0000\n" +
+			"Current status: 0 (Normal)\n" +
+			"Standard output/error:\n" +
+			"OK\n\n" +
+			"From MyNAS"
+		require.Equal(t, expected, readAll(t, r.Body))
+	})
 	defer s.Close()
 	defer c.Close()
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
@@ -1411,7 +1444,7 @@ what's up
 type smtpHandlerFunc func(http.ResponseWriter, *http.Request)
 
 func newTestSMTPServer(t *testing.T, handler smtpHandlerFunc) (s *smtp.Server, c net.Conn, conf *Config, scanner *bufio.Scanner) {
-	conf = newTestConfig(t)
+	conf = newTestConfig(t, "")
 	conf.SMTPServerListen = ":25"
 	conf.SMTPServerDomain = "ntfy.sh"
 	conf.SMTPServerAddrPrefix = "ntfy-"

@@ -88,6 +88,11 @@ func WithFilename(filename string) PublishOption {
 	return WithHeader("X-Filename", filename)
 }
 
+// WithSequenceID sets a sequence ID for the message, allowing updates to existing notifications
+func WithSequenceID(sequenceID string) PublishOption {
+	return WithHeader("X-Sequence-ID", sequenceID)
+}
+
 // WithEmail instructs the server to also send the message to the given e-mail address
 func WithEmail(email string) PublishOption {
 	return WithHeader("X-Email", email)

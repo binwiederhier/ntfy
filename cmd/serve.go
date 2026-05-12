@@ -111,6 +111,9 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-startup-queries", Aliases: []string{"web_push_startup_queries"}, EnvVars: []string{"NTFY_WEB_PUSH_STARTUP_QUERIES"}, Usage: "queries run when the web push database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-duration", Aliases: []string{"web_push_expiry_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryDuration), Usage: "automatically expire unused subscriptions after this time"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-warning-duration", Aliases: []string{"web_push_expiry_warning_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryWarningDuration), Usage: "send web push warning notification after this time before expiring unused subscriptions"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "monitor-file", Aliases: []string{"monitor_file"}, EnvVars: []string{"NTFY_MONITOR_FILE"}, Usage: "file used to store heartbeat monitor state (enables the monitor feature)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "monitor-startup-queries", Aliases: []string{"monitor_startup_queries"}, EnvVars: []string{"NTFY_MONITOR_STARTUP_QUERIES"}, Usage: "queries run when the monitor database is initialized"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "monitor-check-interval", Aliases: []string{"monitor_check_interval"}, EnvVars: []string{"NTFY_MONITOR_CHECK_INTERVAL"}, Value: util.FormatDuration(server.DefaultMonitorCheckInterval), Usage: "how often the heartbeat ticker scans for stale monitors"}),
 )
 
 var cmdServe = &cli.Command{
@@ -155,6 +158,9 @@ func execServe(c *cli.Context) error {
 	webPushStartupQueries := c.String("web-push-startup-queries")
 	webPushExpiryDurationStr := c.String("web-push-expiry-duration")
 	webPushExpiryWarningDurationStr := c.String("web-push-expiry-warning-duration")
+	monitorFile := c.String("monitor-file")
+	monitorStartupQueries := c.String("monitor-startup-queries")
+	monitorCheckIntervalStr := c.String("monitor-check-interval")
 	cacheFile := c.String("cache-file")
 	cacheDurationStr := c.String("cache-duration")
 	cacheStartupQueries := c.String("cache-startup-queries")
@@ -259,6 +265,10 @@ func execServe(c *cli.Context) error {
 	webPushExpiryWarningDuration, err := util.ParseDuration(webPushExpiryWarningDurationStr)
 	if err != nil {
 		return fmt.Errorf("invalid web push expiry warning duration: %s", webPushExpiryWarningDurationStr)
+	}
+	monitorCheckInterval, err := util.ParseDuration(monitorCheckIntervalStr)
+	if err != nil {
+		return fmt.Errorf("invalid monitor check interval: %s", monitorCheckIntervalStr)
 	}
 
 	// Convert sizes to bytes
@@ -521,6 +531,9 @@ func execServe(c *cli.Context) error {
 	conf.WebPushStartupQueries = webPushStartupQueries
 	conf.WebPushExpiryDuration = webPushExpiryDuration
 	conf.WebPushExpiryWarningDuration = webPushExpiryWarningDuration
+	conf.MonitorFile = monitorFile
+	conf.MonitorStartupQueries = monitorStartupQueries
+	conf.MonitorCheckInterval = monitorCheckInterval
 	conf.BuildVersion = c.App.Version
 	conf.BuildDate = maybeFromMetadata(c.App.Metadata, MetadataKeyDate)
 	conf.BuildCommit = maybeFromMetadata(c.App.Metadata, MetadataKeyCommit)

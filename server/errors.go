@@ -146,7 +146,15 @@ var (
 	errHTTPBadRequestEmailVerificationCodeInvalid    = &errHTTP{40051, http.StatusBadRequest, "invalid request: email verification code invalid or expired", "", nil}
 	errHTTPBadRequestEmailAddressNotVerified         = &errHTTP{40052, http.StatusBadRequest, "invalid request: email address not verified", "https://ntfy.sh/docs/publish/#e-mail-notifications", nil}
 	errHTTPBadRequestAnonymousEmailNotAllowed        = &errHTTP{40053, http.StatusBadRequest, "invalid request: anonymous email sending is not allowed", "https://ntfy.sh/docs/publish/#e-mail-notifications", nil}
+	errHTTPBadRequestMonitorBodyInvalid              = &errHTTP{40060, http.StatusBadRequest, "invalid request: monitor body must be valid JSON with required fields", "", nil}
+	errHTTPBadRequestMonitorKeyInvalid               = &errHTTP{40061, http.StatusBadRequest, "invalid request: monitor key invalid", "", nil}
+	errHTTPBadRequestMonitorPeriodInvalid            = &errHTTP{40062, http.StatusBadRequest, "invalid request: monitor period out of bounds", "", nil}
+	errHTTPBadRequestMonitorGraceInvalid             = &errHTTP{40063, http.StatusBadRequest, "invalid request: monitor grace out of bounds", "", nil}
+	errHTTPBadRequestMonitorAlertTopicInvalid        = &errHTTP{40064, http.StatusBadRequest, "invalid request: monitor alert topic invalid", "", nil}
+	errHTTPBadRequestMonitorAlertPriorityInvalid     = &errHTTP{40065, http.StatusBadRequest, "invalid request: monitor alert priority out of bounds", "", nil}
+	errHTTPBadRequestMonitorsDisabled                = &errHTTP{40066, http.StatusBadRequest, "invalid request: monitors are not enabled on this server", "", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
+	errHTTPNotFoundMonitor                           = &errHTTP{40402, http.StatusNotFound, "monitor not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPConflictUserExists                        = &errHTTP{40901, http.StatusConflict, "conflict: user already exists", "", nil}
@@ -156,6 +164,7 @@ var (
 	errHTTPConflictProvisionedUserChange             = &errHTTP{40905, http.StatusConflict, "conflict: cannot change or delete provisioned user", "", nil}
 	errHTTPConflictProvisionedTokenChange            = &errHTTP{40906, http.StatusConflict, "conflict: cannot change or delete provisioned token", "", nil}
 	errHTTPConflictEmailExists                       = &errHTTP{40907, http.StatusConflict, "conflict: email address already exists", "", nil}
+	errHTTPConflictMonitorExists                     = &errHTTP{40908, http.StatusConflict, "conflict: monitor with this key already exists", "", nil}
 	errHTTPGonePhoneVerificationExpired              = &errHTTP{41001, http.StatusGone, "phone number verification expired or does not exist", "", nil}
 	errHTTPEntityTooLargeAttachment                  = &errHTTP{41301, http.StatusRequestEntityTooLarge, "attachment too large, or bandwidth limit reached", "https://ntfy.sh/docs/publish/#limitations", nil}
 	errHTTPEntityTooLargeMatrixRequest               = &errHTTP{41302, http.StatusRequestEntityTooLarge, "Matrix request is larger than the max allowed length", "", nil}

@@ -39,6 +39,7 @@ import (
 	"heckel.io/ntfy/v2/mail"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/monitor"
 	"heckel.io/ntfy/v2/payments"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -65,6 +66,7 @@ type Server struct {
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
 	userManager       *user.Manager                       // Might be nil!
+	monitorManager    *monitor.Manager                    // Heartbeat monitors; nil when conf.MonitorFile is empty
 	messageCache      *message.Cache                      // Database that stores the messages
 	webPush           *webpush.Store                      // Database that stores web push subscriptions
 	attachment        *attachment.Store                   // Attachment store (file system or S3)
@@ -106,6 +108,9 @@ var (
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
+	apiMonitorsPath                                      = "/v1/monitors"
+	apiMonitorsSingleRegex                               = regexp.MustCompile(`^/v1/monitors/([-_A-Za-z0-9]{1,64})$`)
+	apiHeartbeatRegex                                    = regexp.MustCompile(`^/v1/heartbeat/([-_A-Za-z0-9]{1,64})$`)
 	apiAccountPath                                       = "/v1/account"
 	apiAccountTokenPath                                  = "/v1/account/token"
 	apiAccountPasswordPath                               = "/v1/account/password"
@@ -267,6 +272,13 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	var monitorManager *monitor.Manager
+	if conf.MonitorFile != "" {
+		monitorManager, err = monitor.NewSQLiteManager(conf.MonitorFile, conf.MonitorStartupQueries)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var firebaseClient *firebaseClient
 	if conf.FirebaseKeyFile != "" {
 		sender, err := newFirebaseSender(conf.FirebaseKeyFile)
@@ -292,6 +304,7 @@ func New(conf *Config) (*Server, error) {
 		mailSender:      mailSender,
 		topics:          topics,
 		userManager:     userManager,
+		monitorManager:  monitorManager,
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		visitors:        make(map[string]*visitor),
@@ -421,6 +434,9 @@ func (s *Server) Run() error {
 	go s.runStatsResetter()
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
+	if s.monitorManager != nil {
+		go s.runMonitorChecker()
+	}
 
 	return <-errChan
 }
@@ -456,6 +472,9 @@ func (s *Server) Stop() {
 func (s *Server) closeDatabases() {
 	if s.userManager != nil {
 		s.userManager.Close()
+	}
+	if s.monitorManager != nil {
+		s.monitorManager.Close()
 	}
 	if s.messageCache != nil {
 		s.messageCache.Close()
@@ -615,6 +634,16 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.ensureEmailsEnabled(s.withAccountSync(s.handleAccountEmailAdd)))(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountEmailPath {
 		return s.ensureUser(s.ensureEmailsEnabled(s.withAccountSync(s.handleAccountEmailDelete)))(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiMonitorsPath {
+		return s.ensureUser(s.ensureMonitorsEnabled(s.handleMonitorAdd))(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiMonitorsPath {
+		return s.ensureUser(s.ensureMonitorsEnabled(s.handleMonitorList))(w, r, v)
+	} else if r.Method == http.MethodGet && apiMonitorsSingleRegex.MatchString(r.URL.Path) {
+		return s.ensureUser(s.ensureMonitorsEnabled(s.handleMonitorGet))(w, r, v)
+	} else if r.Method == http.MethodDelete && apiMonitorsSingleRegex.MatchString(r.URL.Path) {
+		return s.ensureUser(s.ensureMonitorsEnabled(s.handleMonitorDelete))(w, r, v)
+	} else if (r.Method == http.MethodGet || r.Method == http.MethodPost) && apiHeartbeatRegex.MatchString(r.URL.Path) {
+		return s.ensureUser(s.ensureMonitorsEnabled(s.handleHeartbeat))(w, r, v)
 	} else if r.Method == http.MethodPost && apiWebPushPath == r.URL.Path {
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushUpdate))(w, r, v)
 	} else if r.Method == http.MethodDelete && apiWebPushPath == r.URL.Path {

@@ -28,6 +28,7 @@ const (
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
+	DefaultMonitorCheckInterval                 = 30 * time.Second // How often the heartbeat ticker scans for stale monitors
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -191,6 +192,9 @@ type Config struct {
 	WebPushStartupQueries                string
 	WebPushExpiryDuration                time.Duration
 	WebPushExpiryWarningDuration         time.Duration
+	MonitorFile                          string        // Path to monitor SQLite file; empty disables the feature
+	MonitorStartupQueries                string        // PRAGMA-style startup queries for the monitor DB
+	MonitorCheckInterval                 time.Duration // How often the heartbeat ticker runs
 	BuildVersion                         string // Injected by App
 	BuildDate                            string // Injected by App
 	BuildCommit                          string // Injected by App
@@ -290,6 +294,9 @@ func NewConfig() *Config {
 		WebPushEmailAddress:                  "",
 		WebPushExpiryDuration:                DefaultWebPushExpiryDuration,
 		WebPushExpiryWarningDuration:         DefaultWebPushExpiryWarningDuration,
+		MonitorFile:                          "",
+		MonitorStartupQueries:                "",
+		MonitorCheckInterval:                 DefaultMonitorCheckInterval,
 		BuildVersion:                         "",
 		BuildDate:                            "",
 		BuildCommit:                          "",

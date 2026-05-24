@@ -47,6 +47,8 @@ type Message struct {
 	PollID      string      `json:"poll_id,omitempty"`
 	ContentType string      `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
 	Encoding    string      `json:"encoding,omitempty"`     // Empty for raw UTF-8, or "base64" for encoded bytes
+	Percentage  *int        `json:"percentage,omitempty"`   // 0-100, nil if unset
+	End         int64       `json:"end,omitempty"`          // Unix epoch, for live notification countdown
 	Sender      netip.Addr  `json:"-"`                      // IP address of uploader, used for rate limiting
 	User        string      `json:"-"`                      // UserID of the uploader, used to associated attachments
 }

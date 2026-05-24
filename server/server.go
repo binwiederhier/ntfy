@@ -1278,6 +1278,23 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		cache = false
 		email = ""
 	}
+	// Live notification fields (percentage & end)
+	percentageStr := readParam(r, "x-percentage", "percentage")
+	if percentageStr != "" {
+		percentage, err := strconv.Atoi(percentageStr)
+		if err != nil || percentage < 0 || percentage > 100 {
+			return false, false, "", "", "", false, "", errHTTPBadRequestPercentageInvalid
+		}
+		m.Percentage = &percentage
+	}
+	endStr := readParam(r, "x-end", "end")
+	if endStr != "" {
+		end, err := strconv.ParseInt(endStr, 10, 64)
+		if err != nil {
+			return false, false, "", "", "", false, "", errHTTPBadRequestEndInvalid
+		}
+		m.End = end
+	}
 	return cache, firebase, email, call, template, unifiedpush, priorityStr, nil
 }
 
@@ -2211,6 +2228,12 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.SequenceID != "" {
 			r.Header.Set("X-Sequence-ID", m.SequenceID)
+		}
+		if m.Percentage != nil {
+			r.Header.Set("X-Percentage", fmt.Sprintf("%d", *m.Percentage))
+		}
+		if m.End > 0 {
+			r.Header.Set("X-End", fmt.Sprintf("%d", m.End))
 		}
 		return next(w, r, v)
 	}

@@ -198,6 +198,12 @@ func toFirebaseMessage(m *model.Message, auther user.Auther) (*messaging.Message
 		if m.PollID != "" {
 			data["poll_id"] = m.PollID
 		}
+		if m.Percentage != nil {
+			data["percentage"] = fmt.Sprintf("%d", *m.Percentage)
+		}
+		if m.End > 0 {
+			data["end"] = fmt.Sprintf("%d", m.End)
+		}
 		apnsConfig = createAPNSAlertConfig(m, data)
 	}
 	var androidConfig *messaging.AndroidConfig

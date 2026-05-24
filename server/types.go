@@ -27,6 +27,8 @@ type publishMessage struct {
 	Cache      string         `json:"cache"`    // use string as it defaults to true (or use &bool instead)
 	Firebase   string         `json:"firebase"` // use string as it defaults to true (or use &bool instead)
 	Delay      string         `json:"delay"`
+	Percentage *int           `json:"percentage"`
+	End        int64          `json:"end"`
 }
 
 // messageEncoder is a function that knows how to encode a message

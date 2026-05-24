@@ -146,6 +146,8 @@ var (
 	errHTTPBadRequestEmailVerificationCodeInvalid    = &errHTTP{40051, http.StatusBadRequest, "invalid request: email verification code invalid or expired", "", nil}
 	errHTTPBadRequestEmailAddressNotVerified         = &errHTTP{40052, http.StatusBadRequest, "invalid request: email address not verified", "https://ntfy.sh/docs/publish/#e-mail-notifications", nil}
 	errHTTPBadRequestAnonymousEmailNotAllowed        = &errHTTP{40053, http.StatusBadRequest, "invalid request: anonymous email sending is not allowed", "https://ntfy.sh/docs/publish/#e-mail-notifications", nil}
+	errHTTPBadRequestPercentageInvalid               = &errHTTP{40054, http.StatusBadRequest, "invalid request: percentage must be an integer between 0 and 100", "https://ntfy.sh/docs/publish/#updating-deleting-notifications", nil}
+	errHTTPBadRequestEndInvalid                      = &errHTTP{40055, http.StatusBadRequest, "invalid request: end must be a valid Unix timestamp", "https://ntfy.sh/docs/publish/#updating-deleting-notifications", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

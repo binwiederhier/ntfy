@@ -14,6 +14,7 @@ import (
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"strings"
+	"time"
 )
 
 const (
@@ -236,19 +237,32 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 // createAPNSAlertConfig creates an APNS config for iOS notifications that show up as an alert (only relevant for iOS).
 // We must set the Alert struct ("alert"), and we need to set MutableContent ("mutable-content"), so the Notification Service
 // Extension in iOS can modify the message.
+//
+// The subtitle is set to the original message time so that iOS always shows the exact date and time in the notification
+// banner, even when the iOS notification center groups old notifications under a relative label like "Yesterday".
+// The Notification Service Extension may override this with a locally-formatted string if desired.
 func createAPNSAlertConfig(m *model.Message, data map[string]string) *messaging.APNSConfig {
 	apnsData := make(map[string]any)
 	for k, v := range data {
 		apnsData[k] = v
 	}
+	apnsPriority := "5"
+	if m.Priority >= 4 {
+		apnsPriority = "10"
+	}
 	return &messaging.APNSConfig{
+		Headers: map[string]string{
+			"apns-push-type": "alert",
+			"apns-priority":  apnsPriority,
+		},
 		Payload: &messaging.APNSPayload{
 			CustomData: apnsData,
 			Aps: &messaging.Aps{
 				MutableContent: true,
 				Alert: &messaging.ApsAlert{
-					Title: m.Title,
-					Body:  maybeTruncateAPNSBodyMessage(m.Message),
+					Title:    m.Title,
+					SubTitle: time.Unix(m.Time, 0).UTC().Format("Jan 2, 2006, 3:04 PM") + " (UTC)",
+					Body:     maybeTruncateAPNSBodyMessage(m.Message),
 				},
 			},
 		},

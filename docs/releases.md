@@ -1905,6 +1905,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+## ntfy server v2.24.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Include exact UTC date and time as notification subtitle in APNs alert payloads, so iOS always shows the original message timestamp even when the notification center groups older notifications under a relative label like "Yesterday" ([#1749](https://github.com/binwiederhier/ntfy/issues/1749))
+* Add missing `apns-push-type: alert` and `apns-priority` headers to APNs alert notifications, aligning with Apple's requirements for iOS 13+ ([#1749](https://github.com/binwiederhier/ntfy/issues/1749))
+
 ## ntfy iOS app v1.7.0 (UNRELEASED)
 
 This release brings **image and attachment support** to the iOS app, finally closing one of the longest-standing iOS

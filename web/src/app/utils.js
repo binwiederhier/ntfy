@@ -209,7 +209,7 @@ export const formatPrice = (n) => {
 };
 
 export const openUrl = (url) => {
-  window.open(url, "_blank", "noopener,noreferrer");
+  window.open(url, "_blank", "noreferrer");
 };
 
 export const sounds = {

@@ -45,6 +45,9 @@ ADD ./db ./db
 ADD ./message ./message
 ADD ./model ./model
 ADD ./webpush ./webpush
+ADD ./attachment ./attachment
+ADD ./mail ./mail
+ADD ./s3 ./s3
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server
 
 FROM alpine

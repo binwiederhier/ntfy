@@ -89,6 +89,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-desktop](https://codeberg.org/zvava/ntfy-desktop) - Cross-platform desktop application for ntfy
 - [ntfy-desktop](https://github.com/Aetherinox/ntfy-desktop) - Desktop client for Windows, Linux, and MacOS with push notifications
 - [ntfy svelte front-end](https://github.com/novatorem/Ntfy) - Front-end built with svelte
+- [ntfy Desktop (Windows)](https://github.com/simoneferrari/ntfy-desktop) - Native Windows desktop client with multi-server support, toast notifications and message history, built with WPF and .NET (C#)
 - [wio-ntfy-ticker](https://github.com/nachotp/wio-ntfy-ticker) - Ticker display for a ntfy.sh topic
 - [ntfysh-windows](https://github.com/mshafer1/ntfysh-windows) - A ntfy client for Windows Desktop
 - [ntfyr](https://github.com/haxwithaxe/ntfyr) - A simple commandline tool to send notifications to ntfy
@@ -191,6 +192,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Blog + forum posts
 
+- [Push alerts for WHM using ntfy](https://rubixstudios.com.au/insights/push-alerts-for-whm-using-ntfy) - rubixstudios.com.au - 5/2026
 - [Device notifications via HTTP with ntfy](https://alistairshepherd.uk/writing/ntfy/) - alistairshepherd.uk - 6/2025
 - [Notifications about (almost) anything with ntfy.sh](https://hamatti.org/posts/notifications-about-almost-anything-with-ntfy-sh/) - hamatti.org - 6/2025
 - [I set up a self-hosted notification service for everything, and I'll never look back](https://www.xda-developers.com/set-up-self-hosted-notification-service/) ⭐ - xda-developers.com - 5/2025

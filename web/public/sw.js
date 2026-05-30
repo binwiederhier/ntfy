@@ -4,6 +4,7 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
 import { clientsClaim } from "workbox-core";
 import { dbAsync } from "../src/app/db";
+import session from "../src/app/Session";
 import { ACTION_HTTP, ACTION_VIEW } from "../src/app/actions";
 import { badge, icon, messageWithSequenceId, notificationTag, toNotificationParams } from "../src/app/notificationUtils";
 import initI18n from "../src/app/i18n";
@@ -11,8 +12,9 @@ import {
   EVENT_MESSAGE,
   EVENT_MESSAGE_CLEAR,
   EVENT_MESSAGE_DELETE,
-  WEBPUSH_EVENT_MESSAGE,
-  WEBPUSH_EVENT_SUBSCRIPTION_EXPIRING,
+  SW_PERIODIC_SYNC_EXTEND_TOKEN_TAG,
+  SW_WEBPUSH_EVENT_MESSAGE,
+  SW_WEBPUSH_EVENT_SUBSCRIPTION_EXPIRING,
 } from "../src/app/events";
 
 /**
@@ -35,6 +37,7 @@ const broadcastChannel = new BroadcastChannel("web-push-broadcast");
  */
 const handlePushMessage = async (data) => {
   const { subscription_id: subscriptionId, message } = data;
+
   const db = await dbAsync();
 
   console.log("[ServiceWorker] Message received", data);
@@ -43,8 +46,23 @@ const handlePushMessage = async (data) => {
   const subscription = await db.subscriptions.get(subscriptionId);
   if (!subscription) {
     console.log("[ServiceWorker] Subscription not found", subscriptionId);
+    handlePushUnknown(data);
     return;
   }
+
+  // NOTE: As soon as possible, to avoid this Safari error:
+  // > Push event handling completed without showing any notification via
+  // > ServiceWorkerRegistration.showNotification(). This may trigger removal of
+  // > the push subscription.
+  await self.registration.showNotification(
+    ...toNotificationParams({
+      message,
+      defaultTitle: message.topic,
+      topicRoute: new URL(message.topic, self.location.origin).toString(),
+      baseUrl: subscription.baseUrl,
+      topic: subscription.topic,
+    })
+  );
 
   // Delete existing notification with same sequence ID (if any)
   const sequenceId = message.sequence_id || message.id;
@@ -71,16 +89,70 @@ const handlePushMessage = async (data) => {
   // Broadcast the message to potentially play a sound
   broadcastChannel.postMessage(message);
 
-  await self.registration.showNotification(
-    ...toNotificationParams({
-      message,
-      defaultTitle: message.topic,
-      topicRoute: new URL(message.topic, self.location.origin).toString(),
-      baseUrl: subscription.baseUrl,
-      topic: subscription.topic,
-    })
-  );
+  await maybeExtendToken();
 };
+
+const refreshTokenThreshold = 1000 * 60 * 60; // 1 hour
+const maybeExtendToken = async () => {
+  if (import.meta.env.DEV) {
+    console.warn("[ServiceWorker] Skipping token extension in development since no config.base_url exists");
+    return;
+  }
+
+  const token = await session.tokenAsync();
+  if (!token) {
+    console.debug("[ServiceWorker] No session token, skipping token extension");
+    return;
+  }
+
+  const lastExtendedAt = await session.lastExtendedAtAsync();
+  const now = Date.now();
+
+  if (lastExtendedAt && now - lastExtendedAt < refreshTokenThreshold) {
+    console.debug(`[ServiceWorker] Token extended ${Math.floor((now - lastExtendedAt) / 1000 / 60)} minutes ago, skipping`);
+    return;
+  }
+
+  console.log("[ServiceWorker] Extending user access token");
+
+  // duplicated from utils.js#accountTokenUrl since we can't import that here
+  // as long as there's mp3 and other incompatible imports there
+  const tokenUrl = `${config.base_url}/v1/account/token`;
+
+  try {
+    const response = await fetch(tokenUrl, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      await session.setLastExtendedAtAsync();
+      console.log(`[ServiceWorker] Token extended successfully`);
+    } else {
+      console.error(`[ServiceWorker] Failed to extend token: ${response.status} ${response.statusText}`);
+    }
+  } catch (e) {
+    console.error("[ServiceWorker] Failed to extend token", e);
+  }
+};
+
+/**
+ * Registers a periodic-sync listener for `extend_token` (see hooks.js).
+ * This extends the token regardless of whether the browser is open.
+ *
+ * CAVEATS:
+ * - Chromium-only
+ * - Only when the PWA is _installed_ (not just running in a browser tab)
+ * - Only when notifications are granted
+ */
+self.addEventListener("periodicsync", (event) => {
+  if (event.tag === SW_PERIODIC_SYNC_EXTEND_TOKEN_TAG) {
+    console.log(`[ServiceWorker] Received periodicsync event "${SW_PERIODIC_SYNC_EXTEND_TOKEN_TAG}"`);
+    event.waitUntil(maybeExtendToken());
+  }
+});
 
 /**
  * Handle a message_delete event: delete the notification from the database.
@@ -192,7 +264,7 @@ const handlePush = async (data) => {
   // - Web app: hooks.js:handleNotification()
   // - Web app: sw.js:handleMessage(), sw.js:handleMessageClear(), ...
 
-  if (data.event === WEBPUSH_EVENT_MESSAGE) {
+  if (data.event === SW_WEBPUSH_EVENT_MESSAGE) {
     const { message } = data;
     if (message.event === EVENT_MESSAGE) {
       return await handlePushMessage(data);
@@ -201,7 +273,7 @@ const handlePush = async (data) => {
     } else if (message.event === EVENT_MESSAGE_CLEAR) {
       return await handlePushMessageClear(data);
     }
-  } else if (data.event === WEBPUSH_EVENT_SUBSCRIPTION_EXPIRING) {
+  } else if (data.event === SW_WEBPUSH_EVENT_SUBSCRIPTION_EXPIRING) {
     return await handlePushSubscriptionExpiring(data);
   }
 

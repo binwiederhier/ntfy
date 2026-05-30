@@ -151,7 +151,7 @@ web-deps:
 	# If this fails for .svg files, optimize them with svgo
 
 web-deps-update:
-	cd web && $(NPM) update
+	cd web && $(NPM) update --before="$(shell date -d '7 days ago' +%Y-%m-%d)"
 	cd web && $(NPM) install
 
 web-fmt:

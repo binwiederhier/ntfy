@@ -164,7 +164,7 @@ const autolink = (s) => {
   const parts = s.split(/(\bhttps?:\/\/[-A-Z0-9+\u0026\u2019@#/%?=()~_|!:,.;]*[-A-Z0-9+\u0026@#/%=~()_|]\b)/gi);
   for (let i = 1; i < parts.length; i += 2) {
     parts[i] = (
-      <Link key={i} href={parts[i]} underline="hover" target="_blank" rel="noreferrer,noopener">
+      <Link key={i} href={parts[i]} underline="hover" target="_blank" rel="noreferrer">
         {shortUrl(parts[i])}
       </Link>
     );

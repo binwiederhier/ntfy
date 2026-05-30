@@ -255,6 +255,7 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
     go run main.go \
       --log-level debug \
       serve \
+        --base-url http://localhost \
         --web-push-public-key KEY \
         --web-push-private-key KEY \
         --web-push-email-address <email> \

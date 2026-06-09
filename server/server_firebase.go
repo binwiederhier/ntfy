@@ -241,16 +241,29 @@ func createAPNSAlertConfig(m *model.Message, data map[string]string) *messaging.
 	for k, v := range data {
 		apnsData[k] = v
 	}
+	aps := &messaging.Aps{
+		MutableContent: true,
+		Alert: &messaging.ApsAlert{
+			Title: m.Title,
+			Body:  maybeTruncateAPNSBodyMessage(m.Message),
+		},
+	}
+	headers := map[string]string{"apns-push-type": "alert"}
+
+	// Critical alerts (iOS): max priority messages bypass silent mode / Do Not Disturb. The iOS
+	// Notification Service Extension re-applies the critical sound based on priority, but we also
+	// flag the raw payload as critical (sound dict + interruption-level), so it stays critical even
+	// if the NSE never runs (e.g. when it exceeds its time budget or is dropped under memory pressure).
+	if m.Priority >= 5 {
+		aps.CriticalSound = &messaging.CriticalSound{Critical: true, Name: "default", Volume: 1.0}
+		aps.CustomData = map[string]any{"interruption-level": "critical"}
+		headers["apns-priority"] = "10"
+	}
 	return &messaging.APNSConfig{
+		Headers: headers,
 		Payload: &messaging.APNSPayload{
 			CustomData: apnsData,
-			Aps: &messaging.Aps{
-				MutableContent: true,
-				Alert: &messaging.ApsAlert{
-					Title: m.Title,
-					Body:  maybeTruncateAPNSBodyMessage(m.Message),
-				},
-			},
+			Aps:        aps,
 		},
 	}
 }

@@ -492,6 +492,11 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
   <figcaption>Detail view of priority notifications</figcaption>
 </figure>
 
+On **iOS**, max priority (`5`) messages are delivered as [critical alerts](https://developer.apple.com/documentation/usernotifications/unnotificationinterruptionlevel/critical),
+which break through silent mode and Do Not Disturb and play a sound at full volume. You must grant ntfy
+permission to send critical alerts (the app asks for it on first launch; it can also be toggled in
+**iOS Settings > Notifications > ntfy**).
+
 ## Tags & emojis 🥳 🎉
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 

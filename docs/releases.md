@@ -1948,6 +1948,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.25.0 (UNRELEASED)
+
+**Features:**
+
+* Send priority 5 (max/urgent) messages as iOS critical alerts (APNs critical sound + `interruption-level`), so they bypass silent mode and Do Not Disturb ([ntfy-ios#44](https://github.com/binwiederhier/ntfy-ios/pull/44), thanks to [@am7590](https://github.com/am7590) for the iOS app contribution)
+
 ### ntfy Android v1.25.x (UNRELEASED)
 
 This release makes the "connection lost" alert configurable and turns it off by default. Folks did not like it and many reached out

@@ -55,6 +55,15 @@ builds:
       - "-s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [ windows ]
     goarch: [amd64 ]
+  - id: ntfy_tray_windows_amd64
+    main: ./cmd/ntfy-tray
+    binary: ntfy-tray
+    env:
+      - CGO_ENABLED=0 # systray's Windows implementation does not require cgo
+    ldflags:
+      - "-H=windowsgui -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
+    goos: [ windows ]
+    goarch: [ amd64 ]
   -
     id: ntfy_darwin_all
     binary: ntfy
@@ -120,12 +129,14 @@ archives:
   - id: ntfy_windows
     ids:
       - ntfy_windows_amd64
+      - ntfy_tray_windows_amd64
     formats: [ zip ]
     wrap_in_directory: true
     files:
       - LICENSE
       - README.md
       - client/client.yml
+      - web/public/static/images/favicon.ico
   - id: ntfy_darwin
     ids:
       - ntfy_darwin_all

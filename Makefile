@@ -2,7 +2,7 @@ MAKEFLAGS := --jobs=1
 NPM := npm
 PYTHON := python3
 PIP := pip3
-VERSION := $(shell git describe --tag)
+VERSION := $(shell git describe --tag 2>/dev/null || echo dev)
 COMMIT := $(shell git rev-parse --short HEAD)
 
 .PHONY:
@@ -27,6 +27,9 @@ help:
 	@echo "  make cli-linux-armv7            - Build server & client (Linux, armv7 only)"
 	@echo "  make cli-linux-arm64            - Build server & client (Linux, arm64 only)"
 	@echo "  make cli-windows-amd64          - Build client (Windows, amd64 only)"
+	@echo "  make cli-windows-client         - Build client only (Windows, amd64 only)"
+	@echo "  make cli-windows-tray-amd64     - Build Windows tray helper (amd64 only)"
+	@echo "  make windows-installer-amd64    - Build Windows tray/client installer (amd64 only)"
 	@echo "  make cli-darwin-all             - Build client (macOS, arm64+amd64 universal binary)"
 	@echo
 	@echo "Build server & client (without GoReleaser):"
@@ -109,6 +112,7 @@ build-deps-ubuntu:
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
 		gcc-mingw-w64-x86-64 \
+		nsis \
 		python3 \
 		python3-venv \
 		jq
@@ -183,6 +187,9 @@ cli-linux-arm64: cli-deps-static-sites cli-deps-gcc-arm64
 cli-windows-amd64: cli-deps-static-sites
 	goreleaser build --snapshot --clean --id ntfy_windows_amd64
 
+cli-windows-tray-amd64:
+	goreleaser build --snapshot --clean --id ntfy_tray_windows_amd64
+
 cli-darwin-all: cli-deps-static-sites
 	goreleaser build --snapshot --clean --id ntfy_darwin_all
 
@@ -216,6 +223,35 @@ cli-windows-server: cli-deps-static-sites
 		-ldflags \
 		"-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
 
+cli-windows-client: cli-deps-static-sites
+	# This is a target to build the Windows CLI client without server support.
+	mkdir -p dist/ntfy_windows_client
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+		-o dist/ntfy_windows_client/ntfy.exe \
+		-tags noserver \
+		-ldflags \
+		"-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)"
+
+cli-windows-tray:
+	# This is a target to build the Windows tray helper manually.
+	mkdir -p dist/ntfy_windows_tray
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+		-o dist/ntfy_windows_tray/ntfy-tray.exe \
+		-ldflags \
+		"-H=windowsgui -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(shell date +%s)" \
+		./cmd/ntfy-tray
+
+windows-installer-amd64: cli-windows-client cli-windows-tray windows-installer-deps
+	rm -rf dist/ntfy_windows_installer
+	mkdir -p dist/ntfy_windows_installer
+	cp dist/ntfy_windows_client/ntfy.exe dist/ntfy_windows_installer/
+	cp dist/ntfy_windows_tray/ntfy-tray.exe dist/ntfy_windows_installer/
+	cp web/public/static/images/favicon.ico dist/ntfy_windows_installer/
+	cp client/client.yml dist/ntfy_windows_installer/
+	cp packaging/windows/set-shortcut-appid.ps1 dist/ntfy_windows_installer/
+	cp LICENSE README.md dist/ntfy_windows_installer/
+	makensis -DVERSION=$(VERSION) -DSOURCE_DIR="$(CURDIR)/dist/ntfy_windows_installer" -DOUT_FILE="$(CURDIR)/dist/ntfy-$(VERSION)-windows-amd64-setup.exe" packaging/windows/ntfy-tray.nsi
+
 cli-client: cli-deps-static-sites
 	# This is a target to build the CLI (excluding the server) manually. This should work on Linux/macOS/Windows.
 	# Use this for development, if you really don't want to install GoReleaser ...
@@ -246,6 +282,9 @@ cli-deps-gcc-arm64:
 cli-deps-gcc-windows:
 	which x86_64-w64-mingw32-gcc || { echo "ERROR: Windows cross compiler not installed. On Ubuntu, run: apt install gcc-mingw-w64-x86-64"; exit 1; }
 
+windows-installer-deps:
+	which makensis || { echo "ERROR: NSIS not installed. On Ubuntu, run: apt install nsis"; exit 1; }
+
 cli-deps-update:
 	go get -u
 	go mod tidy
@@ -259,7 +298,7 @@ cli-build-results:
 	[ -f dist/metadata.json ] && cat dist/metadata.json | jq . || true
 	[ -f dist/checksums.txt ] && cat dist/checksums.txt || true
 	find dist -maxdepth 2 -type f \
-		\( -name '*.deb' -or -name '*.rpm' -or -name '*.zip' -or -name '*.tar.gz' -or -name 'ntfy' \) \
+		\( -name '*.deb' -or -name '*.rpm' -or -name '*.zip' -or -name '*.tar.gz' -or -name '*.exe' -or -name 'ntfy' \) \
 		-and -not -path 'dist/goreleaserdocker*' \
 		-exec sha256sum {} \;
 

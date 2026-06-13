@@ -1023,7 +1023,7 @@ you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail
     On ntfy.sh, anonymous email sending was disabled due to abuse. To use the email notification feature, 
     you must verify your email in the web app's [Account section](https://ntfy.sh/account). 
 
-As of today, only SMTP servers with PLAIN auth and STARTLS are supported. To enable e-mail sending, you must set the 
+As of today, SMTP servers with PLAIN and LOGIN auth and STARTLS are supported. To enable e-mail sending, you must set the 
 following settings:
 
 * `base-url` is the root URL for the ntfy server; this is needed for e-mail footer

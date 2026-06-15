@@ -121,5 +121,10 @@
     "publish_dialog_other_features": "Citas funkcijas:",
     "publish_dialog_chip_call_label": "Tālruņa zvans",
     "publish_dialog_chip_delay_label": "Aizkavēt piegādi",
-    "publish_dialog_chip_topic_label": "Mainīt tēmu"
+    "publish_dialog_chip_topic_label": "Mainīt tēmu",
+    "prefs_legal_contact_title": "Kontaktinformācija:",
+    "prefs_legal_name": "Vārds",
+    "prefs_legal_email": "E-pasts",
+    "prefs_legal_notice": "Juridisks paziņojums",
+    "prefs_privacy_policy": "Privātuma politika"
 }

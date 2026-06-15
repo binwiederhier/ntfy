@@ -405,5 +405,10 @@
     "account_upgrade_dialog_reservations_warning_other": "Sinu praegune teenusepakett võimaldab senise paketiga võrreldes reserveerida vähem teemasid. Enne paketi muutmist <strong>palun esmalt kustuta vähemalt {{count}} reserveeringut</strong>. Seda saad <Link>teha siin</Link>.",
     "prefs_users_description": "Oma kaitstud teemade kasutajaid saad lisada ja eemaldada siin. Palun arvesta, et kasutajanimi ja salasõna on salvestatud veebibrauseri kohalikus andmeruumis.",
     "account_basics_cannot_edit_or_delete_provisioned_user": "Eelsisestatud kasutajat ei saa muuta ega kustutada",
-    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Eelsisestatud tunnusluba ei saa muuta ega kustutada"
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Eelsisestatud tunnusluba ei saa muuta ega kustutada",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Nimi",
+    "prefs_legal_email": "E-post",
+    "prefs_legal_notice": "Juriidiline teave",
+    "prefs_privacy_policy": "Privaatsuspoliitika"
 }

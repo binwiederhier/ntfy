@@ -364,5 +364,10 @@
     "prefs_appearance_theme_system": "النظام (الافتراضي)",
     "prefs_notifications_min_priority_low_and_higher": "أولوية منخفضة وأعلى",
     "prefs_notifications_min_priority_default_and_higher": "الأولوية الافتراضية وما فوقها",
-    "prefs_notifications_min_priority_high_and_higher": "أولوية عالية وأعلى"
+    "prefs_notifications_min_priority_high_and_higher": "أولوية عالية وأعلى",
+    "prefs_legal_contact_title": "معلومات الاتصال:",
+    "prefs_legal_name": "الاسم",
+    "prefs_legal_email": "البريد الإلكتروني",
+    "prefs_legal_notice": "إشعار قانوني",
+    "prefs_privacy_policy": "سياسة الخصوصية"
 }

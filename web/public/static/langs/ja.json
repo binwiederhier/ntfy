@@ -405,5 +405,10 @@
     "web_push_unknown_notification_title": "不明な通知を受信しました",
     "web_push_unknown_notification_body": "ウェブアプリを開いてntfyをアップデートする必要があります",
     "account_basics_cannot_edit_or_delete_provisioned_user": "自動作成されたユーザーの編集や削除はできません",
-    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "自動作成されたトークンは編集や削除はできません"
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "自動作成されたトークンは編集や削除はできません",
+    "prefs_legal_contact_title": "連絡先:",
+    "prefs_legal_name": "氏名",
+    "prefs_legal_email": "メールアドレス",
+    "prefs_legal_notice": "法的通知",
+    "prefs_privacy_policy": "プライバシーポリシー"
 }

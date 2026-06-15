@@ -730,6 +730,10 @@ func (s *Server) configResponse() *apiConfigResponse {
 		WebPushPublicKey:   s.config.WebPushPublicKey,
 		DisallowedTopics:   s.config.DisallowedTopics,
 		ConfigHash:         s.config.Hash(),
+		LegalName:        	s.config.LegalName,
+		LegalEmail:       	s.config.LegalEmail,
+		PrivacyPolicyURL: s.config.PrivacyPolicyURL,
+    	LegalNoticeURL:   s.config.LegalNoticeURL,  
 	}
 }
 

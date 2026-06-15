@@ -405,5 +405,10 @@
     "web_push_unknown_notification_title": "接收到未知通知",
     "web_push_unknown_notification_body": "你可能需要打开网页来更新ntfy",
     "account_basics_cannot_edit_or_delete_provisioned_user": "已设置的用户无法被编辑或删除",
-    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "无法编辑或删除已设置的令牌"
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "无法编辑或删除已设置的令牌",
+    "prefs_legal_contact_title": "联系方式：",
+    "prefs_legal_name": "姓名",
+    "prefs_legal_email": "电子邮箱",
+    "prefs_legal_notice": "法律声明",
+    "prefs_privacy_policy": "隐私政策"
 }

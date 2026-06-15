@@ -112,5 +112,10 @@
     "publish_dialog_drop_file_here": "Povleci in spusti",
     "emoji_picker_search_placeholder": "Išči emoji",
     "emoji_picker_search_clear": "Ponastavi iskanje",
-    "subscribe_dialog_subscribe_title": "Naročite se na temo"
+    "subscribe_dialog_subscribe_title": "Naročite se na temo",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Ime",
+    "prefs_legal_email": "E-pošta",
+    "prefs_legal_notice": "Pravno obvestilo",
+    "prefs_privacy_policy": "Politika zasebnosti"
 }

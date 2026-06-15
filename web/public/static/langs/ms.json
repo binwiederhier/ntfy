@@ -186,5 +186,10 @@
     "account_upgrade_dialog_button_pay_now": "Bayar sekarang dan langgan",
     "account_tokens_title": "Token akses",
     "account_tokens_description": "Gunakan token akses semasa menerbitkan dan melanggan melalui API ntfy, jadi anda tidak perlu menghantar bukti kelayakan akaun anda. Lihat <Link>dokumentasi</Link> untuk mengetahui lebih lanjut.",
-    "account_tokens_table_last_access_header": "Akses terakhir"
+    "account_tokens_table_last_access_header": "Akses terakhir",
+    "prefs_legal_contact_title": "Hubungi:",
+    "prefs_legal_name": "Nama",
+    "prefs_legal_email": "E-mel",
+    "prefs_legal_notice": "Notis undang-undang",
+    "prefs_privacy_policy": "Dasar privasi"
 }

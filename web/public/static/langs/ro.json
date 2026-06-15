@@ -360,5 +360,10 @@
     "priority_default": "implicit",
     "priority_high": "ridicat",
     "priority_max": "maxim",
-    "error_boundary_button_reload_ntfy": "Reîncarcă ntfy"
+    "error_boundary_button_reload_ntfy": "Reîncarcă ntfy",
+    "prefs_legal_contact_title": "Contact:",
+    "prefs_legal_name": "Nume",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Notă legală",
+    "prefs_privacy_policy": "Politică de confidențialitate"
 }

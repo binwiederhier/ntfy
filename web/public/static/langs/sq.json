@@ -59,5 +59,10 @@
     "alert_notification_ios_install_required_title": "Instalimi i iOS-it detyrohet",
     "alert_notification_permission_denied_description": "Ju lutemi riaktivizoni ato në Browser-in tuaj",
     "nav_button_documentation": "Dokumentacion",
-    "alert_notification_permission_required_button": "Lejo tani"
+    "alert_notification_permission_required_button": "Lejo tani",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Emri",
+    "prefs_legal_email": "E-maili",
+    "prefs_legal_notice": "Njoftim ligjor",
+    "prefs_privacy_policy": "Politika e privatësisë"
 }

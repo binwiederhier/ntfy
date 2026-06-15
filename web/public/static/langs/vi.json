@@ -97,5 +97,10 @@
     "notifications_none_for_any_description": "Để gửi thông báo đến một topic, bạn chỉ cần dùng PUT hoặc POST đến URL của topic. Dưới đây là một ví dụ với một trong các topic của bạn.",
     "notifications_no_subscriptions_title": "Có vẻ như bạn chưa đăng ký topic nào.",
     "notifications_no_subscriptions_description": "Bấm vào liên kết \"{{linktext}}\" để tạo hoặc đăng ký một chủ đề. Sau đó, bạn có thể gửi tin nhắn qua PUT hoặc POST và sẽ nhận thông báo tại đây.",
-    "notifications_example": "Ví dụ"
+    "notifications_example": "Ví dụ",
+    "prefs_legal_contact_title": "Liên hệ:",
+    "prefs_legal_name": "Tên",
+    "prefs_legal_email": "Email",
+    "prefs_legal_notice": "Thông báo pháp lý",
+    "prefs_privacy_policy": "Chính sách bảo mật"
 }

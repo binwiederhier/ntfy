@@ -4,5 +4,10 @@
     "common_add": "Приложити",
     "common_back": "Назадъ",
     "login_form_button_submit": "Въниди",
-    "signup_form_password": "Таино слово"
+    "signup_form_password": "Таино слово",
+    "prefs_legal_contact_title": "Контактъ:",
+    "prefs_legal_name": "Имя:",
+    "prefs_legal_email": "Электронная почта:",
+    "prefs_legal_notice": "Юридическое уведомление",
+    "prefs_privacy_policy": "Политика конфиденциальности"
 }

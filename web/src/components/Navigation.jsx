@@ -85,6 +85,8 @@ Navigation.width = navWidth;
 
 const NavList = (props) => {
   const theme = useTheme();
+  console.log("config keys:", Object.keys(config));
+  console.log("legal_name:", config.legal_name);
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,7 +137,7 @@ const NavList = (props) => {
     showNotificationContextNotSupportedBox;
 
   return (
-    <>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
       <List component="nav" sx={{ paddingTop: { xs: 0, sm: alertVisible ? 0 : "" } }}>
         {versionChanged && <VersionUpdateBanner />}
@@ -147,9 +149,7 @@ const NavList = (props) => {
         {alertVisible && <Divider />}
         {!showSubscriptionsList && (
           <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
-            <ListItemIcon>
-              <ChatBubble />
-            </ListItemIcon>
+            <ListItemIcon><ChatBubble /></ListItemIcon>
             <ListItemText primary={t("nav_button_all_notifications")} />
           </ListItemButton>
         )}
@@ -157,9 +157,7 @@ const NavList = (props) => {
           <>
             <ListSubheader>{t("nav_topics_title")}</ListSubheader>
             <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
-              <ListItemIcon>
-                <ChatBubble />
-              </ListItemIcon>
+              <ListItemIcon><ChatBubble /></ListItemIcon>
               <ListItemText primary={t("nav_button_all_notifications")} />
             </ListItemButton>
             <SubscriptionList subscriptions={props.subscriptions} selectedSubscription={props.selectedSubscription} />
@@ -168,42 +166,28 @@ const NavList = (props) => {
         )}
         {session.exists() && (
           <ListItemButton onClick={handleAccountClick} selected={location.pathname === routes.account}>
-            <ListItemIcon>
-              <Person />
-            </ListItemIcon>
+            <ListItemIcon><Person /></ListItemIcon>
             <ListItemText primary={t("nav_button_account")} />
           </ListItemButton>
         )}
         <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
-          <ListItemIcon>
-            <SettingsIcon />
-          </ListItemIcon>
+          <ListItemIcon><SettingsIcon /></ListItemIcon>
           <ListItemText primary={t("nav_button_settings")} />
         </ListItemButton>
         <ListItemButton onClick={() => openUrl("/docs")}>
-          <ListItemIcon>
-            <ArticleIcon />
-          </ListItemIcon>
+          <ListItemIcon><ArticleIcon /></ListItemIcon>
           <ListItemText primary={t("nav_button_documentation")} />
         </ListItemButton>
         <ListItemButton onClick={() => props.onPublishMessageClick()}>
-          <ListItemIcon>
-            <Send />
-          </ListItemIcon>
+          <ListItemIcon><Send /></ListItemIcon>
           <ListItemText primary={t("nav_button_publish_message")} />
         </ListItemButton>
         <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
-          <ListItemIcon>
-            <AddIcon />
-          </ListItemIcon>
+          <ListItemIcon><AddIcon /></ListItemIcon>
           <ListItemText primary={t("nav_button_subscribe")} />
         </ListItemButton>
-        {showUpgradeBanner && (
-          // The text background gradient didn't seem to do well with switching between light/dark mode,
-          // So adding a `key` forces React to replace the entire component when the theme changes
-          <UpgradeBanner key={`upgrade-banner-${theme.palette.mode}`} mode={theme.palette.mode} />
-        )}
       </List>
+
       <SubscribeDialog
         key={`subscribeDialog${subscribeDialogKey}`} // Resets dialog when canceled/closed
         open={subscribeDialogOpen}
@@ -211,7 +195,64 @@ const NavList = (props) => {
         onCancel={handleSubscribeReset}
         onSuccess={handleSubscribeSubmit}
       />
-    </>
+
+      {showUpgradeBanner && (
+        // The text background gradient didn't seem to do well with switching between light/dark mode,
+        // So adding a `key` forces React to replace the entire component when the theme changes
+        <UpgradeBanner key={`upgrade-banner-${theme.palette.mode}`} mode={theme.palette.mode} />
+      )}
+
+
+
+      {(config.legal_name || config.legal_email || config.legal_notice_url || config.privacy_policy_url) && (
+        <Box sx={{ mt: "auto", p: 2, borderTop: "1px solid rgba(128,128,128,0.3)" }}>
+          {(config.legal_name || config.legal_email) && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
+                {t("prefs_legal_contact_title")}
+              </Typography>
+
+              {config.legal_name && (
+                <Typography variant="caption" display="block">
+                  <strong>{t("prefs_legal_name")}:</strong> {config.legal_name}
+                </Typography>
+              )}
+
+              {config.legal_email && (
+                <Typography variant="caption" display="block">
+                  <strong>{t("prefs_legal_email")}:</strong>{" "}
+                  <a href={`mailto:${config.legal_email}`} style={{ color: "#90caf9", textDecoration: "underline" }}>
+                    {config.legal_email}
+                  </a>
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {config.legal_notice_url && (
+            <Typography variant="caption" display="block">
+              <a
+                href={config.legal_notice_url.startsWith("http") ? config.legal_notice_url : `https://${config.legal_notice_url}`}
+                style={{ color: "#90caf9", textDecoration: "underline" }}
+                target="_blank" rel="noopener noreferrer">
+                {t("prefs_legal_notice")}
+              </a>
+            </Typography>
+          )}
+
+          {config.privacy_policy_url && (
+            <Typography variant="caption" display="block">
+              <a
+                href={config.privacy_policy_url.startsWith("http") ? config.privacy_policy_url : `https://${config.privacy_policy_url}`}
+                style={{ color: "#90caf9", textDecoration: "underline" }}
+                target="_blank" rel="noopener noreferrer">
+                {t("prefs_privacy_policy")}
+              </a>
+            </Typography>
+          )}
+        </Box>
+      )}
+    </Box>
   );
 };
 

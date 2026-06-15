@@ -188,5 +188,10 @@
     "prefs_users_dialog_password_label": "비밀번호",
     "priority_max": "최상",
     "error_boundary_description": "이것은 당연히 발생되어서는 안됩니다. 굉장히 죄송합니다.<br/>가능하시다면 <githubLink>이 문제를 깃허브에 제보</githubLink>해 주시거나, <discordLink>디스코드 서버</discordLink>나 <matrixLink>Matrix</matrixLink>를 통해 알려주세요.",
-    "common_copy_to_clipboard": "클립보드에 복사"
+    "common_copy_to_clipboard": "클립보드에 복사",
+    "prefs_legal_contact_title": "연락처:",
+    "prefs_legal_name": "이름",
+    "prefs_legal_email": "이메일",
+    "prefs_legal_notice": "법적 고지",
+    "prefs_privacy_policy": "개인정보처리방침"
 }

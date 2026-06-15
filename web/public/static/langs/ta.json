@@ -403,5 +403,10 @@
     "web_push_subscription_expiring_title": "அறிவிப்புகள் இடைநிறுத்தப்படும்",
     "web_push_subscription_expiring_body": "தொடர்ந்து அறிவிப்புகளைப் பெற NTFY ஐத் திறக்கவும்",
     "web_push_unknown_notification_title": "சேவையகத்திலிருந்து அறியப்படாத அறிவிப்பு பெறப்பட்டது",
-    "web_push_unknown_notification_body": "வலை பயன்பாட்டைத் திறப்பதன் மூலம் நீங்கள் NTFY ஐ புதுப்பிக்க வேண்டியிருக்கலாம்"
+    "web_push_unknown_notification_body": "வலை பயன்பாட்டைத் திறப்பதன் மூலம் நீங்கள் NTFY ஐ புதுப்பிக்க வேண்டியிருக்கலாம்",
+    "prefs_legal_contact_title": "தொடர்புக்கு:",
+    "prefs_legal_name": "பெயர்",
+    "prefs_legal_email": "மின்னஞ்சல்",
+    "prefs_legal_notice": "சட்ட அறிவிப்பு",
+    "prefs_privacy_policy": "தனியுரிமைக் கொள்கை"
 }

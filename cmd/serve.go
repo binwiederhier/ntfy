@@ -104,6 +104,11 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-secret-key", Aliases: []string{"stripe_secret_key"}, EnvVars: []string{"NTFY_STRIPE_SECRET_KEY"}, Value: "", Usage: "key used for the Stripe API communication, this enables payments"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-webhook-key", Aliases: []string{"stripe_webhook_key"}, EnvVars: []string{"NTFY_STRIPE_WEBHOOK_KEY"}, Value: "", Usage: "key required to validate the authenticity of incoming webhooks from Stripe"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "billing-contact", Aliases: []string{"billing_contact"}, EnvVars: []string{"NTFY_BILLING_CONTACT"}, Value: "", Usage: "e-mail or website to display in upgrade dialog (only if payments are enabled)"}),
+	//Name
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "legal-name", Aliases: []string{"legal_name"}, EnvVars: []string{"NTFY_LEGAL_NAME"}, Value: "", Usage: "stores the server maintainer's full legal name"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "legal-email", Aliases: []string{"legal_email"}, EnvVars: []string{"NTFY_LEGAL_EMAIL"}, Value: "", Usage: "stores the contact email address for legal inquiries"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "privacy-policy-url", Aliases: []string{"privacy_policy_url"}, EnvVars: []string{"NTFY_PRIVACY_POLICY_URL"}, Value: "", Usage: "URL link to the server's privacy policy page"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "legal-notice-url", Aliases: []string{"legal_notice_url"}, EnvVars: []string{"NTFY_LEGAL_NOTICE_URL"}, Value: "", Usage: "URL link to the server's legal notice or impressum page"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "enable-metrics", Aliases: []string{"enable_metrics"}, EnvVars: []string{"NTFY_ENABLE_METRICS"}, Value: false, Usage: "if set, Prometheus metrics are exposed via the /metrics endpoint"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "metrics-listen-http", Aliases: []string{"metrics_listen_http"}, EnvVars: []string{"NTFY_METRICS_LISTEN_HTTP"}, Usage: "ip:port used to expose the metrics endpoint (implicitly enables metrics)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "profile-listen-http", Aliases: []string{"profile_listen_http"}, EnvVars: []string{"NTFY_PROFILE_LISTEN_HTTP"}, Usage: "ip:port used to expose the profiling endpoints (implicitly enables profiling)"}),
@@ -224,6 +229,11 @@ func execServe(c *cli.Context) error {
 	metricsListenHTTP := c.String("metrics-listen-http")
 	enableMetrics := c.Bool("enable-metrics") || metricsListenHTTP != ""
 	profileListenHTTP := c.String("profile-listen-http")
+	legalName := c.String("legal-name")
+	legalEmail := c.String("legal-email")
+	privacyPolicy := c.String("privacy-policy-url")
+	legalNotice := c.String("legal-notice-url")
+
 
 	// Convert durations
 	cacheDuration, err := util.ParseDuration(cacheDurationStr)
@@ -537,6 +547,11 @@ func execServe(c *cli.Context) error {
 	conf.BuildVersion = c.App.Version
 	conf.BuildDate = maybeFromMetadata(c.App.Metadata, MetadataKeyDate)
 	conf.BuildCommit = maybeFromMetadata(c.App.Metadata, MetadataKeyCommit)
+	conf.LegalName = legalName
+	conf.LegalEmail = legalEmail
+	conf.PrivacyPolicyURL = privacyPolicy
+	conf.LegalNoticeURL = legalNotice
+
 
 	// Check if we should run as a Windows service
 	if ranAsService, err := maybeRunAsService(conf); err != nil {

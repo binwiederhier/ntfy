@@ -319,6 +319,10 @@ type apiConfigResponse struct {
 	WebPushPublicKey   string   `json:"web_push_public_key"`
 	DisallowedTopics   []string `json:"disallowed_topics"`
 	ConfigHash         string   `json:"config_hash"`
+	LegalName          string   `json:"legal_name"`
+	LegalEmail         string   `json:"legal_email"`
+	PrivacyPolicyURL string `json:"privacy_policy_url"`
+    LegalNoticeURL   string `json:"legal_notice_url"`
 }
 
 type apiAccountBillingPrices struct {

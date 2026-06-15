@@ -406,5 +406,10 @@
     "web_push_unknown_notification_title": "Notificação desconhecida recebida do servidor",
     "web_push_unknown_notification_body": "Talvez seja necessário atualizar o ntfy abrindo o aplicativo da Web",
     "account_basics_cannot_edit_or_delete_provisioned_user": "Um usuário provisionado não pode ser editado ou apagado",
-    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Não é possível editar ou apagar o token provisionado"
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Não é possível editar ou apagar o token provisionado",
+    "prefs_legal_contact_title": "Contato:",
+    "prefs_legal_name": "Nome",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Aviso legal",
+    "prefs_privacy_policy": "Política de privacidade"
 }

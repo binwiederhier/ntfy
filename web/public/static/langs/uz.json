@@ -23,5 +23,10 @@
     "signup_form_toggle_password_visibility": "Parol ko‘rinishini o‘zgartirish",
     "signup_already_have_account": "Hisobingiz bormi? Tizimga kiring!",
     "signup_disabled": "Ro‘yxatdan o‘tish o‘chirilgan",
-    "action_bar_account": "Hisob"
+    "action_bar_account": "Hisob",
+    "prefs_legal_contact_title": "Aloqa:",
+    "prefs_legal_name": "Ism",
+    "prefs_legal_email": "El. pochta",
+    "prefs_legal_notice": "Huquqiy ogohlantirish",
+    "prefs_privacy_policy": "Maxfiylik siyosati"
 }

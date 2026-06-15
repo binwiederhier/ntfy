@@ -405,5 +405,10 @@
     "web_push_unknown_notification_body": "你可能需要開啟網頁來更新 ntfy",
     "web_push_unknown_notification_title": "接收到不明通知",
     "account_basics_cannot_edit_or_delete_provisioned_user": "已佈建的使用者無法編輯或刪除",
-    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "無法編輯或刪除已佈建的權杖"
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "無法編輯或刪除已佈建的權杖",
+    "prefs_legal_contact_title": "聯絡方式：",
+    "prefs_legal_name": "姓名",
+    "prefs_legal_email": "電子郵件",
+    "prefs_legal_notice": "法律聲明",
+    "prefs_privacy_policy": "隱私權政策"
 }

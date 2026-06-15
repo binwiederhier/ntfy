@@ -40,5 +40,10 @@
     "action_bar_profile_logout": "Tancar sessió",
     "action_bar_sign_in": "Iniciar sessió",
     "action_bar_sign_up": "Crear compte",
-    "message_bar_type_message": "Escriu un missatge aquí"
+    "message_bar_type_message": "Escriu un missatge aquí",
+    "prefs_legal_contact_title": "Contacte:",
+    "prefs_legal_name": "Nom",
+    "prefs_legal_email": "Correu electrònic",
+    "prefs_legal_notice": "Avís legal",
+    "prefs_privacy_policy": "Política de privadesa"
 }

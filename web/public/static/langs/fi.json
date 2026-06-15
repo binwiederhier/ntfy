@@ -406,5 +406,10 @@
     "web_push_unknown_notification_body": "Voit joutua päivittämään ntfy:n avaamalla verkkosovelluksen",
     "notifications_actions_failed_notification": "Epäonnistunut toiminto",
     "subscribe_dialog_subscribe_use_another_background_info": "Ilmoituksia muilta palvelimilta ei vastaanoteta, mikäli verkkosovellus ei ole avoinna",
-    "prefs_notifications_web_push_enabled_description": "Ilmoituksia vastaanotetaan siitä huolimatta, että verkkosovellus ei ole käynnissä (Web Push:n kautta)"
+    "prefs_notifications_web_push_enabled_description": "Ilmoituksia vastaanotetaan siitä huolimatta, että verkkosovellus ei ole käynnissä (Web Push:n kautta)",
+    "prefs_legal_contact_title": "Yhteystiedot:",
+    "prefs_legal_name": "Nimi",
+    "prefs_legal_email": "Sähköposti",
+    "prefs_legal_notice": "Oikeudellinen huomautus",
+    "prefs_privacy_policy": "Tietosuojaseloste"
 }

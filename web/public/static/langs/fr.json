@@ -405,5 +405,10 @@
     "web_push_unknown_notification_title": "Notification inconnue reçue du serveur",
     "web_push_unknown_notification_body": "Il est possible que vous deviez mettre à jour ntfy en ouvrant l'application web",
     "account_basics_cannot_edit_or_delete_provisioned_user": "Un utilisateur provisionné ne peut pas être modifié ou supprimé",
-    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Impossible de modifier ou de supprimer le jeton provisionné"
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Impossible de modifier ou de supprimer le jeton provisionné",
+    "prefs_legal_contact_title": "Contact :",
+    "prefs_legal_name": "Nom",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Mentions légales",
+    "prefs_privacy_policy": "Politique de confidentialité"
 }

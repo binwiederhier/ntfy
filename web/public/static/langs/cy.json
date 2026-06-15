@@ -44,5 +44,10 @@
     "signup_form_button_submit": "Cofrestru",
     "common_back": "Yn ôl",
     "common_copy_to_clipboard": "Copio i'r clipfwrdd",
-    "signup_already_have_account": "Gyda chyfrif yn barod? Mewngofnodi!"
+    "signup_already_have_account": "Gyda chyfrif yn barod? Mewngofnodi!",
+    "prefs_legal_contact_title": "Cyswllt:",
+    "prefs_legal_name": "Enw",
+    "prefs_legal_email": "E-bost",
+    "prefs_legal_notice": "Hysbysiad Cyfreithiol",
+    "prefs_privacy_policy": "Polisi Preifatrwydd"
 }

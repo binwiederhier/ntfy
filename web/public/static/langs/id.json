@@ -406,5 +406,10 @@
     "web_push_unknown_notification_title": "Notifikasi yang tidak diketahui diterima dari server",
     "web_push_unknown_notification_body": "Anda mungkin harus memperbarui ntfy dengan membuka aplikasi web",
     "account_basics_cannot_edit_or_delete_provisioned_user": "Pengguna yang telah ditetapkan tidak dapat diedit atau dihapus",
-    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Tidak dapat mengedit atau menghapus token yang disediakan"
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Tidak dapat mengedit atau menghapus token yang disediakan",
+    "prefs_legal_contact_title": "Kontak:",
+    "prefs_legal_name": "Nama",
+    "prefs_legal_email": "Email",
+    "prefs_legal_notice": "Pemberitahuan hukum",
+    "prefs_privacy_policy": "Kebijakan privasi"
 }

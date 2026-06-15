@@ -96,5 +96,10 @@
     "notifications_none_for_any_title": "Не сте добиле никакви известувања.",
     "notifications_actions_failed_notification": "Неуспешно дејство",
     "notifications_none_for_topic_title": "Сè уште не сте добиле никакви известувања за оваа тема.",
-    "publish_dialog_filename_label": "Име на фајл"
+    "publish_dialog_filename_label": "Име на фајл",
+    "prefs_legal_contact_title": "Контакт:",
+    "prefs_legal_name": "Име",
+    "prefs_legal_email": "Е-пошта",
+    "prefs_legal_notice": "Правна напомена",
+    "prefs_privacy_policy": "Политика за приватност"
 }

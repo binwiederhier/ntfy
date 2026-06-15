@@ -69,5 +69,10 @@
     "nav_button_subscribe": "הרשמה לנושא",
     "nav_button_muted": "התראות הושתקו",
     "nav_button_connecting": "מתחבר",
-    "nav_upgrade_banner_label": "שדרוג ל־ntfy Pro"
+    "nav_upgrade_banner_label": "שדרוג ל־ntfy Pro",
+    "prefs_legal_contact_title": "איש קשר:",
+    "prefs_legal_name": "שם",
+    "prefs_legal_email": "דואר אלקטרוני",
+    "prefs_legal_notice": "הודעה משפטית",
+    "prefs_privacy_policy": "מדיניות פרטיות"
 }

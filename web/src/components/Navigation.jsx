@@ -85,8 +85,6 @@ Navigation.width = navWidth;
 
 const NavList = (props) => {
   const theme = useTheme();
-  console.log("config keys:", Object.keys(config));
-  console.log("legal_name:", config.legal_name);
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();

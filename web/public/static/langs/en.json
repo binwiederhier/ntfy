@@ -425,7 +425,7 @@
   "web_push_subscription_expiring_body": "Open ntfy to continue receiving notifications",
   "web_push_unknown_notification_title": "Unknown notification received from server",
   "web_push_unknown_notification_body": "You may need to update ntfy by opening the web app",
-  "prefs_legal_contact_title": "Content:",
+  "prefs_legal_contact_title": "Contact:",
   "prefs_legal_name": "Name",
   "prefs_legal_email": "Email",
   "prefs_legal_notice": "Legal Notice",

@@ -10,7 +10,7 @@ require (
 	github.com/emersion/go-smtp v0.24.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/gorilla/websocket v1.5.3
-	github.com/mattn/go-sqlite3 v1.14.44
+	github.com/mattn/go-sqlite3 v1.14.45
 	github.com/olebedev/when v1.1.0
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v2 v2.27.7

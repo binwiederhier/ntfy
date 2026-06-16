@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"firebase.google.com/go/v4/messaging"
 	"github.com/stretchr/testify/require"
@@ -165,12 +166,17 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 		Priority: "high",
 	}, fbm.Android)
 	require.Equal(t, &messaging.APNSConfig{
+		Headers: map[string]string{
+			"apns-push-type": "alert",
+			"apns-priority":  "10",
+		},
 		Payload: &messaging.APNSPayload{
 			Aps: &messaging.Aps{
 				MutableContent: true,
 				Alert: &messaging.ApsAlert{
-					Title: "some title",
-					Body:  "this is a message",
+					Title:    "some title",
+					SubTitle: time.Unix(m.Time, 0).UTC().Format("Jan 2, 2006, 3:04 PM") + " (UTC)",
+					Body:     "this is a message",
 				},
 			},
 			CustomData: map[string]any{
@@ -247,7 +253,9 @@ func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {
 		"poll_id":      m.ID,
 	}, fbm.Data)
 	require.Equal(t, "", fbm.APNS.Payload.Aps.Alert.Title)
+	require.Equal(t, time.Unix(m.Time, 0).UTC().Format("Jan 2, 2006, 3:04 PM")+" (UTC)", fbm.APNS.Payload.Aps.Alert.SubTitle)
 	require.Equal(t, "New message", fbm.APNS.Payload.Aps.Alert.Body)
+	require.Equal(t, map[string]string{"apns-push-type": "alert", "apns-priority": "10"}, fbm.APNS.Headers)
 }
 
 func TestToFirebaseMessage_PollRequest(t *testing.T) {
@@ -257,12 +265,17 @@ func TestToFirebaseMessage_PollRequest(t *testing.T) {
 	require.Equal(t, "mytopic", fbm.Topic)
 	require.Nil(t, fbm.Android)
 	require.Equal(t, &messaging.APNSConfig{
+		Headers: map[string]string{
+			"apns-push-type": "alert",
+			"apns-priority":  "5",
+		},
 		Payload: &messaging.APNSPayload{
 			Aps: &messaging.Aps{
 				MutableContent: true,
 				Alert: &messaging.ApsAlert{
-					Title: "",
-					Body:  "New message",
+					Title:    "",
+					SubTitle: time.Unix(m.Time, 0).UTC().Format("Jan 2, 2006, 3:04 PM") + " (UTC)",
+					Body:     "New message",
 				},
 			},
 			CustomData: map[string]any{

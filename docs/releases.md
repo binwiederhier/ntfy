@@ -1948,6 +1948,32 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+## ntfy server v2.24.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Include exact UTC date and time as notification subtitle in APNs alert payloads, so iOS always shows the original message timestamp even when the notification center groups older notifications under a relative label like "Yesterday" ([#1749](https://github.com/binwiederhier/ntfy/issues/1749))
+* Add missing `apns-push-type: alert` and `apns-priority` headers to APNs alert notifications, aligning with Apple's requirements for iOS 13+ ([#1749](https://github.com/binwiederhier/ntfy/issues/1749))
+
+## ntfy iOS app v1.7.0 (UNRELEASED)
+
+This release brings **image and attachment support** to the iOS app, finally closing one of the longest-standing iOS
+feature gaps. Images sent via the `Attach` header (or as a PUT body) are now previewed inline in the notification banner
+and inside the app, and other attachments can be downloaded, previewed via Quick Look, and shared from the notification
+row. There's also a new "Download attachments" setting to control auto-download by size.
+
+**Features:**
+
+* Show image previews in notifications and inline in the notification list, with tap-to-zoom Quick Look preview and share sheet ([ntfy-ios#40](https://github.com/binwiederhier/ntfy-ios/pull/40), [#276](https://github.com/binwiederhier/ntfy/issues/276), [#1226](https://github.com/binwiederhier/ntfy/issues/1226), thanks to [@am7590](https://github.com/am7590) for the contribution)
+* Download non-image attachments on demand with progress indication, persist them locally, and reuse files already fetched by the notification service extension ([ntfy-ios#40](https://github.com/binwiederhier/ntfy-ios/pull/40), thanks to [@am7590](https://github.com/am7590) for the contribution)
+* Add "Download attachments" setting with size thresholds (Never, Under 100 KB / 500 KB / 1 MB / 5 MB / 10 MB / 50 MB, Always) to control automatic attachment downloads ([ntfy-ios#40](https://github.com/binwiederhier/ntfy-ios/pull/40), thanks to [@am7590](https://github.com/am7590) for the contribution)
+### ntfy server v2.24.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Extend account token automatically from the PWA service worker, so installed PWAs don't get logged out ([#1669](https://github.com/binwiederhier/ntfy/pull/1669), [#1203](https://github.com/binwiederhier/ntfy/issues/1203), [#1533](https://github.com/binwiederhier/ntfy/issues/1533), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves) for the contribution)
+* Fix `rel` attribute on auto-linked notification URLs so `noreferrer`/`noopener` are actually applied ([#1720](https://github.com/binwiederhier/ntfy/pull/1720), thanks to [@dmitrylyzo](https://github.com/dmitrylyzo) for the contribution)
+
 ### ntfy Android v1.25.x (UNRELEASED)
 
 This release makes the "connection lost" alert configurable and turns it off by default. Folks did not like it and many reached out

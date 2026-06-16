@@ -10,6 +10,18 @@ ExecReload=/bin/kill --signal HUP $MAINPID
 Restart=on-failure
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 LimitNOFILE=10000
+PrivateDevices=true
+ProtectClock=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+RestrictRealtime=true
+ProtectHostname=true
+
+# These will be added in a future update.
+# ProtectSystem=full
+# PrivateTmp=true
+
 
 [Install]
 WantedBy=multi-user.target

@@ -1,6 +1,9 @@
 package user
 
 import (
+	"fmt"
+	"strings"
+
 	"heckel.io/ntfy/v2/db"
 )
 
@@ -76,6 +79,11 @@ const (
 		JOIN "user" u ON u.id = a.user_id
 		WHERE (u.user_name = $1 OR u.user_name = $2) AND $3 LIKE a.topic ESCAPE '\'
 		ORDER BY u.user_name DESC, LENGTH(a.topic) DESC, CASE WHEN a.write THEN 1 ELSE 0 END DESC
+	`
+	postgresSelectAccessCacheAllQuery = `
+		SELECT u.user_name, a.topic, a.read, a.write
+		FROM user_access a
+		JOIN "user" u ON u.id = a.user_id
 	`
 	postgresSelectUserAllAccessQuery = `
 		SELECT user_id, topic, read, write, provisioned
@@ -221,6 +229,21 @@ const (
 	`
 )
 
+// postgresSelectAccessCacheUsersQuery builds the per-users cache-load query
+// with a "$1, $2, ..." IN clause sized for n usernames.
+func postgresSelectAccessCacheUsersQuery(n int) string {
+	var sb strings.Builder
+	sb.WriteString(`SELECT u.user_name, a.topic, a.read, a.write FROM user_access a JOIN "user" u ON u.id = a.user_id WHERE u.user_name IN (`)
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		fmt.Fprintf(&sb, "$%d", i+1)
+	}
+	sb.WriteString(")")
+	return sb.String()
+}
+
 // NewPostgresManager creates a new Manager backed by a PostgreSQL database using an existing connection pool.
 var postgresQueries = queries{
 	selectUserByID:               postgresSelectUserByIDQuery,
@@ -245,6 +268,8 @@ var postgresQueries = queries{
 	deleteUsersMarked:            postgresDeleteUsersMarkedQuery,
 	deleteUsersProvisioned:       postgresDeleteUsersProvisionedQuery,
 	selectTopicPerms:             postgresSelectTopicPermsQuery,
+	selectAccessCacheAll:         postgresSelectAccessCacheAllQuery,
+	selectAccessCacheUsers:       postgresSelectAccessCacheUsersQuery,
 	selectUserAllAccess:          postgresSelectUserAllAccessQuery,
 	selectUserAccess:             postgresSelectUserAccessQuery,
 	selectUserReservations:       postgresSelectUserReservationsQuery,

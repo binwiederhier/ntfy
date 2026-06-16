@@ -34,37 +34,37 @@ as a service starting at boot time.
 
 === "x86_64/amd64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_amd64.tar.gz
-    tar zxvf ntfy_2.23.0_linux_amd64.tar.gz
-    sudo cp -a ntfy_2.23.0_linux_amd64/ntfy /usr/local/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_2.23.0_linux_amd64/{client,server}/*.yml /etc/ntfy
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_amd64.tar.gz
+    tar zxvf ntfy_2.24.0_linux_amd64.tar.gz
+    sudo cp -a ntfy_2.24.0_linux_amd64/ntfy /usr/local/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_2.24.0_linux_amd64/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
 === "armv6"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_armv6.tar.gz
-    tar zxvf ntfy_2.23.0_linux_armv6.tar.gz
-    sudo cp -a ntfy_2.23.0_linux_armv6/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_2.23.0_linux_armv6/{client,server}/*.yml /etc/ntfy
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_armv6.tar.gz
+    tar zxvf ntfy_2.24.0_linux_armv6.tar.gz
+    sudo cp -a ntfy_2.24.0_linux_armv6/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_2.24.0_linux_armv6/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
 === "armv7/armhf"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_armv7.tar.gz
-    tar zxvf ntfy_2.23.0_linux_armv7.tar.gz
-    sudo cp -a ntfy_2.23.0_linux_armv7/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_2.23.0_linux_armv7/{client,server}/*.yml /etc/ntfy
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_armv7.tar.gz
+    tar zxvf ntfy_2.24.0_linux_armv7.tar.gz
+    sudo cp -a ntfy_2.24.0_linux_armv7/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_2.24.0_linux_armv7/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
 === "arm64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_arm64.tar.gz
-    tar zxvf ntfy_2.23.0_linux_arm64.tar.gz
-    sudo cp -a ntfy_2.23.0_linux_arm64/ntfy /usr/bin/ntfy
-    sudo mkdir /etc/ntfy && sudo cp ntfy_2.23.0_linux_arm64/{client,server}/*.yml /etc/ntfy
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_arm64.tar.gz
+    tar zxvf ntfy_2.24.0_linux_arm64.tar.gz
+    sudo cp -a ntfy_2.24.0_linux_arm64/ntfy /usr/bin/ntfy
+    sudo mkdir /etc/ntfy && sudo cp ntfy_2.24.0_linux_arm64/{client,server}/*.yml /etc/ntfy
     sudo ntfy serve
     ```
 
@@ -84,25 +84,25 @@ Install the ntfy server unit file (which contains parameters to start the servic
 
 === "x86_64/amd64"
     ```bash
-    sudo mv ntfy_2.23.0_linux_amd64/server/ntfy.service /etc/systemd/system/
+    sudo mv ntfy_2.24.0_linux_amd64/server/ntfy.service /etc/systemd/system/
     sudo chmod 644 /etc/systemd/system/ntfy.service
     ```
 
 === "armv6"
     ```bash
-    sudo mv ntfy_2.23.0_linux_armv6/server/ntfy.service /etc/systemd/system/
+    sudo mv ntfy_2.24.0_linux_armv6/server/ntfy.service /etc/systemd/system/
     sudo chmod 644 /etc/systemd/system/ntfy.service
     ```
 
 === "armv7/armhf"
     ```bash
-    sudo mv ntfy_2.23.0_linux_armv7/server/ntfy.service /etc/systemd/system/
+    sudo mv ntfy_2.24.0_linux_armv7/server/ntfy.service /etc/systemd/system/
     sudo chmod 644 /etc/systemd/system/ntfy.service
     ```
 
 === "arm64"
     ```bash
-    sudo mv ntfy_2.23.0_linux_arm64/server/ntfy.service /etc/systemd/system/
+    sudo mv ntfy_2.24.0_linux_arm64/server/ntfy.service /etc/systemd/system/
     sudo chmod 644 /etc/systemd/system/ntfy.service
     ```
 
@@ -118,25 +118,25 @@ Install the ntfy server service script:
 
 === "x86_64/amd64"
     ```bash
-    sudo mv ntfy_2.23.0_linux_amd64/server/ntfy.openrc /etc/init.d/ntfy
+    sudo mv ntfy_2.24.0_linux_amd64/server/ntfy.openrc /etc/init.d/ntfy
     sudo chmod 755 /etc/init.d/ntfy
     ```
 
 === "armv6"
     ```bash
-    sudo mv ntfy_2.23.0_linux_armv6/server/ntfy.openrc /etc/init.d/ntfy
+    sudo mv ntfy_2.24.0_linux_armv6/server/ntfy.openrc /etc/init.d/ntfy
     sudo chmod 755 /etc/init.d/ntfy
     ```
 
 === "armv7/armhf"
     ```bash
-    sudo mv ntfy_2.23.0_linux_armv7/server/ntfy.openrc /etc/init.d/ntfy
+    sudo mv ntfy_2.24.0_linux_armv7/server/ntfy.openrc /etc/init.d/ntfy
     sudo chmod 755 /etc/init.d/ntfy
     ```
 
 === "arm64"
     ```bash
-    sudo mv ntfy_2.23.0_linux_arm64/server/ntfy.openrc /etc/init.d/ntfy
+    sudo mv ntfy_2.24.0_linux_arm64/server/ntfy.openrc /etc/init.d/ntfy
     sudo chmod 755 /etc/init.d/ntfy
     ```
 
@@ -204,7 +204,7 @@ Manually installing the .deb file:
 
 === "x86_64/amd64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_amd64.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_amd64.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -212,7 +212,7 @@ Manually installing the .deb file:
 
 === "armv6"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_armv6.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_armv6.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -220,7 +220,7 @@ Manually installing the .deb file:
 
 === "armv7/armhf"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_armv7.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_armv7.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -228,7 +228,7 @@ Manually installing the .deb file:
 
 === "arm64"
     ```bash
-    wget https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_arm64.deb
+    wget https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_arm64.deb
     sudo dpkg -i ntfy_*.deb
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
@@ -238,28 +238,28 @@ Manually installing the .deb file:
 
 === "x86_64/amd64"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_amd64.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_amd64.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "armv6"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_armv6.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_armv6.rpm
     sudo systemctl enable ntfy
     sudo systemctl start ntfy
     ```
 
 === "armv7/armhf"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_armv7.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_armv7.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
 
 === "arm64"
     ```bash
-    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_linux_arm64.rpm
+    sudo rpm -ivh https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_linux_arm64.rpm
     sudo systemctl enable ntfy 
     sudo systemctl start ntfy
     ```
@@ -301,18 +301,18 @@ pkg install go-ntfy
 
 ## macOS
 The [ntfy CLI](subscribe/cli.md) (`ntfy publish` and `ntfy subscribe` only) is supported on macOS as well. 
-To install, please [download the tarball](https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_darwin_all.tar.gz), 
+To install, please [download the tarball](https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_darwin_all.tar.gz), 
 extract it and place it somewhere in your `PATH` (e.g. `/usr/local/bin/ntfy`). 
 
 If run as `root`, ntfy will look for its config at `/etc/ntfy/client.yml`. For all other users, it'll look for it at 
 `~/Library/Application Support/ntfy/client.yml` (sample included in the tarball).
 
 ```bash
-curl -L https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_darwin_all.tar.gz > ntfy_2.23.0_darwin_all.tar.gz
-tar zxvf ntfy_2.23.0_darwin_all.tar.gz
-sudo cp -a ntfy_2.23.0_darwin_all/ntfy /usr/local/bin/ntfy
+curl -L https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_darwin_all.tar.gz > ntfy_2.24.0_darwin_all.tar.gz
+tar zxvf ntfy_2.24.0_darwin_all.tar.gz
+sudo cp -a ntfy_2.24.0_darwin_all/ntfy /usr/local/bin/ntfy
 mkdir ~/Library/Application\ Support/ntfy 
-cp ntfy_2.23.0_darwin_all/client/client.yml ~/Library/Application\ Support/ntfy/client.yml
+cp ntfy_2.24.0_darwin_all/client/client.yml ~/Library/Application\ Support/ntfy/client.yml
 ntfy --help
 ```
 
@@ -333,7 +333,7 @@ brew install ntfy
 The ntfy server and CLI are fully supported on Windows. You can run the ntfy server directly or as a Windows service.
 To install, you can either
 
-* [Download the latest ZIP](https://github.com/binwiederhier/ntfy/releases/download/v2.23.0/ntfy_2.23.0_windows_amd64.zip),
+* [Download the latest ZIP](https://github.com/binwiederhier/ntfy/releases/download/v2.24.0/ntfy_2.24.0_windows_amd64.zip),
 extract it and place the `ntfy.exe` binary somewhere in your `%Path%`. 
 * Or install ntfy from the [Scoop](https://scoop.sh) main repository via `scoop install ntfy`
 

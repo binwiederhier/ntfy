@@ -1,14 +1,15 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/v2/server"
 	"heckel.io/ntfy/v2/test"
 	"heckel.io/ntfy/v2/user"
-	"os"
-	"path/filepath"
-	"testing"
 )
 
 func TestCLI_User_Add(t *testing.T) {
@@ -128,6 +129,7 @@ func newTestServerWithAuth(t *testing.T) (s *server.Server, conf *server.Config,
 	conf.File = configFile
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	conf.AuthDefault = user.PermissionDenyAll
+	conf.AuthAccessCacheEnabled = false
 	s, port = test.StartServerWithConfig(t, conf)
 	return
 }

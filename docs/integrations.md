@@ -189,6 +189,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [send_to_ntfy_extension](https://github.com/TheDuffman85/send_to_ntfy_extension/) ⭐ - A browser extension to send the notifications to ntfy (JS)
 - [SIA-Server](https://github.com/ZebMcKayhan/SIA-Server) - A light weight, self-hosted notification Server for Honywell Galaxy Flex alarm systems (Python)
 - [zabbix-ntfy](https://github.com/torgrimt/zabbix-ntfy) - Zabbix server Mediatype to add support for ntfy.sh services
+- [Rubix Notify](https://wordpress.org/plugins/rubix-notify) - WordPress Integration with ntfy (PHP + React).
 
 ## Blog + forum posts
 

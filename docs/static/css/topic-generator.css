@@ -1,0 +1,235 @@
+/* Topic name generator (Publishing page) */
+/* Styled to mirror the config generator (header + left form / right output panels). */
+
+.tg-generator {
+    margin: 16px 0 24px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    font-size: 0.78rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+/* Header (matches .cg-modal-header) */
+.tg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid #ddd;
+}
+
+.tg-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.tg-reset {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    color: #777;
+    cursor: pointer;
+    padding: 4px 12px;
+    font-family: inherit;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.tg-reset:hover {
+    color: #333;
+    border-color: #999;
+}
+
+/* Body: left (form) + right (output), matches .cg-modal-body */
+.tg-body {
+    display: flex;
+    min-height: 0;
+}
+
+.tg-left {
+    flex: 1;
+    border-right: 1px solid #ddd;
+    padding: 16px 18px;
+    min-width: 0;
+}
+
+.tg-right {
+    flex: 1;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+/* One output per block: label on its own line, then value field + copy button */
+.tg-output-row {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.tg-output-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* Form field (matches .cg-field) */
+.tg-field > label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+    font-size: 0.78rem;
+    color: #555;
+}
+
+.tg-field input[type="text"] {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-family: inherit;
+    box-sizing: border-box;
+    background: #fff;
+}
+
+.tg-field input[type="text"]:focus {
+    border-color: var(--md-primary-fg-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(51, 133, 116, 0.15);
+}
+
+.tg-note {
+    margin-top: 10px;
+    font-size: 0.72rem;
+    color: #999;
+    line-height: 1.5;
+}
+
+.tg-note code {
+    font-size: 0.72rem;
+    padding: 1px 4px;
+}
+
+.tg-output-label {
+    margin-bottom: 4px;
+    white-space: nowrap;
+    font-weight: 500;
+    font-size: 0.78rem;
+    color: #555;
+}
+
+/* Copy button (matches .cg-btn-copy) */
+.tg-btn-copy {
+    background: none;
+    color: #777;
+    border: none;
+    padding: 2px 4px;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+
+.tg-btn-copy:hover {
+    color: #333;
+}
+
+/* Output block (matches .cg-output-wrap pre). Scoped under .tg-generator so the margin
+   reset beats the theme's .md-typeset pre rule, which otherwise adds a stray top margin. */
+.tg-generator .tg-output {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 6px 9px;
+    background: #f5f5f5;
+    color: var(--md-default-fg-color);
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: var(--md-code-font-family, monospace);
+    font-size: 0.72rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+}
+
+/* Dark mode */
+body[data-md-color-scheme="slate"] .tg-generator {
+    background: #1e1e2e;
+    border-color: #444;
+}
+
+body[data-md-color-scheme="slate"] .tg-header {
+    border-bottom-color: #444;
+}
+
+body[data-md-color-scheme="slate"] .tg-title {
+    color: #ddd;
+}
+
+body[data-md-color-scheme="slate"] .tg-reset {
+    border-color: #555;
+    color: #888;
+}
+
+body[data-md-color-scheme="slate"] .tg-reset:hover {
+    border-color: #888;
+    color: #ddd;
+}
+
+body[data-md-color-scheme="slate"] .tg-left {
+    border-right-color: #444;
+}
+
+body[data-md-color-scheme="slate"] .tg-field > label,
+body[data-md-color-scheme="slate"] .tg-output-label {
+    color: #aaa;
+}
+
+body[data-md-color-scheme="slate"] .tg-btn-copy {
+    color: #888;
+}
+
+body[data-md-color-scheme="slate"] .tg-btn-copy:hover {
+    color: #bbb;
+}
+
+body[data-md-color-scheme="slate"] .tg-field input[type="text"] {
+    background: #2a2a3a;
+    border-color: #555;
+    color: #ddd;
+}
+
+body[data-md-color-scheme="slate"] .tg-note {
+    color: #777;
+}
+
+body[data-md-color-scheme="slate"] .tg-output {
+    background: #161620;
+    border-color: #444;
+}
+
+/* Responsive: stack panels like the config generator does on mobile */
+@media (max-width: 700px) {
+    .tg-body {
+        flex-direction: column;
+    }
+
+    .tg-left {
+        border-right: none;
+        border-bottom: 1px solid #ddd;
+    }
+
+    body[data-md-color-scheme="slate"] .tg-left {
+        border-bottom-color: #444;
+    }
+}

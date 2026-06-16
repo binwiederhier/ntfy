@@ -1,7 +1,7 @@
 # Publishing
 Publishing messages can be done via HTTP PUT/POST or via the [ntfy CLI](subscribe/cli.md#publish-messages) ([install instructions](install.md)).
 Topics are created on the fly by subscribing or publishing to them. Because there is no sign-up, **the topic is essentially a password**, so pick 
-something that's not easily guessable.
+something that's not easily guessable (see [picking a topic](#picking-a-topic) for a handy topic name generator).
 
 Here's an example showing how to publish a simple message using a POST request:
 
@@ -307,6 +307,44 @@ an [external image attachment](#attach-file-from-a-url) and [email publishing](#
   ![priority notification](static/img/android-screenshot-notification-multiline.jpg){ width=500 }
   <figcaption>Notification using a click action, a user action, with an external image attachment and forwarded via email</figcaption>
 </figure>
+
+## Picking a topic
+Since there is no sign-up, **the topic is essentially a password**, so pick something that's not easily guessable. Topic names may
+only contain letters, numbers, underscores and dashes (`[-_A-Za-z0-9]`), and may be up to 64 characters long.
+
+Not sure what to pick? Type a name below and the generator will add a random, hard-to-guess suffix for you. Everything happens locally in your browser:
+
+<div id="tg-widget" class="tg-generator">
+<div class="tg-header">
+<span class="tg-title">Topic name generator</span>
+<button type="button" id="tg-reroll" class="tg-reset" title="Generate a new random suffix">Regenerate suffix</button>
+</div>
+<div class="tg-body">
+<div class="tg-left">
+<div class="tg-field">
+<label for="tg-input">Type a topic name</label>
+<input type="text" id="tg-input" placeholder="e.g. backups, alerts, phil-home" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+</div>
+<div class="tg-note">Spaces and characters other than letters, numbers, <code>-</code> and <code>_</code> are removed automatically as you type. Names are capped at 64 characters.</div>
+</div>
+<div class="tg-right">
+<div class="tg-output-row">
+<span class="tg-output-label">Your topic:</span>
+<div class="tg-output-line">
+<pre class="tg-output" id="tg-output-name"></pre>
+<button type="button" class="tg-btn-copy" data-copy="tg-output-name" title="Copy to clipboard"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+</div>
+</div>
+<div class="tg-output-row">
+<span class="tg-output-label">Your topic URL:</span>
+<div class="tg-output-line">
+<pre class="tg-output" id="tg-output-url">https://ntfy.sh/</pre>
+<button type="button" class="tg-btn-copy" data-copy="tg-output-url" title="Copy to clipboard"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+</div>
+</div>
+</div>
+</div>
+</div>
 
 ## Message title
 _Supported on:_ :material-android: :material-apple: :material-firefox:

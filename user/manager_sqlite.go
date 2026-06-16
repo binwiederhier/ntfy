@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 
@@ -82,6 +83,11 @@ const (
 		JOIN user u ON u.id = a.user_id
 		WHERE (u.user = ? OR u.user = ?) AND ? LIKE a.topic ESCAPE '\'
 		ORDER BY u.user DESC, LENGTH(a.topic) DESC, a.write DESC
+	`
+	sqliteSelectAccessCacheAllQuery = `
+		SELECT u.user, a.topic, a.read, a.write
+		FROM user_access a
+		JOIN user u ON u.id = a.user_id
 	`
 	sqliteSelectUserAllAccessQuery = `
 		SELECT user_id, topic, read, write, provisioned
@@ -220,6 +226,21 @@ const (
 	`
 )
 
+// sqliteSelectAccessCacheUsersQuery builds the per-users cache-load query
+// with a "?, ?, ..." IN clause sized for n usernames.
+func sqliteSelectAccessCacheUsersQuery(n int) string {
+	var sb strings.Builder
+	sb.WriteString(`SELECT u.user, a.topic, a.read, a.write FROM user_access a JOIN user u ON u.id = a.user_id WHERE u.user IN (`)
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString("?")
+	}
+	sb.WriteString(")")
+	return sb.String()
+}
+
 var sqliteQueries = queries{
 	selectUserByID:               sqliteSelectUserByIDQuery,
 	selectUserByName:             sqliteSelectUserByNameQuery,
@@ -243,6 +264,8 @@ var sqliteQueries = queries{
 	deleteUsersMarked:            sqliteDeleteUsersMarkedQuery,
 	deleteUsersProvisioned:       sqliteDeleteUsersProvisionedQuery,
 	selectTopicPerms:             sqliteSelectTopicPermsQuery,
+	selectAccessCacheAll:         sqliteSelectAccessCacheAllQuery,
+	selectAccessCacheUsers:       sqliteSelectAccessCacheUsersQuery,
 	selectUserAllAccess:          sqliteSelectUserAllAccessQuery,
 	selectUserAccess:             sqliteSelectUserAccessQuery,
 	selectUserReservations:       sqliteSelectUserReservationsQuery,
@@ -289,7 +312,13 @@ func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager
 	if !util.FileExists(parentDir) {
 		return nil, fmt.Errorf("user database directory %s does not exist or is not accessible", parentDir)
 	}
-	d, err := sql.Open("sqlite3", filename)
+	// Open with case-sensitive LIKE. ACL topic matching is done via LIKE (see
+	// selectTopicPerms), and SQLite's LIKE is case-insensitive for ASCII by
+	// default -- without this, an ACL rule for "secret" would also match a
+	// request for "SECRET", which is a security iisue. PostgreSQL's LIKE is
+	// already case-sensitive, so this only affects SQLite. The pragma is
+	// applied to every pooled connection by the driver.
+	d, err := sql.Open("sqlite3", fmt.Sprintf("%s?_case_sensitive_like=on", filename))
 	if err != nil {
 		return nil, err
 	}

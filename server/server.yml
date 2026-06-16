@@ -116,6 +116,8 @@
 # - auth-tokens is a list of access tokens that are automatically created when the server starts.
 #   Each entry is in the format "<username>:<token>[:<label>]", e.g. "phil:tk_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef:My token".
 #   Use 'ntfy token generate' to generate a new access token.
+# - auth-access-cache enables an in-memory snapshot of the access control table that authorizes every
+#   request without a database round-trip.
 #
 # Debian/RPM package users:
 #   Use /var/lib/ntfy/user.db as user database to avoid permission issues. The package
@@ -131,6 +133,7 @@
 # auth-users:
 # auth-access:
 # auth-tokens:
+# auth-access-cache: false
 
 # If set, the X-Forwarded-For header (or whatever is configured in proxy-forwarded-header) is used to determine
 # the visitor IP address instead of the remote address of the connection.

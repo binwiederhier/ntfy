@@ -245,16 +245,18 @@ const (
 
 // Config holds the configuration for the user Manager
 type Config struct {
-	Filename            string              // Database filename, e.g. "/var/lib/ntfy/user.db" (SQLite)
-	DatabaseURL         string              // Database connection string (PostgreSQL)
-	StartupQueries      string              // Queries to run on startup, e.g. to create initial users or tiers (SQLite only)
-	DefaultAccess       Permission          // Default permission if no ACL matches
-	ProvisionEnabled    bool                // Hack: Enable auto-provisioning of users and access grants, disabled for "ntfy user" commands
-	Users               []*User             // Predefined users to create on startup
-	Access              map[string][]*Grant // Predefined access grants to create on startup (username -> []*Grant)
-	Tokens              map[string][]*Token // Predefined users to create on startup (username -> []*Token)
-	QueueWriterInterval time.Duration       // Interval for the async queue writer to flush stats and token updates to the database
-	BcryptCost          int                 // Cost of generated passwords; lowering makes testing faster
+	Filename                  string              // Database filename, e.g. "/var/lib/ntfy/user.db" (SQLite)
+	DatabaseURL               string              // Database connection string (PostgreSQL)
+	StartupQueries            string              // Queries to run on startup, e.g. to create initial users or tiers (SQLite only)
+	DefaultAccess             Permission          // Default permission if no ACL matches
+	ProvisionEnabled          bool                // Hack: Enable auto-provisioning of users and access grants, disabled for "ntfy user" commands
+	Users                     []*User             // Predefined users to create on startup
+	Access                    map[string][]*Grant // Predefined access grants to create on startup (username -> []*Grant)
+	Tokens                    map[string][]*Token // Predefined users to create on startup (username -> []*Token)
+	QueueWriterInterval       time.Duration       // Interval for the async queue writer to flush stats and token updates to the database
+	BcryptCost                int                 // Cost of generated passwords; lowering makes testing faster
+	AccessCacheEnabled        bool                // Enables the in-memory ACL cache (high volume servers only)
+	AccessCacheReloadInterval time.Duration       // Reload interval for access cache, relevant for ACL writes from CLI
 }
 
 // Error constants used by the package
@@ -303,7 +305,9 @@ type queries struct {
 	deleteUsersProvisioned       string
 
 	// Access queries
-	selectTopicPerms            string
+	selectTopicPerms            string             // Direct-DB authorizeTopicAccess query; used when the in-memory cache is disabled
+	selectAccessCacheAll        string             // Bulk load: (user_name, topic, read, write) for the in-memory ACL cache
+	selectAccessCacheUsers      func(n int) string // Returns a per-users load query whose IN clause is sized for n usernames
 	selectUserAllAccess         string
 	selectUserAccess            string
 	selectUserReservations      string

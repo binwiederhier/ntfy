@@ -378,6 +378,7 @@ func createUserManager(c *cli.Context) (*user.Manager, error) {
 		ProvisionEnabled:    false, // Hack: Do not re-provision users on manager initialization
 		BcryptCost:          user.DefaultUserPasswordBcryptCost,
 		QueueWriterInterval: user.DefaultUserStatsQueueWriterInterval,
+		AccessCacheEnabled:  false, // Do not cache for CLI commands
 	}
 	if databaseURL != "" {
 		host, dbErr := pg.Open(databaseURL)

@@ -6,11 +6,35 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date |
 |------------------|---------|--------------|
-| ntfy server      | v2.23.0 | May 17, 2026 |
+| ntfy server      | v2.24.0 | June 4, 2026 |
 | ntfy Android app | v1.24.0 | Mar 5, 2026  |
 | ntfy iOS app     | v1.7.0  | May 30, 2026 |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.24.0
+Released June 4, 2026
+
+The main feature for this release is an in-memory ACL cache (`auth-access-cache`) that can help bring down the read load
+on the production database. The topic authorization queries are consistently the highest ranking queries on the database,
+so this will help quite a bit. The current database load is quite low, but I'm expecting it to increase as more users join
+and use ntfy.
+
+**Security issues:**
+
+* Fix case-insensitive ACL topic matching on SQLite: an access control rule for `secret` no longer also matches a request for `SECRET`. SQLite's `LIKE` is case-insensitive for ASCII by default. PostgreSQL was unaffected. It's honestly incredible that this issue remained undetected for so long, especially while ntfy.sh was running on SQLite (it now runs on PostgreSQL).
+
+**Features:**
+
+* Add opt-in in-memory ACL cache (`auth-access-cache`) that serves topic authorization without a database round-trip; off by default, intended for high-volume servers
+* Add `ntfy --version` flag to the CLI ([#1722](https://github.com/binwiederhier/ntfy/issues/1722), [#1748](https://github.com/binwiederhier/ntfy/pull/1748), thanks to [@sskender](https://github.com/sskender) for the contribution, and [@Saucy9607](https://github.com/Saucy9607) for reporting)
+
+**Bug fixes + maintenance:**
+
+* Extend account token automatically from the PWA service worker, so installed PWAs don't get logged out ([#1669](https://github.com/binwiederhier/ntfy/pull/1669), [#1203](https://github.com/binwiederhier/ntfy/issues/1203), [#1533](https://github.com/binwiederhier/ntfy/issues/1533), thanks to [@nihalgonsalves](https://github.com/nihalgonsalves) for the contribution)
+* Fix `rel` attribute on auto-linked notification URLs so `noreferrer`/`noopener` are actually applied ([#1720](https://github.com/binwiederhier/ntfy/pull/1720), thanks to [@dmitrylyzo](https://github.com/dmitrylyzo) for the contribution)
+* Add systemd sandboxing/hardening to the `ntfy.service` unit ([#1467](https://github.com/binwiederhier/ntfy/pull/1467), thanks to [@Velocifyer](https://github.com/Velocifyer) for the contribution)
+* Fix `cmd` package build on macOS (darwin) so the server compiles from source ([#1631](https://github.com/binwiederhier/ntfy/issues/1631), [#1696](https://github.com/binwiederhier/ntfy/pull/1696), thanks to [@ShipItAndPray](https://github.com/ShipItAndPray) for the contribution, and [@XYenon](https://github.com/XYenon) for reporting)
 
 ## ntfy iOS app v1.7.0
 Released May 30, 2026
@@ -1976,3 +2000,16 @@ especially when paired with increaseing the server-side `keepalive-interval` in 
 
 * Undo automatic phone number linking for numbers in message body ([ntfy-android#170](https://github.com/binwiederhier/ntfy-android/pull/170), thanks to [@acortelyou](https://github.com/acortelyou) for the contribution)
 * Fix subscription icons disappearing after a few days due to Android clearing cache ([#1322](https://github.com/binwiederhier/ntfy/issues/1322), thanks to [@mcanning](https://github.com/mcanning) for reporting)
+
+### ntfy iOS app v1.8.0 (UNRELEASED)
+
+**Features:**
+
+* Deliver priority 5 (max/urgent) notifications as critical alerts that bypass silent mode and Do Not Disturb ([ntfy-ios#44](https://github.com/binwiederhier/ntfy-ios/pull/44), thanks to [@am7590](https://github.com/am7590) for the contribution)
+* Apply the attachment auto-download size setting to all attachment types, not just images ([ntfy-ios#43](https://github.com/binwiederhier/ntfy-ios/pull/43), thanks to [@am7590](https://github.com/am7590) for the contribution)
+
+**Bug fixes + maintenance:**
+
+* Restore the native swipe-to-go-back gesture in the topic detail view ([ntfy-ios#45](https://github.com/binwiederhier/ntfy-ios/pull/45), thanks to [@am7590](https://github.com/am7590) for the contribution)
+* Fix saved attachments being left "in use" so they couldn't be deleted in the Files app ([ntfy-ios#43](https://github.com/binwiederhier/ntfy-ios/pull/43), thanks to [@am7590](https://github.com/am7590) for the contribution)
+* Improve poll request subscription matching for protected topics so notifications resolve to the real message content, with better logging ([ntfy-ios#43](https://github.com/binwiederhier/ntfy-ios/pull/43), thanks to [@am7590](https://github.com/am7590) for the contribution)

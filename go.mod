@@ -17,7 +17,7 @@ require (
 	golang.org/x/crypto v0.52.0
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0
-	golang.org/x/term v0.43.0
+	golang.org/x/term v0.44.0
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.283.0
 	gopkg.in/yaml.v2 v2.4.0
@@ -34,7 +34,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stripe/stripe-go/v74 v74.30.0
-	golang.org/x/sys v0.45.0
+	golang.org/x/sys v0.46.0
 	golang.org/x/text v0.37.0
 )
 

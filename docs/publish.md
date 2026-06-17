@@ -3702,6 +3702,8 @@ all the supported fields:
 | `icon`        | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                                                 |
 | `filename`    | -        | *string*                         | `file.jpg`                                | File name of the attachment                                                               |
 | `delay`       | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                                                |
+| `percentage`  | -        | *int (0-100)*                    | `45`                                      | Progress value used when [updating notifications](#updating-notifications)                |
+| `end`         | -        | *number*                         | `1717020000`                              | Unix timestamp used for countdown when [updating notifications](#updating-notifications)  |
 | `email`       | -        | *e-mail address or 'yes'*        | `phil@example.com` or `yes`               | E-mail address for e-mail notifications, or `yes` to use first verified address           |
 | `call`        | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                                        |
 | `sequence_id` | -        | *string*                         | `my-sequence-123`                         | Sequence ID for [updating/deleting notifications](#updating-deleting-notifications)   |
@@ -3841,6 +3843,27 @@ notification with the new one. You can either:
 1. **Use the message ID**: First publish like normal to `POST /<topic>` without a sequence ID, then use the returned message `id` as the sequence ID for updates
 2. **Use a custom sequence ID**: Publish directly to `POST /<topic>/<sequence_id>` with your own identifier, or use `POST /<topic>` with the 
    `X-Sequence-ID` header (or any of its aliases: `Sequence-ID` or`SID`)
+
+When sending updates in a sequence, you can also include live notification metadata:
+
+* `X-Percentage` / `percentage`: Progress value as integer from `0` to `100` (`0` is valid)
+* `X-End` / `end`: Unix timestamp indicating when a countdown should end
+
+Example:
+
+```bash
+# Initial notification
+curl -d "Downloading file..." ntfy.sh/mytopic/my-download-123
+
+# Update progress (0% is valid)
+curl -H "X-Sequence-ID: my-download-123" -H "X-Percentage: 0" -d "Starting download" ntfy.sh/mytopic
+
+# Update progress
+curl -H "X-Sequence-ID: my-download-123" -H "X-Percentage: 50" -d "Download 50% ..." ntfy.sh/mytopic
+
+# Set countdown end time (Unix timestamp)
+curl -H "X-Sequence-ID: my-download-123" -H "X-End: 1717020000" -d "Finalizing..." ntfy.sh/mytopic
+```
 
 If you don't know the sequence ID ahead of time, you can publish a message first and then use the returned 
 message `id` to update it. Here's an example:
@@ -4915,6 +4938,8 @@ table in their canonical form.
 | `X-Markdown`    | `Markdown`, `md`                           | Enable [Markdown formatting](#markdown-formatting) in the notification body                   |
 | `X-Icon`        | `Icon`                                     | URL to use as notification [icon](#icons)                                                     |
 | `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |
+| `X-Percentage`  | `Percentage`                               | Progress value (`0` to `100`) for [updating notifications](#updating-notifications)           |
+| `X-End`         | `End`                                      | Unix timestamp for countdown when [updating notifications](#updating-notifications)            |
 | `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address (or `yes`) for [e-mail notifications](#e-mail-notifications)                   |
 | `X-Call`        | `Call`                                     | Phone number for [phone calls](#phone-calls)                                                  |
 | `X-Cache`       | `Cache`                                    | Allows disabling [message caching](#message-caching)                                          |

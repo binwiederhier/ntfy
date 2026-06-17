@@ -531,6 +531,112 @@ func TestServer_PublishAtInvalidDelay(t *testing.T) {
 	})
 }
 
+func TestServer_PublishPercentage(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// Valid percentage
+		response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+			"X-Percentage": "45",
+		})
+		require.Equal(t, 200, response.Code)
+		msg := toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Percentage)
+		require.Equal(t, 45, *msg.Percentage)
+		require.Equal(t, int64(0), msg.End)
+
+		// Percentage 0
+		response = request(t, s, "PUT", "/mytopic2", "a message", map[string]string{
+			"X-Percentage": "0",
+		})
+		require.Equal(t, 200, response.Code)
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Percentage)
+		require.Equal(t, 0, *msg.Percentage)
+
+		// Percentage 100
+		response = request(t, s, "PUT", "/mytopic3", "a message", map[string]string{
+			"X-Percentage": "100",
+		})
+		require.Equal(t, 200, response.Code)
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Percentage)
+		require.Equal(t, 100, *msg.Percentage)
+
+		// Invalid percentage: negative
+		response = request(t, s, "PUT", "/mytopic4", "a message", map[string]string{
+			"X-Percentage": "-1",
+		})
+		err := toHTTPError(t, response.Body.String())
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40054, err.Code)
+
+		// Invalid percentage: over 100
+		response = request(t, s, "PUT", "/mytopic5", "a message", map[string]string{
+			"X-Percentage": "101",
+		})
+		err = toHTTPError(t, response.Body.String())
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40054, err.Code)
+
+		// Invalid percentage: non-integer
+		response = request(t, s, "PUT", "/mytopic6", "a message", map[string]string{
+			"X-Percentage": "abc",
+		})
+		err = toHTTPError(t, response.Body.String())
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40054, err.Code)
+	})
+}
+
+func TestServer_PublishEnd(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// Valid end timestamp
+		response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+			"X-End": "1717020000",
+		})
+		require.Equal(t, 200, response.Code)
+		msg := toMessage(t, response.Body.String())
+		require.Equal(t, int64(1717020000), msg.End)
+		require.Nil(t, msg.Percentage)
+
+		// Invalid end: non-integer
+		response = request(t, s, "PUT", "/mytopic2", "a message", map[string]string{
+			"X-End": "abc",
+		})
+		err := toHTTPError(t, response.Body.String())
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40055, err.Code)
+
+		// Invalid end: empty
+		response = request(t, s, "PUT", "/mytopic3", "a message", map[string]string{
+			"X-End": "",
+		})
+		require.Equal(t, 200, response.Code)
+		msg = toMessage(t, response.Body.String())
+		require.Equal(t, int64(0), msg.End)
+	})
+}
+
+func TestServer_PublishPercentageAndEnd(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// Both fields together
+		response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+			"X-Percentage": "72",
+			"X-End":        "1717020000",
+		})
+		require.Equal(t, 200, response.Code)
+		msg := toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Percentage)
+		require.Equal(t, 72, *msg.Percentage)
+		require.Equal(t, int64(1717020000), msg.End)
+	})
+}
+
 func TestServer_PublishAtTooLarge(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))
@@ -816,6 +922,83 @@ func TestServer_PublishAsJSON_WithSequenceID(t *testing.T) {
 		msg := toMessage(t, response.Body.String())
 		require.NotEmpty(t, msg.ID)
 		require.Equal(t, "my-sequence-123", msg.SequenceID)
+	})
+}
+
+func TestServer_PublishAsJSON_WithPercentage(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		response := request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","percentage":45}`, nil)
+		require.Equal(t, 200, response.Code)
+		msg := toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Percentage)
+		require.Equal(t, 45, *msg.Percentage)
+
+		response = request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","percentage":0}`, nil)
+		require.Equal(t, 200, response.Code)
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Percentage)
+		require.Equal(t, 0, *msg.Percentage)
+
+		response = request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","percentage":100}`, nil)
+		require.Equal(t, 200, response.Code)
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Percentage)
+		require.Equal(t, 100, *msg.Percentage)
+	})
+}
+
+func TestServer_PublishAsJSON_WithEnd(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		response := request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","end":1717020000}`, nil)
+		require.Equal(t, 200, response.Code)
+		msg := toMessage(t, response.Body.String())
+		require.Equal(t, int64(1717020000), msg.End)
+		require.Nil(t, msg.Percentage)
+	})
+}
+
+func TestServer_PublishAsJSON_WithPercentageAndEnd(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		response := request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","percentage":72,"end":1717020000}`, nil)
+		require.Equal(t, 200, response.Code)
+		msg := toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Percentage)
+		require.Equal(t, 72, *msg.Percentage)
+		require.Equal(t, int64(1717020000), msg.End)
+	})
+}
+
+func TestServer_PublishAsJSON_InvalidPercentage(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		response := request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","percentage":-1}`, nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40054, toHTTPError(t, response.Body.String()).Code)
+
+		response = request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","percentage":101}`, nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40054, toHTTPError(t, response.Body.String()).Code)
+
+		response = request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","percentage":"abc"}`, nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40024, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
+func TestServer_PublishAsJSON_InvalidEnd(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		response := request(t, s, "PUT", "/", `{"topic":"mytopic","message":"A message","end":"abc"}`, nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40024, toHTTPError(t, response.Body.String()).Code)
 	})
 }
 

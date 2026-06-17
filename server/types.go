@@ -156,15 +156,17 @@ type apiUserAddOrUpdateRequest struct {
 }
 
 type apiUserResponse struct {
-	Username string                  `json:"username"`
-	Role     string                  `json:"role"`
-	Tier     string                  `json:"tier,omitempty"`
-	Grants   []*apiUserGrantResponse `json:"grants,omitempty"`
+	Username    string                  `json:"username"`
+	Role        string                  `json:"role"`
+	Tier        string                  `json:"tier,omitempty"`
+	Grants      []*apiUserGrantResponse `json:"grants,omitempty"`
+	Provisioned bool                    `json:"provisioned,omitempty"`
 }
 
 type apiUserGrantResponse struct {
-	Topic      string `json:"topic"` // This may be a pattern
-	Permission string `json:"permission"`
+	Topic       string `json:"topic"` // This may be a pattern
+	Permission  string `json:"permission"`
+	Provisioned bool   `json:"provisioned,omitempty"`
 }
 
 type apiUserDeleteRequest struct {

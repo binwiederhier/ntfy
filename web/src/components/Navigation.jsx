@@ -25,6 +25,7 @@ import { useContext, useState } from "react";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import Person from "@mui/icons-material/Person";
 import SettingsIcon from "@mui/icons-material/Settings";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import AddIcon from "@mui/icons-material/Add";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ChatBubble, MoreVert, NotificationsOffOutlined, Send } from "@mui/icons-material";
@@ -172,6 +173,14 @@ const NavList = (props) => {
               <Person />
             </ListItemIcon>
             <ListItemText primary={t("nav_button_account")} />
+          </ListItemButton>
+        )}
+        {session.exists() && isAdmin && (
+          <ListItemButton onClick={() => navigate(routes.admin)} selected={location.pathname === routes.admin}>
+            <ListItemIcon>
+              <AdminPanelSettingsIcon />
+            </ListItemIcon>
+            <ListItemText primary={t("nav_button_admin")} />
           </ListItemButton>
         )}
         <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>

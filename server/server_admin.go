@@ -32,15 +32,17 @@ func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visit
 		userGrants := make([]*apiUserGrantResponse, len(grants[u.ID]))
 		for i, g := range grants[u.ID] {
 			userGrants[i] = &apiUserGrantResponse{
-				Topic:      g.TopicPattern,
-				Permission: g.Permission.String(),
+				Topic:       g.TopicPattern,
+				Permission:  g.Permission.String(),
+				Provisioned: g.Provisioned,
 			}
 		}
 		usersResponse[i] = &apiUserResponse{
-			Username: u.Name,
-			Role:     string(u.Role),
-			Tier:     tier,
-			Grants:   userGrants,
+			Username:    u.Name,
+			Role:        string(u.Role),
+			Tier:        tier,
+			Grants:      userGrants,
+			Provisioned: u.Provisioned,
 		}
 	}
 	return s.writeJSON(w, usersResponse)

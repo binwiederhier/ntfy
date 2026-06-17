@@ -6,6 +6,7 @@ const routes = {
   signup: "/signup",
   app: config.app_root,
   account: "/account",
+  admin: "/admin",
   settings: "/settings",
   subscription: "/:topic",
   subscriptionExternal: "/:baseUrl/:topic",

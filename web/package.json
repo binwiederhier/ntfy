@@ -14,7 +14,7 @@
     "@emotion/cache": "^11.11.0",
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
-    "@mui/icons-material": "^5.4.2",
+    "@mui/icons-material": "^9.1.1",
     "@mui/material": "latest",
     "dexie": "^3.2.1",
     "dexie-react-hooks": "^1.1.1",

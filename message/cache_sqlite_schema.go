@@ -47,6 +47,21 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_sender ON messages (sender);
 		CREATE INDEX IF NOT EXISTS idx_user ON messages (user);
 		CREATE INDEX IF NOT EXISTS idx_attachment_expires ON messages (attachment_expires);
+		CREATE TABLE IF NOT EXISTS message_attachments (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			mid TEXT NOT NULL,
+			aid TEXT NOT NULL,
+			position INT NOT NULL,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL,
+			size INT NOT NULL,
+			expires INT NOT NULL,
+			url TEXT NOT NULL,
+			deleted INT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_message_attachments_mid ON message_attachments (mid);
+		CREATE INDEX IF NOT EXISTS idx_message_attachments_aid ON message_attachments (aid);
+		CREATE INDEX IF NOT EXISTS idx_message_attachments_expires ON message_attachments (expires);
 		CREATE TABLE IF NOT EXISTS stats (
 			key TEXT PRIMARY KEY,
 			value INT
@@ -57,7 +72,7 @@ const (
 
 // Schema version management for SQLite
 const (
-	sqliteCurrentSchemaVersion          = 15
+	sqliteCurrentSchemaVersion          = 16
 	sqliteCreateSchemaVersionTableQuery = `
 		CREATE TABLE IF NOT EXISTS schemaVersion (
 			id INT PRIMARY KEY,
@@ -190,6 +205,37 @@ const (
 		ALTER TABLE messages ADD COLUMN event TEXT NOT NULL DEFAULT('message');
 		CREATE INDEX IF NOT EXISTS idx_sequence_id ON messages (sequence_id);
 	`
+
+	// 15 -> 16
+	sqliteMigrate15To16CreateAttachmentsTableQuery = `
+		CREATE TABLE IF NOT EXISTS message_attachments (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			mid TEXT NOT NULL,
+			aid TEXT NOT NULL,
+			position INT NOT NULL,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL,
+			size INT NOT NULL,
+			expires INT NOT NULL,
+			url TEXT NOT NULL,
+			deleted INT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_message_attachments_mid ON message_attachments (mid);
+		CREATE INDEX IF NOT EXISTS idx_message_attachments_aid ON message_attachments (aid);
+		CREATE INDEX IF NOT EXISTS idx_message_attachments_expires ON message_attachments (expires);
+		INSERT INTO message_attachments (mid, aid, position, name, type, size, expires, url, deleted)
+			SELECT mid,
+			       CASE WHEN attachment_expires > 0 AND attachment_url LIKE '%/file/' || mid || '%' THEN mid ELSE '' END,
+			       0,
+			       attachment_name,
+			       attachment_type,
+			       attachment_size,
+			       attachment_expires,
+			       attachment_url,
+			       attachment_deleted
+			FROM messages
+			WHERE attachment_url <> '';
+	`
 )
 
 var (
@@ -209,6 +255,7 @@ var (
 		12: sqliteMigrateFrom12,
 		13: sqliteMigrateFrom13,
 		14: sqliteMigrateFrom14,
+		15: sqliteMigrateFrom15,
 	}
 )
 
@@ -459,6 +506,19 @@ func sqliteMigrateFrom14(sqlDB *sql.DB, _ time.Duration) error {
 	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 14 to 15")
 	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 15); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func sqliteMigrateFrom15(sqlDB *sql.DB, _ time.Duration) error {
+	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 15 to 16")
+	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(sqliteMigrate15To16CreateAttachmentsTableQuery); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 16); err != nil {
 			return err
 		}
 		return nil

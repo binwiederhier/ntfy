@@ -56,6 +56,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", Aliases: []string{"attachment_cache_dir"}, EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files, or S3 URL (s3://ACCESS_KEY:SECRET_KEY@BUCKET[/PREFIX]?region=REGION[&endpoint=ENDPOINT])"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"attachment_total_size_limit", "A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentTotalSizeLimit), Usage: "limit of the on-disk attachment cache"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-file-size-limit", Aliases: []string{"attachment_file_size_limit", "Y"}, EnvVars: []string{"NTFY_ATTACHMENT_FILE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentFileSizeLimit), Usage: "per-file attachment size limit (e.g. 300k, 2M, 100M)"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "attachment-count-limit", Aliases: []string{"attachment_count_limit"}, EnvVars: []string{"NTFY_ATTACHMENT_COUNT_LIMIT"}, Value: server.DefaultAttachmentCountLimit, Usage: "per-message attachment count limit"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-expiry-duration", Aliases: []string{"attachment_expiry_duration", "X"}, EnvVars: []string{"NTFY_ATTACHMENT_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultAttachmentExpiryDuration), Usage: "duration after which uploaded attachments will be deleted (e.g. 3h, 20h)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "template-dir", Aliases: []string{"template_dir"}, EnvVars: []string{"NTFY_TEMPLATE_DIR"}, Value: server.DefaultTemplateDir, Usage: "directory to load named message templates from"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "keepalive-interval", Aliases: []string{"keepalive_interval", "k"}, EnvVars: []string{"NTFY_KEEPALIVE_INTERVAL"}, Value: util.FormatDuration(server.DefaultKeepaliveInterval), Usage: "interval of keepalive messages"}),
@@ -173,6 +174,7 @@ func execServe(c *cli.Context) error {
 	attachmentCacheDir := c.String("attachment-cache-dir")
 	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
 	attachmentFileSizeLimitStr := c.String("attachment-file-size-limit")
+	attachmentCountLimit := c.Int("attachment-count-limit")
 	attachmentExpiryDurationStr := c.String("attachment-expiry-duration")
 	templateDir := c.String("template-dir")
 	keepaliveIntervalStr := c.String("keepalive-interval")
@@ -328,6 +330,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
+	} else if attachmentCountLimit < 1 {
+		return errors.New("attachment-count-limit cannot be lower than one")
 	} else if baseURL != "" {
 		u, err := url.Parse(baseURL)
 		if err != nil {
@@ -474,6 +478,7 @@ func execServe(c *cli.Context) error {
 	conf.AttachmentCacheDir = attachmentCacheDir
 	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
 	conf.AttachmentFileSizeLimit = attachmentFileSizeLimit
+	conf.AttachmentCountLimit = attachmentCountLimit
 	conf.AttachmentExpiryDuration = attachmentExpiryDuration
 	conf.TemplateDir = templateDir
 	conf.KeepaliveInterval = keepaliveInterval

@@ -309,12 +309,21 @@ func TestStore_Attachments(t *testing.T) {
 		m.ID = "m2"
 		m.SequenceID = "m2"
 		m.Sender = netip.MustParseAddr("1.2.3.4")
-		m.Attachment = &model.Attachment{
-			Name:    "car.jpg",
-			Type:    "image/jpeg",
-			Size:    10000,
-			Expires: expires2,
-			URL:     "https://ntfy.sh/file/aCaRURL.jpg",
+		m.Attachments = []*model.Attachment{
+			{
+				Name:    "car.jpg",
+				Type:    "image/jpeg",
+				Size:    10000,
+				Expires: expires2,
+				URL:     "https://ntfy.sh/file/aCaRURL.jpg",
+			},
+			{
+				Name:    "manual.pdf",
+				Type:    "application/pdf",
+				Size:    3000,
+				Expires: expires2,
+				URL:     "https://ntfy.sh/file/manual.pdf",
+			},
 		}
 		require.Nil(t, s.AddMessage(m))
 
@@ -351,11 +360,15 @@ func TestStore_Attachments(t *testing.T) {
 		require.Equal(t, int64(10000), messages[1].Attachment.Size)
 		require.Equal(t, expires2, messages[1].Attachment.Expires)
 		require.Equal(t, "https://ntfy.sh/file/aCaRURL.jpg", messages[1].Attachment.URL)
+		require.Len(t, messages[1].Attachments, 2)
+		require.Equal(t, messages[1].Attachments[0], messages[1].Attachment)
+		require.Equal(t, "manual.pdf", messages[1].Attachments[1].Name)
+		require.Equal(t, int64(3000), messages[1].Attachments[1].Size)
 		require.Equal(t, "1.2.3.4", messages[1].Sender.String())
 
 		size, err := s.AttachmentBytesUsedBySender("1.2.3.4")
 		require.Nil(t, err)
-		require.Equal(t, int64(10000), size)
+		require.Equal(t, int64(13000), size)
 
 		size, err = s.AttachmentBytesUsedBySender("5.6.7.8")
 		require.Nil(t, err)

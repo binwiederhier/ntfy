@@ -12,13 +12,30 @@ const (
 		INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user_id, content_type, encoding, published)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
 	`
-	postgresSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
-	postgresDeleteScheduledBySequenceIDQuery      = `DELETE FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
-	postgresUpdateMessagesForTopicExpiryQuery     = `UPDATE message SET expires = $1 WHERE topic = $2`
-	postgresSelectMessagesByIDQuery               = `
+	postgresInsertAttachmentQuery = `
+		INSERT INTO message_attachment (mid, aid, position, name, type, size, expires, url, deleted)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+	postgresSelectScheduledMessageIDsBySeqIDQuery    = `SELECT mid FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
+	postgresSelectScheduledAttachmentIDsBySeqIDQuery = `SELECT DISTINCT COALESCE(NULLIF(a.aid, ''), m.mid) FROM message m LEFT JOIN message_attachment a ON a.mid = m.mid WHERE m.topic = $1 AND m.sequence_id = $2 AND m.published = FALSE`
+	postgresDeleteScheduledBySequenceIDQuery         = `DELETE FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
+	postgresUpdateMessagesForTopicExpiryQuery        = `UPDATE message SET expires = $1 WHERE topic = $2`
+	postgresSelectMessagesByIDQuery                  = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE mid = $1
+	`
+	postgresSelectMessagesByAttachmentIDQuery = `
+		SELECT m.mid, m.sequence_id, m.time, m.event, m.expires, m.topic, m.message, m.title, m.priority, m.tags, m.click, m.icon, m.actions, m.attachment_name, m.attachment_type, m.attachment_size, m.attachment_expires, m.attachment_url, m.sender, m.user_id, m.content_type, m.encoding
+		FROM message m
+		JOIN message_attachment a ON a.mid = m.mid
+		WHERE a.aid = $1
+	`
+	postgresSelectAttachmentsByMessageIDQuery = `
+		SELECT aid, name, type, size, expires, url
+		FROM message_attachment
+		WHERE mid = $1 AND deleted = FALSE
+		ORDER BY position, id
 	`
 	postgresSelectMessagesSinceTimeQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
@@ -65,10 +82,10 @@ const (
 	postgresSelectTopicsQuery           = `SELECT topic FROM message GROUP BY topic`
 
 	postgresDeleteExpiredMessagesQuery         = `DELETE FROM message WHERE mid IN (SELECT mid FROM message WHERE expires <= $1 AND published = TRUE LIMIT $2)`
-	postgresMarkExpiredAttachmentsDeletedQuery = `UPDATE message SET attachment_deleted = TRUE WHERE mid IN (SELECT mid FROM message WHERE attachment_expires > 0 AND attachment_expires <= $1 AND attachment_deleted = FALSE LIMIT $2)`
-	postgresSelectAttachmentsSizeBySenderQuery = `SELECT COALESCE(SUM(attachment_size), 0) FROM message WHERE user_id = '' AND sender = $1 AND attachment_expires >= $2`
-	postgresSelectAttachmentsSizeByUserIDQuery = `SELECT COALESCE(SUM(attachment_size), 0) FROM message WHERE user_id = $1 AND attachment_expires >= $2`
-	postgresSelectAttachmentsWithSizesQuery    = `SELECT mid, attachment_size FROM message WHERE attachment_expires > $1 AND attachment_deleted = FALSE`
+	postgresMarkExpiredAttachmentsDeletedQuery = `UPDATE message_attachment SET deleted = TRUE WHERE id IN (SELECT id FROM message_attachment WHERE expires > 0 AND expires <= $1 AND deleted = FALSE LIMIT $2)`
+	postgresSelectAttachmentsSizeBySenderQuery = `SELECT COALESCE(SUM(a.size), 0) FROM message_attachment a JOIN message m ON m.mid = a.mid WHERE m.user_id = '' AND m.sender = $1 AND a.expires >= $2 AND a.deleted = FALSE`
+	postgresSelectAttachmentsSizeByUserIDQuery = `SELECT COALESCE(SUM(a.size), 0) FROM message_attachment a JOIN message m ON m.mid = a.mid WHERE m.user_id = $1 AND a.expires >= $2 AND a.deleted = FALSE`
+	postgresSelectAttachmentsWithSizesQuery    = `SELECT a.aid, a.size FROM message_attachment a JOIN message m ON m.mid = a.mid WHERE a.expires > $1 AND a.deleted = FALSE AND a.aid <> ''`
 
 	postgresSelectStatsQuery       = `SELECT value FROM message_stats WHERE key = 'messages'`
 	postgresUpdateStatsQuery       = `UPDATE message_stats SET value = $1 WHERE key = 'messages'`
@@ -76,28 +93,32 @@ const (
 )
 
 var postgresQueries = queries{
-	insertMessage:                    postgresInsertMessageQuery,
-	selectScheduledMessageIDsBySeqID: postgresSelectScheduledMessageIDsBySeqIDQuery,
-	deleteScheduledBySequenceID:      postgresDeleteScheduledBySequenceIDQuery,
-	updateMessagesForTopicExpiry:     postgresUpdateMessagesForTopicExpiryQuery,
-	selectMessagesByID:               postgresSelectMessagesByIDQuery,
-	selectMessagesSinceTime:          postgresSelectMessagesSinceTimeQuery,
-	selectMessagesSinceTimeScheduled: postgresSelectMessagesSinceTimeIncludeScheduledQuery,
-	selectMessagesSinceID:            postgresSelectMessagesSinceIDQuery,
-	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
-	selectMessagesLatest:             postgresSelectMessagesLatestQuery,
-	selectMessagesDue:                postgresSelectMessagesDueQuery,
-	deleteExpiredMessages:            postgresDeleteExpiredMessagesQuery,
-	updateMessagePublished:           postgresUpdateMessagePublishedQuery,
-	selectMessagesCount:              postgresSelectMessagesCountQuery,
-	selectTopics:                     postgresSelectTopicsQuery,
-	markExpiredAttachmentsDeleted:    postgresMarkExpiredAttachmentsDeletedQuery,
-	selectAttachmentsSizeBySender:    postgresSelectAttachmentsSizeBySenderQuery,
-	selectAttachmentsSizeByUserID:    postgresSelectAttachmentsSizeByUserIDQuery,
-	selectAttachmentsWithSizes:       postgresSelectAttachmentsWithSizesQuery,
-	selectStats:                      postgresSelectStatsQuery,
-	updateStats:                      postgresUpdateStatsQuery,
-	updateMessageTime:                postgresUpdateMessageTimeQuery,
+	insertMessage:                       postgresInsertMessageQuery,
+	insertAttachment:                    postgresInsertAttachmentQuery,
+	selectScheduledMessageIDsBySeqID:    postgresSelectScheduledMessageIDsBySeqIDQuery,
+	selectScheduledAttachmentIDsBySeqID: postgresSelectScheduledAttachmentIDsBySeqIDQuery,
+	deleteScheduledBySequenceID:         postgresDeleteScheduledBySequenceIDQuery,
+	updateMessagesForTopicExpiry:        postgresUpdateMessagesForTopicExpiryQuery,
+	selectMessagesByID:                  postgresSelectMessagesByIDQuery,
+	selectMessagesByAttachmentID:        postgresSelectMessagesByAttachmentIDQuery,
+	selectAttachmentsByMessageID:        postgresSelectAttachmentsByMessageIDQuery,
+	selectMessagesSinceTime:             postgresSelectMessagesSinceTimeQuery,
+	selectMessagesSinceTimeScheduled:    postgresSelectMessagesSinceTimeIncludeScheduledQuery,
+	selectMessagesSinceID:               postgresSelectMessagesSinceIDQuery,
+	selectMessagesSinceIDScheduled:      postgresSelectMessagesSinceIDIncludeScheduledQuery,
+	selectMessagesLatest:                postgresSelectMessagesLatestQuery,
+	selectMessagesDue:                   postgresSelectMessagesDueQuery,
+	deleteExpiredMessages:               postgresDeleteExpiredMessagesQuery,
+	updateMessagePublished:              postgresUpdateMessagePublishedQuery,
+	selectMessagesCount:                 postgresSelectMessagesCountQuery,
+	selectTopics:                        postgresSelectTopicsQuery,
+	markExpiredAttachmentsDeleted:       postgresMarkExpiredAttachmentsDeletedQuery,
+	selectAttachmentsSizeBySender:       postgresSelectAttachmentsSizeBySenderQuery,
+	selectAttachmentsSizeByUserID:       postgresSelectAttachmentsSizeByUserIDQuery,
+	selectAttachmentsWithSizes:          postgresSelectAttachmentsWithSizesQuery,
+	selectStats:                         postgresSelectStatsQuery,
+	updateStats:                         postgresUpdateStatsQuery,
+	updateMessageTime:                   postgresUpdateMessageTimeQuery,
 }
 
 // NewPostgresStore creates a new PostgreSQL-backed message cache store using an existing database connection pool.

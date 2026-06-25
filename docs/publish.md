@@ -975,10 +975,11 @@ _Supported on:_ :material-android: :material-apple: :material-firefox:
 You can **send images and other files to your phone** as attachments to a notification. The attachments are then downloaded
 onto your phone (depending on size and setting automatically), and can be used from the Downloads folder.
 
-There are two different ways to send attachments: 
+There are three different ways to send attachments:
 
 * sending [a local file](#attach-local-file) via PUT, e.g. from `~/Flowers/flower.jpg` or `ringtone.mp3`
-* or by [passing an external URL](#attach-file-from-a-url) as an attachment, e.g. `https://f-droid.org/F-Droid.apk` 
+* sending [multiple local files](#attach-multiple-local-files) as `multipart/form-data`
+* or by [passing external URLs](#attach-file-from-a-url) as attachments, e.g. `https://f-droid.org/F-Droid.apk`
 
 ### Attach local file
 To **send a file from your computer** as an attachment, you can send it as the PUT request body. If a message is greater 
@@ -1073,6 +1074,53 @@ Here's what that looks like on Android:
   <figcaption>Image attachment sent from a local file</figcaption>
 </figure>
 
+### Attach multiple local files
+To send more than one local file in a single message, publish a standard `multipart/form-data` request and repeat the
+`attachment` file part once for each file. You may also include a `message` form field and repeat `attach` form fields
+for external URLs. The default server limit is 10 attachments per message.
+
+Legacy single-file publishing with the request body and `Filename` header remains supported, but cannot be combined with
+multipart `attachment` file parts or multipart `attach` fields.
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -F "message=Here are the files" \
+        -F "attachment=@flower.jpg" \
+        -F "attachment=@notes.pdf" \
+        ntfy.sh/flowers
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /flowers HTTP/1.1
+    Host: ntfy.sh
+    Content-Type: multipart/form-data; boundary=...
+
+    --...
+    Content-Disposition: form-data; name="message"
+
+    Here are the files
+    --...
+    Content-Disposition: form-data; name="attachment"; filename="flower.jpg"
+
+    (binary JPEG data)
+    --...
+    Content-Disposition: form-data; name="attachment"; filename="notes.pdf"
+
+    (binary PDF data)
+    --...--
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    const body = new FormData();
+    body.append("message", "Here are the files");
+    body.append("attachment", fileInput.files[0], "flower.jpg");
+    body.append("attachment", fileInput.files[1], "notes.pdf");
+    fetch("https://ntfy.sh/flowers", { method: "POST", body });
+    ```
+
 ### Attach file from a URL
 Instead of sending a local file to your phone, you can use **an external URL** to specify where the attachment is hosted.
 This could be a Dropbox link, a file from social media, or any other publicly available URL. Since the files are 
@@ -1084,6 +1132,10 @@ to specify the attachment URL. It can be any type of file.
 ntfy will automatically try to derive the file name from the URL (e.g `https://example.com/flower.jpg` will yield a 
 filename `flower.jpg`). To override this filename, you may send the `X-Filename` header or query parameter (or any of its
 aliases `Filename`, `File` or `f`).
+
+To attach multiple external URLs in JSON, use the `attachments` array with objects containing `url` and optional `name`.
+The legacy JSON fields `attach` and `filename` cannot be combined with the `attachments` array in the same request.
+JSON attachments are URLs only; local files should use the multipart form shown above.
 
 Here's an example showing how to attach an APK file:
 
@@ -3707,6 +3759,7 @@ all the supported fields:
 | `actions`     | -        | *JSON array*                     | *(see [action buttons](#action-buttons))* | Custom [user action buttons](#action-buttons) for notifications                           |
 | `click`       | -        | *URL*                            | `https://example.com`                     | Website opened when notification is [clicked](#click-action)                              |
 | `attach`      | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-a-url)                       |
+| `attachments` | -        | *JSON array*                     | `[{"url":"https://example.com/a.jpg"}]`   | URLs of multiple attachments; mutually exclusive with `attach` and `filename`             |
 | `markdown`    | -        | *bool*                           | `true`                                    | Set to true if the `message` is Markdown-formatted                                        |
 | `icon`        | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                                                 |
 | `filename`    | -        | *string*                         | `file.jpg`                                | File name of the attachment                                                               |

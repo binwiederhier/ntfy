@@ -160,11 +160,13 @@
 #   e.g. /var/cache/ntfy/attachments, or s3://ACCESS_KEY:SECRET_KEY@bucket/prefix?region=us-east-1&endpoint=https://...
 # - attachment-total-size-limit is the limit of the on-disk attachment cache directory (total size)
 # - attachment-file-size-limit is the per-file attachment size limit (e.g. 300k, 2M, 100M)
+# - attachment-count-limit is the per-message attachment count limit
 # - attachment-expiry-duration is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h)
 #
 # attachment-cache-dir:
 # attachment-total-size-limit: "5G"
 # attachment-file-size-limit: "15M"
+# attachment-count-limit: 10
 # attachment-expiry-duration: "3h"
 
 # Template directory for message templates.

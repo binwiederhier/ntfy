@@ -30,36 +30,44 @@ var (
 
 // Message represents a message published to a topic
 type Message struct {
-	ID          string      `json:"id"`                    // Random message ID
-	SequenceID  string      `json:"sequence_id,omitempty"` // Message sequence ID for updating message contents (omitted if same as ID)
-	Time        int64       `json:"time"`                  // Unix time in seconds
-	Expires     int64       `json:"expires,omitempty"`     // Unix time in seconds (not required for open/keepalive)
-	Event       string      `json:"event"`                 // One of the above
-	Topic       string      `json:"topic"`
-	Title       string      `json:"title,omitempty"`
-	Message     string      `json:"message,omitempty"`
-	Priority    int         `json:"priority,omitempty"`
-	Tags        []string    `json:"tags,omitempty"`
-	Click       string      `json:"click,omitempty"`
-	Icon        string      `json:"icon,omitempty"`
-	Actions     []*Action   `json:"actions,omitempty"`
-	Attachment  *Attachment `json:"attachment,omitempty"`
-	PollID      string      `json:"poll_id,omitempty"`
-	ContentType string      `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
-	Encoding    string      `json:"encoding,omitempty"`     // Empty for raw UTF-8, or "base64" for encoded bytes
-	Sender      netip.Addr  `json:"-"`                      // IP address of uploader, used for rate limiting
-	User        string      `json:"-"`                      // UserID of the uploader, used to associated attachments
+	ID          string        `json:"id"`                    // Random message ID
+	SequenceID  string        `json:"sequence_id,omitempty"` // Message sequence ID for updating message contents (omitted if same as ID)
+	Time        int64         `json:"time"`                  // Unix time in seconds
+	Expires     int64         `json:"expires,omitempty"`     // Unix time in seconds (not required for open/keepalive)
+	Event       string        `json:"event"`                 // One of the above
+	Topic       string        `json:"topic"`
+	Title       string        `json:"title,omitempty"`
+	Message     string        `json:"message,omitempty"`
+	Priority    int           `json:"priority,omitempty"`
+	Tags        []string      `json:"tags,omitempty"`
+	Click       string        `json:"click,omitempty"`
+	Icon        string        `json:"icon,omitempty"`
+	Actions     []*Action     `json:"actions,omitempty"`
+	Attachment  *Attachment   `json:"attachment,omitempty"`  // Compatibility alias for the first attachment
+	Attachments []*Attachment `json:"attachments,omitempty"` // Canonical list of attachments
+	PollID      string        `json:"poll_id,omitempty"`
+	ContentType string        `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
+	Encoding    string        `json:"encoding,omitempty"`     // Empty for raw UTF-8, or "base64" for encoded bytes
+	Sender      netip.Addr    `json:"-"`                      // IP address of uploader, used for rate limiting
+	User        string        `json:"-"`                      // UserID of the uploader, used to associated attachments
 }
 
 // Context returns a log context for the message
 func (m *Message) Context() log.Context {
+	m.NormalizeAttachments()
+	var attachmentTotalSize int64
+	for _, attachment := range m.Attachments {
+		attachmentTotalSize += attachment.Size
+	}
 	fields := map[string]any{
-		"topic":               m.Topic,
-		"message_id":          m.ID,
-		"message_sequence_id": m.SequenceID,
-		"message_time":        m.Time,
-		"message_event":       m.Event,
-		"message_body_size":   len(m.Message),
+		"topic":                         m.Topic,
+		"message_id":                    m.ID,
+		"message_sequence_id":           m.SequenceID,
+		"message_time":                  m.Time,
+		"message_event":                 m.Event,
+		"message_body_size":             len(m.Message),
+		"message_attachments":           len(m.Attachments),
+		"message_attachment_total_size": attachmentTotalSize,
 	}
 	if m.Sender.IsValid() {
 		fields["message_sender"] = m.Sender.String()
@@ -88,21 +96,53 @@ func (m *Message) SanitizeUTF8() {
 		m.Attachment.Type = util.SanitizeUTF8(m.Attachment.Type)
 		m.Attachment.URL = util.SanitizeUTF8(m.Attachment.URL)
 	}
+	for _, attachment := range m.Attachments {
+		attachment.ID = util.SanitizeUTF8(attachment.ID)
+		attachment.Name = util.SanitizeUTF8(attachment.Name)
+		attachment.Type = util.SanitizeUTF8(attachment.Type)
+		attachment.URL = util.SanitizeUTF8(attachment.URL)
+	}
 }
 
 // ForJSON returns a copy of the message suitable for JSON output.
 // It clears the SequenceID if it equals the ID to reduce redundancy.
 func (m *Message) ForJSON() *Message {
-	if m.SequenceID == m.ID {
-		clone := *m
+	clone := *m
+	clone.NormalizeAttachments()
+	if clone.SequenceID == clone.ID {
 		clone.SequenceID = ""
-		return &clone
 	}
-	return m
+	return &clone
+}
+
+// NormalizeAttachments makes Attachments the source of truth and Attachment the
+// compatibility alias for the first attachment.
+func (m *Message) NormalizeAttachments() {
+	if len(m.Attachments) == 0 && m.Attachment != nil {
+		m.Attachments = []*Attachment{m.Attachment}
+	}
+	if len(m.Attachments) > 0 {
+		m.Attachment = m.Attachments[0]
+	} else {
+		m.Attachment = nil
+	}
+}
+
+// AttachmentIDs returns IDs for attachments stored by ntfy.
+func (m *Message) AttachmentIDs() []string {
+	m.NormalizeAttachments()
+	ids := make([]string, 0, len(m.Attachments))
+	for _, attachment := range m.Attachments {
+		if attachment.ID != "" {
+			ids = append(ids, attachment.ID)
+		}
+	}
+	return ids
 }
 
 // Attachment represents a file attachment on a message
 type Attachment struct {
+	ID      string `json:"-"` // Internal attachment/file ID
 	Name    string `json:"name"`
 	Type    string `json:"type,omitempty"`
 	Size    int64  `json:"size,omitempty"`

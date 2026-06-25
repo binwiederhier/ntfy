@@ -23,28 +23,32 @@ var errNoRows = errors.New("no rows found")
 
 // queries holds the database-specific SQL queries
 type queries struct {
-	insertMessage                    string
-	selectScheduledMessageIDsBySeqID string
-	deleteScheduledBySequenceID      string
-	updateMessagesForTopicExpiry     string
-	selectMessagesByID               string
-	selectMessagesSinceTime          string
-	selectMessagesSinceTimeScheduled string
-	selectMessagesSinceID            string
-	selectMessagesSinceIDScheduled   string
-	selectMessagesLatest             string
-	selectMessagesDue                string
-	deleteExpiredMessages            string
-	updateMessagePublished           string
-	selectMessagesCount              string
-	selectTopics                     string
-	markExpiredAttachmentsDeleted    string
-	selectAttachmentsSizeBySender    string
-	selectAttachmentsSizeByUserID    string
-	selectAttachmentsWithSizes       string
-	selectStats                      string
-	updateStats                      string
-	updateMessageTime                string
+	insertMessage                       string
+	insertAttachment                    string
+	selectScheduledMessageIDsBySeqID    string
+	selectScheduledAttachmentIDsBySeqID string
+	deleteScheduledBySequenceID         string
+	updateMessagesForTopicExpiry        string
+	selectMessagesByID                  string
+	selectMessagesByAttachmentID        string
+	selectAttachmentsByMessageID        string
+	selectMessagesSinceTime             string
+	selectMessagesSinceTimeScheduled    string
+	selectMessagesSinceID               string
+	selectMessagesSinceIDScheduled      string
+	selectMessagesLatest                string
+	selectMessagesDue                   string
+	deleteExpiredMessages               string
+	updateMessagePublished              string
+	selectMessagesCount                 string
+	selectTopics                        string
+	markExpiredAttachmentsDeleted       string
+	selectAttachmentsSizeBySender       string
+	selectAttachmentsSizeByUserID       string
+	selectAttachmentsWithSizes          string
+	selectStats                         string
+	updateStats                         string
+	updateMessageTime                   string
 }
 
 // Cache stores published messages
@@ -119,21 +123,27 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 		return err
 	}
 	defer stmt.Close()
+	attachmentStmt, err := tx.Prepare(c.queries.insertAttachment)
+	if err != nil {
+		return err
+	}
+	defer attachmentStmt.Close()
 	for _, m := range ms {
 		if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
 			return model.ErrUnexpectedMessageType
 		}
+		m.NormalizeAttachments()
 		published := m.Time <= time.Now().Unix()
 		tags := util.SanitizeUTF8(strings.Join(m.Tags, ","))
 		var attachmentName, attachmentType, attachmentURL string
 		var attachmentSize, attachmentExpires int64
 		var attachmentDeleted bool
-		if m.Attachment != nil {
-			attachmentName = util.SanitizeUTF8(m.Attachment.Name)
-			attachmentType = util.SanitizeUTF8(m.Attachment.Type)
-			attachmentSize = m.Attachment.Size
-			attachmentExpires = m.Attachment.Expires
-			attachmentURL = util.SanitizeUTF8(m.Attachment.URL)
+		if len(m.Attachments) > 0 {
+			attachmentName = util.SanitizeUTF8(m.Attachments[0].Name)
+			attachmentType = util.SanitizeUTF8(m.Attachments[0].Type)
+			attachmentSize = m.Attachments[0].Size
+			attachmentExpires = m.Attachments[0].Expires
+			attachmentURL = util.SanitizeUTF8(m.Attachments[0].URL)
 		}
 		var actionsStr string
 		if len(m.Actions) > 0 {
@@ -176,6 +186,25 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 		if err != nil {
 			return err
 		}
+		for i, a := range m.Attachments {
+			if a == nil {
+				continue
+			}
+			_, err := attachmentStmt.Exec(
+				m.ID,
+				util.SanitizeUTF8(a.ID),
+				i,
+				util.SanitizeUTF8(a.Name),
+				util.SanitizeUTF8(a.Type),
+				a.Size,
+				a.Expires,
+				util.SanitizeUTF8(a.URL),
+				attachmentDeleted,
+			)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		log.Tag(tagMessageCache).Err(err).Error("Writing %d message(s) failed (took %v)", len(ms), time.Since(start))
@@ -209,7 +238,7 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 	if err != nil {
 		return nil, err
 	}
-	return readMessages(rows)
+	return c.readMessages(rows)
 }
 
 func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool) ([]*model.Message, error) {
@@ -224,7 +253,7 @@ func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled
 	if err != nil {
 		return nil, err
 	}
-	return readMessages(rows)
+	return c.readMessages(rows)
 }
 
 func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
@@ -232,7 +261,7 @@ func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	return readMessages(rows)
+	return c.readMessages(rows)
 }
 
 // MessagesDue returns all messages that are due for publishing
@@ -241,7 +270,7 @@ func (c *Cache) MessagesDue() ([]*model.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	return readMessages(rows)
+	return c.readMessages(rows)
 }
 
 // DeleteExpiredMessages deletes up to `limit` expired messages in a single query
@@ -266,7 +295,29 @@ func (c *Cache) Message(id string) (*model.Message, error) {
 	if !rows.Next() {
 		return nil, model.ErrMessageNotFound
 	}
-	return readMessage(rows)
+	m, err := readMessage(rows)
+	if err != nil {
+		return nil, err
+	}
+	return c.hydrateAttachments(m)
+}
+
+// MessageByAttachmentID returns the message that owns the given attachment/file ID,
+// or ErrMessageNotFound if not found.
+func (c *Cache) MessageByAttachmentID(attachmentID string) (*model.Message, error) {
+	rows, err := c.db.ReadOnly().Query(c.queries.selectMessagesByAttachmentID, attachmentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, model.ErrMessageNotFound
+	}
+	m, err := readMessage(rows)
+	if err != nil {
+		return nil, err
+	}
+	return c.hydrateAttachments(m)
 }
 
 // UpdateMessageTime updates the time column for a message by ID. This is only used for testing.
@@ -313,12 +364,12 @@ func (c *Cache) Topics() ([]string, error) {
 }
 
 // DeleteScheduledBySequenceID deletes unpublished (scheduled) messages with the given topic and sequence ID.
-// It returns the message IDs of the deleted messages, which can be used to clean up attachment files.
+// It returns the attachment IDs of the deleted messages, which can be used to clean up attachment files.
 func (c *Cache) DeleteScheduledBySequenceID(topic, sequenceID string) ([]string, error) {
 	c.maybeLock()
 	defer c.maybeUnlock()
 	return db.QueryTx(c.db, func(tx *sql.Tx) ([]string, error) {
-		rows, err := tx.Query(c.queries.selectScheduledMessageIDsBySeqID, topic, sequenceID)
+		rows, err := tx.Query(c.queries.selectScheduledAttachmentIDsBySeqID, topic, sequenceID)
 		if err != nil {
 			return nil, err
 		}
@@ -457,12 +508,15 @@ func (c *Cache) processMessageBatches() {
 	}
 }
 
-func readMessages(rows *sql.Rows) ([]*model.Message, error) {
+func (c *Cache) readMessages(rows *sql.Rows) ([]*model.Message, error) {
 	defer rows.Close()
 	messages := make([]*model.Message, 0)
 	for rows.Next() {
 		m, err := readMessage(rows)
 		if err != nil {
+			return nil, err
+		}
+		if _, err := c.hydrateAttachments(m); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)
@@ -471,6 +525,42 @@ func readMessages(rows *sql.Rows) ([]*model.Message, error) {
 		return nil, err
 	}
 	return messages, nil
+}
+
+func (c *Cache) hydrateAttachments(m *model.Message) (*model.Message, error) {
+	rows, err := c.db.ReadOnly().Query(c.queries.selectAttachmentsByMessageID, m.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	attachments := make([]*model.Attachment, 0)
+	for rows.Next() {
+		var id, name, typ, url string
+		var size, expires int64
+		if err := rows.Scan(&id, &name, &typ, &size, &expires, &url); err != nil {
+			return nil, err
+		}
+		attachments = append(attachments, &model.Attachment{
+			ID:      id,
+			Name:    name,
+			Type:    typ,
+			Size:    size,
+			Expires: expires,
+			URL:     url,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(attachments) == 0 && m.Attachment != nil {
+		if m.Attachment.ID == "" && strings.Contains(m.Attachment.URL, "/file/"+m.ID) {
+			m.Attachment.ID = m.ID
+		}
+		attachments = append(attachments, m.Attachment)
+	}
+	m.Attachments = attachments
+	m.NormalizeAttachments()
+	return m, nil
 }
 
 func readMessage(rows *sql.Rows) (*model.Message, error) {

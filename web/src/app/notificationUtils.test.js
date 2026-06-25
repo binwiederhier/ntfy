@@ -118,6 +118,23 @@ describe("toNotificationParams", () => {
     });
     expect(options.tag).toBe("https://ntfy.sh/mytopic/99");
   });
+
+  it("uses the first attachment image from attachments", () => {
+    const [, options] = toNotificationParams({
+      message: {
+        ...baseMessage,
+        attachments: [
+          { name: "image.png", url: "https://ntfy.sh/file/image.png" },
+          { name: "other.png", url: "https://ntfy.sh/file/other.png" },
+        ],
+      },
+      defaultTitle: "fallback",
+      topicRoute: "/mytopic",
+      baseUrl: "https://ntfy.sh",
+      topic: "mytopic",
+    });
+    expect(options.image).toBe("https://ntfy.sh/file/image.png");
+  });
 });
 
 describe("messageWithSequenceId", () => {

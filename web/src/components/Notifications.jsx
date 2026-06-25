@@ -1,6 +1,5 @@
 import {
   Container,
-  ButtonBase,
   CardActions,
   CardContent,
   CircularProgress,
@@ -190,7 +189,7 @@ const NotificationBody = ({ notification }) => {
 const NotificationItem = (props) => {
   const { t, i18n } = useTranslation();
   const { notification } = props;
-  const { attachment } = notification;
+  const attachments = notification.attachments?.length > 0 ? notification.attachments : notification.attachment ? [notification.attachment] : [];
   const date = formatShortDateTime(notification.time, i18n.language);
   const otherTags = unmatchedTags(notification.tags);
   const tags = otherTags.length > 0 ? otherTags.join(", ") : null;
@@ -206,11 +205,9 @@ const NotificationItem = (props) => {
     copyToClipboard(s);
     props.onShowSnack();
   };
-  const expired = attachment && attachment.expires && attachment.expires < Date.now() / 1000;
-  const hasAttachmentActions = attachment && !expired;
   const hasClickAction = notification.click;
   const hasUserActions = notification.actions && notification.actions.length > 0;
-  const showActions = hasAttachmentActions || hasClickAction || hasUserActions;
+  const showActions = hasClickAction || hasUserActions;
 
   return (
     <Card sx={{ padding: 1 }} role="listitem" aria-label={t("notifications_list_item")}>
@@ -262,7 +259,9 @@ const NotificationItem = (props) => {
           <NotificationBody notification={notification} />
           {maybeActionErrors(notification)}
         </Typography>
-        {attachment && <Attachment attachment={attachment} />}
+        {attachments.map((a, index) => (
+          <Attachment key={`${a.url || a.name || "attachment"}${index}`} attachment={a} onCopy={handleCopy} />
+        ))}
         {tags && (
           <Typography sx={{ fontSize: 14 }} color="text.secondary">
             {t("notifications_tags")}: {tags}
@@ -271,20 +270,6 @@ const NotificationItem = (props) => {
       </CardContent>
       {showActions && (
         <CardActions sx={{ paddingTop: 0 }}>
-          {hasAttachmentActions && (
-            <>
-              <Tooltip title={t("notifications_attachment_copy_url_title")}>
-                <Button onClick={() => handleCopy(attachment.url)}>{t("notifications_attachment_copy_url_button")}</Button>
-              </Tooltip>
-              <Tooltip
-                title={t("notifications_attachment_open_title", {
-                  url: attachment.url,
-                })}
-              >
-                <Button onClick={() => openUrl(attachment.url)}>{t("notifications_attachment_open_button")}</Button>
-              </Tooltip>
-            </>
-          )}
           {hasClickAction && (
             <>
               <Tooltip title={t("notifications_click_copy_url_title")}>
@@ -308,14 +293,19 @@ const NotificationItem = (props) => {
 
 const Attachment = (props) => {
   const { t, i18n } = useTranslation();
-  const { attachment } = props;
+  const { attachment, onCopy } = props;
   const expired = attachment.expires && attachment.expires < Date.now() / 1000;
   const expires = attachment.expires && attachment.expires > Date.now() / 1000;
   const displayableImage = !expired && isImage(attachment);
 
   // Unexpired image
   if (displayableImage) {
-    return <Image attachment={attachment} />;
+    return (
+      <>
+        <Image attachment={attachment} />
+        <AttachmentActions attachment={attachment} onCopy={onCopy} />
+      </>
+    );
   }
 
   // Anything else: Show box
@@ -364,8 +354,12 @@ const Attachment = (props) => {
 
   // Not expired
   return (
-    <ButtonBase
+    <Box
       sx={{
+        display: "flex",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 1,
         marginTop: 2,
       }}
     >
@@ -377,6 +371,8 @@ const Attachment = (props) => {
         sx={{
           display: "flex",
           alignItems: "center",
+          flexGrow: 1,
+          minWidth: 0,
           padding: 1,
           borderRadius: "4px",
           "&:hover": {
@@ -390,7 +386,33 @@ const Attachment = (props) => {
           {maybeInfoText}
         </Typography>
       </Link>
-    </ButtonBase>
+      <AttachmentActions attachment={attachment} onCopy={onCopy} />
+    </Box>
+  );
+};
+
+const AttachmentActions = ({ attachment, onCopy }) => {
+  const { t } = useTranslation();
+  if (!attachment?.url) {
+    return null;
+  }
+  return (
+    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, marginTop: 0.5 }}>
+      <Tooltip title={t("notifications_attachment_copy_url_title")}>
+        <Button size="small" onClick={() => onCopy(attachment.url)}>
+          {t("notifications_attachment_copy_url_button")}
+        </Button>
+      </Tooltip>
+      <Tooltip
+        title={t("notifications_attachment_open_title", {
+          url: attachment.url,
+        })}
+      >
+        <Button size="small" onClick={() => openUrl(attachment.url)}>
+          {t("notifications_attachment_open_button")}
+        </Button>
+      </Tooltip>
+    </Box>
   );
 };
 

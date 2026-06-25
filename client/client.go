@@ -40,17 +40,18 @@ type Client struct {
 
 // Message is a struct that represents a ntfy message
 type Message struct { // TODO combine with server.message
-	ID         string
-	Event      string
-	Time       int64
-	Topic      string
-	Message    string
-	Title      string
-	Priority   int
-	Tags       []string
-	Click      string
-	Icon       string
-	Attachment *Attachment
+	ID          string
+	Event       string
+	Time        int64
+	Topic       string
+	Message     string
+	Title       string
+	Priority    int
+	Tags        []string
+	Click       string
+	Icon        string
+	Attachment  *Attachment
+	Attachments []*Attachment
 
 	// Additional fields
 	TopicURL       string

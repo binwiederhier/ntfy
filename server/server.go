@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -822,11 +823,11 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	if len(matches) != 2 {
 		return errHTTPInternalErrorInvalidPath
 	}
-	messageID := matches[1]
-	reader, size, err := s.attachment.Read(messageID)
+	attachmentID := matches[1]
+	reader, size, err := s.attachment.Read(attachmentID)
 	if err != nil {
 		return errHTTPNotFound.Fields(log.Context{
-			"message_id":    messageID,
+			"attachment_id": attachmentID,
 			"error_context": "attachment_store",
 		})
 	}
@@ -840,18 +841,21 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	// This is an easy way to
 	//   - avoid abuse (e.g. 1 uploader, 1k downloaders)
 	//   - and also uses the higher bandwidth limits of a paying user
-	m, err := s.messageCache.Message(messageID)
+	m, err := s.messageCache.MessageByAttachmentID(attachmentID)
 	if errors.Is(err, model.ErrMessageNotFound) {
 		if s.config.CacheBatchTimeout > 0 {
 			// Strange edge case: If we immediately after upload request the file (the web app does this for images),
 			// and messages are persisted asynchronously, retry fetching from the database
 			m, err = util.Retry(func() (*model.Message, error) {
-				return s.messageCache.Message(messageID)
+				return s.messageCache.MessageByAttachmentID(attachmentID)
 			}, s.config.CacheBatchTimeout, 100*time.Millisecond, 300*time.Millisecond, 600*time.Millisecond)
+		}
+		if errors.Is(err, model.ErrMessageNotFound) {
+			m, err = s.messageCache.Message(attachmentID) // Legacy fallback: /file/<messageID>
 		}
 		if err != nil {
 			return errHTTPNotFound.Fields(log.Context{
-				"message_id":    messageID,
+				"attachment_id": attachmentID,
 				"error_context": "message_cache",
 			})
 		}
@@ -872,8 +876,9 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 		return errHTTPTooManyRequestsLimitAttachmentBandwidth.With(m)
 	}
 	// Actually send file
-	if m.Attachment.Name != "" {
-		w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(m.Attachment.Name))
+	attachment := messageAttachmentByID(m, attachmentID)
+	if attachment != nil && attachment.Name != "" {
+		w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(attachment.Name))
 	}
 	_, err = io.Copy(util.NewContentTypeWriter(w, r.URL.Path), reader)
 	return err
@@ -886,6 +891,16 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
+func messageAttachmentByID(m *model.Message, attachmentID string) *model.Attachment {
+	m.NormalizeAttachments()
+	for _, attachment := range m.Attachments {
+		if attachment.ID == attachmentID {
+			return attachment
+		}
+	}
+	return m.Attachment
+}
+
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
 	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
@@ -896,14 +911,27 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if err != nil {
 		return nil, err
 	}
-	body, err := util.Peek(r.Body, s.config.MessageSizeLimit)
-	if err != nil {
-		return nil, err
+	multipartPublish := isMultipartPublish(r)
+	var body *util.PeekedReadCloser
+	if !multipartPublish {
+		body, err = util.Peek(r.Body, s.config.MessageSizeLimit)
+		if err != nil {
+			return nil, err
+		}
 	}
 	m := model.NewDefaultMessage(t.ID, "")
 	cache, firebase, email, call, template, unifiedpush, priorityStr, e := s.parsePublishParams(r, m)
 	if e != nil {
 		return nil, e.With(t)
+	}
+	var multipartFiles []*multipart.FileHeader
+	if multipartPublish {
+		var errHTTP *errHTTP
+		multipartFiles, email, call, priorityStr, errHTTP = s.parsePublishMultipart(r, m, email, call, template, priorityStr, cache)
+		if errHTTP != nil {
+			return nil, errHTTP.With(t)
+		}
+		defer r.MultipartForm.RemoveAll() //nolint:errcheck
 	}
 	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
@@ -940,9 +968,16 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if cache {
 		m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
 	}
-	if err := s.handlePublishBody(r, v, m, body, template, unifiedpush, priorityStr); err != nil {
-		return nil, err
+	if multipartPublish {
+		if err := s.handleMultipartAttachments(r, v, m, multipartFiles); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.handlePublishBody(r, v, m, body, template, unifiedpush, priorityStr); err != nil {
+			return nil, err
+		}
 	}
+	m.NormalizeAttachments()
 	if m.Message == "" {
 		m.Message = emptyMessageBody
 	}
@@ -1222,6 +1257,37 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 			m.Attachment.Name = "attachment"
 		}
 	}
+	attachmentsJSON := readParam(r, "x-attachments")
+	if attachmentsJSON != "" {
+		if m.Attachment != nil {
+			return false, false, "", "", "", false, "", errHTTPBadRequestAttachmentsAmbiguous
+		}
+		var attachments []publishAttachment
+		if err := json.Unmarshal([]byte(attachmentsJSON), &attachments); err != nil {
+			return false, false, "", "", "", false, "", errHTTPBadRequestMessageJSONInvalid
+		}
+		if len(attachments) > s.config.AttachmentCountLimit {
+			return false, false, "", "", "", false, "", errHTTPBadRequestAttachmentsTooMany
+		}
+		for _, attachment := range attachments {
+			attachment.URL = strings.TrimSpace(attachment.URL)
+			if attachment.URL == "" {
+				continue
+			}
+			if !urlRegex.MatchString(attachment.URL) {
+				return false, false, "", "", "", false, "", errHTTPBadRequestAttachmentURLInvalid
+			}
+			name := strings.TrimSpace(attachment.Name)
+			if name == "" {
+				name = attachmentNameFromURL(attachment.URL)
+			}
+			m.Attachments = append(m.Attachments, &model.Attachment{
+				Name: name,
+				URL:  attachment.URL,
+			})
+		}
+		m.NormalizeAttachments()
+	}
 	if icon != "" {
 		if !urlRegex.MatchString(icon) {
 			return false, false, "", "", "", false, "", errHTTPBadRequestIconURLInvalid
@@ -1305,6 +1371,120 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		email = ""
 	}
 	return cache, firebase, email, call, template, unifiedpush, priorityStr, nil
+}
+
+func isMultipartPublish(r *http.Request) bool {
+	return strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/form-data")
+}
+
+func (s *Server) parsePublishMultipart(r *http.Request, m *model.Message, email, call string, template templateMode, priorityStr string, cache bool) ([]*multipart.FileHeader, string, string, string, *errHTTP) {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		return nil, email, call, priorityStr, errHTTPBadRequest
+	}
+	files := r.MultipartForm.File["attachment"]
+	externalURLs := r.MultipartForm.Value["attach"]
+	if m.Attachment != nil && (len(files) > 0 || len(externalURLs) > 0) {
+		return nil, email, call, priorityStr, errHTTPBadRequestAttachmentsAmbiguous
+	}
+	if len(files)+len(externalURLs) > s.config.AttachmentCountLimit {
+		return nil, email, call, priorityStr, errHTTPBadRequestAttachmentsTooMany
+	}
+	values := r.MultipartForm.Value
+	if title := firstFormValue(values, "title"); title != "" {
+		m.Title = title
+	}
+	if click := firstFormValue(values, "click"); click != "" {
+		m.Click = click
+	}
+	if message := firstFormValue(values, "message"); message != "" {
+		if !template.InlineMode() {
+			message = strings.ReplaceAll(message, "\\n", "\n")
+		}
+		m.Message = message
+	}
+	if tags := firstFormValue(values, "tags"); tags != "" {
+		m.Tags = util.Map(util.SplitNoEmpty(tags, ","), strings.TrimSpace)
+	}
+	if p := firstFormValue(values, "priority"); p != "" {
+		priorityStr = p
+		if !template.Enabled() {
+			var err error
+			m.Priority, err = util.ParsePriority(priorityStr)
+			if err != nil {
+				return nil, email, call, priorityStr, errHTTPBadRequestPriorityInvalid
+			}
+			priorityStr = ""
+		}
+	}
+	if markdown := firstFormValue(values, "markdown"); toBool(strings.ToLower(markdown)) {
+		m.ContentType = "text/markdown"
+	}
+	if e := firstFormValue(values, "email"); e != "" {
+		if !emailAddressRegex.MatchString(e) && !toBool(e) {
+			return nil, email, call, priorityStr, errHTTPBadRequestEmailAddressInvalid
+		}
+		email = e
+	}
+	if c := firstFormValue(values, "call"); c != "" {
+		if s.config.TwilioAccount == "" || s.userManager == nil {
+			return nil, email, call, priorityStr, errHTTPBadRequestPhoneCallsDisabled
+		} else if !isBoolValue(c) && !phoneNumberRegex.MatchString(c) {
+			return nil, email, call, priorityStr, errHTTPBadRequestPhoneNumberInvalid
+		}
+		call = c
+	}
+	if delayStr := firstFormValue(values, "delay"); delayStr != "" {
+		if !cache {
+			return nil, email, call, priorityStr, errHTTPBadRequestDelayNoCache
+		}
+		if email != "" {
+			return nil, email, call, priorityStr, errHTTPBadRequestDelayNoEmail
+		}
+		if call != "" {
+			return nil, email, call, priorityStr, errHTTPBadRequestDelayNoCall
+		}
+		delay, err := util.ParseFutureTime(delayStr, time.Now())
+		if err != nil {
+			return nil, email, call, priorityStr, errHTTPBadRequestDelayCannotParse
+		} else if delay.Unix() < time.Now().Add(s.config.MessageDelayMin).Unix() {
+			return nil, email, call, priorityStr, errHTTPBadRequestDelayTooSmall
+		} else if delay.Unix() > time.Now().Add(s.config.MessageDelayMax).Unix() {
+			return nil, email, call, priorityStr, errHTTPBadRequestDelayTooLarge
+		}
+		m.Time = delay.Unix()
+	}
+	for _, attach := range externalURLs {
+		attach = strings.TrimSpace(attach)
+		if attach == "" {
+			continue
+		}
+		if !urlRegex.MatchString(attach) {
+			return nil, email, call, priorityStr, errHTTPBadRequestAttachmentURLInvalid
+		}
+		m.Attachments = append(m.Attachments, &model.Attachment{
+			Name: attachmentNameFromURL(attach),
+			URL:  attach,
+		})
+	}
+	m.NormalizeAttachments()
+	return files, email, call, priorityStr, nil
+}
+
+func firstFormValue(values map[string][]string, key string) string {
+	if vv, ok := values[key]; ok && len(vv) > 0 {
+		return strings.TrimSpace(vv[0])
+	}
+	return ""
+}
+
+func attachmentNameFromURL(attachmentURL string) string {
+	if u, err := url.Parse(attachmentURL); err == nil {
+		name := path.Base(u.Path)
+		if name != "." && name != "/" && name != "" {
+			return name
+		}
+	}
+	return "attachment"
 }
 
 // handlePublishBody consumes the PUT/POST body and decides whether the body is an attachment or the message.
@@ -1478,6 +1658,79 @@ func (s *Server) renderTemplate(name, tpl, source string) (string, error) {
 }
 
 func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *model.Message, body *util.PeekedReadCloser) error {
+	if m.Attachment == nil {
+		m.Attachment = &model.Attachment{}
+	}
+	m.Attachment.ID = m.ID
+	m.NormalizeAttachments()
+	return s.writeAttachment(r, v, m, m.Attachment, body, r.ContentLength, -1)
+}
+
+func (s *Server) handleMultipartAttachments(r *http.Request, v *visitor, m *model.Message, files []*multipart.FileHeader) error {
+	if len(files) == 0 {
+		if len(m.Attachments) > 0 && m.Message == "" {
+			m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachments[0].Name)
+		}
+		return nil
+	}
+	if s.attachment == nil || s.config.BaseURL == "" {
+		return errHTTPBadRequestAttachmentsDisallowed.With(m)
+	}
+	vinfo, err := v.Info()
+	if err != nil {
+		return err
+	}
+	remainingBytes := vinfo.Stats.AttachmentTotalSizeRemaining
+	writtenIDs := make([]string, 0, len(files))
+	if len(m.Attachments) > 0 && m.Message == "" {
+		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachments[0].Name)
+	}
+	for _, fileHeader := range files {
+		file, err := fileHeader.Open()
+		if err != nil {
+			s.removeAttachmentsAfterFailedPublish(writtenIDs, v, m)
+			return err
+		}
+		body, err := util.Peek(file, s.config.MessageSizeLimit)
+		if err != nil {
+			file.Close() //nolint:errcheck
+			s.removeAttachmentsAfterFailedPublish(writtenIDs, v, m)
+			return err
+		}
+		attachment := &model.Attachment{
+			ID:   model.GenerateMessageID(),
+			Name: fileHeader.Filename,
+		}
+		if attachment.Name == "" {
+			attachment.Name = "attachment"
+		}
+		if err := s.writeAttachment(r, v, m, attachment, body, fileHeader.Size, remainingBytes); err != nil {
+			body.Close() //nolint:errcheck
+			s.removeAttachmentsAfterFailedPublish(writtenIDs, v, m)
+			return err
+		}
+		body.Close() //nolint:errcheck
+		writtenIDs = append(writtenIDs, attachment.ID)
+		remainingBytes -= attachment.Size
+		m.Attachments = append(m.Attachments, attachment)
+		m.NormalizeAttachments()
+	}
+	if len(m.Attachments) > 0 && m.Message == "" {
+		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachments[0].Name)
+	}
+	return nil
+}
+
+func (s *Server) removeAttachmentsAfterFailedPublish(ids []string, v *visitor, m *model.Message) {
+	if s.attachment == nil || len(ids) == 0 {
+		return
+	}
+	if err := s.attachment.Remove(ids...); err != nil {
+		logvm(v, m).Tag(tagPublish).Err(err).Warn("Error removing attachments after failed publish")
+	}
+}
+
+func (s *Server) writeAttachment(r *http.Request, v *visitor, m *model.Message, a *model.Attachment, body *util.PeekedReadCloser, untrustedLength, remainingBytes int64) error {
 	if s.attachment == nil || s.config.BaseURL == "" {
 		return errHTTPBadRequestAttachmentsDisallowed.With(m)
 	}
@@ -1492,33 +1745,33 @@ func (s *Server) handleBodyAsAttachment(r *http.Request, v *visitor, m *model.Me
 	if m.Time > attachmentExpiry {
 		return errHTTPBadRequestAttachmentsExpiryBeforeDelivery.With(m)
 	}
+	if remainingBytes < 0 {
+		remainingBytes = vinfo.Stats.AttachmentTotalSizeRemaining
+	}
 	// Early "do-not-trust" check, hard limit see below
-	if r.ContentLength > 0 && (r.ContentLength > vinfo.Stats.AttachmentTotalSizeRemaining || r.ContentLength > vinfo.Limits.AttachmentFileSizeLimit) {
+	if untrustedLength > 0 && (untrustedLength > remainingBytes || untrustedLength > vinfo.Limits.AttachmentFileSizeLimit) {
 		return errHTTPEntityTooLargeAttachment.With(m).Fields(log.Context{
-			"message_content_length":          r.ContentLength,
-			"attachment_total_size_remaining": vinfo.Stats.AttachmentTotalSizeRemaining,
+			"message_content_length":          untrustedLength,
+			"attachment_total_size_remaining": remainingBytes,
 			"attachment_file_size_limit":      vinfo.Limits.AttachmentFileSizeLimit,
 		})
 	}
-	if m.Attachment == nil {
-		m.Attachment = &model.Attachment{}
-	}
 	var ext string
-	m.Attachment.Expires = attachmentExpiry
-	m.Attachment.Type, ext = util.DetectContentType(body.PeekedBytes, m.Attachment.Name)
-	m.Attachment.URL = fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, m.ID, ext)
-	if m.Attachment.Name == "" {
-		m.Attachment.Name = fmt.Sprintf("attachment%s", ext)
+	a.Expires = attachmentExpiry
+	a.Type, ext = util.DetectContentType(body.PeekedBytes, a.Name)
+	a.URL = fmt.Sprintf("%s/file/%s%s", s.config.BaseURL, a.ID, ext)
+	if a.Name == "" {
+		a.Name = fmt.Sprintf("attachment%s", ext)
 	}
 	if m.Message == "" {
-		m.Message = fmt.Sprintf(defaultAttachmentMessage, m.Attachment.Name)
+		m.Message = fmt.Sprintf(defaultAttachmentMessage, a.Name)
 	}
 	limiters := []util.Limiter{
 		v.BandwidthLimiter(),
 		util.NewFixedLimiter(vinfo.Limits.AttachmentFileSizeLimit),
-		util.NewFixedLimiter(vinfo.Stats.AttachmentTotalSizeRemaining),
+		util.NewFixedLimiter(remainingBytes),
 	}
-	m.Attachment.Size, err = s.attachment.Write(m.ID, body, r.ContentLength, limiters...)
+	a.Size, err = s.attachment.Write(a.ID, body, untrustedLength, limiters...)
 	if errors.Is(err, util.ErrLimitReached) {
 		return errHTTPEntityTooLargeAttachment.With(m)
 	} else if err != nil {
@@ -2198,8 +2451,18 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if len(m.Tags) > 0 {
 			r.Header.Set("X-Tags", strings.Join(m.Tags, ","))
 		}
+		if len(m.Attachments) > 0 && (m.Attach != "" || m.Filename != "") {
+			return errHTTPBadRequestAttachmentsAmbiguous
+		}
 		if m.Attach != "" {
 			r.Header.Set("X-Attach", m.Attach)
+		}
+		if len(m.Attachments) > 0 {
+			attachments, err := json.Marshal(m.Attachments)
+			if err != nil {
+				return errHTTPBadRequestMessageJSONInvalid
+			}
+			r.Header.Set("X-Attachments", string(attachments))
 		}
 		if m.Filename != "" {
 			r.Header.Set("X-Filename", m.Filename)

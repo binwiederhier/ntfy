@@ -58,7 +58,7 @@ const PublishDialog = (props) => {
   const [priority, setPriority] = useState(3);
   const [clickUrl, setClickUrl] = useState("");
   const [attachUrl, setAttachUrl] = useState("");
-  const [attachFile, setAttachFile] = useState(null);
+  const [attachFiles, setAttachFiles] = useState([]);
   const [filename, setFilename] = useState("");
   const [filenameEdited, setFilenameEdited] = useState(false);
   const [email, setEmail] = useState("");
@@ -74,7 +74,7 @@ const PublishDialog = (props) => {
   const [showCall, setShowCall] = useState(false);
   const [showDelay, setShowDelay] = useState(false);
 
-  const showAttachFile = !!attachFile && !showAttachUrl;
+  const showAttachFile = attachFiles.length > 0 && !showAttachUrl;
   const attachFileInput = useRef();
   const [attachFileError, setAttachFileError] = useState("");
 
@@ -150,14 +150,11 @@ const PublishDialog = (props) => {
     if (delay.trim()) {
       url.searchParams.append("delay", delay.trim());
     }
-    if (attachFile && message.trim()) {
-      url.searchParams.append("message", message.replaceAll("\n", "\\n").trim());
-    }
     if (markdownEnabled) {
       url.searchParams.append("markdown", "true");
     }
 
-    const body = attachFile || message;
+    const body = attachFiles.length > 0 ? multipartBody(message, attachFiles) : message;
     try {
       const user = await userManager.get(baseUrl);
       const headers = maybeWithAuth({}, user);
@@ -189,13 +186,14 @@ const PublishDialog = (props) => {
     }
   };
 
-  const checkAttachmentLimits = async (file) => {
+  const checkAttachmentLimits = async (files) => {
     try {
       const apiAccount = await accountApi.get();
       const fileSizeLimit = apiAccount.limits.attachment_file_size ?? 0;
       const remainingBytes = apiAccount.stats.attachment_total_size_remaining;
-      const fileSizeLimitReached = fileSizeLimit > 0 && file.size > fileSizeLimit;
-      const quotaReached = remainingBytes > 0 && file.size > remainingBytes;
+      const fileSizeLimitReached = fileSizeLimit > 0 && files.some((file) => file.size > fileSizeLimit);
+      const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+      const quotaReached = remainingBytes > 0 && totalSize > remainingBytes;
       if (fileSizeLimitReached && quotaReached) {
         setAttachFileError(
           t("publish_dialog_attachment_limits_file_and_quota_reached", {
@@ -232,34 +230,53 @@ const PublishDialog = (props) => {
     attachFileInput.current.click();
   };
 
-  const updateAttachFile = async (file) => {
-    setAttachFile(file);
-    setFilename(file.name);
+  const updateAttachFiles = async (files, append = false) => {
+    const attachments = files.map((file) => ({
+      file,
+      filename: file.name || "attachment",
+    }));
+    const next = append ? [...attachFiles, ...attachments] : attachments;
+    setAttachFiles(next);
     props.onResetOpenMode();
-    await checkAttachmentLimits(file);
+    await checkAttachmentLimits(next.map(({ file }) => file));
   };
 
   useEffect(() => {
     if (props.attachFile) {
-      updateAttachFile(props.attachFile);
+      updateAttachFiles([props.attachFile]);
     }
   }, [props.attachFile]);
 
   const handlePaste = (ev) => {
     const blob = props.getPastedImage(ev);
     if (blob) {
-      updateAttachFile(blob);
+      updateAttachFiles([blob], true);
     }
   };
 
   const handleAttachFileChanged = async (ev) => {
-    await updateAttachFile(ev.target.files[0]);
+    await updateAttachFiles(Array.from(ev.target.files));
+    ev.target.value = "";
   };
 
   const handleAttachFileDrop = async (ev) => {
     ev.preventDefault();
     setDropZone(false);
-    await updateAttachFile(ev.dataTransfer.files[0]);
+    await updateAttachFiles(Array.from(ev.dataTransfer.files));
+  };
+
+  const handleAttachFileRemove = async (index) => {
+    const next = attachFiles.filter((_, i) => i !== index);
+    setAttachFiles(next);
+    if (next.length === 0) {
+      setAttachFileError("");
+    } else {
+      await checkAttachmentLimits(next.map(({ file }) => file));
+    }
+  };
+
+  const handleAttachFilenameChange = (index, newFilename) => {
+    setAttachFiles((prev) => prev.map((attachment, i) => (i === index ? { ...attachment, filename: newFilename } : attachment)));
   };
 
   const handleAttachFileDragLeave = () => {
@@ -604,19 +621,14 @@ const PublishDialog = (props) => {
               />
             </ClosableRow>
           )}
-          <input type="file" ref={attachFileInput} onChange={handleAttachFileChanged} style={{ display: "none" }} aria-hidden />
+          <input type="file" ref={attachFileInput} onChange={handleAttachFileChanged} style={{ display: "none" }} aria-hidden multiple />
           {showAttachFile && (
             <AttachmentBox
-              file={attachFile}
-              filename={filename}
+              attachments={attachFiles}
               disabled={disabled}
               error={attachFileError}
-              onChangeFilename={(f) => setFilename(f)}
-              onClose={() => {
-                setAttachFile(null);
-                setAttachFileError("");
-                setFilename("");
-              }}
+              onChangeFilename={handleAttachFilenameChange}
+              onRemove={handleAttachFileRemove}
             />
           )}
           {showDelay && (
@@ -819,52 +831,65 @@ const DialogIconButton = (props) => {
   );
 };
 
+const multipartBody = (message, attachFiles) => {
+  const body = new FormData();
+  if (message.trim()) {
+    body.append("message", message.trim());
+  }
+  attachFiles.forEach(({ file, filename }) => {
+    body.append("attachment", file, filename || file.name || "attachment");
+  });
+  return body;
+};
+
 const AttachmentBox = (props) => {
   const { t } = useTranslation();
-  const { file } = props;
   return (
     <>
       <Typography variant="body1" sx={{ marginTop: 2 }}>
         {t("publish_dialog_attached_file_title")}
       </Typography>
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          padding: 0.5,
-          borderRadius: "4px",
-        }}
-      >
-        <AttachmentIcon type={file.type} href={imageRegex.test(file.name) ? URL.createObjectURL(file) : undefined} />
-        <Box sx={{ marginLeft: 1, textAlign: "left" }}>
-          <ExpandingTextField
-            minWidth={140}
-            variant="body2"
-            placeholder={t("publish_dialog_attached_file_filename_placeholder")}
-            value={props.filename}
-            onChange={(ev) => props.onChangeFilename(ev.target.value)}
-            disabled={props.disabled}
-          />
-          <br />
-          <Typography variant="body2" sx={{ color: "text.primary" }}>
-            {formatBytes(file.size)}
-            {props.error && (
-              <Typography component="span" sx={{ color: "error.main" }} aria-live="polite">
-                {" "}
-                ({props.error})
-              </Typography>
-            )}
-          </Typography>
-        </Box>
-        <DialogIconButton
-          disabled={props.disabled}
-          onClick={props.onClose}
-          sx={{ marginLeft: "6px" }}
-          aria-label={t("publish_dialog_attached_file_remove")}
+      {props.attachments.map(({ file, filename }, index) => (
+        <Box
+          key={`${file.name || "attachment"}${file.size}${index}`}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            padding: 0.5,
+            borderRadius: "4px",
+          }}
         >
-          <Close />
-        </DialogIconButton>
-      </Box>
+          <AttachmentIcon type={file.type} href={imageRegex.test(file.name || "") ? URL.createObjectURL(file) : undefined} />
+          <Box sx={{ marginLeft: 1, textAlign: "left", minWidth: 0 }}>
+            <ExpandingTextField
+              minWidth={140}
+              variant="body2"
+              placeholder={t("publish_dialog_attached_file_filename_placeholder")}
+              value={filename}
+              onChange={(ev) => props.onChangeFilename(index, ev.target.value)}
+              disabled={props.disabled}
+            />
+            <br />
+            <Typography variant="body2" sx={{ color: "text.primary" }}>
+              {formatBytes(file.size)}
+              {props.error && index === 0 && (
+                <Typography component="span" sx={{ color: "error.main" }} aria-live="polite">
+                  {" "}
+                  ({props.error})
+                </Typography>
+              )}
+            </Typography>
+          </Box>
+          <DialogIconButton
+            disabled={props.disabled}
+            onClick={() => props.onRemove(index)}
+            sx={{ marginLeft: "6px" }}
+            aria-label={t("publish_dialog_attached_file_remove")}
+          >
+            <Close />
+          </DialogIconButton>
+        </Box>
+      ))}
     </>
   );
 };

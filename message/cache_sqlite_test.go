@@ -209,7 +209,7 @@ func TestSqliteStore_Migration_From9(t *testing.T) {
 	require.True(t, rows.Next())
 	var version int
 	require.Nil(t, rows.Scan(&version))
-	require.Equal(t, 15, version)
+	require.Equal(t, 16, version)
 	require.Nil(t, rows.Close())
 
 	messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
@@ -287,6 +287,6 @@ func checkSqliteSchemaVersion(t *testing.T, filename string) {
 	require.True(t, rows.Next())
 	var schemaVersion int
 	require.Nil(t, rows.Scan(&schemaVersion))
-	require.Equal(t, 15, schemaVersion)
+	require.Equal(t, 16, schemaVersion)
 	require.Nil(t, rows.Close())
 }

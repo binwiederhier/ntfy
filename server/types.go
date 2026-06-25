@@ -10,23 +10,29 @@ import (
 
 // publishMessage is used as input when publishing as JSON
 type publishMessage struct {
-	Topic      string         `json:"topic"`
-	SequenceID string         `json:"sequence_id"`
-	Title      string         `json:"title"`
-	Message    string         `json:"message"`
-	Priority   int            `json:"priority"`
-	Tags       []string       `json:"tags"`
-	Click      string         `json:"click"`
-	Icon       string         `json:"icon"`
-	Actions    []model.Action `json:"actions"`
-	Attach     string         `json:"attach"`
-	Markdown   bool           `json:"markdown"`
-	Filename   string         `json:"filename"`
-	Email      string         `json:"email"`
-	Call       string         `json:"call"`
-	Cache      string         `json:"cache"`    // use string as it defaults to true (or use &bool instead)
-	Firebase   string         `json:"firebase"` // use string as it defaults to true (or use &bool instead)
-	Delay      string         `json:"delay"`
+	Topic       string              `json:"topic"`
+	SequenceID  string              `json:"sequence_id"`
+	Title       string              `json:"title"`
+	Message     string              `json:"message"`
+	Priority    int                 `json:"priority"`
+	Tags        []string            `json:"tags"`
+	Click       string              `json:"click"`
+	Icon        string              `json:"icon"`
+	Actions     []model.Action      `json:"actions"`
+	Attach      string              `json:"attach"`
+	Attachments []publishAttachment `json:"attachments"`
+	Markdown    bool                `json:"markdown"`
+	Filename    string              `json:"filename"`
+	Email       string              `json:"email"`
+	Call        string              `json:"call"`
+	Cache       string              `json:"cache"`    // use string as it defaults to true (or use &bool instead)
+	Firebase    string              `json:"firebase"` // use string as it defaults to true (or use &bool instead)
+	Delay       string              `json:"delay"`
+}
+
+type publishAttachment struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
 }
 
 // messageEncoder is a function that knows how to encode a message

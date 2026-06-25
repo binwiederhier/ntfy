@@ -48,6 +48,8 @@ export const isImage = (attachment) => {
   return attachment.name?.match(imageRegex) || attachment.url?.match(imageRegex);
 };
 
+const firstAttachment = (message) => (message.attachments?.length > 0 ? message.attachments[0] : message.attachment);
+
 export const icon = "/static/images/ntfy.png";
 export const badge = "/static/images/mask-icon.svg";
 
@@ -58,7 +60,8 @@ export const badge = "/static/images/mask-icon.svg";
 export const notificationTag = (baseUrl, topic, sequenceId) => `${baseUrl}/${topic}/${sequenceId}`;
 
 export const toNotificationParams = ({ message, defaultTitle, topicRoute, baseUrl, topic }) => {
-  const image = isImage(message.attachment) ? message.attachment.url : undefined;
+  const attachment = firstAttachment(message);
+  const image = isImage(attachment) ? attachment.url : undefined;
   const sequenceId = message.sequence_id || message.id;
   const tag = notificationTag(baseUrl, topic, sequenceId);
   const subscriptionId = `${baseUrl}/${topic}`;

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
@@ -8,6 +9,7 @@ import (
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/util"
 	"io"
+	"mime/multipart"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,12 +32,12 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "click", Aliases: []string{"U"}, EnvVars: []string{"NTFY_CLICK"}, Usage: "URL to open when notification is clicked"},
 	&cli.StringFlag{Name: "icon", Aliases: []string{"i"}, EnvVars: []string{"NTFY_ICON"}, Usage: "URL to use as notification icon"},
 	&cli.StringFlag{Name: "actions", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ACTIONS"}, Usage: "actions JSON array or simple definition"},
-	&cli.StringFlag{Name: "attach", Aliases: []string{"a"}, EnvVars: []string{"NTFY_ATTACH"}, Usage: "URL to send as an external attachment"},
+	&cli.StringSliceFlag{Name: "attach", Aliases: []string{"a"}, EnvVars: []string{"NTFY_ATTACH"}, Usage: "URL to send as an external attachment"},
 	&cli.BoolFlag{Name: "markdown", Aliases: []string{"md"}, EnvVars: []string{"NTFY_MARKDOWN"}, Usage: "Message is formatted as Markdown"},
 	&cli.StringFlag{Name: "template", Aliases: []string{"tpl"}, EnvVars: []string{"NTFY_TEMPLATE"}, Usage: "use templates to transform JSON message body"},
 	&cli.StringFlag{Name: "filename", Aliases: []string{"name", "n"}, EnvVars: []string{"NTFY_FILENAME"}, Usage: "filename for the attachment"},
 	&cli.StringFlag{Name: "sequence-id", Aliases: []string{"sequence_id", "sid", "S"}, EnvVars: []string{"NTFY_SEQUENCE_ID"}, Usage: "sequence ID for updating notifications"},
-	&cli.StringFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
+	&cli.StringSliceFlag{Name: "file", Aliases: []string{"f"}, EnvVars: []string{"NTFY_FILE"}, Usage: "file to upload as an attachment"},
 	&cli.StringFlag{Name: "email", Aliases: []string{"mail", "e"}, EnvVars: []string{"NTFY_EMAIL"}, Usage: "also send to e-mail address"},
 	&cli.StringFlag{Name: "user", Aliases: []string{"u"}, EnvVars: []string{"NTFY_USER"}, Usage: "username[:password] used to auth against the server"},
 	&cli.StringFlag{Name: "token", Aliases: []string{"k"}, EnvVars: []string{"NTFY_TOKEN"}, Usage: "access token used to auth against the server"},
@@ -71,6 +73,7 @@ Examples:
   ntfy pub --icon="http://some.tld/icon.png" 'Icon!'      # Send notification with custom icon
   ntfy pub --attach="http://some.tld/file.zip" files      # Send ZIP archive from URL as attachment
   ntfy pub --file=flower.jpg flowers 'Nice!'              # Send image.jpg as attachment
+  ntfy pub --file=a.jpg --file=b.jpg flowers 'Nice!'      # Send multiple local files as attachments
   ntfy pub -S my-id mytopic 'Update me'                   # Send with sequence ID for updates
   echo 'message' | ntfy publish mytopic                   # Send message from stdin
   ntfy pub -u phil:mypass secret Psst                     # Publish with username/password
@@ -99,12 +102,12 @@ func execPublish(c *cli.Context) error {
 	click := c.String("click")
 	icon := c.String("icon")
 	actions := c.String("actions")
-	attach := c.String("attach")
+	attach := c.StringSlice("attach")
 	markdown := c.Bool("markdown")
 	template := c.String("template")
 	filename := c.String("filename")
 	sequenceID := c.String("sequence-id")
-	file := c.String("file")
+	files := c.StringSlice("file")
 	email := c.String("email")
 	user := c.String("user")
 	token := c.String("token")
@@ -116,6 +119,9 @@ func execPublish(c *cli.Context) error {
 	// Checks
 	if user != "" && token != "" {
 		return errors.New("cannot set both --user and --token")
+	}
+	if filename != "" && !((len(files) == 1 && len(attach) == 0) || (len(files) == 0 && len(attach) == 1)) {
+		return errors.New("--filename may only be used with a single --file or single --attach")
 	}
 
 	// Do the things
@@ -145,8 +151,8 @@ func execPublish(c *cli.Context) error {
 	if actions != "" {
 		options = append(options, client.WithActions(strings.ReplaceAll(actions, "\n", " ")))
 	}
-	if attach != "" {
-		options = append(options, client.WithAttach(attach))
+	if len(attach) == 1 && len(files) == 0 {
+		options = append(options, client.WithAttach(attach[0]))
 	}
 	if markdown {
 		options = append(options, client.WithMarkdown())
@@ -208,12 +214,20 @@ func execPublish(c *cli.Context) error {
 		}
 	}
 	var body io.Reader
-	if file == "" {
+	if shouldPublishMultipart(files, attach) {
+		var contentType string
+		body, contentType, err = multipartPublishBody(c, message, files, attach, filename)
+		if err != nil {
+			return err
+		}
+		options = append(options, client.WithHeader("Content-Type", contentType))
+	} else if len(files) == 0 {
 		body = strings.NewReader(message)
 	} else {
 		if message != "" {
 			options = append(options, client.WithMessage(message))
 		}
+		file := files[0]
 		if file == "-" {
 			if filename == "" {
 				options = append(options, client.WithFilename("stdin"))
@@ -238,6 +252,66 @@ func execPublish(c *cli.Context) error {
 		fmt.Fprintln(c.App.Writer, strings.TrimSpace(m.Raw))
 	}
 	return nil
+}
+
+func shouldPublishMultipart(files, attach []string) bool {
+	return len(files)+len(attach) > 1
+}
+
+func multipartPublishBody(c *cli.Context, message string, files, attach []string, filename string) (*bytes.Buffer, string, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if message != "" {
+		if err := writer.WriteField("message", message); err != nil {
+			return nil, "", err
+		}
+	}
+	for _, attachmentURL := range attach {
+		if err := writer.WriteField("attach", attachmentURL); err != nil {
+			return nil, "", err
+		}
+	}
+	for _, file := range files {
+		name := filepath.Base(file)
+		var reader io.Reader
+		var closeFn func() error
+		if file == "-" {
+			name = "stdin"
+			reader = c.App.Reader
+		} else {
+			f, err := os.Open(file)
+			if err != nil {
+				return nil, "", err
+			}
+			reader = f
+			closeFn = f.Close
+		}
+		if filename != "" {
+			name = filename
+		}
+		part, err := writer.CreateFormFile("attachment", name)
+		if err != nil {
+			if closeFn != nil {
+				closeFn()
+			}
+			return nil, "", err
+		}
+		if _, err := io.Copy(part, reader); err != nil {
+			if closeFn != nil {
+				closeFn()
+			}
+			return nil, "", err
+		}
+		if closeFn != nil {
+			if err := closeFn(); err != nil {
+				return nil, "", err
+			}
+		}
+	}
+	if err := writer.Close(); err != nil {
+		return nil, "", err
+	}
+	return &body, writer.FormDataContentType(), nil
 }
 
 // parseTopicMessageCommand reads the topic and the remaining arguments from the context.

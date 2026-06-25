@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
 	_ "embed"
@@ -10,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -2484,6 +2486,133 @@ func TestServer_PublishAttachmentExternalWithFilename(t *testing.T) {
 		require.Equal(t, int64(0), msg.Attachment.Size)
 		require.Equal(t, int64(0), msg.Attachment.Expires)
 		require.Equal(t, netip.Addr{}, msg.Sender)
+	})
+}
+
+func TestServer_PublishAttachmentsJSON(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/", `{
+			"topic": "mytopic",
+			"message": "Multiple attachments",
+			"attachments": [
+				{"url": "https://example.com/files/one.jpg"},
+				{"url": "https://example.com/files/two.pdf", "name": "second.pdf"}
+			]
+		}`, map[string]string{
+			"Content-Type": "application/json",
+		})
+		require.Equal(t, 200, response.Code)
+
+		msg := toMessage(t, response.Body.String())
+		require.Equal(t, "Multiple attachments", msg.Message)
+		require.Len(t, msg.Attachments, 2)
+		require.Equal(t, "one.jpg", msg.Attachments[0].Name)
+		require.Equal(t, "https://example.com/files/one.jpg", msg.Attachments[0].URL)
+		require.Equal(t, "second.pdf", msg.Attachments[1].Name)
+		require.Equal(t, "https://example.com/files/two.pdf", msg.Attachments[1].URL)
+		require.Equal(t, msg.Attachments[0], msg.Attachment)
+	})
+}
+
+func TestServer_PublishAttachmentsJSONAmbiguous(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/", `{
+			"topic": "mytopic",
+			"attach": "https://example.com/legacy.jpg",
+			"attachments": [{"url": "https://example.com/new.jpg"}]
+		}`, map[string]string{
+			"Content-Type": "application/json",
+		})
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40056, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
+func TestServer_PublishAttachmentsJSONCountLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.AttachmentCountLimit = 1
+		s := newTestServer(t, c)
+		response := request(t, s, "PUT", "/", `{
+			"topic": "mytopic",
+			"attachments": [
+				{"url": "https://example.com/one.jpg"},
+				{"url": "https://example.com/two.jpg"}
+			]
+		}`, map[string]string{
+			"Content-Type": "application/json",
+		})
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40055, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
+func TestServer_PublishAttachmentsMultipart(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		require.Nil(t, writer.WriteField("message", "Multipart attachments"))
+		require.Nil(t, writer.WriteField("attach", "https://example.com/files/external.png"))
+		part, err := writer.CreateFormFile("attachment", "first.txt")
+		require.Nil(t, err)
+		_, err = part.Write([]byte("first file"))
+		require.Nil(t, err)
+		part, err = writer.CreateFormFile("attachment", "second.txt")
+		require.Nil(t, err)
+		_, err = part.Write([]byte("second file"))
+		require.Nil(t, err)
+		require.Nil(t, writer.Close())
+
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic", body.String(), map[string]string{
+			"Content-Type": writer.FormDataContentType(),
+		})
+		require.Equal(t, 200, response.Code)
+
+		msg := toMessage(t, response.Body.String())
+		require.Equal(t, "Multipart attachments", msg.Message)
+		require.Len(t, msg.Attachments, 3)
+		require.Equal(t, "external.png", msg.Attachments[0].Name)
+		require.Equal(t, "https://example.com/files/external.png", msg.Attachments[0].URL)
+		require.Equal(t, "first.txt", msg.Attachments[1].Name)
+		require.Equal(t, int64(10), msg.Attachments[1].Size)
+		require.Contains(t, msg.Attachments[1].URL, "http://127.0.0.1:12345/file/")
+		require.Equal(t, "second.txt", msg.Attachments[2].Name)
+		require.Equal(t, int64(11), msg.Attachments[2].Size)
+		require.Contains(t, msg.Attachments[2].URL, "http://127.0.0.1:12345/file/")
+		require.Equal(t, msg.Attachments[0], msg.Attachment)
+
+		firstPath := strings.TrimPrefix(msg.Attachments[1].URL, "http://127.0.0.1:12345")
+		response = request(t, s, "GET", firstPath, "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, "first file", response.Body.String())
+
+		secondPath := strings.TrimPrefix(msg.Attachments[2].URL, "http://127.0.0.1:12345")
+		response = request(t, s, "GET", secondPath, "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, "second file", response.Body.String())
+	})
+}
+
+func TestServer_PublishAttachmentsMultipartAmbiguous(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		part, err := writer.CreateFormFile("attachment", "file.txt")
+		require.Nil(t, err)
+		_, err = part.Write([]byte("file"))
+		require.Nil(t, err)
+		require.Nil(t, writer.Close())
+
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic", body.String(), map[string]string{
+			"Content-Type": writer.FormDataContentType(),
+			"X-Filename":   "legacy.txt",
+		})
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40056, toHTTPError(t, response.Body.String()).Code)
 	})
 }
 

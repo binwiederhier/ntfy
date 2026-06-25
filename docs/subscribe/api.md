@@ -338,9 +338,13 @@ format of the message. It's very straight forward:
 | `priority`    | -        | *1, 2, 3, 4, or 5*                                                              | `4`                                                   | Message [priority](../publish.md#message-priority) with 1=min, 3=default and 5=max                                                   |
 | `click`       | -        | *URL*                                                                           | `https://example.com`                                 | Website opened when notification is [clicked](../publish.md#click-action)                                                            |
 | `actions`     | -        | *JSON array*                                                                    | *see [actions buttons](../publish.md#action-buttons)* | [Action buttons](../publish.md#action-buttons) that can be displayed in the notification                                             |
-| `attachment`  | -        | *JSON object*                                                                   | *see below*                                           | Details about an attachment (name, URL, size, ...)                                                                                   |
+| `attachment`  | -        | *JSON object*                                                                   | *see below*                                           | Compatibility alias for the first attachment (name, URL, size, ...)                                                                 |
+| `attachments` | -        | *JSON array*                                                                    | *see below*                                           | Details about all attachments (name, URL, size, ...)                                                                                |
 
 **Attachment** (part of the message, see [attachments](../publish.md#attachments) for details):
+
+Messages with attachments include `attachments` as the canonical list. The singular `attachment` field is still included
+as a compatibility alias for the first item so older clients continue to work.
 
 | Field     | Required | Type        | Example                        | Description                                                                                               |
 |-----------|----------|-------------|--------------------------------|-----------------------------------------------------------------------------------------------------------|
@@ -373,6 +377,15 @@ Here's an example for each message type:
             "expires": 1643946728,
             "url": "https://ntfy.sh/file/sPs71M8A2T.png"
         },
+        "attachments": [
+            {
+                "name": "camera.jpg",
+                "type": "image/png",
+                "size": 33848,
+                "expires": 1643946728,
+                "url": "https://ntfy.sh/file/sPs71M8A2T.png"
+            }
+        ],
         "title": "Unauthorized access detected",
         "message": "Movement detected in the yard. You better go check"
     }

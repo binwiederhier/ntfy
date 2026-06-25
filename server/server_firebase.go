@@ -195,6 +195,13 @@ func toFirebaseMessage(m *model.Message, auther user.Auther) (*messaging.Message
 			data["attachment_expires"] = fmt.Sprintf("%d", m.Attachment.Expires)
 			data["attachment_url"] = m.Attachment.URL
 		}
+		if len(m.Attachments) > 0 {
+			attachments, err := json.Marshal(m.Attachments)
+			if err != nil {
+				return nil, err
+			}
+			data["attachments"] = string(attachments)
+		}
 		if m.PollID != "" {
 			data["poll_id"] = m.PollID
 		}

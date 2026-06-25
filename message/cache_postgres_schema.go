@@ -45,6 +45,21 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_message_attachment_expires ON message (attachment_expires) WHERE attachment_deleted = FALSE;
 		CREATE INDEX IF NOT EXISTS idx_message_sender_attachment_expires ON message (sender, attachment_expires) WHERE user_id = '';
 		CREATE INDEX IF NOT EXISTS idx_message_user_id_attachment_expires ON message (user_id, attachment_expires);
+		CREATE TABLE IF NOT EXISTS message_attachment (
+			id BIGSERIAL PRIMARY KEY,
+			mid TEXT NOT NULL,
+			aid TEXT NOT NULL,
+			position INT NOT NULL,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL,
+			size BIGINT NOT NULL,
+			expires BIGINT NOT NULL,
+			url TEXT NOT NULL,
+			deleted BOOLEAN NOT NULL DEFAULT FALSE
+		);
+		CREATE INDEX IF NOT EXISTS idx_message_attachment_mid ON message_attachment (mid);
+		CREATE INDEX IF NOT EXISTS idx_message_attachment_aid ON message_attachment (aid);
+		CREATE INDEX IF NOT EXISTS idx_message_attachment_expires2 ON message_attachment (expires) WHERE deleted = FALSE;
 		CREATE TABLE IF NOT EXISTS message_stats (
 			key TEXT PRIMARY KEY,
 			value BIGINT
@@ -59,7 +74,7 @@ const (
 
 // PostgreSQL schema management queries
 const (
-	postgresCurrentSchemaVersion     = 15
+	postgresCurrentSchemaVersion     = 16
 	postgresInsertSchemaVersionQuery = `INSERT INTO schema_version (store, version) VALUES ('message', $1)`
 	postgresUpdateSchemaVersionQuery = `UPDATE schema_version SET version = $1 WHERE store = 'message'`
 	postgresSelectSchemaVersionQuery = `SELECT version FROM schema_version WHERE store = 'message'`
@@ -71,10 +86,41 @@ const (
 	postgresMigrate14To15CreateIndexQuery = `
 		CREATE INDEX IF NOT EXISTS idx_message_attachment_expires ON message (attachment_expires) WHERE attachment_deleted = FALSE;
 	`
+	// 15 -> 16
+	postgresMigrate15To16CreateAttachmentsTableQuery = `
+		CREATE TABLE IF NOT EXISTS message_attachment (
+			id BIGSERIAL PRIMARY KEY,
+			mid TEXT NOT NULL,
+			aid TEXT NOT NULL,
+			position INT NOT NULL,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL,
+			size BIGINT NOT NULL,
+			expires BIGINT NOT NULL,
+			url TEXT NOT NULL,
+			deleted BOOLEAN NOT NULL DEFAULT FALSE
+		);
+		CREATE INDEX IF NOT EXISTS idx_message_attachment_mid ON message_attachment (mid);
+		CREATE INDEX IF NOT EXISTS idx_message_attachment_aid ON message_attachment (aid);
+		CREATE INDEX IF NOT EXISTS idx_message_attachment_expires2 ON message_attachment (expires) WHERE deleted = FALSE;
+		INSERT INTO message_attachment (mid, aid, position, name, type, size, expires, url, deleted)
+			SELECT mid,
+			       CASE WHEN attachment_expires > 0 AND attachment_url LIKE ('%/file/' || mid || '%') THEN mid ELSE '' END,
+			       0,
+			       attachment_name,
+			       attachment_type,
+			       attachment_size,
+			       attachment_expires,
+			       attachment_url,
+			       attachment_deleted
+			FROM message
+			WHERE attachment_url <> '';
+	`
 )
 
 var postgresMigrations = map[int]func(d *sql.DB) error{
 	14: postgresMigrateFrom14,
+	15: postgresMigrateFrom15,
 }
 
 func setupPostgres(d *sql.DB) error {
@@ -104,6 +150,19 @@ func postgresMigrateFrom14(d *sql.DB) error {
 			return err
 		}
 		if _, err := tx.Exec(postgresUpdateSchemaVersionQuery, 15); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func postgresMigrateFrom15(d *sql.DB) error {
+	log.Tag(tagMessageCache).Info("Migrating message cache database schema: from 15 to 16")
+	return db.ExecTx(d, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(postgresMigrate15To16CreateAttachmentsTableQuery); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(postgresUpdateSchemaVersionQuery, 16); err != nil {
 			return err
 		}
 		return nil

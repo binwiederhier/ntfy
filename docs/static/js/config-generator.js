@@ -114,6 +114,7 @@
     { key: "attachment-cache-dir", env: "NTFY_ATTACHMENT_CACHE_DIR", section: "attach" },
     { key: "attachment-file-size-limit", env: "NTFY_ATTACHMENT_FILE_SIZE_LIMIT", section: "attach", def: "15M" },
     { key: "attachment-total-size-limit", env: "NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT", section: "attach", def: "5G" },
+    { key: "attachment-count-limit", env: "NTFY_ATTACHMENT_COUNT_LIMIT", section: "attach", def: "10" },
     { key: "attachment-expiry-duration", env: "NTFY_ATTACHMENT_EXPIRY_DURATION", section: "attach", def: "3h" },
     { key: "cache-file", env: "NTFY_CACHE_FILE", section: "cache" },
     { key: "cache-duration", env: "NTFY_CACHE_DURATION", section: "cache", def: "12h" },

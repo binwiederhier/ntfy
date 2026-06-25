@@ -53,7 +53,7 @@ const (
 	DefaultAttachmentFileSizeLimit     = int64(15 * 1024 * 1024)       // 15 MB
 	DefaultAttachmentExpiryDuration    = 3 * time.Hour
 	DefaultAttachmentOrphanGracePeriod = time.Hour // Don't delete orphaned objects younger than this to avoid races with in-flight uploads
-
+	DefaultAttachmentCountLimit        = 10
 )
 
 // Defines all per-visitor limits
@@ -121,6 +121,7 @@ type Config struct {
 	AttachmentCacheDir                   string
 	AttachmentTotalSizeLimit             int64
 	AttachmentFileSizeLimit              int64
+	AttachmentCountLimit                 int
 	AttachmentExpiryDuration             time.Duration
 	AttachmentOrphanGracePeriod          time.Duration
 	TemplateDir                          string // Directory to load named templates from
@@ -230,6 +231,7 @@ func NewConfig() *Config {
 		AttachmentCacheDir:                   "",
 		AttachmentTotalSizeLimit:             DefaultAttachmentTotalSizeLimit,
 		AttachmentFileSizeLimit:              DefaultAttachmentFileSizeLimit,
+		AttachmentCountLimit:                 DefaultAttachmentCountLimit,
 		AttachmentExpiryDuration:             DefaultAttachmentExpiryDuration,
 		AttachmentOrphanGracePeriod:          DefaultAttachmentOrphanGracePeriod,
 		TemplateDir:                          DefaultTemplateDir,

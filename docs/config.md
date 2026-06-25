@@ -306,6 +306,10 @@ This generator helps you configure your self-hosted ntfy instance. It's not full
 <input type="text" data-key="attachment-total-size-limit" placeholder="5G">
 </div>
 <div class="cg-field cg-inline-field">
+<label>Max attachments per message?</label>
+<input type="number" data-key="attachment-count-limit" placeholder="10">
+</div>
+<div class="cg-field cg-inline-field">
 <label>How long before attachments expire?</label>
 <input type="text" data-key="attachment-expiry-duration" placeholder="3h">
 </div>
@@ -512,6 +516,7 @@ The following config options are relevant to attachments:
 * `attachment-total-size-limit` is the size limit of the attachment storage (default: 5G)
 * `attachment-file-size-limit` is the per-file attachment size limit (e.g. 300k, 2M, 100M, default: 15M)
 * `attachment-expiry-duration` is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h, default: 3h)
+* `attachment-count-limit` is the maximum number of attachments allowed on one message (default: 10)
 
 !!! warning
     ntfy takes full control over the attachment directory or S3 bucket. Files that match the message ID format without
@@ -535,6 +540,7 @@ Here's an example config using the local filesystem for attachment storage:
     attachment-cache-dir: "/var/cache/ntfy/attachments"
     attachment-total-size-limit: "5G"
     attachment-file-size-limit: "15M"
+    attachment-count-limit: 10
     attachment-expiry-duration: "3h"
     visitor-attachment-total-size-limit: "100M"
     visitor-attachment-daily-bandwidth-limit: "500M"
@@ -2294,6 +2300,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `attachment-cache-dir`                     | `NTFY_ATTACHMENT_CACHE_DIR`                     | *directory or S3 URL*                               | -                 | Cache directory for attached files, or S3 URL for object storage (format: `s3://KEY:SECRET@BUCKET[/PREFIX]?region=REGION[&endpoint=ENDPOINT][&disable_http2=true]`).                                                                    |
 | `attachment-total-size-limit`              | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT`              | *size*                                              | 5G                | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected.                                                                                                                           |
 | `attachment-file-size-limit`               | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT`               | *size*                                              | 15M               | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected.                                                                                                                                               |
+| `attachment-count-limit`                   | `NTFY_ATTACHMENT_COUNT_LIMIT`                   | *number*                                            | 10                | Per-message attachment count limit. Requests with more attachments will be rejected.                                                                                                                                                    |
 | `attachment-expiry-duration`               | `NTFY_ATTACHMENT_EXPIRY_DURATION`               | *duration*                                          | 3h                | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Strongly affects `visitor-attachment-total-size-limit`.                                                                                                       |
 | `smtp-sender-addr`                         | `NTFY_SMTP_SENDER_ADDR`                         | `host:port`                                         | -                 | SMTP server address to allow email sending                                                                                                                                                                                              |
 | `smtp-sender-user`                         | `NTFY_SMTP_SENDER_USER`                         | *string*                                            | -                 | SMTP user; only used if e-mail sending is enabled                                                                                                                                                                                       |
@@ -2400,6 +2407,7 @@ OPTIONS:
    --attachment-cache-dir value, --attachment_cache_dir value                                                             cache directory for attached files, or S3 URL (s3://ACCESS_KEY:SECRET_KEY@BUCKET[/PREFIX]?region=REGION[&endpoint=ENDPOINT][&disable_http2=true]) [$NTFY_ATTACHMENT_CACHE_DIR]
    --attachment-total-size-limit value, --attachment_total_size_limit value, -A value                                     limit of the on-disk attachment cache (default: "5G") [$NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT]
    --attachment-file-size-limit value, --attachment_file_size_limit value, -Y value                                       per-file attachment size limit (e.g. 300k, 2M, 100M) (default: "15M") [$NTFY_ATTACHMENT_FILE_SIZE_LIMIT]
+   --attachment-count-limit value, --attachment_count_limit value                                                         per-message attachment count limit (default: 10) [$NTFY_ATTACHMENT_COUNT_LIMIT]
    --attachment-expiry-duration value, --attachment_expiry_duration value, -X value                                       duration after which uploaded attachments will be deleted (e.g. 3h, 20h) (default: "3h") [$NTFY_ATTACHMENT_EXPIRY_DURATION]
    --keepalive-interval value, --keepalive_interval value, -k value                                                       interval of keepalive messages (default: "45s") [$NTFY_KEEPALIVE_INTERVAL]
    --manager-interval value, --manager_interval value, -m value                                                           interval of for message pruning and stats printing (default: "1m") [$NTFY_MANAGER_INTERVAL]

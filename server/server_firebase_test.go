@@ -165,6 +165,9 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 		Priority: "high",
 	}, fbm.Android)
 	require.Equal(t, &messaging.APNSConfig{
+		Headers: map[string]string{
+			"apns-push-type": "alert",
+		},
 		Payload: &messaging.APNSPayload{
 			Aps: &messaging.Aps{
 				MutableContent: true,
@@ -248,6 +251,42 @@ func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {
 	}, fbm.Data)
 	require.Equal(t, "", fbm.APNS.Payload.Aps.Alert.Title)
 	require.Equal(t, "New message", fbm.APNS.Payload.Aps.Alert.Body)
+	// Priority is kept when downgrading to a poll request (see toPollRequest), so a priority 5
+	// message still wakes iOS as a critical alert to poll for the message.
+	require.Equal(t, "10", fbm.APNS.Headers["apns-priority"])
+	require.True(t, fbm.APNS.Payload.Aps.CriticalSound.Critical)
+	require.Equal(t, "critical", fbm.APNS.Payload.Aps.CustomData["interruption-level"])
+}
+
+func TestToFirebaseMessage_Message_Critical(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "this is urgent")
+	m.Priority = 5
+	m.Title = "wake up"
+	fbm, err := toFirebaseMessage(m, &testAuther{Allow: true})
+	require.Nil(t, err)
+
+	// Critical alerts use apns-priority 10, a critical sound dict, and interruption-level "critical"
+	// so the iOS device treats the message as critical (bypassing silent mode / Do Not Disturb).
+	require.Equal(t, "alert", fbm.APNS.Headers["apns-push-type"])
+	require.Equal(t, "10", fbm.APNS.Headers["apns-priority"])
+	require.NotNil(t, fbm.APNS.Payload.Aps.CriticalSound)
+	require.True(t, fbm.APNS.Payload.Aps.CriticalSound.Critical)
+	require.Equal(t, "default", fbm.APNS.Payload.Aps.CriticalSound.Name)
+	require.Equal(t, 1.0, fbm.APNS.Payload.Aps.CriticalSound.Volume)
+	require.Equal(t, "critical", fbm.APNS.Payload.Aps.CustomData["interruption-level"])
+}
+
+func TestToFirebaseMessage_Message_NotCritical(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "this is normal")
+	m.Priority = 4
+	fbm, err := toFirebaseMessage(m, &testAuther{Allow: true})
+	require.Nil(t, err)
+
+	// Priority < 5 is a regular alert: no critical sound and no interruption-level.
+	require.Equal(t, "alert", fbm.APNS.Headers["apns-push-type"])
+	require.Empty(t, fbm.APNS.Headers["apns-priority"])
+	require.Nil(t, fbm.APNS.Payload.Aps.CriticalSound)
+	require.Nil(t, fbm.APNS.Payload.Aps.CustomData)
 }
 
 func TestToFirebaseMessage_PollRequest(t *testing.T) {
@@ -257,6 +296,9 @@ func TestToFirebaseMessage_PollRequest(t *testing.T) {
 	require.Equal(t, "mytopic", fbm.Topic)
 	require.Nil(t, fbm.Android)
 	require.Equal(t, &messaging.APNSConfig{
+		Headers: map[string]string{
+			"apns-push-type": "alert",
+		},
 		Payload: &messaging.APNSPayload{
 			Aps: &messaging.Aps{
 				MutableContent: true,

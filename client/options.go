@@ -19,6 +19,9 @@ type SubscribeOption = RequestOption
 
 // WithMessage sets the notification message. This is an alternative way to passing the message body.
 func WithMessage(message string) PublishOption {
+	if strings.Contains(message, "\n") {
+		return WithHeader("X-Message", strings.ReplaceAll(message, "\n", "\\n"))
+	}
 	return WithHeader("X-Message", message)
 }
 

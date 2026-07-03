@@ -24,6 +24,9 @@ If you like tutorials, check out :simple-youtube: [Kris Occhipinti's ntfy instal
 [Alex's Docker-based setup guide](https://blog.alexsguardian.net/posts/2023/09/12/selfhosting-ntfy/). Both are great
 resources to get started. _I am not affiliated with Kris or Alex, I just liked their video/post._
 
+## Managed hosting
+If you would rather not run ntfy yourself, [Zenith](https://zenith.hosting/host/ntfy?ref=gh) offers one-click managed ntfy hosting with storage, backups and TLS handled for you.
+
 ## Linux binaries
 Please check out the [releases page](https://github.com/binwiederhier/ntfy/releases) for binaries and
 deb/rpm packages.

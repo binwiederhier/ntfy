@@ -84,6 +84,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [symfony/ntfy-notifier](https://symfony.com/components/NtfyNotifier) ⭐ - Symfony Notifier integration for ntfy (PHP)
 - [ntfy-java](https://github.com/MaheshBabu11/ntfy-java/) - A Java package to interact with a ntfy server (Java)
 - [aiontfy](https://github.com/tr4nt0r/aiontfy) - Asynchronous client library for publishing and subscribing to ntfy (Python)
+- [ex_ntfy](https://github.com/houllette/ex_ntfy) - Elixir SDK covering publishing, polling, and streaming subscriptions for ntfy servers (Elixir)
 
 ## CLIs + GUIs
 

@@ -532,8 +532,16 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 		// Write error response only if the connection was not hijacked yet. Bytes written to hijacked
 		// connections are WebSocket frames, not HTTP, and will cause "http: response.WriteHeader on hijacked
 		// connection" log spam.
+		//
+		// If the error happened before the upgrade completed, the connection is still a regular HTTP
+		// connection, so we can return the actual HTTP status code (e.g. 401/403) instead of a bogus 200,
+		// along with the ntfy error code and message in headers. This lets WebSocket clients distinguish
+		// failures from a successful upgrade (101) and from unrelated 2xx pages returned by proxies (the
+		// error body is not readable by most WebSocket clients). See binwiederhier/ntfy#535.
 		var postUpgradeErr *errWebSocketPostUpgrade
 		if !errors.As(err, &postUpgradeErr) {
+			w.Header().Set("X-Ntfy-Error-Code", fmt.Sprintf("%d", httpErr.Code))
+			w.Header().Set("X-Ntfy-Error", httpErr.Message)
 			w.WriteHeader(httpErr.HTTPCode)
 		}
 		return

@@ -76,6 +76,9 @@ func New(conf Config, pool *db.DB, deliver DeliverFunc) (Broadcaster, error) {
 	if pool == nil {
 		return nil, errors.New("cluster mode requires a PostgreSQL database (set database-url)")
 	}
+	if conf.AdvertiseURL == "" {
+		return nil, errors.New("cluster mode requires an advertise URL (set cluster-advertise-url or base-url)")
+	}
 	if conf.NodeID == "" {
 		conf.NodeID = defaultNodeID()
 	}
@@ -85,9 +88,7 @@ func New(conf Config, pool *db.DB, deliver DeliverFunc) (Broadcaster, error) {
 	if conf.NodeTTL == 0 {
 		conf.NodeTTL = defaultNodeTTL
 	}
-	// The peer-mesh data plane lands in a separate commit; until then, cluster mode is wired
-	// through but fan-out is still a no-op.
-	return &Nop{}, nil
+	return newMesh(conf, pool, deliver)
 }
 
 // defaultNodeID returns the hostname, or a random string if it is unavailable. The hostname is

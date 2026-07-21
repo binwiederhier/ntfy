@@ -334,6 +334,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("cluster-mode requires database-url to be set")
 	} else if clusterMode && clusterSecret == "" {
 		return errors.New("cluster-mode requires cluster-secret to be set")
+	} else if clusterMode && clusterAdvertiseURL == "" && baseURL == "" {
+		return errors.New("cluster-mode requires cluster-advertise-url or base-url to be set")
 	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if firebaseKeyFile != "" && !server.FirebaseAvailable {

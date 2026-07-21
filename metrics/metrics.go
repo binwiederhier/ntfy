@@ -75,6 +75,21 @@ var (
 	HTTPRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ntfy_http_requests_total",
 	}, []string{"http_code", "ntfy_code", "http_method"})
+	ClusterPeers = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_cluster_peers",
+	})
+	ClusterMessagesBroadcast = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_messages_broadcast_total",
+	})
+	ClusterSendErrors = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_send_errors_total",
+	})
+	ClusterQueueDropped = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_queue_dropped_total",
+	})
+	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_cluster_leader",
+	})
 )
 
 // init registers all collectors with the default Prometheus registry. Registration is
@@ -103,5 +118,10 @@ func init() {
 		Subscribers,
 		Topics,
 		HTTPRequests,
+		ClusterPeers,
+		ClusterMessagesBroadcast,
+		ClusterSendErrors,
+		ClusterQueueDropped,
+		ClusterLeader,
 	)
 }

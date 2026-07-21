@@ -22,10 +22,15 @@ const (
 		VALUES ($1, $2, $3)
 		ON CONFLICT (node_id) DO UPDATE SET advertise_url = EXCLUDED.advertise_url, last_heartbeat = EXCLUDED.last_heartbeat
 	`
-	selectLivePeersQuery = `SELECT node_id, advertise_url FROM node_registry WHERE last_heartbeat >= $1 AND node_id != $2`
-	pruneStaleNodesQuery = `DELETE FROM node_registry WHERE last_heartbeat < $1`
-	deleteNodeQuery      = `DELETE FROM node_registry WHERE node_id = $1`
+	selectLivePeersQuery     = `SELECT node_id, advertise_url FROM node_registry WHERE last_heartbeat >= $1 AND node_id != $2`
+	pruneStaleNodesQuery     = `DELETE FROM node_registry WHERE last_heartbeat < $1`
+	deleteNodeQuery          = `DELETE FROM node_registry WHERE node_id = $1`
+	tryAdvisoryXactLockQuery = `SELECT pg_advisory_xact_lock($1)`
 )
+
+// schemaLockKey is the advisory-lock key serializing registry table creation across nodes. It is
+// distinct from leaderLockKey, which is session-scoped and long-held.
+const schemaLockKey = int64(0x6e746679c) // "ntfy" + c (create)
 
 // peerCacheTTL is how long the peer list is cached between registry reads, so the message path
 // does not hit the database on every publish.
@@ -58,13 +63,32 @@ func newRegistry(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*
 		advertiseURL: advertiseURL,
 		ttl:          ttl,
 	}
-	if _, err := pool.Exec(createNodeRegistryTableQuery); err != nil {
+	if err := r.createTable(); err != nil {
 		return nil, err
 	}
 	if err := r.register(); err != nil {
 		return nil, err
 	}
 	return r, nil
+}
+
+// createTable creates the registry table, serialized via a transaction-scoped advisory lock:
+// CREATE TABLE IF NOT EXISTS is not atomic in PostgreSQL, so multiple nodes cold-booting
+// concurrently on a fresh database would otherwise race and crash with a duplicate-key error
+// on pg_class.
+func (r *registry) createTable() error {
+	tx, err := r.pool.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(tryAdvisoryXactLockQuery, schemaLockKey); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(createNodeRegistryTableQuery); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // register upserts this node into the registry with a fresh heartbeat and invalidates the local

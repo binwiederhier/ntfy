@@ -212,6 +212,30 @@ func TestMesh_LeaderFailover(t *testing.T) {
 	waitFor(t, follower.IsLeader)
 }
 
+func TestRegistry_ConcurrentCreate(t *testing.T) {
+	// Multiple nodes cold-booting on a fresh database must not race on table creation: CREATE
+	// TABLE IF NOT EXISTS is not atomic in PostgreSQL, so creation is serialized via an advisory
+	// lock. Without it, this test fails sporadically with a duplicate-key error on pg_class.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	const n = 8
+	errs := make(chan error, n)
+	for i := 0; i < n; i++ {
+		go func(i int) {
+			pool, err := pg.Open(schemaDSN)
+			if err != nil {
+				errs <- err
+				return
+			}
+			defer pool.DB.Close()
+			_, err = newRegistry(db.New(pool, nil), fmt.Sprintf("node-%d", i), "http://127.0.0.1:1", time.Second)
+			errs <- err
+		}(i)
+	}
+	for i := 0; i < n; i++ {
+		require.Nil(t, <-errs)
+	}
+}
+
 func TestMesh_CloseDeregisters(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)

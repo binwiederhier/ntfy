@@ -1,12 +1,14 @@
 package server
 
 import (
+	"net"
 	"net/http"
 	"net/netip"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 )
@@ -62,6 +64,53 @@ func TestServer_Cluster_SyncEventBroadcasts(t *testing.T) {
 	messages := b.Messages()
 	require.Len(t, messages, 1)
 	require.Equal(t, "st_1234", messages[0].Topic)
+}
+
+func TestServer_Cluster_EndToEnd(t *testing.T) {
+	// Two full servers sharing one Postgres schema: a message published to node A over HTTP must
+	// reach a subscriber connected to node B, via the node registry and the fan-out endpoint.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	// Node B: create the listener first so its advertise URL is known before the server exists
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestConfig(t, schemaDSN)
+	confB.ClusterMode = true
+	confB.NodeID = "node-b"
+	confB.ClusterSecret = "s3cret"
+	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
+	sB := newTestServer(t, confB)
+	srvB := &http.Server{Handler: http.HandlerFunc(sB.handle)}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+	// Node A: publish-only in this test, so its advertise URL is never called
+	confA := newTestConfig(t, schemaDSN)
+	confA.ClusterMode = true
+	confA.NodeID = "node-a"
+	confA.ClusterSecret = "s3cret"
+	confA.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	sA := newTestServer(t, confA)
+	// Subscribe on node B
+	topics, err := sB.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	var mu sync.Mutex
+	var received []*model.Message
+	topics[0].Subscribe(func(_ *visitor, m *model.Message) error {
+		mu.Lock()
+		defer mu.Unlock()
+		received = append(received, m)
+		return nil
+	}, "", func() {})
+	// Publish on node A
+	response := request(t, sA, "PUT", "/mytopic", "hello cluster", nil)
+	require.Equal(t, 200, response.Code)
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(received) == 1
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, "hello cluster", received[0].Message)
 }
 
 func TestServer_Cluster_DeliverFromBus(t *testing.T) {

@@ -121,6 +121,10 @@ type Config struct {
 	CertFile                             string
 	DatabaseURL                          string   // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
 	DatabaseReplicaURLs                  []string // PostgreSQL read replica connection strings
+	ClusterMode                          bool     // If true, cross-node message fan-out is enabled (requires PostgreSQL); see cluster package
+	NodeID                               string   // Stable per-node identifier used to skip a node's own fan-out; hostname if empty
+	ClusterAdvertiseURL                  string   // Base URL peers use to reach this node's internal fan-out endpoint (defaults to BaseURL)
+	ClusterSecret                        string   // Shared secret authenticating node-to-node fan-out requests
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
@@ -236,6 +240,10 @@ func NewConfig() *Config {
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",
+		ClusterMode:                          false,
+		NodeID:                               "",
+		ClusterAdvertiseURL:                  "",
+		ClusterSecret:                        "",
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,

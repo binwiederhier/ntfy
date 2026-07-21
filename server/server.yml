@@ -61,6 +61,27 @@
 #
 # database-url: <connection-string>
 
+# If "cluster-mode" is enabled, this node registers itself in the PostgreSQL node registry and
+# fans published messages out to the other cluster nodes over HTTP, so subscribers connected to
+# any node receive messages published to any other node. Requires "database-url" and
+# "cluster-secret".
+#
+# - node-id is a stable per-node identifier; it defaults to the hostname.
+# - cluster-advertise-url is the base URL peer nodes use to reach this node's internal fan-out
+#   endpoint (/v1/internal/fanout); it defaults to "base-url". It should point to a private
+#   network address.
+# - cluster-secret authenticates node-to-node fan-out requests; it must be identical on all
+#   nodes.
+#
+# SECURITY: The fan-out endpoint injects messages into arbitrary topics. The shared secret
+# protects it, but you should additionally make sure that peer traffic stays on a private
+# network, and consider blocking /v1/internal/* from the public internet (e.g. in nginx).
+#
+# cluster-mode: false
+# node-id: <hostname>
+# cluster-advertise-url: <base-url>
+# cluster-secret: <secret>
+
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.
 # Not required if "database-url" is set (messages are stored in PostgreSQL instead).

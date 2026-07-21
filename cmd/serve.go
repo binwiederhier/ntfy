@@ -43,6 +43,10 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "cluster-mode", Aliases: []string{"cluster_mode"}, EnvVars: []string{"NTFY_CLUSTER_MODE"}, Usage: "enable cross-node message fan-out across cluster nodes (requires database-url and cluster-secret)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "node-id", Aliases: []string{"node_id"}, EnvVars: []string{"NTFY_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (defaults to the hostname)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-advertise-url", Aliases: []string{"cluster_advertise_url"}, EnvVars: []string{"NTFY_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out endpoint (defaults to base-url)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-secret", Aliases: []string{"cluster_secret"}, EnvVars: []string{"NTFY_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
@@ -157,6 +161,10 @@ func execServe(c *cli.Context) error {
 	firebaseKeyFile := c.String("firebase-key-file")
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
+	clusterMode := c.Bool("cluster-mode")
+	nodeID := c.String("node-id")
+	clusterAdvertiseURL := c.String("cluster-advertise-url")
+	clusterSecret := c.String("cluster-secret")
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
 	webPushFile := c.String("web-push-file")
@@ -322,6 +330,10 @@ func execServe(c *cli.Context) error {
 		return errors.New("if database-url is set, auth-file, cache-file, and web-push-file must not be set")
 	} else if len(databaseReplicaURLs) > 0 && databaseURL == "" {
 		return errors.New("database-replica-urls can only be used if database-url is also set")
+	} else if clusterMode && databaseURL == "" {
+		return errors.New("cluster-mode requires database-url to be set")
+	} else if clusterMode && clusterSecret == "" {
+		return errors.New("cluster-mode requires cluster-secret to be set")
 	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if firebaseKeyFile != "" && !server.FirebaseAvailable {
@@ -559,6 +571,10 @@ func execServe(c *cli.Context) error {
 	conf.ProfileListenHTTP = profileListenHTTP
 	conf.DatabaseURL = databaseURL
 	conf.DatabaseReplicaURLs = databaseReplicaURLs
+	conf.ClusterMode = clusterMode
+	conf.NodeID = nodeID
+	conf.ClusterAdvertiseURL = clusterAdvertiseURL
+	conf.ClusterSecret = clusterSecret
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey
 	conf.WebPushFile = webPushFile

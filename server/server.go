@@ -32,6 +32,7 @@ import (
 	"heckel.io/ntfy/v2/action"
 	"heckel.io/ntfy/v2/attachment"
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -72,6 +73,7 @@ type Server struct {
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
+	broadcaster       cluster.Broadcaster                 // Fans messages out to peer cluster nodes (cluster.Nop when not clustered)
 	closeChan         chan bool
 	mu                sync.RWMutex
 }
@@ -334,7 +336,40 @@ func New(conf *Config) (*Server, error) {
 		stripe:          stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
+	// Cross-node fan-out broadcaster; delivery of peer messages to local subscribers is injected
+	// as a callback, so the cluster package never depends on the server
+	advertiseURL := conf.ClusterAdvertiseURL
+	if advertiseURL == "" {
+		advertiseURL = conf.BaseURL
+	}
+	s.broadcaster, err = cluster.New(cluster.Config{
+		Enabled:         conf.ClusterMode,
+		NodeID:          conf.NodeID,
+		AdvertiseURL:    advertiseURL,
+		Secret:          conf.ClusterSecret,
+		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
+	}, pool, s.deliverFromBus)
+	if err != nil {
+		return nil, err
+	}
 	return s, nil
+}
+
+// deliverFromBus delivers a message received from a peer node (via the broadcaster) to this
+// node's local subscribers. It is the receive-side counterpart to broadcaster.Broadcast: local
+// delivery and all global side effects (Firebase, email, web push, upstream) already ran on the
+// origin node, so this only publishes to the local topic, and never re-broadcasts.
+func (s *Server) deliverFromBus(m *model.Message) {
+	s.mu.RLock()
+	t, ok := s.topics[m.Topic]
+	s.mu.RUnlock()
+	if !ok {
+		return // No local subscribers for this topic
+	}
+	v := s.visitor(m.Sender, nil)
+	if err := t.Publish(v, m); err != nil {
+		logvm(v, m).Err(err).Warn("Cluster: unable to deliver fan-out message to local subscribers")
+	}
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -478,6 +513,9 @@ func (s *Server) Stop() {
 	if s.attachment != nil {
 		s.attachment.Close()
 	}
+	if s.broadcaster != nil {
+		s.broadcaster.Close()
+	}
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -504,6 +542,12 @@ func (s *Server) closeDatabases() {
 
 // handle is the main entry point for all HTTP requests
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
+	// The internal cluster fan-out endpoint authenticates with a shared secret and bypasses the
+	// normal authentication/visitor pipeline, so it is handled before maybeAuthenticate
+	if r.Method == http.MethodPost && r.URL.Path == cluster.FanoutPath {
+		s.broadcaster.ServeFanout(w, r)
+		return
+	}
 	r, v, err := s.maybeAuthenticate(r) // Note: Always returns v (and r, with the client IP in its context), even on error
 	if err != nil {
 		s.handleError(w, r, v, err)
@@ -833,6 +877,60 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
+// dispatchOpts selects which delivery targets fire for a published message, beyond delivery to
+// local subscribers and the cross-node broadcast (which always happen).
+type dispatchOpts struct {
+	firebase bool   // Send to Firebase (if configured)
+	email    string // Send an email to this address (if a mailer is configured)
+	call     string // Call this phone number (if Twilio is configured)
+	upstream bool   // Forward a poll request to the upstream server (if configured)
+	webPush  bool   // Publish to web push endpoints (if configured)
+	async    bool   // Deliver to local subscribers in a goroutine, logging errors instead of returning them
+}
+
+// dispatch delivers m to local subscribers, broadcasts it to peer cluster nodes, and fires the
+// requested side-effect targets. It is the single choke point through which every published
+// message must pass; t may be nil when the topic has no local subscribers (delayed sender).
+//
+// The side-effect targets (Firebase, email, calls, upstream, web push) are global, not per-node:
+// they fire only here on the origin node, and never again when a peer node receives the message
+// via the broadcaster (see deliverFromBus).
+func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchOpts) error {
+	// Deliver to local subscribers
+	if t != nil {
+		if opts.async {
+			go func() {
+				if err := t.Publish(v, m); err != nil {
+					logvm(v, m).Err(err).Warn("Unable to publish message")
+				}
+			}()
+		} else if err := t.Publish(v, m); err != nil {
+			return err
+		}
+	}
+	// Fan out to peer cluster nodes, whose subscribers do not show up in this node's topics map
+	if err := s.broadcaster.Broadcast(m); err != nil {
+		logvm(v, m).Err(err).Warn("Cluster: unable to broadcast message to peer nodes")
+	}
+	// Fire the requested side-effect targets
+	if s.firebaseClient != nil && opts.firebase {
+		go s.sendToFirebase(v, m)
+	}
+	if s.mailer != nil && opts.email != "" {
+		go s.sendEmail(v, m, opts.email)
+	}
+	if s.config.TwilioAccount != "" && opts.call != "" {
+		go s.callPhone(v, m, opts.call)
+	}
+	if s.config.UpstreamBaseURL != "" && opts.upstream {
+		go s.forwardPollRequest(v, m)
+	}
+	if s.config.WebPushPublicKey != "" && opts.webPush {
+		go s.publishToWebPushEndpoints(v, m)
+	}
+	return nil
+}
+
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
 	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
@@ -911,23 +1009,15 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		ev.Debug("Received message")
 	}
 	if !delayed {
-		if err := t.Publish(v, m); err != nil {
+		err := s.dispatch(v, t, m, dispatchOpts{
+			firebase: firebase,
+			email:    email,
+			call:     call,
+			upstream: !unifiedpush, // UP messages are not sent to upstream
+			webPush:  true,
+		})
+		if err != nil {
 			return nil, err
-		}
-		if s.firebaseClient != nil && firebase {
-			go s.sendToFirebase(v, m)
-		}
-		if s.mailer != nil && email != "" {
-			go s.sendEmail(v, m, email)
-		}
-		if s.config.TwilioAccount != "" && call != "" {
-			go s.callPhone(v, m, call)
-		}
-		if s.config.UpstreamBaseURL != "" && !unifiedpush { // UP messages are not sent to upstream
-			go s.forwardPollRequest(v, m)
-		}
-		if s.config.WebPushPublicKey != "" {
-			go s.publishToWebPushEndpoints(v, m)
 		}
 	} else {
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
@@ -1027,17 +1117,9 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 	m.Sender = v.IP()
 	m.User = v.MaybeUserID()
 	m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
-	// Publish to subscribers
-	if err := t.Publish(v, m); err != nil {
+	// Publish to subscribers, peer nodes, Firebase (for Android clients), and web push endpoints
+	if err := s.dispatch(v, t, m, dispatchOpts{firebase: true, webPush: true}); err != nil {
 		return err
-	}
-	// Send to Firebase for Android clients
-	if s.firebaseClient != nil {
-		go s.sendToFirebase(v, m)
-	}
-	// Send to web push endpoints
-	if s.config.WebPushPublicKey != "" {
-		go s.publishToWebPushEndpoints(v, m)
 	}
 	if event == model.MessageDeleteEvent {
 		// Delete any existing scheduled message with the same sequence ID
@@ -1987,24 +2069,18 @@ func (s *Server) sendDelayedMessages() error {
 func (s *Server) sendDelayedMessage(v *visitor, m *model.Message) error {
 	logvm(v, m).Debug("Sending delayed message")
 	s.mu.RLock()
-	t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
+	t := s.topics[m.Topic] // May be nil if there are no local subscribers; dispatch handles that
 	s.mu.RUnlock()
-	if ok {
-		go func() {
-			// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler
-			if err := t.Publish(v, m); err != nil {
-				logvm(v, m).Err(err).Warn("Unable to publish message")
-			}
-		}()
-	}
-	if s.firebaseClient != nil { // Firebase subscribers may not show up in topics map
-		go s.sendToFirebase(v, m)
-	}
-	if s.config.UpstreamBaseURL != "" {
-		go s.forwardPollRequest(v, m)
-	}
-	if s.config.WebPushPublicKey != "" {
-		go s.publishToWebPushEndpoints(v, m)
+	// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler.
+	// Firebase subscribers may not show up in the topics map, so side effects fire regardless.
+	err := s.dispatch(v, t, m, dispatchOpts{
+		firebase: true,
+		upstream: true,
+		webPush:  true,
+		async:    true,
+	})
+	if err != nil {
+		return err
 	}
 	if err := s.messageCache.MarkPublished(m); err != nil {
 		return err

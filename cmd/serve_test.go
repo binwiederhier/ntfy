@@ -536,6 +536,20 @@ func TestIP_Host_Parsing(t *testing.T) {
 	}
 }
 
+func TestCLI_Serve_ClusterModeValidation(t *testing.T) {
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
+	// cluster-mode requires database-url
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "database-url")
+	// cluster-mode requires cluster-secret; must fail validation before any database connection
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode", "--database-url=postgres://user:pass@localhost:1/na"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster-secret")
+}
+
 func newEmptyFile(t *testing.T) string {
 	filename := filepath.Join(t.TempDir(), "empty")
 	require.Nil(t, os.WriteFile(filename, []byte{}, 0600))

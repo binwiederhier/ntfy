@@ -22,8 +22,8 @@ cloud.google.com/go/storage v1.63.0 h1:hvXF2xfg9I32bjujggxgkEZn/Ej6sJ9pieFgeueBL
 cloud.google.com/go/storage v1.63.0/go.mod h1:tirWVptrFNo5GEX2DQ47JooF7yaweJdAJ1hYAVMvKzE=
 cloud.google.com/go/trace v1.16.0 h1:GmQovzFc5F0CNfl0VLgL64aoTtu7xsM0YajW2GlG9+E=
 cloud.google.com/go/trace v1.16.0/go.mod h1:r+bdAn16dKLSV1G2D5v3e58IlQlizfxWrUfjx7kM7X0=
-firebase.google.com/go/v4 v4.20.0 h1:ighpjeAC45rY/95cUQ+ojIKlKcTnz2YC0ldam56z2YU=
-firebase.google.com/go/v4 v4.20.0/go.mod h1:hqhkQtZkThGH42TnaYi7A8EFR1E0FEuB5oHvJ1Q57t8=
+firebase.google.com/go/v4 v4.21.0 h1:HBZV4jrLtFYj8EwWyqEZOuRLfkfkV2bpnfyyXHOhPxY=
+firebase.google.com/go/v4 v4.21.0/go.mod h1:CDumIdA5oTiyDpLNVcQoW8ZrB5CTgyE2D45DuENIABg=
 github.com/AlekSi/pointer v1.2.0 h1:glcy/gc4h8HnG2Z3ZECSzZ1IX1x2JxRVuDzaJwQE0+w=
 github.com/AlekSi/pointer v1.2.0/go.mod h1:gZGfd3dpW4vEc/UlyfKKi1roIqcCgwOIvb0tSNSBle0=
 github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=

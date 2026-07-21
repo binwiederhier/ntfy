@@ -28,7 +28,7 @@ replace github.com/emersion/go-smtp => github.com/emersion/go-smtp v0.17.0 // Pi
 require github.com/pkg/errors v0.9.1 // indirect
 
 require (
-	firebase.google.com/go/v4 v4.20.0
+	firebase.google.com/go/v4 v4.21.0
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/microcosm-cc/bluemonday v1.0.27

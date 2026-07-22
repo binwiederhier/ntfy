@@ -75,7 +75,7 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	require.Nil(t, err)
 	confB := newTestConfig(t, schemaDSN)
 	confB.ClusterMode = true
-	confB.NodeID = "node-b"
+	confB.ClusterNodeID = "node-b"
 	confB.ClusterSecret = "s3cret"
 	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
 	sB := newTestServer(t, confB)
@@ -85,7 +85,7 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	// Node A: publish-only in this test, so its advertise URL is never called
 	confA := newTestConfig(t, schemaDSN)
 	confA.ClusterMode = true
-	confA.NodeID = "node-a"
+	confA.ClusterNodeID = "node-a"
 	confA.ClusterSecret = "s3cret"
 	confA.ClusterAdvertiseURL = "http://127.0.0.1:1"
 	sA := newTestServer(t, confA)

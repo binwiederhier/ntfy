@@ -344,7 +344,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	s.cluster, err = cluster.New(cluster.Config{
 		Enabled:         conf.ClusterMode,
-		NodeID:          conf.NodeID,
+		NodeID:          conf.ClusterNodeID,
 		AdvertiseURL:    advertiseURL,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,

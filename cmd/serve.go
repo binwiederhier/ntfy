@@ -45,7 +45,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "cluster-mode", Aliases: []string{"cluster_mode"}, EnvVars: []string{"NTFY_CLUSTER_MODE"}, Usage: "enable cross-node message fan-out across cluster nodes (requires database-url and cluster-secret)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "node-id", Aliases: []string{"node_id"}, EnvVars: []string{"NTFY_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (defaults to the hostname)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-node-id", Aliases: []string{"cluster_node_id"}, EnvVars: []string{"NTFY_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (defaults to the hostname)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-advertise-url", Aliases: []string{"cluster_advertise_url"}, EnvVars: []string{"NTFY_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out endpoint (defaults to base-url)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-secret", Aliases: []string{"cluster_secret"}, EnvVars: []string{"NTFY_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-batch-linger", Aliases: []string{"cluster_batch_linger"}, EnvVars: []string{"NTFY_CLUSTER_BATCH_LINGER"}, Value: util.FormatDuration(cluster.DefaultBatchLinger), Usage: "how long fan-out messages wait to form a batch per peer node (0 = send immediately)"}),
@@ -164,7 +164,7 @@ func execServe(c *cli.Context) error {
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
 	clusterMode := c.Bool("cluster-mode")
-	nodeID := c.String("node-id")
+	clusterNodeID := c.String("cluster-node-id")
 	clusterAdvertiseURL := c.String("cluster-advertise-url")
 	clusterSecret := c.String("cluster-secret")
 	clusterBatchLingerStr := c.String("cluster-batch-linger")
@@ -581,7 +581,7 @@ func execServe(c *cli.Context) error {
 	conf.DatabaseURL = databaseURL
 	conf.DatabaseReplicaURLs = databaseReplicaURLs
 	conf.ClusterMode = clusterMode
-	conf.NodeID = nodeID
+	conf.ClusterNodeID = clusterNodeID
 	conf.ClusterAdvertiseURL = clusterAdvertiseURL
 	conf.ClusterSecret = clusterSecret
 	conf.ClusterBatchLinger = clusterBatchLinger

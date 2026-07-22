@@ -168,6 +168,7 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 		Payload: &messaging.APNSPayload{
 			Aps: &messaging.Aps{
 				MutableContent: true,
+				Sound:          "default",
 				Alert: &messaging.ApsAlert{
 					Title: "some title",
 					Body:  "this is a message",
@@ -248,6 +249,95 @@ func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {
 	}, fbm.Data)
 	require.Equal(t, "", fbm.APNS.Payload.Aps.Alert.Title)
 	require.Equal(t, "New message", fbm.APNS.Payload.Aps.Alert.Body)
+	// Reserved/auth topics become poll_request but keep priority 5 → still audible
+	require.Equal(t, "default", fbm.APNS.Payload.Aps.Sound)
+	require.Nil(t, fbm.APNS.Payload.Aps.CriticalSound)
+}
+
+func TestToFirebaseMessage_Message_MaxPriority_Allowed(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "this is a max-priority message")
+	m.Priority = 5
+	m.Title = "max title"
+
+	fbm, err := toFirebaseMessage(m, &testAuther{Allow: true})
+	require.Nil(t, err)
+	require.Equal(t, "mytopic", fbm.Topic)
+	require.Equal(t, &messaging.AndroidConfig{
+		Priority: "high",
+	}, fbm.Android)
+	require.Equal(t, &messaging.APNSConfig{
+		Payload: &messaging.APNSPayload{
+			Aps: &messaging.Aps{
+				MutableContent: true,
+				Sound:          "default",
+				Alert: &messaging.ApsAlert{
+					Title: "max title",
+					Body:  "this is a max-priority message",
+				},
+			},
+			CustomData: map[string]any{
+				"id":           m.ID,
+				"time":         fmt.Sprintf("%d", m.Time),
+				"event":        "message",
+				"topic":        "mytopic",
+				"sequence_id":  "",
+				"priority":     "5",
+				"tags":         "",
+				"click":        "",
+				"icon":         "",
+				"title":        "max title",
+				"message":      "this is a max-priority message",
+				"content_type": "",
+				"encoding":     "",
+			},
+		},
+	}, fbm.APNS)
+	require.Nil(t, fbm.APNS.Payload.Aps.CriticalSound)
+}
+
+func TestToFirebaseMessage_Message_MinPriority_Silent(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "quiet message")
+	m.Priority = 1
+	m.Title = "min"
+
+	fbm, err := toFirebaseMessage(m, &testAuther{Allow: true})
+	require.Nil(t, err)
+	require.Nil(t, fbm.Android)
+	require.Empty(t, fbm.APNS.Payload.Aps.Sound)
+	require.Nil(t, fbm.APNS.Payload.Aps.CriticalSound)
+	require.Equal(t, "min", fbm.APNS.Payload.Aps.Alert.Title)
+	require.Equal(t, "quiet message", fbm.APNS.Payload.Aps.Alert.Body)
+}
+
+func TestToFirebaseMessage_Message_DefaultPriority_HasSound(t *testing.T) {
+	// Priority 0 / unset should still get default sound (not silent).
+	m := model.NewDefaultMessage("mytopic", "default priority message")
+	require.Equal(t, 0, m.Priority)
+
+	fbm, err := toFirebaseMessage(m, nil)
+	require.Nil(t, err)
+	require.Equal(t, "default", fbm.APNS.Payload.Aps.Sound)
+	require.Nil(t, fbm.APNS.Payload.Aps.CriticalSound)
+}
+
+func TestSetAPNSAlertSound(t *testing.T) {
+	cases := []struct {
+		priority  int
+		wantSound string
+	}{
+		{priority: 0, wantSound: "default"},
+		{priority: 1, wantSound: ""},
+		{priority: 2, wantSound: "default"},
+		{priority: 3, wantSound: "default"},
+		{priority: 4, wantSound: "default"},
+		{priority: 5, wantSound: "default"},
+	}
+	for _, tc := range cases {
+		aps := &messaging.Aps{}
+		setAPNSAlertSound(aps, tc.priority)
+		require.Equal(t, tc.wantSound, aps.Sound, "priority %d", tc.priority)
+		require.Nil(t, aps.CriticalSound, "priority %d", tc.priority)
+	}
 }
 
 func TestToFirebaseMessage_PollRequest(t *testing.T) {
@@ -260,6 +350,7 @@ func TestToFirebaseMessage_PollRequest(t *testing.T) {
 		Payload: &messaging.APNSPayload{
 			Aps: &messaging.Aps{
 				MutableContent: true,
+				Sound:          "default",
 				Alert: &messaging.ApsAlert{
 					Title: "",
 					Body:  "New message",

@@ -42,9 +42,9 @@ func TestEnvelope_MessageKindWithoutMessage(t *testing.T) {
 }
 
 func TestNop(t *testing.T) {
-	b, err := New(Config{}, nil, nil) // not enabled -> Nop, no database required
+	b, err := New(Config{}, nil, nil) // not enabled -> nop cluster, no database required
 	require.Nil(t, err)
-	require.IsType(t, &Nop{}, b)
+	require.IsType(t, &nopCluster{}, b)
 	require.Nil(t, b.Broadcast(model.NewDefaultMessage("mytopic", "hi")))
 	// A single node is trivially the leader, so leader-gated jobs run without special-casing
 	require.True(t, b.IsLeader())

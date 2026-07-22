@@ -13,27 +13,27 @@ import (
 	"heckel.io/ntfy/v2/user"
 )
 
-// fakeBroadcaster records broadcast messages so tests can assert that every publish path passes
+// fakeCluster records broadcast messages so tests can assert that every publish path passes
 // through the cluster broadcaster exactly once.
-type fakeBroadcaster struct {
+type fakeCluster struct {
 	mu       sync.Mutex
 	messages []*model.Message
 }
 
-func (b *fakeBroadcaster) Broadcast(m *model.Message) error {
+func (b *fakeCluster) Broadcast(m *model.Message) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.messages = append(b.messages, m)
 	return nil
 }
 
-func (b *fakeBroadcaster) ServeFanout(_ http.ResponseWriter, _ *http.Request) {}
+func (b *fakeCluster) ServeFanout(_ http.ResponseWriter, _ *http.Request) {}
 
-func (b *fakeBroadcaster) IsLeader() bool { return true }
+func (b *fakeCluster) IsLeader() bool { return true }
 
-func (b *fakeBroadcaster) Close() error { return nil }
+func (b *fakeCluster) Close() error { return nil }
 
-func (b *fakeBroadcaster) Messages() []*model.Message {
+func (b *fakeCluster) Messages() []*model.Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return append([]*model.Message{}, b.messages...)
@@ -41,8 +41,8 @@ func (b *fakeBroadcaster) Messages() []*model.Message {
 
 func TestServer_Cluster_PublishBroadcastsOnce(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t, ""))
-	b := &fakeBroadcaster{}
-	s.broadcaster = b
+	b := &fakeCluster{}
+	s.cluster = b
 	response := request(t, s, "PUT", "/mytopic", "hi there", nil)
 	require.Equal(t, 200, response.Code)
 	messages := b.Messages()
@@ -56,8 +56,8 @@ func TestServer_Cluster_SyncEventBroadcasts(t *testing.T) {
 	// them, cross-device account sync silently breaks when a user's devices land on different
 	// cluster nodes.
 	s := newTestServer(t, newTestConfig(t, ""))
-	b := &fakeBroadcaster{}
-	s.broadcaster = b
+	b := &fakeCluster{}
+	s.cluster = b
 	u := &user.User{ID: "u_abc", Name: "phil", SyncTopic: "st_1234"}
 	v := s.visitor(netip.MustParseAddr("1.2.3.4"), nil)
 	require.Nil(t, s.publishSyncEventForUser(v, u))
@@ -118,8 +118,8 @@ func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 	// node must reach this node's local subscribers, but must NOT be re-broadcast (loop) nor
 	// re-trigger origin-only side effects.
 	s := newTestServer(t, newTestConfig(t, ""))
-	b := &fakeBroadcaster{}
-	s.broadcaster = b
+	b := &fakeCluster{}
+	s.cluster = b
 	topics, err := s.topicsFromIDs(nil, "mytopic")
 	require.Nil(t, err)
 	var mu sync.Mutex

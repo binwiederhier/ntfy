@@ -73,7 +73,7 @@ type Server struct {
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
-	broadcaster       cluster.Broadcaster                 // Fans messages out to peer cluster nodes (cluster.Nop when not clustered)
+	cluster           cluster.Cluster                     // Fans messages out to peer cluster nodes (nop when not clustered)
 	closeChan         chan bool
 	mu                sync.RWMutex
 }
@@ -336,13 +336,13 @@ func New(conf *Config) (*Server, error) {
 		stripe:          stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
-	// Cross-node fan-out broadcaster; delivery of peer messages to local subscribers is injected
+	// Cross-node cluster; delivery of peer messages to local subscribers is injected
 	// as a callback, so the cluster package never depends on the server
 	advertiseURL := conf.ClusterAdvertiseURL
 	if advertiseURL == "" {
 		advertiseURL = conf.BaseURL
 	}
-	s.broadcaster, err = cluster.New(cluster.Config{
+	s.cluster, err = cluster.New(cluster.Config{
 		Enabled:         conf.ClusterMode,
 		NodeID:          conf.NodeID,
 		AdvertiseURL:    advertiseURL,
@@ -355,8 +355,8 @@ func New(conf *Config) (*Server, error) {
 	return s, nil
 }
 
-// deliverFromBus delivers a message received from a peer node (via the broadcaster) to this
-// node's local subscribers. It is the receive-side counterpart to broadcaster.Broadcast: local
+// deliverFromBus delivers a message received from a peer node (via the cluster) to this
+// node's local subscribers. It is the receive-side counterpart to Cluster.Broadcast: local
 // delivery and all global side effects (Firebase, email, web push, upstream) already ran on the
 // origin node, so this only publishes to the local topic, and never re-broadcasts.
 func (s *Server) deliverFromBus(m *model.Message) {
@@ -513,8 +513,8 @@ func (s *Server) Stop() {
 	if s.attachment != nil {
 		s.attachment.Close()
 	}
-	if s.broadcaster != nil {
-		s.broadcaster.Close()
+	if s.cluster != nil {
+		s.cluster.Close()
 	}
 	s.closeDatabases()
 	if s.ban != nil {
@@ -545,7 +545,7 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	// The internal cluster fan-out endpoint authenticates with a shared secret and bypasses the
 	// normal authentication/visitor pipeline, so it is handled before maybeAuthenticate
 	if r.Method == http.MethodPost && r.URL.Path == cluster.FanoutPath {
-		s.broadcaster.ServeFanout(w, r)
+		s.cluster.ServeFanout(w, r)
 		return
 	}
 	r, v, err := s.maybeAuthenticate(r) // Note: Always returns v (and r, with the client IP in its context), even on error
@@ -894,7 +894,7 @@ type dispatchOpts struct {
 //
 // The side-effect targets (Firebase, email, calls, upstream, web push) are global, not per-node:
 // they fire only here on the origin node, and never again when a peer node receives the message
-// via the broadcaster (see deliverFromBus).
+// via the cluster (see deliverFromBus).
 func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchOpts) error {
 	// Deliver to local subscribers
 	if t != nil {
@@ -909,7 +909,7 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 		}
 	}
 	// Fan out to peer cluster nodes, whose subscribers do not show up in this node's topics map
-	if err := s.broadcaster.Broadcast(m); err != nil {
+	if err := s.cluster.Broadcast(m); err != nil {
 		logvm(v, m).Err(err).Warn("Cluster: unable to broadcast message to peer nodes")
 	}
 	// Fire the requested side-effect targets

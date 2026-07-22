@@ -49,12 +49,6 @@ type registry struct {
 	peersFetched time.Time
 }
 
-// peer is a live remote node as read from the registry.
-type peer struct {
-	nodeID       string
-	advertiseURL string
-}
-
 // newRegistry creates the registry table if it does not exist and registers this node.
 func newRegistry(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*registry, error) {
 	r := &registry{

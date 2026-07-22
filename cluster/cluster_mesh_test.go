@@ -56,19 +56,19 @@ func TestMesh_CrossNodeDelivery(t *testing.T) {
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	var mu sync.Mutex
 	var received []*model.Message
-	var meshB *Mesh
+	var meshB *meshCluster
 	srvB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		meshB.ServeFanout(w, r)
 	}))
 	defer srvB.Close()
-	meshB, err := newMesh(newTestMeshConfig("node-b", srvB.URL), poolB, func(m *model.Message) {
+	meshB, err := newMeshCluster(newTestMeshConfig("node-b", srvB.URL), poolB, func(m *model.Message) {
 		mu.Lock()
 		defer mu.Unlock()
 		received = append(received, m)
 	})
 	require.Nil(t, err)
 	defer meshB.Close()
-	meshA, err := newMesh(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, func(m *model.Message) {
+	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, func(m *model.Message) {
 		t.Error("node A must not receive its own broadcast")
 	})
 	require.Nil(t, err)
@@ -90,7 +90,7 @@ func TestMesh_ServeFanout_Auth(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	var delivered int
-	mesh, err := newMesh(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, func(m *model.Message) {
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, func(m *model.Message) {
 		delivered++
 	})
 	require.Nil(t, err)
@@ -124,7 +124,7 @@ func TestMesh_ServeFanout_SelfOriginAndUnknownKind(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	var delivered int
-	mesh, err := newMesh(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, func(m *model.Message) {
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, func(m *model.Message) {
 		delivered++
 	})
 	require.Nil(t, err)
@@ -171,7 +171,7 @@ func TestMesh_SlowPeerIsolation(t *testing.T) {
 	}))
 	defer srvSlow.Close()
 	defer close(release)
-	mesh, err := newMesh(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	// Register the fake peers directly in the registry; they are just rows with fresh heartbeats
@@ -193,10 +193,10 @@ func TestMesh_SlowPeerIsolation(t *testing.T) {
 func TestMesh_LeaderFailover(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
-	meshA, err := newMesh(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil)
+	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
-	meshB, err := newMesh(newTestMeshConfig("node-b", "http://127.0.0.1:1"), poolB, nil)
+	meshB, err := newMeshCluster(newTestMeshConfig("node-b", "http://127.0.0.1:1"), poolB, nil)
 	require.Nil(t, err)
 	defer meshB.Close()
 	// Exactly one node becomes leader
@@ -239,7 +239,7 @@ func TestRegistry_ConcurrentCreate(t *testing.T) {
 func TestMesh_CloseDeregisters(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	mesh, err := newMesh(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
 	require.Nil(t, err)
 	var count int
 	require.Nil(t, pool.QueryRow(`SELECT COUNT(*) FROM node_registry WHERE node_id = 'node-a'`).Scan(&count))

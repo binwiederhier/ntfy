@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
@@ -17,7 +18,8 @@ import (
 
 const (
 	meshHTTPTimeout = 5 * time.Second
-	peerQueueSize   = 1024 // Bounded per-peer fan-out queue (drop on overflow)
+	peerQueueSize   = 1024              // Bounded per-peer fan-out queue (drop on overflow)
+	leaderLockKey   = int64(0x6e746679) // Advisory-lock key ("ntfy") for the singleton-job leader
 	tag             = "cluster"
 )
 
@@ -32,7 +34,7 @@ type meshCluster struct {
 	conf       Config
 	deliver    DeliverFunc
 	registry   *registry
-	leader     *leader
+	leader     *pg.Leader
 	httpClient *http.Client
 	mu         sync.Mutex
 	queues     map[string]*peerQueue // node_id -> queue; reconciled against the registry
@@ -54,7 +56,7 @@ func newMeshCluster(conf Config, pool *db.DB, deliver DeliverFunc) (*meshCluster
 		conf:       conf,
 		deliver:    deliver,
 		registry:   registry,
-		leader:     newLeader(pool),
+		leader:     pg.NewLeader(pool.Primary(), leaderLockKey),
 		httpClient: &http.Client{Timeout: meshHTTPTimeout},
 		queues:     make(map[string]*peerQueue),
 		ctx:        ctx,
@@ -72,7 +74,7 @@ func (c *meshCluster) heartbeatLoop() {
 	defer c.wg.Done()
 	ticker := time.NewTicker(c.conf.HeartbeatInterval)
 	defer ticker.Stop()
-	c.leader.tryAcquire(c.ctx)
+	c.leader.TryAcquire(c.ctx)
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -81,11 +83,14 @@ func (c *meshCluster) heartbeatLoop() {
 			if err := c.registry.register(); err != nil {
 				log.Tag(tag).Err(err).Warn("Failed to refresh node registry heartbeat")
 			}
-			c.leader.tryAcquire(c.ctx)
-			if c.leader.isLeader() {
+			c.leader.TryAcquire(c.ctx)
+			if c.leader.IsLeader() {
+				metrics.ClusterLeader.Set(1)
 				if err := c.registry.prune(); err != nil {
 					log.Tag(tag).Err(err).Warn("Failed to prune stale nodes")
 				}
+			} else {
+				metrics.ClusterLeader.Set(0)
 			}
 			if peers, err := c.registry.livePeers(); err == nil {
 				c.reconcileQueues(peers)
@@ -235,7 +240,7 @@ func (c *meshCluster) ServeFanout(w http.ResponseWriter, r *http.Request) {
 
 // IsLeader reports whether this node currently holds singleton-job leadership.
 func (c *meshCluster) IsLeader() bool {
-	return c.leader.isLeader()
+	return c.leader.IsLeader()
 }
 
 // Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,
@@ -245,7 +250,8 @@ func (c *meshCluster) Close() error {
 	if err := c.registry.deregister(); err != nil {
 		log.Tag(tag).Err(err).Warn("Failed to deregister node")
 	}
-	c.leader.release()
+	c.leader.Release()
+	metrics.ClusterLeader.Set(0)
 	c.wg.Wait()
 	return nil
 }

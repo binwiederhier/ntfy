@@ -36,7 +36,7 @@ type peerQueue struct {
 	ch  chan []byte
 }
 
-func (q *peerQueue) fanoutURL() string {
+func (q *peerQueue) FanoutURL() string {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return q.url

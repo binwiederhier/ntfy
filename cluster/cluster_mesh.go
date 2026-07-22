@@ -80,18 +80,18 @@ func (c *meshCluster) heartbeatLoop() {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			if err := c.registry.register(); err != nil {
+			if err := c.registry.Register(); err != nil {
 				log.Tag(tag).Err(err).Warn("Failed to refresh node registry heartbeat")
 			}
 			if c.leader.TryAcquire(c.ctx) {
 				metrics.ClusterLeader.Set(1)
-				if err := c.registry.prune(); err != nil {
+				if err := c.registry.Prune(); err != nil {
 					log.Tag(tag).Err(err).Warn("Failed to prune stale nodes")
 				}
 			} else {
 				metrics.ClusterLeader.Set(0)
 			}
-			if peers, err := c.registry.livePeers(); err == nil {
+			if peers, err := c.registry.LivePeers(); err == nil {
 				c.reconcileQueues(peers)
 			}
 		}
@@ -146,7 +146,7 @@ func (c *meshCluster) Broadcast(msg *model.Message) error {
 	if err != nil {
 		return err
 	}
-	peers, err := c.registry.livePeers()
+	peers, err := c.registry.LivePeers()
 	if err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func (c *meshCluster) peerWorker(nodeID string, q *peerQueue) {
 			if !ok {
 				return
 			}
-			c.deliverToPeer(nodeID, q.fanoutURL(), payload)
+			c.deliverToPeer(nodeID, q.FanoutURL(), payload)
 		}
 	}
 }
@@ -246,7 +246,7 @@ func (c *meshCluster) IsLeader() bool {
 // and waits for them to exit.
 func (c *meshCluster) Close() error {
 	c.cancel()
-	if err := c.registry.deregister(); err != nil {
+	if err := c.registry.Deregister(); err != nil {
 		log.Tag(tag).Err(err).Warn("Failed to deregister node")
 	}
 	c.leader.Release()

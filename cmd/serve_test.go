@@ -536,26 +536,32 @@ func TestIP_Host_Parsing(t *testing.T) {
 	}
 }
 
-func TestCLI_Serve_ClusterModeValidation(t *testing.T) {
+func TestCLI_Serve_ClusterValidation(t *testing.T) {
 	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
-	// cluster-mode requires database-url
+	// Setting cluster-listen implicitly enables clustering, which requires database-url; all
+	// validation must fail before any database connection is attempted
 	app, _, _, _ := newTestApp()
-	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode"})
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=127.0.0.1:2587"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "database-url")
-	// cluster-mode requires cluster-secret; must fail validation before any database connection
+	// cluster-listen requires cluster-secret
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode", "--database-url=postgres://user:pass@localhost:1/na"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster-secret")
-	// cluster-mode requires cluster-listen (the dedicated fan-out listener)
+	// cluster-listen requires an explicit stable node ID
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster-node-id")
+	// cluster-secret without cluster-listen is a config error (clustering would silently be off)
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-secret=s3cret"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster-listen")
 	// A wildcard cluster-listen bind cannot derive an advertise URL
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret", "--cluster-listen=:2587"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret", "--cluster-node-id=node-a"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster-advertise-url")
 	// cluster-batch-linger must not be negative

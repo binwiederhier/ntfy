@@ -345,7 +345,7 @@ func New(conf *Config) (*Server, error) {
 		advertiseURL = "http://" + conf.ClusterListen
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
-		Enabled:         conf.ClusterMode,
+		Enabled:         conf.ClusterListen != "", // Setting cluster-listen implicitly enables clustering
 		NodeID:          conf.ClusterNodeID,
 		AdvertiseURL:    advertiseURL,
 		Secret:          conf.ClusterSecret,

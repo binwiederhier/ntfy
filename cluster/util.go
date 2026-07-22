@@ -5,24 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/netip"
-	"os"
 	"strings"
 
 	"heckel.io/ntfy/v2/model"
-	"heckel.io/ntfy/v2/util"
 )
-
-const randomNodeIDLength = 12
-
-// defaultNodeID returns the hostname, or a random string if it is unavailable. The hostname is
-// preferred because it is stable across restarts: a node that restarts under the same ID reuses
-// its registry row instead of abandoning it, and log/metric labels stay traceable.
-func defaultNodeID() string {
-	if hostname, err := os.Hostname(); err == nil && hostname != "" {
-		return hostname
-	}
-	return util.RandomString(randomNodeIDLength)
-}
 
 // fanoutURL derives the peer's fan-out endpoint URL from its advertise URL.
 func fanoutURL(advertiseURL string) string {

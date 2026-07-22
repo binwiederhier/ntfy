@@ -44,8 +44,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
-	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "cluster-mode", Aliases: []string{"cluster_mode"}, EnvVars: []string{"NTFY_CLUSTER_MODE"}, Usage: "enable cross-node message fan-out across cluster nodes (requires database-url and cluster-secret)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-node-id", Aliases: []string{"cluster_node_id"}, EnvVars: []string{"NTFY_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (defaults to the hostname)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-node-id", Aliases: []string{"cluster_node_id"}, EnvVars: []string{"NTFY_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (required in cluster mode)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-listen", Aliases: []string{"cluster_listen"}, EnvVars: []string{"NTFY_CLUSTER_LISTEN"}, Usage: "ip:port for the dedicated cluster fan-out listener; bind it to the private network (e.g. 10.0.0.5:2587)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-advertise-url", Aliases: []string{"cluster_advertise_url"}, EnvVars: []string{"NTFY_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out listener (defaults to http://<cluster-listen>)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-secret", Aliases: []string{"cluster_secret"}, EnvVars: []string{"NTFY_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
@@ -164,7 +163,6 @@ func execServe(c *cli.Context) error {
 	firebaseKeyFile := c.String("firebase-key-file")
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
-	clusterMode := c.Bool("cluster-mode")
 	clusterNodeID := c.String("cluster-node-id")
 	clusterListen := c.String("cluster-listen")
 	clusterAdvertiseURL := c.String("cluster-advertise-url")
@@ -339,13 +337,15 @@ func execServe(c *cli.Context) error {
 		return errors.New("if database-url is set, auth-file, cache-file, and web-push-file must not be set")
 	} else if len(databaseReplicaURLs) > 0 && databaseURL == "" {
 		return errors.New("database-replica-urls can only be used if database-url is also set")
-	} else if clusterMode && databaseURL == "" {
-		return errors.New("cluster-mode requires database-url to be set")
-	} else if clusterMode && clusterSecret == "" {
-		return errors.New("cluster-mode requires cluster-secret to be set")
-	} else if clusterMode && clusterListen == "" {
-		return errors.New("cluster-mode requires cluster-listen to be set")
-	} else if clusterMode && clusterAdvertiseURL == "" && wildcardAddr(clusterListen) {
+	} else if clusterListen != "" && databaseURL == "" {
+		return errors.New("cluster-listen requires database-url to be set")
+	} else if clusterListen != "" && clusterSecret == "" {
+		return errors.New("cluster-listen requires cluster-secret to be set")
+	} else if clusterListen != "" && clusterNodeID == "" {
+		return errors.New("cluster-listen requires cluster-node-id to be set")
+	} else if clusterListen == "" && clusterSecret != "" {
+		return errors.New("cluster-secret can only be used if cluster-listen is set")
+	} else if clusterListen != "" && clusterAdvertiseURL == "" && wildcardAddr(clusterListen) {
 		return errors.New("cluster-advertise-url must be set if cluster-listen binds a wildcard address")
 	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
@@ -584,7 +584,6 @@ func execServe(c *cli.Context) error {
 	conf.ProfileListenHTTP = profileListenHTTP
 	conf.DatabaseURL = databaseURL
 	conf.DatabaseReplicaURLs = databaseReplicaURLs
-	conf.ClusterMode = clusterMode
 	conf.ClusterNodeID = clusterNodeID
 	conf.ClusterListen = clusterListen
 	conf.ClusterAdvertiseURL = clusterAdvertiseURL

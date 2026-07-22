@@ -61,15 +61,15 @@
 #
 # database-url: <connection-string>
 
-# If "cluster-mode" is enabled, this node registers itself in the PostgreSQL node registry and
-# fans published messages out to the other cluster nodes over HTTP, so subscribers connected to
-# any node receive messages published to any other node. Requires "database-url",
-# "cluster-secret", and "cluster-listen".
+# If "cluster-listen" is set, clustering is implicitly enabled: this node registers itself in
+# the PostgreSQL node registry and fans published messages out to the other cluster nodes over
+# HTTP, so subscribers connected to any node receive messages published to any other node.
+# Requires "database-url" and "cluster-secret".
 #
-# - cluster-node-id is a stable per-node identifier; it defaults to the hostname.
 # - cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes talk to.
 #   Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners never
 #   serve the fan-out endpoint.
+# - cluster-node-id is a stable per-node identifier (e.g. the hostname); required.
 # - cluster-advertise-url is the base URL peer nodes use to reach this node's fan-out listener;
 #   it defaults to "http://<cluster-listen>". It must be set explicitly if cluster-listen binds
 #   a wildcard address (e.g. ":2587").
@@ -83,9 +83,8 @@
 # protects it, and it is only served on the dedicated cluster listener -- but you should still
 # make sure that listener is reachable only from the private network (firewall/VPC rules).
 #
-# cluster-mode: false
-# cluster-node-id: <hostname>
 # cluster-listen: <ip:port>
+# cluster-node-id: <hostname>
 # cluster-advertise-url: "http://<cluster-listen>"
 # cluster-secret: <secret>
 # cluster-batch-linger: 500ms

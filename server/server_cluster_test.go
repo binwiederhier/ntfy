@@ -74,8 +74,8 @@ func TestServer_Cluster_FanoutNotOnPublicHandler(t *testing.T) {
 	// not serve it, even with cluster mode on and a valid secret.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	conf := newTestConfig(t, schemaDSN)
-	conf.ClusterMode = true
 	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1" // Enables clustering; not bound since Run() is not called
 	conf.ClusterSecret = "s3cret"
 	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
 	s := newTestServer(t, conf)
@@ -121,8 +121,8 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestConfig(t, schemaDSN)
-	confB.ClusterMode = true
 	confB.ClusterNodeID = "node-b"
+	confB.ClusterListen = listenerB.Addr().String() // Enables clustering; the test serves it below
 	confB.ClusterSecret = "s3cret"
 	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
 	sB := newTestServer(t, confB)
@@ -131,8 +131,8 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	defer srvB.Close()
 	// Node A: publish-only in this test, so its advertise URL is never called
 	confA := newTestConfig(t, schemaDSN)
-	confA.ClusterMode = true
 	confA.ClusterNodeID = "node-a"
+	confA.ClusterListen = "127.0.0.1:1" // Enables clustering; not bound since Run() is not called
 	confA.ClusterSecret = "s3cret"
 	confA.ClusterAdvertiseURL = "http://127.0.0.1:1"
 	sA := newTestServer(t, confA)

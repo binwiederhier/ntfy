@@ -123,8 +123,7 @@ type Config struct {
 	CertFile                             string
 	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
 	DatabaseReplicaURLs                  []string      // PostgreSQL read replica connection strings
-	ClusterMode                          bool          // If true, cross-node message fan-out is enabled (requires PostgreSQL); see cluster package
-	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; hostname if empty
+	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; required in cluster mode
 	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
 	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
 	ClusterSecret                        string        // Shared secret authenticating node-to-node fan-out requests
@@ -244,7 +243,6 @@ func NewConfig() *Config {
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",
-		ClusterMode:                          false,
 		ClusterNodeID:                        "",
 		ClusterListen:                        "",
 		ClusterAdvertiseURL:                  "",

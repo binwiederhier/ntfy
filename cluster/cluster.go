@@ -34,7 +34,7 @@ const (
 // this package free of server types.
 type Config struct {
 	Enabled           bool          // Master switch; when false, New returns the nop cluster
-	NodeID            string        // Stable per-node identifier; defaults to the hostname, then random
+	NodeID            string        // Stable per-node identifier; required
 	AdvertiseURL      string        // Base URL peers use to reach this node's fan-out endpoint
 	Secret            string        // Shared secret authenticating node-to-node fan-out requests
 	HeartbeatInterval time.Duration // How often the node registry heartbeat is refreshed
@@ -73,10 +73,10 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 		return nil, errors.New("cluster mode requires a PostgreSQL database (set database-url)")
 	}
 	if conf.AdvertiseURL == "" {
-		return nil, errors.New("cluster mode requires an advertise URL (set cluster-advertise-url or base-url)")
+		return nil, errors.New("cluster mode requires an advertise URL (set cluster-advertise-url)")
 	}
 	if conf.NodeID == "" {
-		conf.NodeID = defaultNodeID()
+		return nil, errors.New("cluster mode requires a stable node ID (set cluster-node-id)")
 	}
 	if conf.HeartbeatInterval == 0 {
 		conf.HeartbeatInterval = defaultHeartbeatInterval

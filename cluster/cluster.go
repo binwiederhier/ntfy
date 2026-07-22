@@ -65,7 +65,7 @@ type Cluster interface {
 
 // New creates the cluster for the given config: the nop cluster when clustering is disabled (the
 // single-node default), or the peer-mesh cluster otherwise.
-func New(conf Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
+func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 	if !conf.Enabled {
 		return &nopCluster{}, nil
 	}

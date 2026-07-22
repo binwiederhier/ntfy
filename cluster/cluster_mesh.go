@@ -34,7 +34,7 @@ const (
 // Each peer has its own bounded send queue and delivery worker, so a slow or wedged peer only
 // backs up (and eventually drops) its own queue and never delays delivery to healthy peers.
 type meshCluster struct {
-	conf       Config
+	conf       *Config
 	deliver    DeliverFunc
 	registry   *registry
 	leader     *pg.Leader
@@ -49,7 +49,7 @@ type meshCluster struct {
 // newMeshCluster creates the mesh cluster: it ensures the registry table exists, registers this
 // node, and starts the heartbeat/leader-election loop. Peer delivery workers are started lazily
 // as peers appear in the registry.
-func newMeshCluster(conf Config, pool *db.DB, deliver DeliverFunc) (*meshCluster, error) {
+func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluster, error) {
 	registry, err := newRegistry(pool, conf.NodeID, conf.AdvertiseURL, conf.NodeTTL)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,11 @@ func (c *meshCluster) heartbeatLoop() {
 	defer c.wg.Done()
 	ticker := time.NewTicker(c.conf.HeartbeatInterval)
 	defer ticker.Stop()
-	c.leader.TryAcquire(c.ctx)
+	// Attempt leadership immediately: the ticker first fires a full interval after startup, and
+	// a fresh single-node cluster should not be leaderless (skipping leader-gated jobs) until then
+	if c.leader.TryAcquire(c.ctx) {
+		metrics.ClusterLeader.Set(1)
+	}
 	for {
 		select {
 		case <-c.ctx.Done():

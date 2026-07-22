@@ -342,7 +342,7 @@ func New(conf *Config) (*Server, error) {
 	if advertiseURL == "" {
 		advertiseURL = conf.BaseURL
 	}
-	s.cluster, err = cluster.New(cluster.Config{
+	s.cluster, err = cluster.New(&cluster.Config{
 		Enabled:         conf.ClusterMode,
 		NodeID:          conf.ClusterNodeID,
 		AdvertiseURL:    advertiseURL,

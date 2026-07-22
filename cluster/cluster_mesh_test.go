@@ -29,8 +29,8 @@ func openTestPool(t *testing.T, dsn string) *db.DB {
 	return d
 }
 
-func newTestMeshConfig(nodeID, advertiseURL string) Config {
-	return Config{
+func newTestMeshConfig(nodeID, advertiseURL string) *Config {
+	return &Config{
 		Enabled:           true,
 		NodeID:            nodeID,
 		AdvertiseURL:      advertiseURL,

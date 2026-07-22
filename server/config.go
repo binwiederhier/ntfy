@@ -10,6 +10,8 @@ import (
 	"text/template"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster"
+
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/user"
 )
@@ -119,12 +121,13 @@ type Config struct {
 	ListenUnixMode                       fs.FileMode
 	KeyFile                              string
 	CertFile                             string
-	DatabaseURL                          string   // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
-	DatabaseReplicaURLs                  []string // PostgreSQL read replica connection strings
-	ClusterMode                          bool     // If true, cross-node message fan-out is enabled (requires PostgreSQL); see cluster package
-	NodeID                               string   // Stable per-node identifier used to skip a node's own fan-out; hostname if empty
-	ClusterAdvertiseURL                  string   // Base URL peers use to reach this node's internal fan-out endpoint (defaults to BaseURL)
-	ClusterSecret                        string   // Shared secret authenticating node-to-node fan-out requests
+	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
+	DatabaseReplicaURLs                  []string      // PostgreSQL read replica connection strings
+	ClusterMode                          bool          // If true, cross-node message fan-out is enabled (requires PostgreSQL); see cluster package
+	NodeID                               string        // Stable per-node identifier used to skip a node's own fan-out; hostname if empty
+	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's internal fan-out endpoint (defaults to BaseURL)
+	ClusterSecret                        string        // Shared secret authenticating node-to-node fan-out requests
+	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
@@ -244,6 +247,7 @@ func NewConfig() *Config {
 		NodeID:                               "",
 		ClusterAdvertiseURL:                  "",
 		ClusterSecret:                        "",
+		ClusterBatchLinger:                   cluster.DefaultBatchLinger,
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,

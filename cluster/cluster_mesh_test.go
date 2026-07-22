@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -95,8 +96,9 @@ func TestMesh_ServeFanout_Auth(t *testing.T) {
 	})
 	require.Nil(t, err)
 	defer mesh.Close()
-	payload, err := marshalEnvelope("node-b", model.NewDefaultMessage("mytopic", "hi"))
+	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
+	payload := assembleBatch("node-b", [][]byte{frag})
 
 	// Wrong secret -> 401, not delivered
 	rr := httptest.NewRecorder()
@@ -130,9 +132,10 @@ func TestMesh_ServeFanout_SelfOriginAndUnknownKind(t *testing.T) {
 	require.Nil(t, err)
 	defer mesh.Close()
 
-	// An envelope that originated on this node must not be re-delivered (loop prevention)
-	payload, err := marshalEnvelope("node-a", model.NewDefaultMessage("mytopic", "loop"))
+	// A batch that originated on this node must not be re-delivered (loop prevention)
+	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "loop"))
 	require.Nil(t, err)
+	payload := assembleBatch("node-a", [][]byte{frag})
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", FanoutPath, strings.NewReader(string(payload)))
 	req.Header.Set(secretHeader, testSecret)
@@ -156,10 +159,14 @@ func TestMesh_SlowPeerIsolation(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	var mu sync.Mutex
-	fastReceived := 0
+	fastReceived := 0 // Messages, not requests: with batching, one request can carry many
 	srvFast := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		batch, err := unmarshalBatch(body)
+		require.Nil(t, err)
 		mu.Lock()
-		fastReceived++
+		fastReceived += len(batch.Messages)
 		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -188,6 +195,46 @@ func TestMesh_SlowPeerIsolation(t *testing.T) {
 		defer mu.Unlock()
 		return fastReceived == n
 	})
+}
+
+func TestMesh_BatchCoalescing(t *testing.T) {
+	// Messages published within the linger window arrive as batches: fewer HTTP requests than
+	// messages, with nothing lost. Fails against a one-request-per-message sender.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	requests, messages := 0, 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		batch, err := unmarshalBatch(body)
+		require.Nil(t, err)
+		mu.Lock()
+		requests++
+		messages += len(batch.Messages)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.BatchLinger = 150 * time.Millisecond
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	_, err = pool.Exec(upsertNodeQuery, "node-fake", srv.URL, time.Now().Unix())
+	require.Nil(t, err)
+	const n = 20
+	for i := 0; i < n; i++ {
+		require.Nil(t, mesh.Broadcast(model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i))))
+	}
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return messages == n
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.Less(t, requests, 5, "expected %d messages coalesced into few requests, got %d", n, requests)
 }
 
 func TestMesh_LeaderFailover(t *testing.T) {

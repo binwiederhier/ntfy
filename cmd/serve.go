@@ -19,6 +19,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/payments"
 	"heckel.io/ntfy/v2/server"
@@ -47,6 +48,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "node-id", Aliases: []string{"node_id"}, EnvVars: []string{"NTFY_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (defaults to the hostname)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-advertise-url", Aliases: []string{"cluster_advertise_url"}, EnvVars: []string{"NTFY_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out endpoint (defaults to base-url)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-secret", Aliases: []string{"cluster_secret"}, EnvVars: []string{"NTFY_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-batch-linger", Aliases: []string{"cluster_batch_linger"}, EnvVars: []string{"NTFY_CLUSTER_BATCH_LINGER"}, Value: util.FormatDuration(cluster.DefaultBatchLinger), Usage: "how long fan-out messages wait to form a batch per peer node (0 = send immediately)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
@@ -165,6 +167,7 @@ func execServe(c *cli.Context) error {
 	nodeID := c.String("node-id")
 	clusterAdvertiseURL := c.String("cluster-advertise-url")
 	clusterSecret := c.String("cluster-secret")
+	clusterBatchLingerStr := c.String("cluster-batch-linger")
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
 	webPushFile := c.String("web-push-file")
@@ -259,6 +262,10 @@ func execServe(c *cli.Context) error {
 	keepaliveInterval, err := util.ParseDuration(keepaliveIntervalStr)
 	if err != nil {
 		return fmt.Errorf("invalid keepalive interval: %s", keepaliveIntervalStr)
+	}
+	clusterBatchLinger, err := util.ParseDuration(clusterBatchLingerStr)
+	if err != nil || clusterBatchLinger < 0 {
+		return fmt.Errorf("invalid cluster batch linger: %s", clusterBatchLingerStr)
 	}
 	managerInterval, err := util.ParseDuration(managerIntervalStr)
 	if err != nil {
@@ -577,6 +584,7 @@ func execServe(c *cli.Context) error {
 	conf.NodeID = nodeID
 	conf.ClusterAdvertiseURL = clusterAdvertiseURL
 	conf.ClusterSecret = clusterSecret
+	conf.ClusterBatchLinger = clusterBatchLinger
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey
 	conf.WebPushFile = webPushFile

@@ -548,6 +548,11 @@ func TestCLI_Serve_ClusterModeValidation(t *testing.T) {
 	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode", "--database-url=postgres://user:pass@localhost:1/na"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster-secret")
+	// cluster-batch-linger must not be negative
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-batch-linger=-1s"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster batch linger")
 }
 
 func newEmptyFile(t *testing.T) string {

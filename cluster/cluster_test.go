@@ -9,35 +9,50 @@ import (
 	"heckel.io/ntfy/v2/model"
 )
 
-func TestEnvelope_RoundTrip(t *testing.T) {
-	m := model.NewDefaultMessage("mytopic", "my message")
-	m.Sender = netip.MustParseAddr("1.2.3.4")
-	m.User = "u_abc"
-	data, err := marshalEnvelope("node-a", m)
+func TestBatch_RoundTrip(t *testing.T) {
+	m1 := model.NewDefaultMessage("mytopic", "my message")
+	m1.Sender = netip.MustParseAddr("1.2.3.4")
+	m1.User = "u_abc"
+	m2 := model.NewDefaultMessage("othertopic", "other message")
+	frag1, err := marshalMessage(m1)
 	require.Nil(t, err)
-	env, err := unmarshalEnvelope(data)
+	frag2, err := marshalMessage(m2)
 	require.Nil(t, err)
-	require.Equal(t, envelopeKindMessage, env.Kind)
-	require.Equal(t, "node-a", env.Origin)
-	require.Equal(t, "mytopic", env.Message.Topic)
-	require.Equal(t, "my message", env.Message.Message)
-	// Sender and User are json:"-" on model.Message; the envelope must carry and reattach them
-	require.Equal(t, netip.MustParseAddr("1.2.3.4"), env.Message.Sender)
-	require.Equal(t, "u_abc", env.Message.User)
+	batch, err := unmarshalBatch(assembleBatch("node-a", [][]byte{frag1, frag2}))
+	require.Nil(t, err)
+	require.Equal(t, envelopeKindBatch, batch.Kind)
+	require.Equal(t, "node-a", batch.Origin)
+	require.Len(t, batch.Messages, 2)
+	require.Equal(t, "mytopic", batch.Messages[0].Message.Topic)
+	require.Equal(t, "my message", batch.Messages[0].Message.Message)
+	// Sender and User are json:"-" on model.Message; the batch must carry and reattach them
+	require.Equal(t, netip.MustParseAddr("1.2.3.4"), batch.Messages[0].Message.Sender)
+	require.Equal(t, "u_abc", batch.Messages[0].Message.User)
+	require.Equal(t, "othertopic", batch.Messages[1].Message.Topic)
+	require.False(t, batch.Messages[1].Message.Sender.IsValid())
 }
 
-func TestEnvelope_UnknownKind(t *testing.T) {
-	// Unknown envelope kinds must parse without error so receivers can ignore them; this keeps
+func TestBatch_SingleMessage(t *testing.T) {
+	// A batch of one is the degenerate case; there is no separate single-message format
+	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
+	require.Nil(t, err)
+	batch, err := unmarshalBatch(assembleBatch("node-a", [][]byte{frag}))
+	require.Nil(t, err)
+	require.Len(t, batch.Messages, 1)
+}
+
+func TestBatch_UnknownKind(t *testing.T) {
+	// Unknown kinds must parse without error so receivers can ignore them; this keeps
 	// mixed-version clusters working during rolling deploys when a newer node introduces a new
 	// envelope kind.
-	env, err := unmarshalEnvelope([]byte(`{"kind":"bloom-gossip","origin":"node-b","filter":"xyz"}`))
+	batch, err := unmarshalBatch([]byte(`{"kind":"bloom-gossip","origin":"node-b","filter":"xyz"}`))
 	require.Nil(t, err)
-	require.Equal(t, "bloom-gossip", env.Kind)
-	require.Nil(t, env.Message)
+	require.Equal(t, "bloom-gossip", batch.Kind)
+	require.Empty(t, batch.Messages)
 }
 
-func TestEnvelope_MessageKindWithoutMessage(t *testing.T) {
-	_, err := unmarshalEnvelope([]byte(`{"kind":"message","origin":"node-b"}`))
+func TestBatch_EntryWithoutMessage(t *testing.T) {
+	_, err := unmarshalBatch([]byte(`{"kind":"batch","origin":"node-b","messages":[{"sender":"1.2.3.4"}]}`))
 	require.Error(t, err)
 }
 

@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/netip"
@@ -28,33 +29,54 @@ func fanoutURL(advertiseURL string) string {
 	return strings.TrimRight(advertiseURL, "/") + FanoutPath
 }
 
-// marshalEnvelope serializes a message and its non-JSON fields for transport to peer nodes.
-func marshalEnvelope(origin string, m *model.Message) ([]byte, error) {
-	env := &envelope{Kind: envelopeKindMessage, Origin: origin, User: m.User, Message: m}
+// marshalMessage serializes one message and its non-JSON fields (Sender, User) as an
+// apiBatchMessage fragment. Fragments are marshaled once per publish and shared across all
+// per-peer queues; assembleBatch joins them without re-marshaling.
+func marshalMessage(m *model.Message) ([]byte, error) {
+	batchMessage := &apiBatchMessage{User: m.User, Message: m}
 	if m.Sender.IsValid() {
-		env.Sender = m.Sender.String()
+		batchMessage.Sender = m.Sender.String()
 	}
-	return json.Marshal(env)
+	return json.Marshal(batchMessage)
 }
 
-// unmarshalEnvelope parses a wire envelope and, for message envelopes, reattaches the non-JSON
-// fields (Sender, User) onto the message. Callers must check the envelope kind and ignore kinds
-// they do not understand.
-func unmarshalEnvelope(data []byte) (*envelope, error) {
-	var env envelope
-	if err := json.Unmarshal(data, &env); err != nil {
+// assembleBatch builds a batch request body from pre-marshaled apiBatchMessage fragments by
+// joining them, avoiding a second JSON marshal of the messages.
+func assembleBatch(origin string, frags [][]byte) []byte {
+	originJSON, _ := json.Marshal(origin) // Marshaling a string cannot fail
+	var buf bytes.Buffer
+	buf.WriteString(`{"kind":"` + envelopeKindBatch + `","origin":`)
+	buf.Write(originJSON)
+	buf.WriteString(`,"messages":[`)
+	for i, frag := range frags {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		buf.Write(frag)
+	}
+	buf.WriteString(`]}`)
+	return buf.Bytes()
+}
+
+// unmarshalBatch parses a wire batch and reattaches the non-JSON fields (Sender, User) onto each
+// message. Callers must check the batch kind and ignore kinds they do not understand.
+func unmarshalBatch(data []byte) (*apiBatch, error) {
+	var batch apiBatch
+	if err := json.Unmarshal(data, &batch); err != nil {
 		return nil, err
 	}
-	if env.Kind == envelopeKindMessage {
-		if env.Message == nil {
-			return nil, errors.New("message envelope without message")
-		}
-		env.Message.User = env.User
-		if env.Sender != "" {
-			if addr, err := netip.ParseAddr(env.Sender); err == nil {
-				env.Message.Sender = addr
+	if batch.Kind == envelopeKindBatch {
+		for _, batchMessage := range batch.Messages {
+			if batchMessage.Message == nil {
+				return nil, errors.New("batch entry without message")
+			}
+			batchMessage.Message.User = batchMessage.User
+			if batchMessage.Sender != "" {
+				if addr, err := netip.ParseAddr(batchMessage.Sender); err == nil {
+					batchMessage.Message.Sender = addr
+				}
 			}
 		}
 	}
-	return &env, nil
+	return &batch, nil
 }

@@ -23,6 +23,11 @@ const secretHeader = "X-Cluster-Secret"
 const (
 	defaultHeartbeatInterval = 3 * time.Second  // How often a node refreshes its registry heartbeat
 	defaultNodeTTL           = 10 * time.Second // A node counts as live if its heartbeat is newer than this
+
+	// DefaultBatchLinger is how long a fan-out message may wait in a peer's queue for more
+	// messages to arrive, so they are delivered as one batch. It trades up to this much
+	// cross-node latency for a bounded request rate per peer.
+	DefaultBatchLinger = 500 * time.Millisecond
 )
 
 // Config configures the cluster. It is assembled by the server from its own config, which keeps
@@ -34,7 +39,8 @@ type Config struct {
 	Secret            string        // Shared secret authenticating node-to-node fan-out requests
 	HeartbeatInterval time.Duration // How often the node registry heartbeat is refreshed
 	NodeTTL           time.Duration // Registry rows older than this do not count as live peers
-	MaxMessageBytes   int64         // Upper bound for inbound fan-out request bodies
+	BatchLinger       time.Duration // How long messages wait in a peer queue to form a batch; 0 = send immediately
+	MaxMessageBytes   int64         // Upper bound for a single message on the wire (batch limits derive from this)
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The

@@ -347,6 +347,7 @@ func New(conf *Config) (*Server, error) {
 		NodeID:          conf.NodeID,
 		AdvertiseURL:    advertiseURL,
 		Secret:          conf.ClusterSecret,
+		BatchLinger:     conf.ClusterBatchLinger,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
@@ -364,7 +365,8 @@ func (s *Server) deliverFromBus(m *model.Message) {
 	t, ok := s.topics[m.Topic]
 	s.mu.RUnlock()
 	if !ok {
-		return // No local subscribers for this topic
+		metrics.ClusterFanoutWasted.Inc() // Broadcast-and-filter: this node had no use for the message
+		return
 	}
 	v := s.visitor(m.Sender, nil)
 	if err := t.Publish(v, m); err != nil {

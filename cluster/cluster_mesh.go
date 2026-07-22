@@ -14,13 +14,16 @@ import (
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/util"
 )
 
 const (
-	meshHTTPTimeout = 5 * time.Second
-	peerQueueSize   = 1024              // Bounded per-peer fan-out queue (drop on overflow)
-	leaderLockKey   = int64(0x6e746679) // Advisory-lock key ("ntfy") for the singleton-job leader
-	tag             = "cluster"
+	meshHTTPTimeout  = 5 * time.Second
+	peerQueueSize    = 1024              // Bounded per-peer fan-out queue (drop on overflow)
+	batchMaxMessages = 100               // Flush a batch early when it reaches this many messages
+	batchMaxBytes    = 256 * 1024        // Flush a batch early when it reaches this size
+	leaderLockKey    = int64(0x6e746679) // Advisory-lock key ("ntfy") for the singleton-job leader
+	tag              = "cluster"
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -115,7 +118,7 @@ func (c *meshCluster) reconcileQueues(peers []peer) {
 			q.url = fanoutURL(url)
 			q.mu.Unlock()
 		} else {
-			close(q.ch) // Worker drains the remainder and exits
+			q.queue.Close() // Flushes the remainder; the worker exits when the queue is drained
 			delete(c.queues, nodeID)
 		}
 	}
@@ -130,7 +133,8 @@ func (c *meshCluster) queueFor(p peer) *peerQueue {
 	}
 	q = &peerQueue{
 		url: fanoutURL(p.advertiseURL),
-		ch:  make(chan []byte, peerQueueSize),
+		queue: util.NewLingerQueue(peerQueueSize, batchMaxMessages, batchMaxBytes,
+			func(frag []byte) int { return len(frag) }, c.conf.BatchLinger),
 	}
 	c.queues[p.nodeID] = q
 	c.wg.Add(1)
@@ -139,10 +143,10 @@ func (c *meshCluster) queueFor(p peer) *peerQueue {
 }
 
 // Broadcast enqueues the message for delivery to every live peer node. Delivery is fire-and-forget
-// via each peer's bounded queue; if a peer's queue is full the message is dropped for that peer
-// (subscribers reconnect and re-poll history from the database).
+// via each peer's bounded batching queue; if a peer's queue is full the message is dropped for
+// that peer (subscribers reconnect and re-poll history from the database).
 func (c *meshCluster) Broadcast(msg *model.Message) error {
-	payload, err := marshalEnvelope(c.conf.NodeID, msg)
+	frag, err := marshalMessage(msg)
 	if err != nil {
 		return err
 	}
@@ -157,10 +161,7 @@ func (c *meshCluster) Broadcast(msg *model.Message) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, p := range peers {
-		q := c.queueFor(p)
-		select {
-		case q.ch <- payload:
-		default:
+		if !c.queueFor(p).queue.TryEnqueue(frag) {
 			metrics.ClusterQueueDropped.Inc()
 			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.nodeID, msg.ID)
 		}
@@ -168,20 +169,14 @@ func (c *meshCluster) Broadcast(msg *model.Message) error {
 	return nil
 }
 
-// peerWorker delivers queued fan-out payloads to a single peer until the queue is closed (peer
-// left the registry) or the mesh shuts down.
+// peerWorker delivers batches of queued fan-out messages to a single peer. Batches form in the
+// peer's LingerQueue (up to BatchLinger delay, flushed early on size/count caps); the worker
+// exits when the queue is closed (peer left the registry, or mesh shutdown) and drained.
 func (c *meshCluster) peerWorker(nodeID string, q *peerQueue) {
 	defer c.wg.Done()
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		case payload, ok := <-q.ch:
-			if !ok {
-				return
-			}
-			c.deliverToPeer(nodeID, q.FanoutURL(), payload)
-		}
+	for frags := range q.queue.Dequeue() {
+		c.deliverToPeer(nodeID, q.FanoutURL(), assembleBatch(c.conf.NodeID, frags))
+		metrics.ClusterBatchesSent.Inc()
 	}
 }
 
@@ -221,18 +216,22 @@ func (c *meshCluster) ServeFanout(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	body, err := io.ReadAll(io.LimitReader(r.Body, c.conf.MaxMessageBytes))
+	// A batch can exceed its byte cap by one message, plus the envelope overhead
+	maxBodyBytes := int64(batchMaxBytes) + c.conf.MaxMessageBytes + 1024
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	env, err := unmarshalEnvelope(body)
+	batch, err := unmarshalBatch(body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if env.Kind == envelopeKindMessage && env.Origin != c.conf.NodeID {
-		c.deliver(env.Message)
+	if batch.Kind == envelopeKindBatch && batch.Origin != c.conf.NodeID {
+		for _, batchMessage := range batch.Messages {
+			c.deliver(batchMessage.Message)
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -245,7 +244,15 @@ func (c *meshCluster) IsLeader() bool {
 // Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,
 // and waits for them to exit.
 func (c *meshCluster) Close() error {
-	c.cancel()
+	c.cancel() // Stops the heartbeat loop and aborts in-flight peer deliveries
+	// Close the peer queues so their workers flush and exit; final sends are best-effort since
+	// the context is already canceled (parity with fire-and-forget delivery)
+	c.mu.Lock()
+	for nodeID, q := range c.queues {
+		q.queue.Close()
+		delete(c.queues, nodeID)
+	}
+	c.mu.Unlock()
 	if err := c.registry.Deregister(); err != nil {
 		log.Tag(tag).Err(err).Warn("Failed to deregister node")
 	}

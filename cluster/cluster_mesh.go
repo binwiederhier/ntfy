@@ -119,7 +119,7 @@ func (c *meshCluster) reconcileQueues(peers []peer) {
 	for nodeID, q := range c.queues {
 		if url, ok := alive[nodeID]; ok {
 			q.mu.Lock()
-			q.url = fanoutURL(url)
+			q.url = deliverURL(url)
 			q.mu.Unlock()
 		} else {
 			q.queue.Close() // Flushes the remainder; the worker exits when the queue is drained
@@ -136,7 +136,7 @@ func (c *meshCluster) queueFor(p peer) *peerQueue {
 		return q
 	}
 	q = &peerQueue{
-		url: fanoutURL(p.advertiseURL),
+		url: deliverURL(p.advertiseURL),
 		queue: util.NewLingerQueue(peerQueueSize, batchMaxMessages, batchMaxBytes,
 			func(frag []byte) int { return len(frag) }, c.conf.BatchLinger),
 	}
@@ -179,7 +179,7 @@ func (c *meshCluster) Broadcast(msg *model.Message) error {
 func (c *meshCluster) peerWorker(nodeID string, q *peerQueue) {
 	defer c.wg.Done()
 	for frags := range q.queue.Dequeue() {
-		c.deliverToPeer(nodeID, q.FanoutURL(), assembleFanoutBody(frags))
+		c.deliverToPeer(nodeID, q.DeliverURL(), assembleDeliverBody(frags))
 		metrics.ClusterBatchesSent.Inc()
 	}
 }
@@ -211,11 +211,11 @@ func (c *meshCluster) deliverToPeer(nodeID, url string, payload []byte) {
 	}
 }
 
-// ServeFanout handles an inbound fan-out request from a peer node. It authenticates via the
+// ServeDeliver handles an inbound fan-out request from a peer node. It authenticates via the
 // shared cluster secret (constant-time compare, rejected before any parsing), skips requests
 // carrying this node's own broadcasts (origin header; loop prevention), and streams the NDJSON
 // body to local subscribers line by line, delivering each message as it is decoded.
-func (c *meshCluster) ServeFanout(w http.ResponseWriter, r *http.Request) {
+func (c *meshCluster) ServeDeliver(w http.ResponseWriter, r *http.Request) {
 	if c.conf.Secret == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get(secretHeader)), []byte(c.conf.Secret)) != 1 {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -231,7 +231,7 @@ func (c *meshCluster) ServeFanout(w http.ResponseWriter, r *http.Request) {
 	}
 	// A batch can exceed its byte cap by one message, plus framing overhead
 	maxBodyBytes := int64(batchMaxBytes) + c.conf.MaxMessageBytes + 1024
-	if err := decodeFanout(io.LimitReader(r.Body, maxBodyBytes), int(c.conf.MaxMessageBytes), c.deliver); err != nil {
+	if err := decodeDeliverBody(io.LimitReader(r.Body, maxBodyBytes), int(c.conf.MaxMessageBytes), c.deliver); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

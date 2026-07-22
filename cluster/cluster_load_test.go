@@ -40,7 +40,7 @@ func TestMesh_Soak(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
-		messages, err := unmarshalFanoutBody(body, 1<<20)
+		messages, err := unmarshalDeliverBody(body, 1<<20)
 		require.Nil(t, err)
 		mu.Lock()
 		requests++
@@ -122,11 +122,11 @@ func BenchmarkDecodeFanout(b *testing.B) {
 		require.Nil(b, err)
 		frags[i] = frag
 	}
-	body := assembleFanoutBody(frags)
+	body := assembleDeliverBody(frags)
 	b.SetBytes(int64(len(body)))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		messages, err := unmarshalFanoutBody(body, 1<<20)
+		messages, err := unmarshalDeliverBody(body, 1<<20)
 		if err != nil || len(messages) != 100 {
 			b.Fatal("decode failed")
 		}

@@ -13,7 +13,7 @@ type nopCluster struct{}
 
 func (c *nopCluster) Broadcast(_ *model.Message) error { return nil }
 
-func (c *nopCluster) ServeFanout(w http.ResponseWriter, _ *http.Request) {
+func (c *nopCluster) ServeDeliver(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 

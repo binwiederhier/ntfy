@@ -90,8 +90,8 @@ var (
 	ClusterBatchesSent = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_batches_sent_total",
 	})
-	ClusterFanoutWasted = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "ntfy_cluster_fanout_wasted_total",
+	ClusterDeliverWasted = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_deliver_wasted_total",
 	})
 	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_leader",
@@ -129,7 +129,7 @@ func init() {
 		ClusterSendErrors,
 		ClusterQueueDropped,
 		ClusterBatchesSent,
-		ClusterFanoutWasted,
+		ClusterDeliverWasted,
 		ClusterLeader,
 	)
 }

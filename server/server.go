@@ -364,12 +364,12 @@ func New(conf *Config) (*Server, error) {
 // any firewalling.
 func (s *Server) clusterHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc(cluster.FanoutPath, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(cluster.DeliverPath, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		s.cluster.ServeFanout(w, r)
+		s.cluster.ServeDeliver(w, r)
 	})
 	mux.HandleFunc(apiHealthPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -387,7 +387,7 @@ func (s *Server) deliverFromBus(m *model.Message) {
 	t, ok := s.topics[m.Topic]
 	s.mu.RUnlock()
 	if !ok {
-		metrics.ClusterFanoutWasted.Inc() // Broadcast-and-filter: this node had no use for the message
+		metrics.ClusterDeliverWasted.Inc() // Broadcast-and-filter: this node had no use for the message
 		return
 	}
 	v := s.visitor(m.Sender, nil)

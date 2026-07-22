@@ -30,7 +30,7 @@ func (b *fakeCluster) Broadcast(m *model.Message) error {
 	return nil
 }
 
-func (b *fakeCluster) ServeFanout(_ http.ResponseWriter, _ *http.Request) {}
+func (b *fakeCluster) ServeDeliver(_ http.ResponseWriter, _ *http.Request) {}
 
 func (b *fakeCluster) IsLeader() bool { return true }
 
@@ -90,7 +90,7 @@ func TestServer_Cluster_FanoutNotOnPublicHandler(t *testing.T) {
 		return nil
 	}, "", func() {})
 	// A valid fan-out request against the PUBLIC handler must not deliver
-	response := request(t, s, "POST", "/v1/internal/fanout",
+	response := request(t, s, "POST", "/v1/internal/deliver",
 		`{"message":{"id":"x1","time":1,"event":"message","topic":"mytopic","message":"sneaky"}}`,
 		map[string]string{"X-Cluster-Secret": "s3cret", "X-Cluster-Origin": "node-b"})
 	require.Equal(t, 404, response.Code)
@@ -100,7 +100,7 @@ func TestServer_Cluster_FanoutNotOnPublicHandler(t *testing.T) {
 	mu.Unlock()
 	// The same request against the cluster listener handler DOES deliver
 	rr := httptest.NewRecorder()
-	req, err := http.NewRequest("POST", "/v1/internal/fanout",
+	req, err := http.NewRequest("POST", "/v1/internal/deliver",
 		strings.NewReader(`{"message":{"id":"x2","time":1,"event":"message","topic":"mytopic","message":"legit"}}`))
 	require.Nil(t, err)
 	req.Header.Set("X-Cluster-Secret", "s3cret")

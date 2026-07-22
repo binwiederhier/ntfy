@@ -13,9 +13,9 @@ import (
 	"heckel.io/ntfy/v2/model"
 )
 
-// FanoutPath is the HTTP path peer nodes POST fan-out envelopes to. The server routes requests
-// for this path to Cluster.ServeFanout before its normal authentication pipeline.
-const FanoutPath = "/v1/internal/fanout"
+// DeliverPath is the HTTP path peer nodes POST fan-out envelopes to. The server routes requests
+// for this path to Cluster.ServeDeliver before its normal authentication pipeline.
+const DeliverPath = "/v1/internal/deliver"
 
 // secretHeader carries the shared secret authenticating node-to-node fan-out requests.
 const secretHeader = "X-Cluster-Secret"
@@ -64,8 +64,8 @@ type Cluster interface {
 	// Broadcast publishes a message to peer nodes. It is fire-and-forget and must not block the
 	// caller's request path.
 	Broadcast(m *model.Message) error
-	// ServeFanout handles an inbound fan-out request from a peer node.
-	ServeFanout(w http.ResponseWriter, r *http.Request)
+	// ServeDeliver handles an inbound fan-out request from a peer node.
+	ServeDeliver(w http.ResponseWriter, r *http.Request)
 	// IsLeader reports whether this node holds the cluster leader lock. Singleton background
 	// jobs (e.g. the Firebase keepaliver) are gated on the leader.
 	IsLeader() bool

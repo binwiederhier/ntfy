@@ -11,7 +11,7 @@ import (
 )
 
 func TestFanout_RoundTrip(t *testing.T) {
-	// The fan-out body is NDJSON: one apiFanoutMessage per line, joined from pre-marshaled
+	// The fan-out body is NDJSON: one apiDeliverMessage per line, joined from pre-marshaled
 	// fragments; the origin travels in a header, not the body
 	m1 := model.NewDefaultMessage("mytopic", "my message")
 	m1.Sender = netip.MustParseAddr("1.2.3.4")
@@ -21,7 +21,7 @@ func TestFanout_RoundTrip(t *testing.T) {
 	require.Nil(t, err)
 	frag2, err := marshalMessage(m2)
 	require.Nil(t, err)
-	messages, err := unmarshalFanoutBody(assembleFanoutBody([][]byte{frag1, frag2}), 1<<20)
+	messages, err := unmarshalDeliverBody(assembleDeliverBody([][]byte{frag1, frag2}), 1<<20)
 	require.Nil(t, err)
 	require.Len(t, messages, 2)
 	require.Equal(t, "mytopic", messages[0].Topic)
@@ -37,7 +37,7 @@ func TestFanout_SingleMessage(t *testing.T) {
 	// A single message is just a one-line body; there is no separate single-message format
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
-	messages, err := unmarshalFanoutBody(assembleFanoutBody([][]byte{frag}), 1<<20)
+	messages, err := unmarshalDeliverBody(assembleDeliverBody([][]byte{frag}), 1<<20)
 	require.Nil(t, err)
 	require.Len(t, messages, 1)
 }
@@ -48,16 +48,16 @@ func TestFanout_MalformedLinesSkipped(t *testing.T) {
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "good"))
 	require.Nil(t, err)
 	body := []byte("this is not json\n{\"sender\":\"1.2.3.4\"}\n" + string(frag) + "\n\n")
-	messages, err := unmarshalFanoutBody(body, 1<<20)
+	messages, err := unmarshalDeliverBody(body, 1<<20)
 	require.Nil(t, err)
 	require.Len(t, messages, 1)
 	require.Equal(t, "good", messages[0].Message)
 }
 
-// unmarshalFanoutBody is a test helper collecting the messages of an NDJSON fan-out body.
-func unmarshalFanoutBody(body []byte, maxLineBytes int) ([]*model.Message, error) {
+// unmarshalDeliverBody is a test helper collecting the messages of an NDJSON fan-out body.
+func unmarshalDeliverBody(body []byte, maxLineBytes int) ([]*model.Message, error) {
 	var messages []*model.Message
-	err := decodeFanout(bytes.NewReader(body), maxLineBytes, func(m *model.Message) {
+	err := decodeDeliverBody(bytes.NewReader(body), maxLineBytes, func(m *model.Message) {
 		messages = append(messages, m)
 	})
 	return messages, err
@@ -71,7 +71,7 @@ func TestNop(t *testing.T) {
 	// A single node is trivially the leader, so leader-gated jobs run without special-casing
 	require.True(t, b.IsLeader())
 	rr := httptest.NewRecorder()
-	b.ServeFanout(rr, httptest.NewRequest("POST", FanoutPath, nil))
+	b.ServeDeliver(rr, httptest.NewRequest("POST", DeliverPath, nil))
 	require.Equal(t, 404, rr.Code)
 	require.Nil(t, b.Close())
 }

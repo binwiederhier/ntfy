@@ -91,8 +91,8 @@ func TestServer_Cluster_FanoutNotOnPublicHandler(t *testing.T) {
 	}, "", func() {})
 	// A valid fan-out request against the PUBLIC handler must not deliver
 	response := request(t, s, "POST", "/v1/internal/fanout",
-		`{"kind":"batch","origin":"node-b","messages":[{"message":{"id":"x1","time":1,"event":"message","topic":"mytopic","message":"sneaky"}}]}`,
-		map[string]string{"X-Cluster-Secret": "s3cret"})
+		`{"message":{"id":"x1","time":1,"event":"message","topic":"mytopic","message":"sneaky"}}`,
+		map[string]string{"X-Cluster-Secret": "s3cret", "X-Cluster-Origin": "node-b"})
 	require.Equal(t, 404, response.Code)
 	time.Sleep(250 * time.Millisecond) // Delivery is async; give a wrong implementation time to fail
 	mu.Lock()
@@ -101,9 +101,10 @@ func TestServer_Cluster_FanoutNotOnPublicHandler(t *testing.T) {
 	// The same request against the cluster listener handler DOES deliver
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("POST", "/v1/internal/fanout",
-		strings.NewReader(`{"kind":"batch","origin":"node-b","messages":[{"message":{"id":"x2","time":1,"event":"message","topic":"mytopic","message":"legit"}}]}`))
+		strings.NewReader(`{"message":{"id":"x2","time":1,"event":"message","topic":"mytopic","message":"legit"}}`))
 	require.Nil(t, err)
 	req.Header.Set("X-Cluster-Secret", "s3cret")
+	req.Header.Set("X-Cluster-Origin", "node-b")
 	s.clusterHandler().ServeHTTP(rr, req)
 	require.Equal(t, 200, rr.Code)
 	waitFor(t, func() bool {

@@ -7,24 +7,11 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-// envelopeKindBatch identifies a fan-out request carrying a batch of published messages (a batch
-// of one is the degenerate case; there is no single-message format). Receivers ignore requests
-// with unknown kinds (with a 200 response), so future envelope kinds can be introduced without
-// breaking mixed-version clusters during rolling deploys.
-const envelopeKindBatch = "batch"
-
-// apiBatch is the wire format for node-to-node fan-out: a batch of messages from one origin node
-// (so a node can skip its own broadcasts).
-type apiBatch struct {
-	Kind     string             `json:"kind"`
-	Origin   string             `json:"origin"`
-	Messages []*apiBatchMessage `json:"messages,omitempty"`
-}
-
-// apiBatchMessage is one message in a fan-out batch. It carries the two fields that model.Message
-// does not serialize to JSON (Sender and User), which are needed to reconstruct the visitor on
-// the receiving node.
-type apiBatchMessage struct {
+// apiFanoutMessage is one line of a fan-out request body (NDJSON: one message per line; a single
+// message is just a one-line body). It carries the two fields that model.Message does not
+// serialize to JSON (Sender and User), which are needed to reconstruct the visitor on the
+// receiving node. The origin node travels in a request header, not in the body.
+type apiFanoutMessage struct {
 	Sender  string         `json:"sender,omitempty"`
 	User    string         `json:"user,omitempty"`
 	Message *model.Message `json:"message"`

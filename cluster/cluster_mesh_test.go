@@ -21,7 +21,7 @@ const testSecret = "s3cret"
 
 // openTestPool opens a dedicated connection pool to the given test schema, so that each simulated
 // node has its own pool like real nodes would.
-func openTestPool(t *testing.T, dsn string) *db.DB {
+func openTestPool(t testing.TB, dsn string) *db.DB {
 	host, err := pg.Open(dsn)
 	require.Nil(t, err)
 	d := db.New(host, nil)
@@ -98,12 +98,13 @@ func TestMesh_ServeFanout_Auth(t *testing.T) {
 	defer mesh.Close()
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
-	payload := assembleBatch("node-b", [][]byte{frag})
+	payload := assembleFanoutBody([][]byte{frag})
 
 	// Wrong secret -> 401, not delivered
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", FanoutPath, strings.NewReader(string(payload)))
 	req.Header.Set(secretHeader, "wrong")
+	req.Header.Set(originHeader, "node-b")
 	mesh.ServeFanout(rr, req)
 	require.Equal(t, 401, rr.Code)
 
@@ -113,16 +114,25 @@ func TestMesh_ServeFanout_Auth(t *testing.T) {
 	require.Equal(t, 401, rr.Code)
 	require.Equal(t, 0, delivered)
 
-	// Correct secret -> 200, delivered
+	// Missing origin -> 400, not delivered
 	rr = httptest.NewRecorder()
 	req = httptest.NewRequest("POST", FanoutPath, strings.NewReader(string(payload)))
 	req.Header.Set(secretHeader, testSecret)
+	mesh.ServeFanout(rr, req)
+	require.Equal(t, 400, rr.Code)
+	require.Equal(t, 0, delivered)
+
+	// Correct secret and origin -> 200, delivered
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequest("POST", FanoutPath, strings.NewReader(string(payload)))
+	req.Header.Set(secretHeader, testSecret)
+	req.Header.Set(originHeader, "node-b")
 	mesh.ServeFanout(rr, req)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, 1, delivered)
 }
 
-func TestMesh_ServeFanout_SelfOriginAndUnknownKind(t *testing.T) {
+func TestMesh_ServeFanout_SelfOrigin(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	var delivered int
@@ -132,21 +142,14 @@ func TestMesh_ServeFanout_SelfOriginAndUnknownKind(t *testing.T) {
 	require.Nil(t, err)
 	defer mesh.Close()
 
-	// A batch that originated on this node must not be re-delivered (loop prevention)
+	// A request that carries this node's own broadcasts must not be re-delivered (loop prevention)
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "loop"))
 	require.Nil(t, err)
-	payload := assembleBatch("node-a", [][]byte{frag})
+	payload := assembleFanoutBody([][]byte{frag})
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", FanoutPath, strings.NewReader(string(payload)))
 	req.Header.Set(secretHeader, testSecret)
-	mesh.ServeFanout(rr, req)
-	require.Equal(t, 200, rr.Code)
-	require.Equal(t, 0, delivered)
-
-	// Unknown envelope kinds are ignored with a 200 (mixed-version rolling deploys)
-	rr = httptest.NewRecorder()
-	req = httptest.NewRequest("POST", FanoutPath, strings.NewReader(`{"kind":"bloom-gossip","origin":"node-b"}`))
-	req.Header.Set(secretHeader, testSecret)
+	req.Header.Set(originHeader, "node-a") // Same as the receiving node's ID
 	mesh.ServeFanout(rr, req)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, 0, delivered)
@@ -163,10 +166,10 @@ func TestMesh_SlowPeerIsolation(t *testing.T) {
 	srvFast := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
-		batch, err := unmarshalBatch(body)
+		messages, err := unmarshalFanoutBody(body, 1<<20)
 		require.Nil(t, err)
 		mu.Lock()
-		fastReceived += len(batch.Messages)
+		fastReceived += len(messages)
 		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -207,11 +210,11 @@ func TestMesh_BatchCoalescing(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
-		batch, err := unmarshalBatch(body)
+		decoded, err := unmarshalFanoutBody(body, 1<<20)
 		require.Nil(t, err)
 		mu.Lock()
 		requests++
-		messages += len(batch.Messages)
+		messages += len(decoded)
 		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -248,10 +251,10 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
-		batch, err := unmarshalBatch(body)
+		messages, err := unmarshalFanoutBody(body, 1<<20)
 		require.Nil(t, err)
 		mu.Lock()
-		received += len(batch.Messages)
+		received += len(messages)
 		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
 	}))

@@ -179,7 +179,7 @@ func (c *meshCluster) Broadcast(msg *model.Message) error {
 func (c *meshCluster) peerWorker(nodeID string, q *peerQueue) {
 	defer c.wg.Done()
 	for frags := range q.queue.Dequeue() {
-		c.deliverToPeer(nodeID, q.FanoutURL(), assembleBatch(c.conf.NodeID, frags))
+		c.deliverToPeer(nodeID, q.FanoutURL(), assembleFanoutBody(frags))
 		metrics.ClusterBatchesSent.Inc()
 	}
 }
@@ -193,8 +193,9 @@ func (c *meshCluster) deliverToPeer(nodeID, url string, payload []byte) {
 		log.Tag(tag).Err(err).Warn("Failed to build fan-out request for peer %s", nodeID)
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentTypeNDJSON)
 	req.Header.Set(secretHeader, c.conf.Secret)
+	req.Header.Set(originHeader, c.conf.NodeID)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if c.ctx.Err() == nil {
@@ -211,31 +212,28 @@ func (c *meshCluster) deliverToPeer(nodeID, url string, payload []byte) {
 }
 
 // ServeFanout handles an inbound fan-out request from a peer node. It authenticates via the
-// shared cluster secret (constant-time compare, rejected before any parsing), and delivers
-// message envelopes that originated on other nodes to local subscribers. Envelopes of unknown
-// kinds are ignored with a 200 response, so newer nodes can introduce new envelope kinds without
-// breaking mixed-version clusters during rolling deploys.
+// shared cluster secret (constant-time compare, rejected before any parsing), skips requests
+// carrying this node's own broadcasts (origin header; loop prevention), and streams the NDJSON
+// body to local subscribers line by line, delivering each message as it is decoded.
 func (c *meshCluster) ServeFanout(w http.ResponseWriter, r *http.Request) {
 	if c.conf.Secret == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get(secretHeader)), []byte(c.conf.Secret)) != 1 {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	// A batch can exceed its byte cap by one message, plus the envelope overhead
+	origin := r.Header.Get(originHeader)
+	if origin == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if origin == c.conf.NodeID {
+		w.WriteHeader(http.StatusOK) // Our own broadcast; nothing to do
+		return
+	}
+	// A batch can exceed its byte cap by one message, plus framing overhead
 	maxBodyBytes := int64(batchMaxBytes) + c.conf.MaxMessageBytes + 1024
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxBodyBytes))
-	if err != nil {
+	if err := decodeFanout(io.LimitReader(r.Body, maxBodyBytes), int(c.conf.MaxMessageBytes), c.deliver); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
-	}
-	batch, err := unmarshalBatch(body)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if batch.Kind == envelopeKindBatch && batch.Origin != c.conf.NodeID {
-		for _, batchMessage := range batch.Messages {
-			c.deliver(batchMessage.Message)
-		}
 	}
 	w.WriteHeader(http.StatusOK)
 }

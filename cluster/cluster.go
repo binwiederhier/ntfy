@@ -20,6 +20,16 @@ const FanoutPath = "/v1/internal/fanout"
 // secretHeader carries the shared secret authenticating node-to-node fan-out requests.
 const secretHeader = "X-Cluster-Secret"
 
+// originHeader carries the sending node's ID on fan-out requests, so a node can skip requests
+// that carry its own broadcasts (loop prevention).
+const originHeader = "X-Cluster-Origin"
+
+// contentTypeNDJSON is the content type of fan-out request bodies (one JSON message per line,
+// matching the framing of ntfy's own /topic/json subscribe stream). Future node-to-node request
+// types get their own paths on the cluster listener; an old node answering 404 on an unknown
+// path keeps mixed-version clusters working during rolling deploys.
+const contentTypeNDJSON = "application/x-ndjson"
+
 const (
 	defaultHeartbeatInterval = 3 * time.Second  // How often a node refreshes its registry heartbeat
 	defaultNodeTTL           = 10 * time.Second // A node counts as live if its heartbeat is newer than this

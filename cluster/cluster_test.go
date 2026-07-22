@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"bytes"
 	"net/http/httptest"
 	"net/netip"
 	"testing"
@@ -9,7 +10,9 @@ import (
 	"heckel.io/ntfy/v2/model"
 )
 
-func TestBatch_RoundTrip(t *testing.T) {
+func TestFanout_RoundTrip(t *testing.T) {
+	// The fan-out body is NDJSON: one apiFanoutMessage per line, joined from pre-marshaled
+	// fragments; the origin travels in a header, not the body
 	m1 := model.NewDefaultMessage("mytopic", "my message")
 	m1.Sender = netip.MustParseAddr("1.2.3.4")
 	m1.User = "u_abc"
@@ -18,42 +21,46 @@ func TestBatch_RoundTrip(t *testing.T) {
 	require.Nil(t, err)
 	frag2, err := marshalMessage(m2)
 	require.Nil(t, err)
-	batch, err := unmarshalBatch(assembleBatch("node-a", [][]byte{frag1, frag2}))
+	messages, err := unmarshalFanoutBody(assembleFanoutBody([][]byte{frag1, frag2}), 1<<20)
 	require.Nil(t, err)
-	require.Equal(t, envelopeKindBatch, batch.Kind)
-	require.Equal(t, "node-a", batch.Origin)
-	require.Len(t, batch.Messages, 2)
-	require.Equal(t, "mytopic", batch.Messages[0].Message.Topic)
-	require.Equal(t, "my message", batch.Messages[0].Message.Message)
-	// Sender and User are json:"-" on model.Message; the batch must carry and reattach them
-	require.Equal(t, netip.MustParseAddr("1.2.3.4"), batch.Messages[0].Message.Sender)
-	require.Equal(t, "u_abc", batch.Messages[0].Message.User)
-	require.Equal(t, "othertopic", batch.Messages[1].Message.Topic)
-	require.False(t, batch.Messages[1].Message.Sender.IsValid())
+	require.Len(t, messages, 2)
+	require.Equal(t, "mytopic", messages[0].Topic)
+	require.Equal(t, "my message", messages[0].Message)
+	// Sender and User are json:"-" on model.Message; the lines must carry and reattach them
+	require.Equal(t, netip.MustParseAddr("1.2.3.4"), messages[0].Sender)
+	require.Equal(t, "u_abc", messages[0].User)
+	require.Equal(t, "othertopic", messages[1].Topic)
+	require.False(t, messages[1].Sender.IsValid())
 }
 
-func TestBatch_SingleMessage(t *testing.T) {
-	// A batch of one is the degenerate case; there is no separate single-message format
+func TestFanout_SingleMessage(t *testing.T) {
+	// A single message is just a one-line body; there is no separate single-message format
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
-	batch, err := unmarshalBatch(assembleBatch("node-a", [][]byte{frag}))
+	messages, err := unmarshalFanoutBody(assembleFanoutBody([][]byte{frag}), 1<<20)
 	require.Nil(t, err)
-	require.Len(t, batch.Messages, 1)
+	require.Len(t, messages, 1)
 }
 
-func TestBatch_UnknownKind(t *testing.T) {
-	// Unknown kinds must parse without error so receivers can ignore them; this keeps
-	// mixed-version clusters working during rolling deploys when a newer node introduces a new
-	// envelope kind.
-	batch, err := unmarshalBatch([]byte(`{"kind":"bloom-gossip","origin":"node-b","filter":"xyz"}`))
+func TestFanout_MalformedLinesSkipped(t *testing.T) {
+	// Fan-out is fire-and-forget: a malformed or message-less line is skipped (and logged), the
+	// remaining lines are still delivered
+	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "good"))
 	require.Nil(t, err)
-	require.Equal(t, "bloom-gossip", batch.Kind)
-	require.Empty(t, batch.Messages)
+	body := []byte("this is not json\n{\"sender\":\"1.2.3.4\"}\n" + string(frag) + "\n\n")
+	messages, err := unmarshalFanoutBody(body, 1<<20)
+	require.Nil(t, err)
+	require.Len(t, messages, 1)
+	require.Equal(t, "good", messages[0].Message)
 }
 
-func TestBatch_EntryWithoutMessage(t *testing.T) {
-	_, err := unmarshalBatch([]byte(`{"kind":"batch","origin":"node-b","messages":[{"sender":"1.2.3.4"}]}`))
-	require.Error(t, err)
+// unmarshalFanoutBody is a test helper collecting the messages of an NDJSON fan-out body.
+func unmarshalFanoutBody(body []byte, maxLineBytes int) ([]*model.Message, error) {
+	var messages []*model.Message
+	err := decodeFanout(bytes.NewReader(body), maxLineBytes, func(m *model.Message) {
+		messages = append(messages, m)
+	})
+	return messages, err
 }
 
 func TestNop(t *testing.T) {

@@ -125,7 +125,8 @@ type Config struct {
 	DatabaseReplicaURLs                  []string      // PostgreSQL read replica connection strings
 	ClusterMode                          bool          // If true, cross-node message fan-out is enabled (requires PostgreSQL); see cluster package
 	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; hostname if empty
-	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's internal fan-out endpoint (defaults to BaseURL)
+	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
+	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
 	ClusterSecret                        string        // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	FirebaseKeyFile                      string
@@ -245,6 +246,7 @@ func NewConfig() *Config {
 		DatabaseURL:                          "",
 		ClusterMode:                          false,
 		ClusterNodeID:                        "",
+		ClusterListen:                        "",
 		ClusterAdvertiseURL:                  "",
 		ClusterSecret:                        "",
 		ClusterBatchLinger:                   cluster.DefaultBatchLinger,

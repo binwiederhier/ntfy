@@ -74,6 +74,7 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	cluster           cluster.Cluster                     // Fans messages out to peer cluster nodes (nop when not clustered)
+	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
 	closeChan         chan bool
 	mu                sync.RWMutex
 }
@@ -337,10 +338,11 @@ func New(conf *Config) (*Server, error) {
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	// Cross-node cluster; delivery of peer messages to local subscribers is injected
-	// as a callback, so the cluster package never depends on the server
+	// as a callback, so the cluster package never depends on the server. Peers talk to each
+	// other only via the dedicated cluster listener, never via the public listeners.
 	advertiseURL := conf.ClusterAdvertiseURL
-	if advertiseURL == "" {
-		advertiseURL = conf.BaseURL
+	if advertiseURL == "" && conf.ClusterListen != "" {
+		advertiseURL = "http://" + conf.ClusterListen
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
 		Enabled:         conf.ClusterMode,
@@ -354,6 +356,26 @@ func New(conf *Config) (*Server, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+// clusterHandler returns the handler served on the dedicated cluster listener (cluster-listen).
+// It serves only the node-to-node fan-out endpoint plus a health endpoint; the public listeners
+// never expose these paths, so internal traffic cannot be reached from the outside even before
+// any firewalling.
+func (s *Server) clusterHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc(cluster.FanoutPath, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		s.cluster.ServeFanout(w, r)
+	})
+	mux.HandleFunc(apiHealthPath, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"healthy":true}`+"\n")
+	})
+	return mux
 }
 
 // deliverFromBus delivers a message received from a peer node (via the cluster) to this
@@ -416,6 +438,9 @@ func (s *Server) Run() error {
 	if s.config.ProfileListenHTTP != "" {
 		listenStr += fmt.Sprintf(" %s[http/profile]", s.config.ProfileListenHTTP)
 	}
+	if s.config.ClusterListen != "" {
+		listenStr += fmt.Sprintf(" %s[http/cluster]", s.config.ClusterListen)
+	}
 	log.Tag(tagStartup).Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.BuildVersion, log.CurrentLevel().String())
 	if log.IsFile() {
 		fmt.Fprintf(os.Stderr, "Listening on%s, ntfy %s\n", listenStr, s.config.BuildVersion)
@@ -470,6 +495,12 @@ func (s *Server) Run() error {
 	} else if s.config.EnableMetrics {
 		s.metricsHandler = promhttp.Handler()
 	}
+	if s.config.ClusterListen != "" {
+		s.httpClusterServer = &http.Server{Addr: s.config.ClusterListen, Handler: s.clusterHandler()}
+		go func() {
+			errChan <- s.httpClusterServer.ListenAndServe()
+		}()
+	}
 	if s.config.ProfileListenHTTP != "" {
 		profileMux := http.NewServeMux()
 		profileMux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -515,6 +546,9 @@ func (s *Server) Stop() {
 	if s.attachment != nil {
 		s.attachment.Close()
 	}
+	if s.httpClusterServer != nil {
+		s.httpClusterServer.Close()
+	}
 	if s.cluster != nil {
 		s.cluster.Close()
 	}
@@ -544,12 +578,6 @@ func (s *Server) closeDatabases() {
 
 // handle is the main entry point for all HTTP requests
 func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
-	// The internal cluster fan-out endpoint authenticates with a shared secret and bypasses the
-	// normal authentication/visitor pipeline, so it is handled before maybeAuthenticate
-	if r.Method == http.MethodPost && r.URL.Path == cluster.FanoutPath {
-		s.cluster.ServeFanout(w, r)
-		return
-	}
 	r, v, err := s.maybeAuthenticate(r) // Note: Always returns v (and r, with the client IP in its context), even on error
 	if err != nil {
 		s.handleError(w, r, v, err)

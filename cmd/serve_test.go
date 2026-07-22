@@ -548,6 +548,16 @@ func TestCLI_Serve_ClusterModeValidation(t *testing.T) {
 	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode", "--database-url=postgres://user:pass@localhost:1/na"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster-secret")
+	// cluster-mode requires cluster-listen (the dedicated fan-out listener)
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster-listen")
+	// A wildcard cluster-listen bind cannot derive an advertise URL
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-mode", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret", "--cluster-listen=:2587"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster-advertise-url")
 	// cluster-batch-linger must not be negative
 	app, _, _, _ = newTestApp()
 	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-batch-linger=-1s"})

@@ -46,7 +46,8 @@ var flagsServe = append(
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "cluster-mode", Aliases: []string{"cluster_mode"}, EnvVars: []string{"NTFY_CLUSTER_MODE"}, Usage: "enable cross-node message fan-out across cluster nodes (requires database-url and cluster-secret)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-node-id", Aliases: []string{"cluster_node_id"}, EnvVars: []string{"NTFY_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (defaults to the hostname)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-advertise-url", Aliases: []string{"cluster_advertise_url"}, EnvVars: []string{"NTFY_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out endpoint (defaults to base-url)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-listen", Aliases: []string{"cluster_listen"}, EnvVars: []string{"NTFY_CLUSTER_LISTEN"}, Usage: "ip:port for the dedicated cluster fan-out listener; bind it to the private network (e.g. 10.0.0.5:2587)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-advertise-url", Aliases: []string{"cluster_advertise_url"}, EnvVars: []string{"NTFY_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out listener (defaults to http://<cluster-listen>)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-secret", Aliases: []string{"cluster_secret"}, EnvVars: []string{"NTFY_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-batch-linger", Aliases: []string{"cluster_batch_linger"}, EnvVars: []string{"NTFY_CLUSTER_BATCH_LINGER"}, Value: util.FormatDuration(cluster.DefaultBatchLinger), Usage: "how long fan-out messages wait to form a batch per peer node (0 = send immediately)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
@@ -165,6 +166,7 @@ func execServe(c *cli.Context) error {
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
 	clusterMode := c.Bool("cluster-mode")
 	clusterNodeID := c.String("cluster-node-id")
+	clusterListen := c.String("cluster-listen")
 	clusterAdvertiseURL := c.String("cluster-advertise-url")
 	clusterSecret := c.String("cluster-secret")
 	clusterBatchLingerStr := c.String("cluster-batch-linger")
@@ -341,8 +343,10 @@ func execServe(c *cli.Context) error {
 		return errors.New("cluster-mode requires database-url to be set")
 	} else if clusterMode && clusterSecret == "" {
 		return errors.New("cluster-mode requires cluster-secret to be set")
-	} else if clusterMode && clusterAdvertiseURL == "" && baseURL == "" {
-		return errors.New("cluster-mode requires cluster-advertise-url or base-url to be set")
+	} else if clusterMode && clusterListen == "" {
+		return errors.New("cluster-mode requires cluster-listen to be set")
+	} else if clusterMode && clusterAdvertiseURL == "" && wildcardAddr(clusterListen) {
+		return errors.New("cluster-advertise-url must be set if cluster-listen binds a wildcard address")
 	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if firebaseKeyFile != "" && !server.FirebaseAvailable {
@@ -582,6 +586,7 @@ func execServe(c *cli.Context) error {
 	conf.DatabaseReplicaURLs = databaseReplicaURLs
 	conf.ClusterMode = clusterMode
 	conf.ClusterNodeID = clusterNodeID
+	conf.ClusterListen = clusterListen
 	conf.ClusterAdvertiseURL = clusterAdvertiseURL
 	conf.ClusterSecret = clusterSecret
 	conf.ClusterBatchLinger = clusterBatchLinger
@@ -762,4 +767,14 @@ func maybeFromMetadata(m map[string]any, key string) string {
 		return ""
 	}
 	return s
+}
+
+// wildcardAddr reports whether the given listen address binds all interfaces (e.g. ":2587",
+// "0.0.0.0:2587", "[::]:2587"), in which case peers cannot derive a reachable URL from it.
+func wildcardAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return true // Unparseable -> cannot derive a URL either
+	}
+	return host == "" || host == "0.0.0.0" || host == "::"
 }

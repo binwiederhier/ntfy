@@ -3,9 +3,12 @@ package server
 import (
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	dbtest "heckel.io/ntfy/v2/db/test"
@@ -66,6 +69,50 @@ func TestServer_Cluster_SyncEventBroadcasts(t *testing.T) {
 	require.Equal(t, "st_1234", messages[0].Topic)
 }
 
+func TestServer_Cluster_FanoutNotOnPublicHandler(t *testing.T) {
+	// The fan-out endpoint lives only on the dedicated cluster listener; the public handler must
+	// not serve it, even with cluster mode on and a valid secret.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterMode = true
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	s := newTestServer(t, conf)
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	var mu sync.Mutex
+	var received []*model.Message
+	topics[0].Subscribe(func(_ *visitor, m *model.Message) error {
+		mu.Lock()
+		defer mu.Unlock()
+		received = append(received, m)
+		return nil
+	}, "", func() {})
+	// A valid fan-out request against the PUBLIC handler must not deliver
+	response := request(t, s, "POST", "/v1/internal/fanout",
+		`{"kind":"batch","origin":"node-b","messages":[{"message":{"id":"x1","time":1,"event":"message","topic":"mytopic","message":"sneaky"}}]}`,
+		map[string]string{"X-Cluster-Secret": "s3cret"})
+	require.Equal(t, 404, response.Code)
+	time.Sleep(250 * time.Millisecond) // Delivery is async; give a wrong implementation time to fail
+	mu.Lock()
+	require.Empty(t, received)
+	mu.Unlock()
+	// The same request against the cluster listener handler DOES deliver
+	rr := httptest.NewRecorder()
+	req, err := http.NewRequest("POST", "/v1/internal/fanout",
+		strings.NewReader(`{"kind":"batch","origin":"node-b","messages":[{"message":{"id":"x2","time":1,"event":"message","topic":"mytopic","message":"legit"}}]}`))
+	require.Nil(t, err)
+	req.Header.Set("X-Cluster-Secret", "s3cret")
+	s.clusterHandler().ServeHTTP(rr, req)
+	require.Equal(t, 200, rr.Code)
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(received) == 1
+	})
+}
+
 func TestServer_Cluster_EndToEnd(t *testing.T) {
 	// Two full servers sharing one Postgres schema: a message published to node A over HTTP must
 	// reach a subscriber connected to node B, via the node registry and the fan-out endpoint.
@@ -79,7 +126,7 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	confB.ClusterSecret = "s3cret"
 	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
 	sB := newTestServer(t, confB)
-	srvB := &http.Server{Handler: http.HandlerFunc(sB.handle)}
+	srvB := &http.Server{Handler: sB.clusterHandler()}
 	go srvB.Serve(listenerB)
 	defer srvB.Close()
 	// Node A: publish-only in this test, so its advertise URL is never called

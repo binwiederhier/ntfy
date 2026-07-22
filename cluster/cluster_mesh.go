@@ -83,8 +83,7 @@ func (c *meshCluster) heartbeatLoop() {
 			if err := c.registry.register(); err != nil {
 				log.Tag(tag).Err(err).Warn("Failed to refresh node registry heartbeat")
 			}
-			c.leader.TryAcquire(c.ctx)
-			if c.leader.IsLeader() {
+			if c.leader.TryAcquire(c.ctx) {
 				metrics.ClusterLeader.Set(1)
 				if err := c.registry.prune(); err != nil {
 					log.Tag(tag).Err(err).Warn("Failed to prune stale nodes")

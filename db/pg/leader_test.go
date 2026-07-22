@@ -18,17 +18,16 @@ func TestLeader_AcquireAndFailover(t *testing.T) {
 	defer l1.Release()
 	defer l2.Release()
 	// First to try wins; the second stays follower
-	l1.TryAcquire(ctx)
-	l2.TryAcquire(ctx)
+	require.True(t, l1.TryAcquire(ctx))
+	require.False(t, l2.TryAcquire(ctx))
 	require.True(t, l1.IsLeader())
 	require.False(t, l2.IsLeader())
-	// Repeated TryAcquire on the leader is a no-op ping
-	l1.TryAcquire(ctx)
-	require.True(t, l1.IsLeader())
+	// Repeated TryAcquire on the leader is a no-op ping and reports leadership
+	require.True(t, l1.TryAcquire(ctx))
 	// Release -> the follower can take over
 	l1.Release()
 	require.False(t, l1.IsLeader())
-	l2.TryAcquire(ctx)
+	require.True(t, l2.TryAcquire(ctx))
 	require.True(t, l2.IsLeader())
 }
 
@@ -39,8 +38,6 @@ func TestLeader_DistinctKeysAreIndependent(t *testing.T) {
 	l2 := pg.NewLeader(testDB.Primary(), 2)
 	defer l1.Release()
 	defer l2.Release()
-	l1.TryAcquire(ctx)
-	l2.TryAcquire(ctx)
-	require.True(t, l1.IsLeader())
-	require.True(t, l2.IsLeader()) // Different keys do not compete
+	require.True(t, l1.TryAcquire(ctx))
+	require.True(t, l2.TryAcquire(ctx)) // Different keys do not compete
 }

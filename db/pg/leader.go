@@ -29,32 +29,34 @@ func NewLeader(db *sql.DB, key int64) *Leader {
 	return &Leader{db: db, key: key}
 }
 
-// TryAcquire attempts to grab (or confirm) the advisory lock on a pinned connection. It is meant
-// to be called periodically; on a healthy leader it is a cheap ping, on a follower it retries
-// the lock.
-func (l *Leader) TryAcquire(ctx context.Context) {
+// TryAcquire attempts to grab (or confirm) the advisory lock on a pinned connection, without
+// blocking. It returns whether this process is the leader after the attempt, i.e. it acquired
+// the lock now or still holds it. It is meant to be called periodically; on a healthy leader it
+// is a cheap ping, on a follower it retries the lock.
+func (l *Leader) TryAcquire(ctx context.Context) bool {
 	l.mu.Lock()
 	conn, held := l.conn, l.held
 	l.mu.Unlock()
 	if held {
 		if conn != nil && conn.PingContext(ctx) == nil {
-			return // Still leader, connection healthy
+			return true // Still leader, connection healthy
 		}
 		l.Release() // Connection died; the lock is already gone, re-acquire below
 	}
 	newConn, err := l.db.Conn(ctx)
 	if err != nil {
-		return
+		return false
 	}
 	var acquired bool
 	if err := newConn.QueryRowContext(ctx, tryAdvisoryLockQuery, l.key).Scan(&acquired); err != nil || !acquired {
 		newConn.Close()
-		return
+		return false
 	}
 	l.mu.Lock()
 	l.conn = newConn
 	l.held = true
 	l.mu.Unlock()
+	return true
 }
 
 // Release unlocks the advisory lock and returns the pinned connection to the pool.

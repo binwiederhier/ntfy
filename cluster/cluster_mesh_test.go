@@ -237,6 +237,68 @@ func TestMesh_BatchCoalescing(t *testing.T) {
 	require.Less(t, requests, 5, "expected %d messages coalesced into few requests, got %d", n, requests)
 }
 
+func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
+	// A peer that dies ungracefully (no Deregister) stops refreshing its heartbeat: after the
+	// TTL it no longer counts as live (no more sends), its queue/worker are reconciled away, the
+	// leader prunes its registry row, and a re-registered peer starts receiving again.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	received := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		batch, err := unmarshalBatch(body)
+		require.Nil(t, err)
+		mu.Lock()
+		received += len(batch.Messages)
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.NodeTTL = 300 * time.Millisecond // Fast expiry so the test observes TTL-based removal
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	// The fake peer registers once and then "dies": its heartbeat is never refreshed
+	_, err = pool.Exec(upsertNodeQuery, "node-dead", srv.URL, time.Now().Unix())
+	require.Nil(t, err)
+	require.Nil(t, mesh.Broadcast(model.NewDefaultMessage("mytopic", "while alive")))
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return received == 1
+	})
+	// After the TTL, the peer is no longer live: its queue is reconciled away and its registry
+	// row is pruned by the leader (this mesh is the only real node, so it holds the lock)
+	waitFor(t, func() bool {
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.queues) == 0
+	})
+	waitFor(t, func() bool {
+		var count int
+		require.Nil(t, pool.QueryRow(`SELECT COUNT(*) FROM node_registry WHERE node_id = 'node-dead'`).Scan(&count))
+		return count == 0
+	})
+	require.Nil(t, mesh.Broadcast(model.NewDefaultMessage("mytopic", "while dead")))
+	time.Sleep(250 * time.Millisecond) // Give a wrong implementation time to deliver anyway
+	mu.Lock()
+	require.Equal(t, 1, received) // Only the first message arrived
+	mu.Unlock()
+	// The peer comes back (same node ID, fresh heartbeat) and receives messages again; the
+	// broadcast retries because the peer list is cached for up to a second
+	_, err = pool.Exec(upsertNodeQuery, "node-dead", srv.URL, time.Now().Unix())
+	require.Nil(t, err)
+	waitFor(t, func() bool {
+		require.Nil(t, mesh.Broadcast(model.NewDefaultMessage("mytopic", "after rejoin")))
+		mu.Lock()
+		defer mu.Unlock()
+		return received > 1
+	})
+}
+
 func TestMesh_LeaderFailover(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)

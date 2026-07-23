@@ -92,14 +92,14 @@ func (r *registry) Register() error {
 		return err
 	}
 	r.mu.Lock()
-	r.peersFetched = time.Time{} // Invalidate the peer cache so the next LivePeers re-reads
+	r.peersFetched = time.Time{} // Invalidate the peer cache so the next Peers re-reads
 	r.mu.Unlock()
 	return nil
 }
 
-// LivePeers returns the current set of live peer nodes (all registry rows with a fresh heartbeat,
+// Peers returns the current set of live peer nodes (all registry rows with a fresh heartbeat,
 // excluding this node), cached for peerCacheTTL.
-func (r *registry) LivePeers() ([]peer, error) {
+func (r *registry) Peers() ([]peer, error) {
 	r.mu.Lock()
 	if r.peers != nil && time.Since(r.peersFetched) < peerCacheTTL {
 		peers := r.peers
@@ -107,7 +107,7 @@ func (r *registry) LivePeers() ([]peer, error) {
 		return peers, nil
 	}
 	r.mu.Unlock()
-	peers, err := r.queryLivePeers()
+	peers, err := r.queryPeers()
 	if err != nil {
 		// Serve the last-known peer list during database hiccups: fan-out keeps flowing to
 		// known peers instead of erroring (and logging) once per published message for the
@@ -126,8 +126,8 @@ func (r *registry) LivePeers() ([]peer, error) {
 	return peers, nil
 }
 
-// queryLivePeers reads the current live peer set from the registry table.
-func (r *registry) queryLivePeers() ([]peer, error) {
+// queryPeers reads the current live peer set from the registry table.
+func (r *registry) queryPeers() ([]peer, error) {
 	cutoff := time.Now().Add(-r.ttl).Unix()
 	rows, err := r.pool.Query(selectLivePeersQuery, cutoff, string(r.nodeID))
 	if err != nil {

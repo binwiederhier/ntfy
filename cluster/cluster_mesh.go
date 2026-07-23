@@ -143,7 +143,7 @@ func (c *meshCluster) heartbeatLoop() {
 			} else {
 				metrics.ClusterLeader.Set(0)
 			}
-			if peers, err := c.registry.LivePeers(); err == nil {
+			if peers, err := c.registry.Peers(); err == nil {
 				c.reconcileQueues(peers)
 				if time.Since(lastStatePush) >= c.conf.StateInterval {
 					c.pushState(peers)
@@ -200,7 +200,7 @@ func (c *meshCluster) queueFor(p peer) *peerQueue {
 // bounded batching queue; if a peer's queue is full the message is dropped for that peer
 // (subscribers reconnect and re-poll history from the database).
 func (c *meshCluster) Relay(msg *model.Message) error {
-	peers, err := c.registry.LivePeers()
+	peers, err := c.registry.Peers()
 	if err != nil {
 		return err
 	}
@@ -375,7 +375,7 @@ func (c *meshCluster) AnnounceTopics(topics []string) {
 	if len(topics) == 0 {
 		return
 	}
-	peers, err := c.registry.LivePeers()
+	peers, err := c.registry.Peers()
 	if err != nil || len(peers) == 0 {
 		return
 	}

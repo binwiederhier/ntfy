@@ -324,7 +324,7 @@ func TestMesh_RelayAfterClose(t *testing.T) {
 }
 
 func TestRegistry_LivePeersStaleCacheOnError(t *testing.T) {
-	// During a database hiccup, LivePeers serves the last-known peer list instead of erroring:
+	// During a database hiccup, Peers serves the last-known peer list instead of erroring:
 	// fan-out keeps flowing to known peers, and the publish path does not log a warning per
 	// message for the duration of the outage.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
@@ -333,7 +333,7 @@ func TestRegistry_LivePeersStaleCacheOnError(t *testing.T) {
 	require.Nil(t, err)
 	_, err = pool.Exec(upsertNodeQuery, "node-peer", "http://127.0.0.1:2", time.Now().Unix())
 	require.Nil(t, err)
-	peers, err := r.LivePeers()
+	peers, err := r.Peers()
 	require.Nil(t, err)
 	require.Len(t, peers, 1)
 	// Expire the cache and break the database; the stale list must still be served
@@ -341,7 +341,7 @@ func TestRegistry_LivePeersStaleCacheOnError(t *testing.T) {
 	r.peersFetched = time.Time{}
 	r.mu.Unlock()
 	require.Nil(t, pool.Close())
-	peers, err = r.LivePeers()
+	peers, err = r.Peers()
 	require.Nil(t, err)
 	require.Len(t, peers, 1)
 	require.Equal(t, NodeID("node-peer"), peers[0].nodeID)

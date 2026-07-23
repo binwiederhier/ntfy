@@ -46,7 +46,7 @@ const (
 
 const (
 	defaultHeartbeatInterval = 3 * time.Second  // How often a node refreshes its registry heartbeat
-	defaultNodeTTL           = 10 * time.Second // A node counts as live if its heartbeat is newer than this
+	defaultNodeTTL           = 30 * time.Second // A node counts as live if its heartbeat is newer than this; generous to avoid false-dead flapping (see plans)
 	defaultStateInterval     = 15 * time.Second // How often the full subscription state is pushed to peers
 
 	// DefaultBatchLinger is how long a fan-out message may wait in a peer's queue for more

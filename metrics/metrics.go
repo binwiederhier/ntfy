@@ -78,8 +78,8 @@ var (
 	ClusterPeers = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_peers",
 	})
-	ClusterMessagesBroadcast = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "ntfy_cluster_messages_broadcast_total",
+	ClusterMessagesRelayed = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_messages_relayed_total",
 	})
 	ClusterSendErrors = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_send_errors_total",
@@ -131,7 +131,7 @@ func init() {
 		Topics,
 		HTTPRequests,
 		ClusterPeers,
-		ClusterMessagesBroadcast,
+		ClusterMessagesRelayed,
 		ClusterSendErrors,
 		ClusterQueueDropped,
 		ClusterBatchesSent,

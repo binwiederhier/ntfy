@@ -402,15 +402,15 @@ func (s *Server) topicAnnouncer(id string) func() {
 }
 
 // deliverFromBus delivers a message received from a peer node (via the cluster) to this
-// node's local subscribers. It is the receive-side counterpart to Cluster.Broadcast: local
+// node's local subscribers. It is the receive-side counterpart to Cluster.Relay: local
 // delivery and all global side effects (Firebase, email, web push, upstream) already ran on the
-// origin node, so this only publishes to the local topic, and never re-broadcasts.
+// origin node, so this only publishes to the local topic, and never re-relays.
 func (s *Server) deliverFromBus(m *model.Message) {
 	s.mu.RLock()
 	t, ok := s.topics[m.Topic]
 	s.mu.RUnlock()
 	if !ok {
-		metrics.ClusterMessagesWasted.Inc() // Broadcast-and-filter: this node had no use for the message
+		metrics.ClusterMessagesWasted.Inc() // Relayed here needlessly: this node had no use for the message
 		return
 	}
 	v := s.visitor(m.Sender, nil)
@@ -941,7 +941,7 @@ type dispatchOpts struct {
 	async    bool   // Deliver to local subscribers in a goroutine, logging errors instead of returning them
 }
 
-// dispatch delivers m to local subscribers, broadcasts it to peer cluster nodes, and fires the
+// dispatch delivers m to local subscribers, relays it to peer cluster nodes, and fires the
 // requested side-effect targets. It is the single choke point through which every published
 // message must pass; t may be nil when the topic has no local subscribers (delayed sender).
 //
@@ -961,9 +961,9 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 			return err
 		}
 	}
-	// Fan out to peer cluster nodes, whose subscribers do not show up in this node's topics map
-	if err := s.cluster.Broadcast(m); err != nil {
-		logvm(v, m).Err(err).Warn("Cluster: unable to broadcast message to peer nodes")
+	// Relay to peer cluster nodes, whose subscribers do not show up in this node's topics map
+	if err := s.cluster.Relay(m); err != nil {
+		logvm(v, m).Err(err).Warn("Cluster: unable to relay message to peer nodes")
 	}
 	// Fire the requested side-effect targets
 	if s.firebaseClient != nil && opts.firebase {

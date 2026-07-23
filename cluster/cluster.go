@@ -85,9 +85,10 @@ type Cluster interface {
 	// The internal peer API (/v1/internal/*), served on the dedicated cluster listener. The
 	// nop cluster answers 404.
 	http.Handler
-	// Broadcast publishes a message to peer nodes that may have subscribers for its topic. It
-	// is fire-and-forget and must not block the caller's request path.
-	Broadcast(m *model.Message) error
+	// Relay sends a locally published message on to the peer nodes that may have subscribers
+	// for its topic (all of them, when subscription knowledge is missing or stale). It is
+	// fire-and-forget and must not block the caller's request path.
+	Relay(m *model.Message) error
 	// AnnounceTopics tells peers that these topics just gained their first local subscriber,
 	// closing the routing-knowledge window to ~one round trip. Nop in single-node mode.
 	AnnounceTopics(topics []string)

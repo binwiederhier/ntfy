@@ -32,7 +32,7 @@ type apiStateTopics struct {
 	Added  []string `json:"added,omitempty"`
 }
 
-// peerState is what a peer last told us about itself; Broadcast routes around peers whose
+// peerState is what a peer last told us about itself; Relay routes around peers whose
 // fresh state provably excludes a topic.
 type peerState struct {
 	topics    *util.BloomFilter

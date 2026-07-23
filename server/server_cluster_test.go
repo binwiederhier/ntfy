@@ -16,7 +16,7 @@ import (
 	"heckel.io/ntfy/v2/user"
 )
 
-// fakeCluster records broadcast messages and topic announcements so tests can assert that every
+// fakeCluster records relayed messages and topic announcements so tests can assert that every
 // publish path passes through the cluster exactly once, and that subscription hooks fire.
 type fakeCluster struct {
 	mu        sync.Mutex
@@ -24,7 +24,7 @@ type fakeCluster struct {
 	announced []string
 }
 
-func (b *fakeCluster) Broadcast(m *model.Message) error {
+func (b *fakeCluster) Relay(m *model.Message) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.messages = append(b.messages, m)
@@ -55,7 +55,7 @@ func (b *fakeCluster) Announced() []string {
 	return append([]string{}, b.announced...)
 }
 
-func TestServer_Cluster_PublishBroadcastsOnce(t *testing.T) {
+func TestServer_Cluster_PublishRelaysOnce(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t, ""))
 	b := &fakeCluster{}
 	s.cluster = b
@@ -67,8 +67,8 @@ func TestServer_Cluster_PublishBroadcastsOnce(t *testing.T) {
 	require.Equal(t, "hi there", messages[0].Message)
 }
 
-func TestServer_Cluster_SyncEventBroadcasts(t *testing.T) {
-	// Account sync events are delivered via the user's st_... sync topic; without broadcasting
+func TestServer_Cluster_SyncEventRelays(t *testing.T) {
+	// Account sync events are delivered via the user's st_... sync topic; without relaying
 	// them, cross-device account sync silently breaks when a user's devices land on different
 	// cluster nodes.
 	s := newTestServer(t, newTestConfig(t, ""))
@@ -199,7 +199,7 @@ func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 		defer mu.Unlock()
 		return len(received) == 1
 	})
-	require.Empty(t, b.Messages()) // Peer messages are never re-broadcast
+	require.Empty(t, b.Messages()) // Peer messages are never re-relayed
 }
 
 func TestServer_Cluster_FirstSubscriberAnnounces(t *testing.T) {

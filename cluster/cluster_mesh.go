@@ -46,7 +46,7 @@ type meshCluster struct {
 	mux        *http.ServeMux // The internal peer API; Cluster is an http.Handler
 	mu         sync.Mutex
 	queues     map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
-	closed     bool                  // Guards against Broadcast spawning new workers after Close
+	closed     bool                  // Guards against Relay spawning new workers after Close
 	statesMu   sync.Mutex
 	states     map[NodeID]*peerState // what each peer last told us (subscription knowledge)
 	ctx        context.Context
@@ -156,7 +156,7 @@ func (c *meshCluster) heartbeatLoop() {
 
 // reconcileQueues aligns the per-peer queues with the given live peer set: it updates the URLs of
 // known peers and stops the queues (and workers) of peers that have left the registry. New queues
-// are created lazily by Broadcast, not here, so a freshly joined peer is reachable immediately.
+// are created lazily by Relay, not here, so a freshly joined peer is reachable immediately.
 func (c *meshCluster) reconcileQueues(peers []peer) {
 	metrics.ClusterPeers.Set(float64(len(peers)))
 	alive := make(map[NodeID]string, len(peers)) // node ID -> advertise URL
@@ -195,10 +195,11 @@ func (c *meshCluster) queueFor(p peer) *peerQueue {
 	return q
 }
 
-// Broadcast enqueues the message for delivery to every live peer node. Delivery is fire-and-forget
-// via each peer's bounded batching queue; if a peer's queue is full the message is dropped for
-// that peer (subscribers reconnect and re-poll history from the database).
-func (c *meshCluster) Broadcast(msg *model.Message) error {
+// Relay enqueues the message for delivery to every live peer node that may have subscribers for
+// its topic (all of them, absent fresh knowledge). Delivery is fire-and-forget via each peer's
+// bounded batching queue; if a peer's queue is full the message is dropped for that peer
+// (subscribers reconnect and re-poll history from the database).
+func (c *meshCluster) Relay(msg *model.Message) error {
 	peers, err := c.registry.LivePeers()
 	if err != nil {
 		return err
@@ -210,7 +211,7 @@ func (c *meshCluster) Broadcast(msg *model.Message) error {
 	if err != nil {
 		return err
 	}
-	metrics.ClusterMessagesBroadcast.Inc()
+	metrics.ClusterMessagesRelayed.Inc()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {

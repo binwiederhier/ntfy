@@ -323,7 +323,7 @@ func TestMesh_RelayAfterClose(t *testing.T) {
 	require.Empty(t, mesh.queues)
 }
 
-func TestRegistry_LivePeersStaleCacheOnError(t *testing.T) {
+func TestRegistry_PeersStaleCacheOnError(t *testing.T) {
 	// During a database hiccup, Peers serves the last-known peer list instead of erroring:
 	// fan-out keeps flowing to known peers, and the publish path does not log a warning per
 	// message for the duration of the outage.

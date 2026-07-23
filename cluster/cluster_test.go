@@ -21,7 +21,7 @@ func TestDeliver_RoundTrip(t *testing.T) {
 	require.Nil(t, err)
 	frag2, err := marshalMessage(m2)
 	require.Nil(t, err)
-	messages, err := unmarshalDeliverBody(assembleDeliverBody([][]byte{frag1, frag2}), 1<<20)
+	messages, err := unmarshalMessageBody(assembleMessageBody([][]byte{frag1, frag2}), 1<<20)
 	require.Nil(t, err)
 	require.Len(t, messages, 2)
 	require.Equal(t, "mytopic", messages[0].Topic)
@@ -37,7 +37,7 @@ func TestDeliver_SingleMessage(t *testing.T) {
 	// A single message is just a one-line body; there is no separate single-message format
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
-	messages, err := unmarshalDeliverBody(assembleDeliverBody([][]byte{frag}), 1<<20)
+	messages, err := unmarshalMessageBody(assembleMessageBody([][]byte{frag}), 1<<20)
 	require.Nil(t, err)
 	require.Len(t, messages, 1)
 }
@@ -48,36 +48,36 @@ func TestDeliver_MalformedLinesSkipped(t *testing.T) {
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "good"))
 	require.Nil(t, err)
 	body := []byte("this is not json\n{\"sender\":\"1.2.3.4\"}\n" + string(frag) + "\n\n")
-	messages, err := unmarshalDeliverBody(body, 1<<20)
+	messages, err := unmarshalMessageBody(body, 1<<20)
 	require.Nil(t, err)
 	require.Len(t, messages, 1)
 	require.Equal(t, "good", messages[0].Message)
 }
 
-// unmarshalDeliverBody is a test helper collecting the messages of an NDJSON fan-out body.
-func unmarshalDeliverBody(body []byte, maxLineBytes int) ([]*model.Message, error) {
+// unmarshalMessageBody is a test helper collecting the messages of an NDJSON message body.
+func unmarshalMessageBody(body []byte, maxLineBytes int) ([]*model.Message, error) {
 	var messages []*model.Message
-	err := decodeDeliverBody(bytes.NewReader(body), maxLineBytes, func(m *model.Message) {
+	err := decodeMessageBody(bytes.NewReader(body), maxLineBytes, func(m *model.Message) {
 		messages = append(messages, m)
 	})
 	return messages, err
 }
 
 func TestNop(t *testing.T) {
-	b, err := New(&Config{}, nil, nil) // not enabled -> nop cluster, no database required
+	b, err := New(&Config{}, nil, nil, nil) // not enabled -> nop cluster, no database required
 	require.Nil(t, err)
 	require.IsType(t, &nopCluster{}, b)
 	require.Nil(t, b.Broadcast(model.NewDefaultMessage("mytopic", "hi")))
 	// A single node is trivially the leader, so leader-gated jobs run without special-casing
 	require.True(t, b.IsLeader())
 	rr := httptest.NewRecorder()
-	b.ServeDeliver(rr, httptest.NewRequest("POST", DeliverPath, nil))
+	b.ServeHTTP(rr, httptest.NewRequest("POST", MessagePath, nil))
 	require.Equal(t, 404, rr.Code)
 	require.Nil(t, b.Close())
 }
 
 func TestNew_EnabledRequiresDatabase(t *testing.T) {
-	_, err := New(&Config{Enabled: true, Secret: "secret"}, nil, nil)
+	_, err := New(&Config{Enabled: true, Secret: "secret"}, nil, nil, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "database")
 }

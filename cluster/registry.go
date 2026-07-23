@@ -41,7 +41,7 @@ const peerCacheTTL = time.Second
 // TTL. Stale rows are pruned by the leader.
 type registry struct {
 	pool         *db.DB
-	nodeID       string
+	nodeID       NodeID
 	advertiseURL string
 	ttl          time.Duration
 	mu           sync.Mutex
@@ -50,7 +50,7 @@ type registry struct {
 }
 
 // newRegistry creates the registry table if it does not exist and registers this node.
-func newRegistry(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*registry, error) {
+func newRegistry(pool *db.DB, nodeID NodeID, advertiseURL string, ttl time.Duration) (*registry, error) {
 	r := &registry{
 		pool:         pool,
 		nodeID:       nodeID,
@@ -88,7 +88,7 @@ func (r *registry) createTable() error {
 // Register upserts this node into the registry with a fresh heartbeat and invalidates the local
 // peer cache.
 func (r *registry) Register() error {
-	if _, err := r.pool.Exec(upsertNodeQuery, r.nodeID, r.advertiseURL, time.Now().Unix()); err != nil {
+	if _, err := r.pool.Exec(upsertNodeQuery, string(r.nodeID), r.advertiseURL, time.Now().Unix()); err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -129,7 +129,7 @@ func (r *registry) LivePeers() ([]peer, error) {
 // queryLivePeers reads the current live peer set from the registry table.
 func (r *registry) queryLivePeers() ([]peer, error) {
 	cutoff := time.Now().Add(-r.ttl).Unix()
-	rows, err := r.pool.Query(selectLivePeersQuery, cutoff, r.nodeID)
+	rows, err := r.pool.Query(selectLivePeersQuery, cutoff, string(r.nodeID))
 	if err != nil {
 		return nil, err
 	}
@@ -137,9 +137,11 @@ func (r *registry) queryLivePeers() ([]peer, error) {
 	peers := make([]peer, 0)
 	for rows.Next() {
 		var p peer
-		if err := rows.Scan(&p.nodeID, &p.advertiseURL); err != nil {
+		var nodeID string
+		if err := rows.Scan(&nodeID, &p.advertiseURL); err != nil {
 			return nil, err
 		}
+		p.nodeID = NodeID(nodeID)
 		peers = append(peers, p)
 	}
 	if err := rows.Err(); err != nil {
@@ -157,6 +159,6 @@ func (r *registry) Prune() error {
 
 // Deregister deletes this node's registry row; called on shutdown.
 func (r *registry) Deregister() error {
-	_, err := r.pool.Exec(deleteNodeQuery, r.nodeID)
+	_, err := r.pool.Exec(deleteNodeQuery, string(r.nodeID))
 	return err
 }

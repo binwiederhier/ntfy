@@ -20,11 +20,12 @@ const (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID          string
-	subscribers map[int]*topicSubscriber
-	rateVisitor *visitor
-	lastAccess  time.Time
-	mu          sync.RWMutex
+	ID                string
+	subscribers       map[int]*topicSubscriber
+	rateVisitor       *visitor
+	lastAccess        time.Time
+	onFirstSubscriber func() // Fired (async) when the subscriber count goes 0 -> 1; may be nil
+	mu                sync.RWMutex
 }
 
 type topicSubscriber struct {
@@ -55,6 +56,10 @@ func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscribe
 		if !exists {
 			break
 		}
+	}
+	if len(t.subscribers) == 0 && t.onFirstSubscriber != nil {
+		// Fired async so cluster announcements never run under the topic lock
+		go t.onFirstSubscriber()
 	}
 	t.subscribers[subscriberID] = &topicSubscriber{
 		userID:     userID, // May be empty

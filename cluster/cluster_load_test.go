@@ -40,7 +40,7 @@ func TestMesh_Soak(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
-		messages, err := unmarshalDeliverBody(body, 1<<20)
+		messages, err := unmarshalMessageBody(body, 1<<20)
 		require.Nil(t, err)
 		mu.Lock()
 		requests++
@@ -53,7 +53,7 @@ func TestMesh_Soak(t *testing.T) {
 	defer srv.Close()
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.BatchLinger = 50 * time.Millisecond
-	mesh, err := newMeshCluster(conf, pool, nil)
+	mesh, err := newMeshCluster(conf, pool, nil, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	_, err = pool.Exec(upsertNodeQuery, "node-peer", srv.URL, time.Now().Unix())
@@ -100,7 +100,7 @@ func BenchmarkBroadcast(b *testing.B) {
 	pool := openTestPool(b, schemaDSN)
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.BatchLinger = time.Minute // Never flush; we measure enqueue only
-	mesh, err := newMeshCluster(conf, pool, nil)
+	mesh, err := newMeshCluster(conf, pool, nil, nil)
 	require.Nil(b, err)
 	defer mesh.Close()
 	_, err = pool.Exec(upsertNodeQuery, "node-peer", "http://127.0.0.1:1", time.Now().Unix())
@@ -122,11 +122,11 @@ func BenchmarkDecodeFanout(b *testing.B) {
 		require.Nil(b, err)
 		frags[i] = frag
 	}
-	body := assembleDeliverBody(frags)
+	body := assembleMessageBody(frags)
 	b.SetBytes(int64(len(body)))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		messages, err := unmarshalDeliverBody(body, 1<<20)
+		messages, err := unmarshalMessageBody(body, 1<<20)
 		if err != nil || len(messages) != 100 {
 			b.Fatal("decode failed")
 		}

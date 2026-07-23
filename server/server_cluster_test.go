@@ -16,11 +16,12 @@ import (
 	"heckel.io/ntfy/v2/user"
 )
 
-// fakeCluster records broadcast messages so tests can assert that every publish path passes
-// through the cluster broadcaster exactly once.
+// fakeCluster records broadcast messages and topic announcements so tests can assert that every
+// publish path passes through the cluster exactly once, and that subscription hooks fire.
 type fakeCluster struct {
-	mu       sync.Mutex
-	messages []*model.Message
+	mu        sync.Mutex
+	messages  []*model.Message
+	announced []string
 }
 
 func (b *fakeCluster) Broadcast(m *model.Message) error {
@@ -30,7 +31,13 @@ func (b *fakeCluster) Broadcast(m *model.Message) error {
 	return nil
 }
 
-func (b *fakeCluster) ServeDeliver(_ http.ResponseWriter, _ *http.Request) {}
+func (b *fakeCluster) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {}
+
+func (b *fakeCluster) AnnounceTopics(topics []string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.announced = append(b.announced, topics...)
+}
 
 func (b *fakeCluster) IsLeader() bool { return true }
 
@@ -40,6 +47,12 @@ func (b *fakeCluster) Messages() []*model.Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return append([]*model.Message{}, b.messages...)
+}
+
+func (b *fakeCluster) Announced() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]string{}, b.announced...)
 }
 
 func TestServer_Cluster_PublishBroadcastsOnce(t *testing.T) {
@@ -90,7 +103,7 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 		return nil
 	}, "", func() {})
 	// A valid fan-out request against the PUBLIC handler must not deliver
-	response := request(t, s, "POST", "/v1/internal/deliver",
+	response := request(t, s, "POST", "/v1/internal/message",
 		`{"message":{"id":"x1","time":1,"event":"message","topic":"mytopic","message":"sneaky"}}`,
 		map[string]string{"X-Cluster-Secret": "s3cret", "X-Cluster-Origin": "node-b"})
 	require.Equal(t, 404, response.Code)
@@ -100,7 +113,7 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 	mu.Unlock()
 	// The same request against the cluster listener handler DOES deliver
 	rr := httptest.NewRecorder()
-	req, err := http.NewRequest("POST", "/v1/internal/deliver",
+	req, err := http.NewRequest("POST", "/v1/internal/message",
 		strings.NewReader(`{"message":{"id":"x2","time":1,"event":"message","topic":"mytopic","message":"legit"}}`))
 	require.Nil(t, err)
 	req.Header.Set("X-Cluster-Secret", "s3cret")
@@ -187,4 +200,23 @@ func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 		return len(received) == 1
 	})
 	require.Empty(t, b.Messages()) // Peer messages are never re-broadcast
+}
+
+func TestServer_Cluster_FirstSubscriberAnnounces(t *testing.T) {
+	// A topic gaining its FIRST subscriber is announced to peers exactly once, so publishers on
+	// other nodes stop skipping this node for it without waiting for the next state push.
+	s := newTestServer(t, newTestConfig(t, ""))
+	b := &fakeCluster{}
+	s.cluster = b
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	subscriber := func(_ *visitor, _ *model.Message) error { return nil }
+	topics[0].Subscribe(subscriber, "", func() {})
+	waitFor(t, func() bool {
+		return len(b.Announced()) == 1 && b.Announced()[0] == "mytopic"
+	})
+	// A second subscriber does not re-announce
+	topics[0].Subscribe(subscriber, "", func() {})
+	time.Sleep(250 * time.Millisecond)
+	require.Len(t, b.Announced(), 1)
 }

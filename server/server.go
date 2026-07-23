@@ -346,36 +346,59 @@ func New(conf *Config) (*Server, error) {
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
 		Enabled:         conf.ClusterListen != "", // Setting cluster-listen implicitly enables clustering
-		NodeID:          conf.ClusterNodeID,
+		NodeID:          cluster.NodeID(conf.ClusterNodeID),
 		AdvertiseURL:    advertiseURL,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
-	}, pool, s.deliverFromBus)
+	}, pool, s.deliverFromBus, s.liveTopics)
 	if err != nil {
 		return nil, err
+	}
+	// The cluster routes messages by subscription knowledge: peers learn this node's live topics
+	// via periodic state pushes (liveTopics) and immediate announcements on a topic's first
+	// subscriber (the hook below; also set in topicsFromIDs for topics created later)
+	for _, t := range s.topics {
+		t.onFirstSubscriber = s.topicAnnouncer(t.ID)
 	}
 	return s, nil
 }
 
 // clusterHandler returns the handler served on the dedicated cluster listener (cluster-listen).
-// It serves only the node-to-node fan-out endpoint plus a health endpoint; the public listeners
-// never expose these paths, so internal traffic cannot be reached from the outside even before
-// any firewalling.
+// It serves the internal peer API (owned and routed by the cluster itself, including auth) plus
+// a health endpoint; the public listeners never expose these paths, so internal traffic cannot
+// be reached from the outside even before any firewalling.
 func (s *Server) clusterHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc(cluster.DeliverPath, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		s.cluster.ServeDeliver(w, r)
-	})
 	mux.HandleFunc(apiHealthPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, `{"healthy":true}`+"\n")
 	})
+	mux.Handle("/", s.cluster)
 	return mux
+}
+
+// liveTopics returns the topics that currently have at least one subscriber, computed fresh on
+// every call. Deliberately NOT the whole topics map: it also holds subscriber-less topics
+// rebuilt from the message cache, which would gut the routing filter's selectivity.
+func (s *Server) liveTopics() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	topics := make([]string, 0, len(s.topics))
+	for _, t := range s.topics {
+		if subscribers, _ := t.Stats(); subscribers > 0 {
+			topics = append(topics, t.ID)
+		}
+	}
+	return topics
+}
+
+// topicAnnouncer returns the first-subscriber hook for a topic: it tells peer nodes right away
+// that this node now wants messages for it (see Cluster.AnnounceTopics).
+func (s *Server) topicAnnouncer(id string) func() {
+	return func() {
+		s.cluster.AnnounceTopics([]string{id})
+	}
 }
 
 // deliverFromBus delivers a message received from a peer node (via the cluster) to this
@@ -387,7 +410,7 @@ func (s *Server) deliverFromBus(m *model.Message) {
 	t, ok := s.topics[m.Topic]
 	s.mu.RUnlock()
 	if !ok {
-		metrics.ClusterDeliverWasted.Inc() // Broadcast-and-filter: this node had no use for the message
+		metrics.ClusterMessagesWasted.Inc() // Broadcast-and-filter: this node had no use for the message
 		return
 	}
 	v := s.visitor(m.Sender, nil)
@@ -1944,7 +1967,9 @@ func (s *Server) topicsFromIDs(v *visitor, ids ...string) ([]*topic, error) {
 			if v != nil && !v.TopicCreationAllowed() {
 				return nil, errHTTPTooManyRequestsLimitTopicCreation
 			}
-			s.topics[id] = newTopic(id)
+			t := newTopic(id)
+			t.onFirstSubscriber = s.topicAnnouncer(id)
+			s.topics[id] = t
 		}
 		topics = append(topics, s.topics[id])
 	}

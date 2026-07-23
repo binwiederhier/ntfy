@@ -13,9 +13,11 @@ type nopCluster struct{}
 
 func (c *nopCluster) Broadcast(_ *model.Message) error { return nil }
 
-func (c *nopCluster) ServeDeliver(w http.ResponseWriter, _ *http.Request) {
+func (c *nopCluster) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
+
+func (c *nopCluster) AnnounceTopics(_ []string) {}
 
 func (c *nopCluster) IsLeader() bool { return true }
 

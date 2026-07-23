@@ -69,7 +69,7 @@ func TestServer_Cluster_SyncEventBroadcasts(t *testing.T) {
 	require.Equal(t, "st_1234", messages[0].Topic)
 }
 
-func TestServer_Cluster_FanoutNotOnPublicHandler(t *testing.T) {
+func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 	// The fan-out endpoint lives only on the dedicated cluster listener; the public handler must
 	// not serve it, even with cluster mode on and a valid secret.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)

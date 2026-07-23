@@ -107,6 +107,27 @@ func (r *registry) LivePeers() ([]peer, error) {
 		return peers, nil
 	}
 	r.mu.Unlock()
+	peers, err := r.queryLivePeers()
+	if err != nil {
+		// Serve the last-known peer list during database hiccups: fan-out keeps flowing to
+		// known peers instead of erroring (and logging) once per published message for the
+		// duration of the outage. Dead peers in the stale list only cost failed sends.
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.peers != nil {
+			return r.peers, nil
+		}
+		return nil, err
+	}
+	r.mu.Lock()
+	r.peers = peers
+	r.peersFetched = time.Now()
+	r.mu.Unlock()
+	return peers, nil
+}
+
+// queryLivePeers reads the current live peer set from the registry table.
+func (r *registry) queryLivePeers() ([]peer, error) {
 	cutoff := time.Now().Add(-r.ttl).Unix()
 	rows, err := r.pool.Query(selectLivePeersQuery, cutoff, r.nodeID)
 	if err != nil {
@@ -124,10 +145,6 @@ func (r *registry) LivePeers() ([]peer, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	r.mu.Lock()
-	r.peers = peers
-	r.peersFetched = time.Now()
-	r.mu.Unlock()
 	return peers, nil
 }
 

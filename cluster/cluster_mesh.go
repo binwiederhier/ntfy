@@ -41,6 +41,7 @@ type meshCluster struct {
 	httpClient *http.Client
 	mu         sync.Mutex
 	queues     map[string]*peerQueue // node_id -> queue; reconciled against the registry
+	closed     bool                  // Guards against Broadcast spawning new workers after Close
 	ctx        context.Context
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
@@ -150,20 +151,23 @@ func (c *meshCluster) queueFor(p peer) *peerQueue {
 // via each peer's bounded batching queue; if a peer's queue is full the message is dropped for
 // that peer (subscribers reconnect and re-poll history from the database).
 func (c *meshCluster) Broadcast(msg *model.Message) error {
-	frag, err := marshalMessage(msg)
-	if err != nil {
-		return err
-	}
 	peers, err := c.registry.LivePeers()
 	if err != nil {
 		return err
 	}
 	if len(peers) == 0 {
-		return nil
+		return nil // Cluster of one; skip the marshal
+	}
+	frag, err := marshalMessage(msg)
+	if err != nil {
+		return err
 	}
 	metrics.ClusterMessagesBroadcast.Inc()
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.closed {
+		return nil // Shutting down; the message is dropped like any other in-flight fan-out
+	}
 	for _, p := range peers {
 		if !c.queueFor(p).queue.TryEnqueue(frag) {
 			metrics.ClusterQueueDropped.Inc()
@@ -250,6 +254,7 @@ func (c *meshCluster) Close() error {
 	// Close the peer queues so their workers flush and exit; final sends are best-effort since
 	// the context is already canceled (parity with fire-and-forget delivery)
 	c.mu.Lock()
+	c.closed = true
 	for nodeID, q := range c.queues {
 		q.queue.Close()
 		delete(c.queues, nodeID)

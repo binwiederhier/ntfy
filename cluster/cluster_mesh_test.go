@@ -302,6 +302,47 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	})
 }
 
+func TestMesh_BroadcastAfterClose(t *testing.T) {
+	// A Broadcast racing shutdown (e.g. an in-flight publish during server Stop) must not spawn
+	// a new peer queue and worker after Close: the worker would never exit (its queue is never
+	// closed) and nothing waits for it.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	require.Nil(t, err)
+	_, err = pool.Exec(upsertNodeQuery, "node-peer", "http://127.0.0.1:1", time.Now().Unix())
+	require.Nil(t, err)
+	require.Nil(t, mesh.Close())
+	require.Nil(t, mesh.Broadcast(model.NewDefaultMessage("mytopic", "too late"))) // Dropped silently
+	mesh.mu.Lock()
+	defer mesh.mu.Unlock()
+	require.Empty(t, mesh.queues)
+}
+
+func TestRegistry_LivePeersStaleCacheOnError(t *testing.T) {
+	// During a database hiccup, LivePeers serves the last-known peer list instead of erroring:
+	// fan-out keeps flowing to known peers, and the publish path does not log a warning per
+	// message for the duration of the outage.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	r, err := newRegistry(pool, "node-a", "http://127.0.0.1:1", 5*time.Second)
+	require.Nil(t, err)
+	_, err = pool.Exec(upsertNodeQuery, "node-peer", "http://127.0.0.1:2", time.Now().Unix())
+	require.Nil(t, err)
+	peers, err := r.LivePeers()
+	require.Nil(t, err)
+	require.Len(t, peers, 1)
+	// Expire the cache and break the database; the stale list must still be served
+	r.mu.Lock()
+	r.peersFetched = time.Time{}
+	r.mu.Unlock()
+	require.Nil(t, pool.Close())
+	peers, err = r.LivePeers()
+	require.Nil(t, err)
+	require.Len(t, peers, 1)
+	require.Equal(t, "node-peer", peers[0].nodeID)
+}
+
 func TestMesh_LeaderFailover(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)

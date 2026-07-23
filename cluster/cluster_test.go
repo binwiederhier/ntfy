@@ -10,7 +10,7 @@ import (
 	"heckel.io/ntfy/v2/model"
 )
 
-func TestFanout_RoundTrip(t *testing.T) {
+func TestDeliver_RoundTrip(t *testing.T) {
 	// The fan-out body is NDJSON: one apiDeliverMessage per line, joined from pre-marshaled
 	// fragments; the origin travels in a header, not the body
 	m1 := model.NewDefaultMessage("mytopic", "my message")
@@ -33,7 +33,7 @@ func TestFanout_RoundTrip(t *testing.T) {
 	require.False(t, messages[1].Sender.IsValid())
 }
 
-func TestFanout_SingleMessage(t *testing.T) {
+func TestDeliver_SingleMessage(t *testing.T) {
 	// A single message is just a one-line body; there is no separate single-message format
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
@@ -42,7 +42,7 @@ func TestFanout_SingleMessage(t *testing.T) {
 	require.Len(t, messages, 1)
 }
 
-func TestFanout_MalformedLinesSkipped(t *testing.T) {
+func TestDeliver_MalformedLinesSkipped(t *testing.T) {
 	// Fan-out is fire-and-forget: a malformed or message-less line is skipped (and logged), the
 	// remaining lines are still delivered
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "good"))

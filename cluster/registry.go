@@ -33,8 +33,10 @@ const (
 const schemaLockKey = int64(0x6e746679c) // "ntfy" + c (create)
 
 // peerCacheTTL is how long the peer list is cached between registry reads, so the message path
-// does not hit the database on every publish.
-const peerCacheTTL = time.Second
+// does not hit the database on every publish. Register() invalidates the cache on every
+// heartbeat, so the EFFECTIVE staleness is bounded by the heartbeat interval, not this value;
+// the TTL only caps it if that invalidation ever goes away.
+const peerCacheTTL = 30 * time.Second
 
 // registry is the node membership table (control plane): each node upserts its own row with a
 // fresh heartbeat every few seconds, and peers are the other rows with a heartbeat newer than the

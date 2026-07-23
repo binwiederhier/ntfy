@@ -91,7 +91,7 @@ func TestMesh_CrossNodeDelivery(t *testing.T) {
 	require.Equal(t, "hello cross-node", received[0].Message)
 }
 
-func TestMesh_ServeDeliver_Auth(t *testing.T) {
+func TestMesh_PeerAPI_Auth(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	var delivered int
@@ -136,7 +136,7 @@ func TestMesh_ServeDeliver_Auth(t *testing.T) {
 	require.Equal(t, 1, delivered)
 }
 
-func TestMesh_ServeDeliver_SelfOrigin(t *testing.T) {
+func TestMesh_PeerAPI_SelfOrigin(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	var delivered int

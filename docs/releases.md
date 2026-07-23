@@ -4,13 +4,45 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Current stable releases
 
-| Component        | Version | Release date |
-|------------------|---------|--------------|
-| ntfy server      | v2.26.3 | Jul 20, 2026 |
-| ntfy Android app | v1.24.0 | Mar 5, 2026  |
-| ntfy iOS app     | v1.7.0  | May 30, 2026 |
+| Component        | Version | Release date  |
+|------------------|---------|---------------|
+| ntfy server      | v2.26.3 | Jul 20, 2026  |
+| ntfy Android app | v1.25.2 | July 23, 2026 |
+| ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy Android v1.25.2
+Released July 23, 2026
+
+This release makes the "connection lost" alert configurable and turns it off by default. Folks did not like it and many reached out
+or even gave ntfy bad reviews. I heard you! You can re-enable the alert in the advanced settings.
+
+The release also tries to be smarter about not retrying the connection at all if the app is in flight mode, or has no network. If there
+is no network, ntfy now keeps the foreground service alive and shows a "Waiting for network" notification, then resumes automatically
+once connectivity returns.
+
+Another change related to the networking is that we now force-reconnect when the connection is changed, e.g. during transitions
+from Wi-Fi to cellular network, or vice versa. That should allow for faster transitions during hand-overs.
+
+We also increase the client-side WebSocket ping interval from 1 minute to 3 minutes, which should slightly improve battery life,
+especially when paired with increaseing the server-side `keepalive-interval` in your self-hosted server.
+
+**Features:**
+
+* Add configurable "Alert when connection is lost" setting, turned off by default ([#1665](https://github.com/binwiederhier/ntfy/issues/1665), [#1662](https://github.com/binwiederhier/ntfy/issues/1662), [#1652](https://github.com/binwiederhier/ntfy/issues/1652), [#1655](https://github.com/binwiederhier/ntfy/issues/1655), thanks to [@tintamarre](https://github.com/tintamarre), [@sjozs](https://github.com/sjozs), [@TheRealOne78](https://github.com/TheRealOne78), and [@DAE51D](https://github.com/DAE51D) for reporting)
+* Handle "no network" gracefully: when the device is offline or in airplane mode, ntfy now stops retrying, suppresses the connection-lost alert, and keeps the foreground service alive with a "Waiting for network" notification, resuming instant delivery automatically when connectivity returns ([ntfy-android#165](https://github.com/binwiederhier/ntfy-android/pull/165), thanks to [@tintamarre](https://github.com/tintamarre) for the contribution, and [#1709](https://github.com/binwiederhier/ntfy/issues/1709), thanks to [@isaitgirl](https://github.com/isaitgirl) for reporting)
+* Improve battery life by increasing WebSocket client ping interval from 1 min to 3 min, and reconnect instantly on Wi-Fi/cellular/VPN transitions ([ntfy-android#113](https://github.com/binwiederhier/ntfy-android/pull/113), thanks to [@ftilde](https://github.com/ftilde) for the investigation)
+* Disable UnifiedPush components when UnifiedPush is disabled in settings ([ntfy-android#168](https://github.com/binwiederhier/ntfy-android/pull/168), thanks to [@p1gp1g](https://github.com/p1gp1g) for the contribution)
+
+**Bug fixes + maintenance:**
+
+* Fix the "connection lost" alert briefly disappearing and re-firing when roaming between networks (e.g. Wi-Fi to cellular), by no longer cancelling it during the transient no-network gap of a handover
+* Fix the "connection lost" alert repeatedly waking the screen while a server stayed unreachable, by no longer re-posting the alert once it is already showing
+* Fix the "connection lost" alert firing late, erratically, or not at all when a connection kept dropping (e.g. a flaky server) rather than being refused outright, by tracking how long the connection has been down independently of whether the drop warrants a UI error
+* Undo automatic phone number linking for numbers in message body ([ntfy-android#170](https://github.com/binwiederhier/ntfy-android/pull/170), thanks to [@acortelyou](https://github.com/acortelyou) for the contribution)
+* Fix subscription icons disappearing after a few days due to Android clearing cache ([#1322](https://github.com/binwiederhier/ntfy/issues/1322), thanks to [@mcanning](https://github.com/mcanning) for reporting)
+* Fix UnifiedPush `failed_reason` being sent as an enum instead of a string, which caused an exception in receiving apps that read it as a string extra ([ntfy-android#182](https://github.com/binwiederhier/ntfy-android/pull/182), thanks to [@p1gp1g](https://github.com/p1gp1g) for the contribution)
 
 ### ntfy server v2.26.3
 Released July 20, 2026
@@ -2021,6 +2053,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.27.0 (UNRELEASED)
 
+**Security:**
+
+* Exclude secrets (Stripe/Twilio/web push keys, SMTP password, provisioned users and tokens) from the config hash served to the web app
+
 **Features:**
 
 * Allow logging in with your verified primary email address (in addition to your username), so a password reset no longer leaves you unable to sign in when you only remember the email you signed up with
@@ -2029,37 +2065,6 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Fix Twilio phone calls and phone number verifications failing silently when Twilio rejected the request, and move the Twilio integration into its own `twilio` package
 * Move the Prometheus metrics into a dedicated `metrics` package
-
-### ntfy Android v1.25.2 (UNRELEASED)
-
-This release makes the "connection lost" alert configurable and turns it off by default. Folks did not like it and many reached out
-or even gave ntfy bad reviews. I heard you! You can re-enable the alert in the advanced settings.
-
-The release also tries to be smarter about not retrying the connection at all if the app is in flight mode, or has no network. If there
-is no network, ntfy now keeps the foreground service alive and shows a "Waiting for network" notification, then resumes automatically
-once connectivity returns.
-
-Another change related to the networking is that we now force-reconnect when the connection is changed, e.g. during transitions
-from Wi-Fi to cellular network, or vice versa. That should allow for faster transitions during hand-overs.
-
-We also increase the client-side WebSocket ping interval from 1 minute to 3 minutes, which should slightly improve battery life,
-especially when paired with increaseing the server-side `keepalive-interval` in your self-hosted server. 
-
-**Features:**
-
-* Add configurable "Alert when connection is lost" setting, turned off by default ([#1665](https://github.com/binwiederhier/ntfy/issues/1665), [#1662](https://github.com/binwiederhier/ntfy/issues/1662), [#1652](https://github.com/binwiederhier/ntfy/issues/1652), [#1655](https://github.com/binwiederhier/ntfy/issues/1655), thanks to [@tintamarre](https://github.com/tintamarre), [@sjozs](https://github.com/sjozs), [@TheRealOne78](https://github.com/TheRealOne78), and [@DAE51D](https://github.com/DAE51D) for reporting)
-* Handle "no network" gracefully: when the device is offline or in airplane mode, ntfy now stops retrying, suppresses the connection-lost alert, and keeps the foreground service alive with a "Waiting for network" notification, resuming instant delivery automatically when connectivity returns ([ntfy-android#165](https://github.com/binwiederhier/ntfy-android/pull/165), thanks to [@tintamarre](https://github.com/tintamarre) for the contribution, and [#1709](https://github.com/binwiederhier/ntfy/issues/1709), thanks to [@isaitgirl](https://github.com/isaitgirl) for reporting)
-* Improve battery life by increasing WebSocket client ping interval from 1 min to 3 min, and reconnect instantly on Wi-Fi/cellular/VPN transitions ([ntfy-android#113](https://github.com/binwiederhier/ntfy-android/pull/113), thanks to [@ftilde](https://github.com/ftilde) for the investigation)
-* Disable UnifiedPush components when UnifiedPush is disabled in settings ([ntfy-android#168](https://github.com/binwiederhier/ntfy-android/pull/168), thanks to [@p1gp1g](https://github.com/p1gp1g) for the contribution)
-
-**Bug fixes + maintenance:**
-
-* Fix the "connection lost" alert briefly disappearing and re-firing when roaming between networks (e.g. Wi-Fi to cellular), by no longer cancelling it during the transient no-network gap of a handover
-* Fix the "connection lost" alert repeatedly waking the screen while a server stayed unreachable, by no longer re-posting the alert once it is already showing
-* Fix the "connection lost" alert firing late, erratically, or not at all when a connection kept dropping (e.g. a flaky server) rather than being refused outright, by tracking how long the connection has been down independently of whether the drop warrants a UI error
-* Undo automatic phone number linking for numbers in message body ([ntfy-android#170](https://github.com/binwiederhier/ntfy-android/pull/170), thanks to [@acortelyou](https://github.com/acortelyou) for the contribution)
-* Fix subscription icons disappearing after a few days due to Android clearing cache ([#1322](https://github.com/binwiederhier/ntfy/issues/1322), thanks to [@mcanning](https://github.com/mcanning) for reporting)
-* Fix UnifiedPush `failed_reason` being sent as an enum instead of a string, which caused an exception in receiving apps that read it as a string extra ([ntfy-android#182](https://github.com/binwiederhier/ntfy-android/pull/182), thanks to [@p1gp1g](https://github.com/p1gp1g) for the contribution)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

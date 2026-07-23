@@ -137,9 +137,9 @@ type Config struct {
 	AuthFile                             string
 	AuthStartupQueries                   string
 	AuthDefault                          user.Permission
-	AuthUsers                            []*user.User
+	AuthUsers                            []*user.User `hash:"-"`
 	AuthAccess                           map[string][]*user.Grant
-	AuthTokens                           map[string][]*user.Token
+	AuthTokens                           map[string][]*user.Token `hash:"-"`
 	AuthBcryptCost                       int
 	AuthStatsQueueWriterInterval         time.Duration
 	AuthAccessCacheEnabled               bool          // Enables the in-memory ACL cache (high volume servers only)
@@ -160,17 +160,17 @@ type Config struct {
 	FirebasePollInterval                 time.Duration
 	FirebaseQuotaExceededPenaltyDuration time.Duration
 	UpstreamBaseURL                      string
-	UpstreamAccessToken                  string
+	UpstreamAccessToken                  string `hash:"-"`
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
-	SMTPSenderPass                       string
+	SMTPSenderPass                       string `hash:"-"`
 	SMTPSenderFrom                       string
 	SMTPSenderVerify                     bool
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
 	TwilioAccount                        string
-	TwilioAuthToken                      string
+	TwilioAuthToken                      string `hash:"-"`
 	TwilioPhoneNumber                    string
 	TwilioCallsBaseURL                   string
 	TwilioVerifyBaseURL                  string
@@ -205,8 +205,8 @@ type Config struct {
 	BehindProxy                          bool           // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
 	ProxyForwardedHeader                 string         // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
 	ProxyTrustedPrefixes                 []netip.Prefix // List of trusted proxy networks (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
-	StripeSecretKey                      string
-	StripeWebhookKey                     string
+	StripeSecretKey                      string         `hash:"-"`
+	StripeWebhookKey                     string         `hash:"-"`
 	StripePriceCacheDuration             time.Duration
 	BillingContact                       string
 	EnableSignup                         bool // Enable creation of accounts via API and UI
@@ -215,7 +215,7 @@ type Config struct {
 	EnableReservations                   bool // Allow users with role "user" to own/reserve topics
 	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
-	WebPushPrivateKey                    string
+	WebPushPrivateKey                    string `hash:"-"`
 	WebPushPublicKey                     string
 	WebPushFile                          string
 	WebPushEmailAddress                  string
@@ -354,6 +354,10 @@ func (c *Config) Hash() string {
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		fieldName := t.Field(i).Name
+		// Secrets must not feed the hash
+		if t.Field(i).Tag.Get("hash") == "-" {
+			continue
+		}
 		// Try to marshal the field and skip if it fails (e.g. *template.Template, netip.Prefix)
 		if b, err := json.Marshal(field.Interface()); err == nil {
 			result += fmt.Sprintf("%s:%s|", fieldName, string(b))

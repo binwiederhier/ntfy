@@ -1,7 +1,6 @@
-// Package schema tracks and migrates database schemas for any store: each store records its
-// version in the shared schema_version table (keyed by store name), and Migrate creates or
-// step-by-step upgrades the store's schema inside a single transaction. It works on PostgreSQL
-// and SQLite, and takes a bare *sql.DB so any package can use it without further dependencies.
+// Package schema tracks and migrates database schemas: each store records its version in the
+// shared schema_version table (keyed by store name), and Migrate creates or upgrades the
+// store's schema inside a single transaction. Works on PostgreSQL and SQLite.
 package schema
 
 import (
@@ -10,9 +9,7 @@ import (
 	"fmt"
 )
 
-// Queries by dialect. The version table is shared by all stores; on PostgreSQL its creation and
-// all migrations are additionally serialized by an advisory lock, because CREATE TABLE IF NOT
-// EXISTS is not atomic and concurrently cold-booting nodes would otherwise race on DDL.
+// Queries by dialect; the version table is shared by all stores
 const (
 	createVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`
 
@@ -24,7 +21,8 @@ const (
 	sqliteUpsertVersionQuery = `INSERT INTO schema_version (store, version) VALUES (?, ?) ON CONFLICT (store) DO UPDATE SET version = excluded.version`
 )
 
-// lockKey is the PostgreSQL advisory-lock key serializing all schema setup ("ntfy" + s).
+// lockKey serializes all schema setup on PostgreSQL ("ntfy" + s): CREATE TABLE IF NOT EXISTS is
+// not atomic, so concurrently cold-booting nodes would otherwise race on DDL and crash.
 const lockKey = int64(0x6e746679a)
 
 // Dialect selects the SQL flavor Migrate speaks to the version table.
@@ -36,23 +34,17 @@ const (
 	SQLite
 )
 
-// MigrateFunc applies one schema change inside the setup transaction: either the initial
-// creation of a store's tables, or one step upgrading a store from version N to N+1. Migrations
-// that need configuration or other state capture it via closure when the migrations map is
-// built, e.g. func migrations(cacheDuration time.Duration) map[int]MigrateFunc.
+// MigrateFunc applies one schema change inside the setup transaction: the initial creation of
+// a store's tables, or one step upgrading a store from version N to N+1. Migrations needing
+// config capture it via closure, e.g. func migrations(cacheDuration time.Duration) map[int]MigrateFunc.
 type MigrateFunc func(tx *sql.Tx) error
 
-// Migrate creates or upgrades the named store's schema to targetVersion, all inside one
-// transaction: a fresh database gets the create func at the target version; an existing one is
-// upgraded step by step through the migrations map (keyed by the FROM version; always append,
-// never insert in the middle); a database migrated by newer code is refused. Multiple stores
-// share the version table, keyed by store name.
-//
-// DDL is transactional on both supported databases, so a failed migration rolls back atomically
-// (no half-applied schema, no lying version row). Two caveats for migration authors: statements
-// that refuse to run in a transaction block (notably Postgres CREATE INDEX CONCURRENTLY, VACUUM)
-// cannot go through Migrate, and DDL holds exclusive table locks until commit, so keep
-// migrations fast and put large backfills in their own steps.
+// Migrate creates or upgrades the named store's schema to targetVersion in one transaction: a
+// fresh database gets the create func; an existing one is upgraded step by step through the
+// migrations map (keyed by the FROM version; always append, never insert in the middle); a
+// schema migrated by newer code is refused. A failed migration rolls back atomically. Caveats:
+// statements that refuse transaction blocks (Postgres CREATE INDEX CONCURRENTLY, VACUUM) cannot
+// go through Migrate, and DDL holds exclusive locks until commit, so keep migrations fast.
 func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, create MigrateFunc, migrations map[int]MigrateFunc) error {
 	tx, err := db.Begin()
 	if err != nil {

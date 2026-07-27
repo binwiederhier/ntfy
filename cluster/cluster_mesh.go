@@ -37,21 +37,22 @@ const (
 // Each peer has its own bounded send queue and delivery worker, so a slow or wedged peer only
 // backs up (and eventually drops) its own queue and never delays delivery to healthy peers.
 type meshCluster struct {
-	conf       *Config
-	deliver    DeliverFunc
-	topics     TopicsFunc
-	registry   *registry
-	leader     *pg.Leader
-	httpClient *http.Client
-	mux        *http.ServeMux // The internal peer API; Cluster is an http.Handler
-	mu         sync.Mutex
-	queues     map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
-	closed     bool                  // Guards against Relay spawning new workers after Close
-	statesMu   sync.Mutex
-	states     map[NodeID]*peerState // what each peer last told us (subscription knowledge)
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         sync.WaitGroup
+	conf          *Config
+	deliver       DeliverFunc
+	topics        TopicsFunc
+	registry      *registry
+	leader        *pg.Leader
+	httpClient    *http.Client
+	mux           *http.ServeMux // The internal peer API; Cluster is an http.Handler
+	mu            sync.Mutex
+	queues        map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
+	closed        bool                  // Guards against Relay spawning new workers after Close
+	statesMu      sync.Mutex
+	states        map[NodeID]*peerState // what each peer last told us (subscription knowledge)
+	lastStatePush time.Time             // Only touched by the heartbeat goroutine
+	ctx           context.Context
+	cancel        context.CancelFunc
+	wg            sync.WaitGroup
 }
 
 // newMeshCluster creates the mesh cluster: it ensures the registry table exists, registers this
@@ -114,42 +115,44 @@ func (c *meshCluster) authenticated(h func(origin NodeID, w http.ResponseWriter,
 	}
 }
 
-// heartbeatLoop periodically refreshes this node's registry heartbeat, retries/confirms the
-// leader lock, reconciles the per-peer queues against the registry, and (as leader) prunes
-// long-dead registry rows.
+// heartbeatLoop runs one heartbeat immediately (the ticker first fires a full interval after
+// startup, and a fresh node should be leader-capable and state-visible right away), then one per
+// interval until shutdown.
 func (c *meshCluster) heartbeatLoop() {
 	defer c.wg.Done()
 	ticker := time.NewTicker(c.conf.HeartbeatInterval)
 	defer ticker.Stop()
-	// Attempt leadership immediately: the ticker first fires a full interval after startup, and
-	// a fresh single-node cluster should not be leaderless (skipping leader-gated jobs) until then
-	if c.leader.TryAcquire(c.ctx) {
-		metrics.ClusterLeader.Set(1)
-	}
-	var lastStatePush time.Time // Zero, so the first tick pushes immediately
+	c.heartbeat()
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			if err := c.registry.Register(); err != nil {
-				log.Tag(tag).Err(err).Warn("Failed to refresh node registry heartbeat")
-			}
-			if c.leader.TryAcquire(c.ctx) {
-				metrics.ClusterLeader.Set(1)
-				if err := c.registry.Prune(); err != nil {
-					log.Tag(tag).Err(err).Warn("Failed to prune stale nodes")
-				}
-			} else {
-				metrics.ClusterLeader.Set(0)
-			}
-			if peers, err := c.registry.Peers(); err == nil {
-				c.reconcileQueues(peers)
-				if time.Since(lastStatePush) >= c.conf.StateInterval {
-					c.pushState(peers)
-					lastStatePush = time.Now()
-				}
-			}
+			c.heartbeat()
+		}
+	}
+}
+
+// heartbeat is one control-plane tick: refresh this node's registry row, retry/confirm the
+// leader lock, prune long-dead registry rows (as leader), reconcile the per-peer queues, and
+// periodically push our subscription state to peers.
+func (c *meshCluster) heartbeat() {
+	if err := c.registry.Register(); err != nil {
+		log.Tag(tag).Err(err).Warn("Failed to refresh node registry heartbeat")
+	}
+	if c.leader.TryAcquire(c.ctx) {
+		metrics.ClusterLeader.Set(1)
+		if err := c.registry.Prune(); err != nil {
+			log.Tag(tag).Err(err).Warn("Failed to prune stale nodes")
+		}
+	} else {
+		metrics.ClusterLeader.Set(0)
+	}
+	if peers, err := c.registry.Peers(); err == nil {
+		c.reconcileQueues(peers)
+		if time.Since(c.lastStatePush) >= c.conf.StateInterval {
+			c.pushState(peers)
+			c.lastStatePush = time.Now()
 		}
 	}
 }
@@ -406,11 +409,13 @@ func (c *meshCluster) Close() error {
 		delete(c.queues, nodeID)
 	}
 	c.mu.Unlock()
+	// Wait for the loops BEFORE deregistering: an in-flight heartbeat's Register would otherwise
+	// re-insert our row right after Deregister deleted it
+	c.wg.Wait()
 	if err := c.registry.Deregister(); err != nil {
 		log.Tag(tag).Err(err).Warn("Failed to deregister node")
 	}
 	c.leader.Release()
 	metrics.ClusterLeader.Set(0)
-	c.wg.Wait()
 	return nil
 }

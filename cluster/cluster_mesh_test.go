@@ -45,6 +45,17 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 	}
 }
 
+// registerFakePeer upserts a registry row for a fake peer, creating the table if the mesh has
+// not been constructed yet (tests register fakes before the mesh boots, since its first
+// heartbeat caches the peer list).
+func registerFakePeer(t *testing.T, pool *db.DB, nodeID NodeID, url string) {
+	t.Helper()
+	_, err := pool.Exec(createNodeRegistryTableQuery)
+	require.Nil(t, err)
+	_, err = pool.Exec(upsertNodeQuery, string(nodeID), url, time.Now().Unix())
+	require.Nil(t, err)
+}
+
 func waitFor(t *testing.T, f func() bool) {
 	t.Helper()
 	for i := 0; i < 100; i++ {
@@ -185,14 +196,13 @@ func TestMesh_SlowPeerIsolation(t *testing.T) {
 	}))
 	defer srvSlow.Close()
 	defer close(release)
+	// Register the fake peers before the mesh boots; its first heartbeat caches the peer list
+	for i, url := range []string{srvFast.URL, srvSlow.URL} {
+		registerFakePeer(t, pool, NodeID(fmt.Sprintf("node-fake-%d", i)), url)
+	}
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	// Register the fake peers directly in the registry; they are just rows with fresh heartbeats
-	for i, url := range []string{srvFast.URL, srvSlow.URL} {
-		_, err := pool.Exec(upsertNodeQuery, fmt.Sprintf("node-fake-%d", i), url, time.Now().Unix())
-		require.Nil(t, err)
-	}
 	const n = 20
 	for i := 0; i < n; i++ {
 		require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i))))
@@ -223,13 +233,12 @@ func TestMesh_BatchCoalescing(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
+	registerFakePeer(t, pool, "node-fake", srv.URL)
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.BatchLinger = 150 * time.Millisecond
 	mesh, err := newMeshCluster(conf, pool, nil, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	_, err = pool.Exec(upsertNodeQuery, "node-fake", srv.URL, time.Now().Unix())
-	require.Nil(t, err)
 	const n = 20
 	for i := 0; i < n; i++ {
 		require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i))))
@@ -450,11 +459,10 @@ func TestMesh_RouteSkipsUnsubscribedPeer(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
+	registerFakePeer(t, pool, "node-b", srv.URL)
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	_, err = pool.Exec(upsertNodeQuery, "node-b", srv.URL, time.Now().Unix())
-	require.Nil(t, err)
 	// node-b reports subscribers only for "subscribed-topic"
 	rr := postState(mesh, "node-b", &apiState{Topics: &apiStateTopics{Filter: topicFilter(t, "subscribed-topic")}})
 	require.Equal(t, 200, rr.Code)
@@ -480,17 +488,18 @@ func TestMesh_RouteBroadcastsOnStaleState(t *testing.T) {
 	var mu sync.Mutex
 	received := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		received++
-		mu.Unlock()
+		if r.URL.Path == MessagePath { // The mesh also pushes state here; count only messages
+			mu.Lock()
+			received++
+			mu.Unlock()
+		}
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
+	registerFakePeer(t, pool, "node-b", srv.URL)
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	_, err = pool.Exec(upsertNodeQuery, "node-b", srv.URL, time.Now().Unix())
-	require.Nil(t, err)
 	rr := postState(mesh, "node-b", &apiState{Topics: &apiStateTopics{Filter: topicFilter(t, "subscribed-topic")}})
 	require.Equal(t, 200, rr.Code)
 	// Age the state beyond the trust window

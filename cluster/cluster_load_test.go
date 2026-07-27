@@ -53,11 +53,11 @@ func TestMesh_Soak(t *testing.T) {
 	defer srv.Close()
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.BatchLinger = 50 * time.Millisecond
+	conf.NodeTTL = time.Minute // The fake peer never heartbeats; liveness is not under test here
+	registerFakePeer(t, pool, "node-peer", srv.URL)
 	mesh, err := newMeshCluster(conf, pool, nil, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	_, err = pool.Exec(upsertNodeQuery, "node-peer", srv.URL, time.Now().Unix())
-	require.Nil(t, err)
 	start := time.Now()
 	var wg sync.WaitGroup
 	for p := 0; p < publishers; p++ {

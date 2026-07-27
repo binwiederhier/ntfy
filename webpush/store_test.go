@@ -1,6 +1,7 @@
 package webpush_test
 
 import (
+	"database/sql"
 	"fmt"
 	"net/netip"
 	"path/filepath"
@@ -13,6 +14,82 @@ import (
 )
 
 const testWebPushEndpoint = "https://updates.push.services.mozilla.com/wpush/v1/AAABBCCCDDEEEFFF"
+
+// Schema layout as written by ntfy releases before the db/schema framework; used to verify
+// that existing databases open cleanly without an adoption step
+const (
+	testPreFrameworkSQLiteSchema = `
+		CREATE TABLE subscription (
+			id TEXT PRIMARY KEY,
+			endpoint TEXT NOT NULL,
+			key_auth TEXT NOT NULL,
+			key_p256dh TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			subscriber_ip TEXT NOT NULL,
+			updated_at INT NOT NULL,
+			warned_at INT NOT NULL DEFAULT 0
+		);
+		CREATE UNIQUE INDEX idx_endpoint ON subscription (endpoint);
+		CREATE TABLE subscription_topic (
+			subscription_id TEXT NOT NULL,
+			topic TEXT NOT NULL,
+			PRIMARY KEY (subscription_id, topic)
+		);
+		CREATE TABLE schemaVersion (id INT PRIMARY KEY, version INT NOT NULL);
+		INSERT INTO schemaVersion VALUES (1, 1);
+	`
+	testPreFrameworkPostgresSchema = `
+		CREATE TABLE webpush_subscription (
+			id TEXT PRIMARY KEY,
+			endpoint TEXT NOT NULL UNIQUE,
+			key_auth TEXT NOT NULL,
+			key_p256dh TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			subscriber_ip TEXT NOT NULL,
+			updated_at BIGINT NOT NULL,
+			warned_at BIGINT NOT NULL DEFAULT 0
+		);
+		CREATE TABLE webpush_subscription_topic (
+			subscription_id TEXT NOT NULL REFERENCES webpush_subscription (id) ON DELETE CASCADE,
+			topic TEXT NOT NULL,
+			PRIMARY KEY (subscription_id, topic)
+		);
+		CREATE TABLE schema_version (store TEXT PRIMARY KEY, version INT NOT NULL);
+		INSERT INTO schema_version (store, version) VALUES ('webpush', 1);
+	`
+)
+
+func TestStoreSQLiteOpensExistingDatabase(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "webpush.db")
+	d, err := sql.Open("sqlite3", filename)
+	require.Nil(t, err)
+	_, err = d.Exec(testPreFrameworkSQLiteSchema)
+	require.Nil(t, err)
+	require.Nil(t, d.Close())
+	store, err := webpush.NewSQLiteStore(filename, "")
+	require.Nil(t, err)
+	defer store.Close()
+	requireStoreUsable(t, store)
+}
+
+func TestStorePostgresOpensExistingDatabase(t *testing.T) {
+	testDB := dbtest.CreateTestPostgres(t)
+	_, err := testDB.Exec(testPreFrameworkPostgresSchema)
+	require.Nil(t, err)
+	store, err := webpush.NewPostgresStore(testDB)
+	require.Nil(t, err)
+	requireStoreUsable(t, store)
+}
+
+func requireStoreUsable(t *testing.T, store *webpush.Store) {
+	t.Helper()
+	err := store.UpsertSubscription(testWebPushEndpoint, "auth-key", "p256dh-key", "u_1234", netip.MustParseAddr("1.2.3.4"), []string{"mytopic"})
+	require.Nil(t, err)
+	subs, err := store.SubscriptionsForTopic("mytopic")
+	require.Nil(t, err)
+	require.Len(t, subs, 1)
+	require.Equal(t, testWebPushEndpoint, subs[0].Endpoint)
+}
 
 func forEachBackend(t *testing.T, f func(t *testing.T, store *webpush.Store)) {
 	t.Run("sqlite", func(t *testing.T) {

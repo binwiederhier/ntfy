@@ -1,9 +1,7 @@
 // Package schema tracks and migrates database schemas, and Migrate creates or upgrades a
 // store's schema inside a single transaction. On PostgreSQL, all stores share one database, so
 // versions live in a shared schema_version table keyed by store name. On SQLite, every store is
-// its own database file, so the version lives in the schemaVersion table keyed by id = 1 -- the
-// exact layout pre-existing ntfy SQLite databases already use, which lets them migrate onto
-// this framework without an adoption step.
+// its own database file, so the version lives in the schemaVersion table keyed by id = 1.
 package schema
 
 import (
@@ -17,36 +15,18 @@ import (
 // Queries by dialect; the version table is shared by all stores on Postgres, and per database
 // file on SQLite
 const (
-	postgresCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`
-	postgresSelectVersionQuery      = `SELECT version FROM schema_version WHERE store = $1`
-	postgresUpsertVersionQuery      = `INSERT INTO schema_version (store, version) VALUES ($1, $2) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`
-	postgresAdvisoryLockQuery       = `SELECT pg_advisory_xact_lock($1)`
-
 	sqliteCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schemaVersion (id INT PRIMARY KEY, version INT NOT NULL)`
 	sqliteSelectVersionQuery      = `SELECT version FROM schemaVersion WHERE id = 1`
 	sqliteUpsertVersionQuery      = `INSERT INTO schemaVersion (id, version) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET version = excluded.version`
+
+	postgresCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`
+	postgresSelectVersionQuery      = `SELECT version FROM schema_version WHERE store = $1`
+	postgresUpsertVersionQuery      = `INSERT INTO schema_version (store, version) VALUES ($1, $2) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`
+	postgresAdvisoryLockQuery       = `SELECT pg_advisory_xact_lock($1)` // Transaction-scoped lock to avoid migration races
 )
 
-// Dialect selects the SQL flavor Migrate speaks to the version table.
-type Dialect int
-
-// Supported dialects; SQLite is the zero value
-const (
-	SQLite Dialect = iota
-	Postgres
-)
-
-// MigrateFunc applies one schema change inside the setup transaction: the initial creation of
-// a store's tables, or one step upgrading a store from version N to N+1. Migrations needing
-// config capture it via closure, e.g. func migrations(cacheDuration time.Duration) map[int]MigrateFunc.
-type MigrateFunc func(tx *sql.Tx) error
-
-// Migrate creates or upgrades the named store's schema to targetVersion in one transaction: a
-// fresh database gets the create func; an existing one is upgraded step by step through the
-// migrations map (keyed by the FROM version; always append, never insert in the middle); a
-// schema migrated by newer code is refused. A failed migration rolls back atomically. Caveats:
-// statements that refuse transaction blocks (Postgres CREATE INDEX CONCURRENTLY, VACUUM) cannot
-// go through Migrate, and DDL holds exclusive locks until commit, so keep migrations fast.
+// Migrate creates or upgrades the named store's schema to targetVersion in one transaction, or
+// creates a new database using the "create" function.
 func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, create MigrateFunc, migrations map[int]MigrateFunc) error {
 	if dialect != Postgres && dialect != SQLite {
 		return fmt.Errorf("unsupported schema dialect %d", dialect)

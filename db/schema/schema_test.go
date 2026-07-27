@@ -84,10 +84,7 @@ func TestMigrate_ClosureCarriesConfig(t *testing.T) {
 	// params plumbing in the framework itself
 	migrationsFor := func(defaultName string) map[int]schema.MigrateFunc {
 		return map[int]schema.MigrateFunc{
-			1: func(tx *sql.Tx) error {
-				_, err := tx.Exec(fmt.Sprintf(`ALTER TABLE things ADD COLUMN nick TEXT NOT NULL DEFAULT '%s'`, defaultName))
-				return err
-			},
+			1: schema.AsMigrateFunc(fmt.Sprintf(`ALTER TABLE things ADD COLUMN nick TEXT NOT NULL DEFAULT '%s'`, defaultName)),
 		}
 	}
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {

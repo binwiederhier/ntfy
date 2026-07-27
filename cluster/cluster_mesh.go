@@ -21,12 +21,12 @@ import (
 
 const (
 	meshHTTPTimeout   = 5 * time.Second
-	peerQueueSize     = 1024              // Bounded per-peer fan-out queue (drop on overflow)
-	batchMaxMessages  = 100               // Flush a batch early when it reaches this many messages
-	batchMaxBytes     = 256 * 1024        // Flush a batch early when it reaches this size
-	stateMaxBytes     = 4 * 1024 * 1024   // Upper bound for inbound state bodies (filter over ~1M topics)
-	stateFilterFPRate = 0.01              // Bloom false-positive rate; a false positive is one wasted send
-	leaderLockKey     = int64(0x6e746679) // Advisory-lock key ("ntfy") for the singleton-job leader; must stay distinct from db/schema's lockKey (shared key space)
+	peerQueueSize     = 1024                   // Bounded per-peer fan-out queue (drop on overflow)
+	batchMaxMessages  = 100                    // Flush a batch early when it reaches this many messages
+	batchMaxBytes     = 256 * 1024             // Flush a batch early when it reaches this size
+	stateMaxBytes     = 4 * 1024 * 1024        // Upper bound for inbound state bodies (filter over ~1M topics)
+	stateFilterFPRate = 0.01                   // Bloom false-positive rate; a false positive is one wasted send
+	leaderLockKey     = int64(0x6e7466792586a) // Advisory-lock key ("ntfy" + 2586 + "a") for the singleton-job leader; keys share one database-wide space, see db/schema's lockKey
 	tag               = "cluster"
 )
 

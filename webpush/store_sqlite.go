@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
-
 	"heckel.io/ntfy/v2/db"
 )
 

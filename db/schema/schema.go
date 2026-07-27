@@ -37,7 +37,9 @@ const (
 )
 
 // MigrateFunc applies one schema change inside the setup transaction: either the initial
-// creation of a store's tables, or one step upgrading a store from version N to N+1.
+// creation of a store's tables, or one step upgrading a store from version N to N+1. Migrations
+// that need configuration or other state capture it via closure when the migrations map is
+// built, e.g. func migrations(cacheDuration time.Duration) map[int]MigrateFunc.
 type MigrateFunc func(tx *sql.Tx) error
 
 // Migrate creates or upgrades the named store's schema to targetVersion, all inside one

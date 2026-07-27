@@ -79,6 +79,28 @@ func TestMigrate_AppliesMigrationSteps(t *testing.T) {
 	})
 }
 
+func TestMigrate_ClosureCarriesConfig(t *testing.T) {
+	// Migrations needing config take it via closure at map-construction time; there is no
+	// params plumbing in the framework itself
+	migrationsFor := func(defaultName string) map[int]schema.MigrateFunc {
+		return map[int]schema.MigrateFunc{
+			1: func(tx *sql.Tx) error {
+				_, err := tx.Exec(fmt.Sprintf(`ALTER TABLE things ADD COLUMN nick TEXT NOT NULL DEFAULT '%s'`, defaultName))
+				return err
+			},
+		}
+	}
+	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
+		require.Nil(t, schema.Migrate(d, dialect, "things", 1, testCreate, nil))
+		_, err := d.Exec(`INSERT INTO things (id, name) VALUES ('a', 'thing a')`)
+		require.Nil(t, err)
+		require.Nil(t, schema.Migrate(d, dialect, "things", 2, testCreate, migrationsFor("configured-default")))
+		var nick string
+		require.Nil(t, d.QueryRow(`SELECT nick FROM things WHERE id = 'a'`).Scan(&nick))
+		require.Equal(t, "configured-default", nick)
+	})
+}
+
 func TestMigrate_RefusesFutureVersion(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
 		require.Nil(t, schema.Migrate(d, dialect, "things", 2, testCreate, map[int]schema.MigrateFunc{}))

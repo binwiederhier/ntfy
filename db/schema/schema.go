@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	"heckel.io/ntfy/v2/db/pg"
 )
 
 // Queries by dialect; the version table is shared by all stores
@@ -20,12 +22,6 @@ const (
 	sqliteSelectVersionQuery = `SELECT version FROM schema_version WHERE store = ?`
 	sqliteUpsertVersionQuery = `INSERT INTO schema_version (store, version) VALUES (?, ?) ON CONFLICT (store) DO UPDATE SET version = excluded.version`
 )
-
-// lockKey serializes all schema setup on PostgreSQL ("ntfy" + 2586 + "b"): CREATE TABLE IF NOT
-// EXISTS is not atomic, so concurrently cold-booting nodes would otherwise race on DDL and
-// crash. Advisory locks share one database-wide key space; all ntfy keys follow the
-// 0x6e7466792586[letter] scheme -- pick the next letter for new locks.
-const lockKey = int64(0x6e7466792586b)
 
 // Dialect selects the SQL flavor Migrate speaks to the version table.
 type Dialect int
@@ -57,7 +53,9 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 	}
 	defer tx.Rollback()
 	if dialect == Postgres {
-		if _, err := tx.Exec(postgresAdvisoryLockQuery, lockKey); err != nil {
+		// Serialize setup across nodes: CREATE TABLE IF NOT EXISTS is not atomic, and
+		// concurrently cold-booting nodes would otherwise race on DDL and crash
+		if _, err := tx.Exec(postgresAdvisoryLockQuery, pg.SchemaLockKey); err != nil {
 			return err
 		}
 	}

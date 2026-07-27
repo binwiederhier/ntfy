@@ -47,6 +47,12 @@ type MigrateFunc func(tx *sql.Tx) error
 // upgraded step by step through the migrations map (keyed by the FROM version; always append,
 // never insert in the middle); a database migrated by newer code is refused. Multiple stores
 // share the version table, keyed by store name.
+//
+// DDL is transactional on both supported databases, so a failed migration rolls back atomically
+// (no half-applied schema, no lying version row). Two caveats for migration authors: statements
+// that refuse to run in a transaction block (notably Postgres CREATE INDEX CONCURRENTLY, VACUUM)
+// cannot go through Migrate, and DDL holds exclusive table locks until commit, so keep
+// migrations fast and put large backfills in their own steps.
 func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, create MigrateFunc, migrations map[int]MigrateFunc) error {
 	tx, err := db.Begin()
 	if err != nil {

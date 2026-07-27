@@ -39,7 +39,7 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 		AdvertiseURL:      advertiseURL,
 		Secret:            testSecret,
 		HeartbeatInterval: 100 * time.Millisecond,
-		NodeTTL:           5 * time.Second,
+		NodeTTL:           time.Second, // Also the peer cache bound; short so fake peers registered mid-test are seen quickly
 		MaxMessageBytes:   1 << 20,
 		StateInterval:     time.Minute, // Individual tests lower this to exercise state pushes
 	}

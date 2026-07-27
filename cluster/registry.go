@@ -32,15 +32,11 @@ const (
 // distinct from leaderLockKey, which is session-scoped and long-held.
 const schemaLockKey = int64(0x6e746679c) // "ntfy" + c (create)
 
-// peerCacheTTL is how long the peer list is cached between registry reads, so the message path
-// does not hit the database on every publish. Register() invalidates the cache on every
-// heartbeat, so the EFFECTIVE staleness is bounded by the heartbeat interval, not this value;
-// the TTL only caps it if that invalidation ever goes away.
-const peerCacheTTL = 30 * time.Second
-
 // registry is the node membership table (control plane): each node upserts its own row with a
 // fresh heartbeat every few seconds, and peers are the other rows with a heartbeat newer than the
-// TTL. Stale rows are pruned by the leader.
+// TTL. Stale rows are pruned by the leader. The TTL bounds membership staleness in BOTH
+// directions: how long a silent node still counts as live, and how long the cached peer list is
+// served before a re-read -- so a new node may take up to a TTL to become visible.
 type registry struct {
 	pool         *db.DB
 	nodeID       NodeID
@@ -87,23 +83,18 @@ func (r *registry) createTable() error {
 	return tx.Commit()
 }
 
-// Register upserts this node into the registry with a fresh heartbeat and invalidates the local
-// peer cache.
+// Register upserts this node into the registry with a fresh heartbeat. It is a pure write: it
+// does not touch the peer cache, because our own row is excluded from Peers() anyway.
 func (r *registry) Register() error {
-	if _, err := r.pool.Exec(upsertNodeQuery, string(r.nodeID), r.advertiseURL, time.Now().Unix()); err != nil {
-		return err
-	}
-	r.mu.Lock()
-	r.peersFetched = time.Time{} // Invalidate the peer cache so the next Peers re-reads
-	r.mu.Unlock()
-	return nil
+	_, err := r.pool.Exec(upsertNodeQuery, string(r.nodeID), r.advertiseURL, time.Now().Unix())
+	return err
 }
 
 // Peers returns the current set of live peer nodes (all registry rows with a fresh heartbeat,
 // excluding this node), cached for peerCacheTTL.
 func (r *registry) Peers() ([]peer, error) {
 	r.mu.Lock()
-	if r.peers != nil && time.Since(r.peersFetched) < peerCacheTTL {
+	if r.peers != nil && time.Since(r.peersFetched) < r.ttl {
 		peers := r.peers
 		r.mu.Unlock()
 		return peers, nil

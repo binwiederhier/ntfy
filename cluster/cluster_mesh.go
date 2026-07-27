@@ -184,7 +184,7 @@ func (c *meshCluster) reconcileQueues(peers []peer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for nodeID, q := range c.queues {
-		if url, ok := alive[nodeID]; !ok || q.url != messageURL(url) {
+		if url, ok := alive[nodeID]; !ok || q.advertiseURL != url {
 			q.queue.Close() // Flushes the remainder; the worker exits when the queue is drained
 			delete(c.queues, nodeID)
 		}
@@ -199,7 +199,7 @@ func (c *meshCluster) queueFor(p peer) *peerQueue {
 		return q
 	}
 	q = &peerQueue{
-		url: messageURL(p.advertiseURL),
+		advertiseURL: p.advertiseURL,
 		queue: util.NewLingerQueue(peerQueueSize, batchMaxMessages, batchMaxBytes,
 			func(frag []byte) int { return len(frag) }, c.conf.BatchLinger),
 	}
@@ -266,7 +266,7 @@ func (c *meshCluster) mayNeed(peer NodeID, topic string) bool {
 func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	defer c.wg.Done()
 	for frags := range q.queue.Dequeue() {
-		c.postToPeer(nodeID, q.url, contentTypeNDJSON, assembleMessageBody(frags))
+		c.postToPeer(nodeID, messageURL(q.advertiseURL), contentTypeNDJSON, assembleMessageBody(frags))
 		metrics.ClusterBatchesSent.Inc()
 	}
 }

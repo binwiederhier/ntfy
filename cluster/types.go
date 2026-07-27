@@ -44,10 +44,10 @@ type peer struct {
 	advertiseURL string
 }
 
-// peerQueue is the bounded, batching send queue and target URL for a single peer. Both are
-// fixed at creation: a peer re-registering under a different advertise URL is treated as a
-// replacement (reconcile retires the old queue; Relay creates a fresh one on demand).
+// peerQueue is the bounded, batching send queue for a single peer, pinned to the advertise URL
+// the peer was created with: a peer re-registering under a different advertise URL is treated
+// as a replacement (reconcile retires the old queue; Relay creates a fresh one on demand).
 type peerQueue struct {
-	url   string
-	queue *util.LingerQueue[[]byte] // pre-marshaled apiMessage fragments
+	advertiseURL string
+	queue        *util.LingerQueue[[]byte] // pre-marshaled apiMessage fragments
 }

@@ -26,7 +26,7 @@ const (
 	batchMaxBytes     = 256 * 1024        // Flush a batch early when it reaches this size
 	stateMaxBytes     = 4 * 1024 * 1024   // Upper bound for inbound state bodies (filter over ~1M topics)
 	stateFilterFPRate = 0.01              // Bloom false-positive rate; a false positive is one wasted send
-	leaderLockKey     = int64(0x6e746679) // Advisory-lock key ("ntfy") for the singleton-job leader
+	leaderLockKey     = int64(0x6e746679) // Advisory-lock key ("ntfy") for the singleton-job leader; must stay distinct from db/schema's lockKey (shared key space)
 	tag               = "cluster"
 )
 

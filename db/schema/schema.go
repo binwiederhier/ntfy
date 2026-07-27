@@ -23,6 +23,8 @@ const (
 
 // lockKey serializes all schema setup on PostgreSQL ("ntfy" + 2586): CREATE TABLE IF NOT EXISTS
 // is not atomic, so concurrently cold-booting nodes would otherwise race on DDL and crash.
+// Advisory locks share one database-wide key space; keep this distinct from every other key
+// (notably the cluster leader lock, 0x6e746679).
 const lockKey = int64(0x6e7466792586)
 
 // Dialect selects the SQL flavor Migrate speaks to the version table.

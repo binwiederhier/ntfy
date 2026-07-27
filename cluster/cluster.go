@@ -26,6 +26,10 @@ const (
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer
 // state table.
+//
+// Naming convention: a "node" is any cluster member in the absolute sense (identity, registry,
+// config); a "peer" is another node as seen from this one (Peers, peerQueue, peerState). A peer
+// IS a node, which is why peer values carry a NodeID.
 type NodeID string
 
 // secretHeader carries the shared secret authenticating node-to-node fan-out requests.

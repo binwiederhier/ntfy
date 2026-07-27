@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"sync"
 	"time"
 
 	"heckel.io/ntfy/v2/model"
@@ -45,16 +44,10 @@ type peer struct {
 	advertiseURL string
 }
 
-// peerQueue is the bounded, batching send queue and target URL for a single peer. The URL may be
-// updated when a peer re-registers under a different advertise URL.
+// peerQueue is the bounded, batching send queue and target URL for a single peer. Both are
+// fixed at creation: a peer re-registering under a different advertise URL is treated as a
+// replacement (reconcile retires the old queue; Relay creates a fresh one on demand).
 type peerQueue struct {
-	mu    sync.Mutex
 	url   string
 	queue *util.LingerQueue[[]byte] // pre-marshaled apiMessage fragments
-}
-
-func (q *peerQueue) MessageURL() string {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	return q.url
 }

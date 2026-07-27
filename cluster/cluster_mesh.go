@@ -171,9 +171,10 @@ func (c *meshCluster) heartbeat() error {
 	return nil
 }
 
-// reconcileQueues aligns the per-peer queues with the given live peer set: it updates the URLs of
-// known peers and stops the queues (and workers) of peers that have left the registry. New queues
-// are created lazily by Relay, not here, so a freshly joined peer is reachable immediately.
+// reconcileQueues retires the queues (and workers) of peers that have left the registry or
+// re-registered under a new advertise URL; the retired queue's remainder was headed for a dead
+// address anyway. New and replacement queues are created lazily by Relay, not here, so a freshly
+// joined peer is reachable immediately.
 func (c *meshCluster) reconcileQueues(peers []peer) {
 	metrics.ClusterPeers.Set(float64(len(peers)))
 	alive := make(map[NodeID]string, len(peers)) // node ID -> advertise URL
@@ -183,11 +184,7 @@ func (c *meshCluster) reconcileQueues(peers []peer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for nodeID, q := range c.queues {
-		if url, ok := alive[nodeID]; ok {
-			q.mu.Lock()
-			q.url = messageURL(url)
-			q.mu.Unlock()
-		} else {
+		if url, ok := alive[nodeID]; !ok || q.url != messageURL(url) {
 			q.queue.Close() // Flushes the remainder; the worker exits when the queue is drained
 			delete(c.queues, nodeID)
 		}
@@ -269,7 +266,7 @@ func (c *meshCluster) mayNeed(peer NodeID, topic string) bool {
 func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	defer c.wg.Done()
 	for frags := range q.queue.Dequeue() {
-		c.postToPeer(nodeID, q.MessageURL(), contentTypeNDJSON, assembleMessageBody(frags))
+		c.postToPeer(nodeID, q.url, contentTypeNDJSON, assembleMessageBody(frags))
 		metrics.ClusterBatchesSent.Inc()
 	}
 }

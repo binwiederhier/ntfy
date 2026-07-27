@@ -22,7 +22,7 @@ const (
 		VALUES ($1, $2, $3)
 		ON CONFLICT (node_id) DO UPDATE SET advertise_url = EXCLUDED.advertise_url, last_heartbeat = EXCLUDED.last_heartbeat
 	`
-	selectPeersQuery     = `SELECT node_id, advertise_url FROM node_registry WHERE last_heartbeat >= $1 AND node_id != $2`
+	selectPeersQuery         = `SELECT node_id, advertise_url FROM node_registry WHERE last_heartbeat >= $1 AND node_id != $2`
 	pruneStaleNodesQuery     = `DELETE FROM node_registry WHERE last_heartbeat < $1`
 	deleteNodeQuery          = `DELETE FROM node_registry WHERE node_id = $1`
 	tryAdvisoryXactLockQuery = `SELECT pg_advisory_xact_lock($1)`

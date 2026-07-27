@@ -21,9 +21,9 @@ const (
 	sqliteUpsertVersionQuery = `INSERT INTO schema_version (store, version) VALUES (?, ?) ON CONFLICT (store) DO UPDATE SET version = excluded.version`
 )
 
-// lockKey serializes all schema setup on PostgreSQL ("ntfy" + s): CREATE TABLE IF NOT EXISTS is
-// not atomic, so concurrently cold-booting nodes would otherwise race on DDL and crash.
-const lockKey = int64(0x6e746679a)
+// lockKey serializes all schema setup on PostgreSQL ("ntfy" + 2586): CREATE TABLE IF NOT EXISTS
+// is not atomic, so concurrently cold-booting nodes would otherwise race on DDL and crash.
+const lockKey = int64(0x6e7466792586)
 
 // Dialect selects the SQL flavor Migrate speaks to the version table.
 type Dialect int

@@ -5,16 +5,29 @@
 package registry
 
 import (
+	"database/sql"
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"heckel.io/ntfy/v2/db"
 )
 
-// Registry queries. The node_registry table is control-plane state maintained by every node
-// independently and idempotently, so it lives outside the message/user schema_version framework.
+// schemaVersion is the current node_registry schema version, tracked in the shared
+// schema_version table like every other store's schema.
 const (
-	createTableQuery = `
+	schemaVersion = 1
+	storeKey      = "node_registry"
+)
+
+// Registry queries. Setup and migrations run inside a single advisory-locked transaction, so
+// concurrently cold-booting nodes serialize instead of racing on DDL.
+const (
+	createSchemaVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`
+	selectSchemaVersionQuery      = `SELECT version FROM schema_version WHERE store = $1`
+	upsertSchemaVersionQuery      = `INSERT INTO schema_version (store, version) VALUES ($1, $2) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`
+	createTableQuery              = `
 		CREATE TABLE IF NOT EXISTS node_registry (
 			node_id        TEXT PRIMARY KEY,
 			advertise_url  TEXT NOT NULL,
@@ -36,6 +49,10 @@ const (
 // distinct from the cluster leader lock key, which is session-scoped and long-held.
 const schemaLockKey = int64(0x6e746679c) // "ntfy" + c (create)
 
+// migrations maps a schema version to the migration upgrading it to the next version; each runs
+// inside the setup transaction. Always append migrations at the end, never insert in the middle.
+var migrations = map[int]func(tx *sql.Tx) error{}
+
 // Peer is a live remote node as read from the registry.
 type Peer struct {
 	NodeID       string
@@ -52,7 +69,7 @@ type Registry struct {
 	nodeID       string
 	advertiseURL string
 	ttl          time.Duration
-	peers        []Peer // cached peer list
+	peers        []*Peer // cached peer list
 	peersFetched time.Time
 	mu           sync.Mutex // Protects peers and peersFetched
 }
@@ -65,7 +82,7 @@ func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry
 		advertiseURL: advertiseURL,
 		ttl:          ttl,
 	}
-	if err := r.createTable(); err != nil {
+	if err := r.setup(); err != nil {
 		return nil, err
 	}
 	if err := r.Register(); err != nil {
@@ -83,7 +100,7 @@ func (r *Registry) Register() error {
 
 // Peers returns the current set of live peer nodes (all registry rows with a fresh heartbeat,
 // excluding this node), cached for the TTL.
-func (r *Registry) Peers() ([]Peer, error) {
+func (r *Registry) Peers() ([]*Peer, error) {
 	r.mu.Lock()
 	if r.peers != nil && time.Since(r.peersFetched) < r.ttl {
 		peers := r.peers
@@ -123,11 +140,12 @@ func (r *Registry) Deregister() error {
 	return err
 }
 
-// createTable creates the registry table, serialized via a transaction-scoped advisory lock:
-// CREATE TABLE IF NOT EXISTS is not atomic in PostgreSQL, so multiple nodes cold-booting
+// setup creates or migrates the registry schema, serialized via a transaction-scoped advisory
+// lock: CREATE TABLE IF NOT EXISTS is not atomic in PostgreSQL, so multiple nodes cold-booting
 // concurrently on a fresh database would otherwise race and crash with a duplicate-key error
-// on pg_class.
-func (r *Registry) createTable() error {
+// on pg_class. The whole setup (version check, creation or migrations, version bump) commits as
+// one transaction.
+func (r *Registry) setup() error {
 	tx, err := r.pool.Begin()
 	if err != nil {
 		return err
@@ -136,23 +154,55 @@ func (r *Registry) createTable() error {
 	if _, err := tx.Exec(tryAdvisoryXactLockQuery, schemaLockKey); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(createTableQuery); err != nil {
+	if _, err := tx.Exec(createSchemaVersionTableQuery); err != nil {
+		return err
+	}
+	var version int
+	err = tx.QueryRow(selectSchemaVersionQuery, storeKey).Scan(&version)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Fresh database: create the table at the current version
+		if _, err := tx.Exec(createTableQuery); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(upsertSchemaVersionQuery, storeKey, schemaVersion); err != nil {
+			return err
+		}
+		return tx.Commit()
+	} else if err != nil {
+		return err
+	}
+	if version == schemaVersion {
+		return tx.Commit()
+	}
+	if version > schemaVersion {
+		return fmt.Errorf("unexpected %s schema version %d, this version of ntfy supports up to %d", storeKey, version, schemaVersion)
+	}
+	for v := version; v < schemaVersion; v++ {
+		migrate, ok := migrations[v]
+		if !ok {
+			return fmt.Errorf("cannot find %s migration step from version %d to %d", storeKey, v, v+1)
+		}
+		if err := migrate(tx); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(upsertSchemaVersionQuery, storeKey, schemaVersion); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
 // queryPeers reads the current live peer set from the registry table.
-func (r *Registry) queryPeers() ([]Peer, error) {
+func (r *Registry) queryPeers() ([]*Peer, error) {
 	cutoff := time.Now().Add(-r.ttl).Unix()
 	rows, err := r.pool.Query(selectPeersQuery, cutoff, r.nodeID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	peers := make([]Peer, 0)
+	peers := make([]*Peer, 0)
 	for rows.Next() {
-		var p Peer
+		p := &Peer{}
 		if err := rows.Scan(&p.NodeID, &p.AdvertiseURL); err != nil {
 			return nil, err
 		}

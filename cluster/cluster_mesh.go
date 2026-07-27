@@ -177,7 +177,7 @@ func (c *meshCluster) heartbeat() error {
 // advertise URL (the retired queue's remainder was headed for a dead address anyway), and prunes
 // the stale state of departed peers. New and replacement queues are created lazily by Relay, not
 // here, so a freshly joined peer is reachable immediately.
-func (c *meshCluster) reconcilePeers(peers []registry.Peer) {
+func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
 	metrics.ClusterPeers.Set(float64(len(peers)))
 	alive := make(map[NodeID]string, len(peers)) // node ID -> advertise URL
 	for _, p := range peers {
@@ -206,7 +206,7 @@ func (c *meshCluster) reconcilePeers(peers []registry.Peer) {
 
 // queueFor returns the send queue for the given peer, creating it (and its delivery worker) if it
 // does not exist yet. The caller must hold c.mu.
-func (c *meshCluster) queueFor(p registry.Peer) *peerQueue {
+func (c *meshCluster) queueFor(p *registry.Peer) *peerQueue {
 	nodeID := NodeID(p.NodeID)
 	q, ok := c.queues[nodeID]
 	if ok {
@@ -373,7 +373,7 @@ func (c *meshCluster) applyTopicState(origin NodeID, topics *apiStateTopics) err
 // currently have local subscribers. Sent directly (not via the linger queues -- state must not
 // wait behind message batches); a lost push self-heals at the next interval. Topics without
 // subscribers disappear simply by not being in the next snapshot.
-func (c *meshCluster) pushState(peers []registry.Peer) {
+func (c *meshCluster) pushState(peers []*registry.Peer) {
 	if len(peers) == 0 {
 		return
 	}

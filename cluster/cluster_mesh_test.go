@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
@@ -45,14 +46,12 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 	}
 }
 
-// registerFakePeer upserts a registry row for a fake peer, creating the table if the mesh has
-// not been constructed yet (tests register fakes before the mesh boots, since its first
-// heartbeat caches the peer list).
-func registerFakePeer(t *testing.T, pool *db.DB, nodeID NodeID, url string) {
+// registerFakePeer registers a fake peer via the registry (creating the table if the mesh has
+// not been constructed yet): tests register fakes before the mesh boots, since its first
+// heartbeat caches the peer list. The fake never refreshes its heartbeat.
+func registerFakePeer(t testing.TB, pool *db.DB, nodeID NodeID, url string) {
 	t.Helper()
-	_, err := pool.Exec(createNodeRegistryTableQuery)
-	require.Nil(t, err)
-	_, err = pool.Exec(upsertNodeQuery, string(nodeID), url, time.Now().Unix())
+	_, err := registry.New(pool, string(nodeID), url, time.Minute)
 	require.Nil(t, err)
 }
 
@@ -278,8 +277,7 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	require.Nil(t, err)
 	defer mesh.Close()
 	// The fake peer registers once and then "dies": its heartbeat is never refreshed
-	_, err = pool.Exec(upsertNodeQuery, "node-dead", srv.URL, time.Now().Unix())
-	require.Nil(t, err)
+	registerFakePeer(t, pool, "node-dead", srv.URL)
 	require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", "while alive")))
 	waitFor(t, func() bool {
 		mu.Lock()
@@ -305,8 +303,7 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	mu.Unlock()
 	// The peer comes back (same node ID, fresh heartbeat) and receives messages again; the
 	// relay retries because the peer list is cached for up to the node TTL
-	_, err = pool.Exec(upsertNodeQuery, "node-dead", srv.URL, time.Now().Unix())
-	require.Nil(t, err)
+	registerFakePeer(t, pool, "node-dead", srv.URL)
 	waitFor(t, func() bool {
 		require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", "after rejoin")))
 		mu.Lock()
@@ -323,37 +320,12 @@ func TestMesh_RelayAfterClose(t *testing.T) {
 	pool := openTestPool(t, schemaDSN)
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
 	require.Nil(t, err)
-	_, err = pool.Exec(upsertNodeQuery, "node-peer", "http://127.0.0.1:1", time.Now().Unix())
-	require.Nil(t, err)
+	registerFakePeer(t, pool, "node-peer", "http://127.0.0.1:1")
 	require.Nil(t, mesh.Close())
 	require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", "too late"))) // Dropped silently
 	mesh.mu.Lock()
 	defer mesh.mu.Unlock()
 	require.Empty(t, mesh.queues)
-}
-
-func TestRegistry_PeersStaleCacheOnError(t *testing.T) {
-	// During a database hiccup, Peers serves the last-known peer list instead of erroring:
-	// fan-out keeps flowing to known peers, and the publish path does not log a warning per
-	// message for the duration of the outage.
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	pool := openTestPool(t, schemaDSN)
-	r, err := newRegistry(pool, "node-a", "http://127.0.0.1:1", 5*time.Second)
-	require.Nil(t, err)
-	_, err = pool.Exec(upsertNodeQuery, "node-peer", "http://127.0.0.1:2", time.Now().Unix())
-	require.Nil(t, err)
-	peers, err := r.Peers()
-	require.Nil(t, err)
-	require.Len(t, peers, 1)
-	// Expire the cache and break the database; the stale list must still be served
-	r.mu.Lock()
-	r.peersFetched = time.Time{}
-	r.mu.Unlock()
-	require.Nil(t, pool.Close())
-	peers, err = r.Peers()
-	require.Nil(t, err)
-	require.Len(t, peers, 1)
-	require.Equal(t, NodeID("node-peer"), peers[0].nodeID)
 }
 
 func TestMesh_LeaderFailover(t *testing.T) {
@@ -376,30 +348,6 @@ func TestMesh_LeaderFailover(t *testing.T) {
 	}
 	require.Nil(t, leader.Close())
 	waitFor(t, follower.IsLeader)
-}
-
-func TestRegistry_ConcurrentCreate(t *testing.T) {
-	// Multiple nodes cold-booting on a fresh database must not race on table creation: CREATE
-	// TABLE IF NOT EXISTS is not atomic in PostgreSQL, so creation is serialized via an advisory
-	// lock. Without it, this test fails sporadically with a duplicate-key error on pg_class.
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	const n = 8
-	errs := make(chan error, n)
-	for i := 0; i < n; i++ {
-		go func(i int) {
-			pool, err := pg.Open(schemaDSN)
-			if err != nil {
-				errs <- err
-				return
-			}
-			defer pool.DB.Close()
-			_, err = newRegistry(db.New(pool, nil), NodeID(fmt.Sprintf("node-%d", i)), "http://127.0.0.1:1", time.Second)
-			errs <- err
-		}(i)
-	}
-	for i := 0; i < n; i++ {
-		require.Nil(t, <-errs)
-	}
 }
 
 func TestMesh_CloseDeregisters(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -40,19 +41,19 @@ type meshCluster struct {
 	conf          *Config
 	deliver       DeliverFunc
 	topics        TopicsFunc
-	registry      *registry
+	registry      *registry.Registry
 	leader        *pg.Leader
 	httpClient    *http.Client
-	mux           *http.ServeMux // The internal peer API; Cluster is an http.Handler
-	mu            sync.Mutex
+	mux           *http.ServeMux        // The internal peer API; Cluster is an http.Handler
 	queues        map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
 	closed        bool                  // Guards against Relay spawning new workers after Close
-	statesMu      sync.Mutex
 	states        map[NodeID]*peerState // what each peer last told us (subscription knowledge)
 	lastStatePush time.Time             // Only touched by the heartbeat goroutine
 	ctx           context.Context
 	cancel        context.CancelFunc
 	wg            sync.WaitGroup
+	mu            sync.Mutex // Protects queues and closed
+	statesMu      sync.Mutex // Protects states
 }
 
 // newMeshCluster creates the mesh cluster: it ensures the registry table exists, registers this
@@ -62,7 +63,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc, topics Topic
 	if topics == nil {
 		topics = func() []string { return nil } // No known topics; peers will broadcast to us
 	}
-	registry, err := newRegistry(pool, conf.NodeID, conf.AdvertiseURL, conf.NodeTTL)
+	reg, err := registry.New(pool, string(conf.NodeID), conf.AdvertiseURL, conf.NodeTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +72,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc, topics Topic
 		conf:       conf,
 		deliver:    deliver,
 		topics:     topics,
-		registry:   registry,
+		registry:   reg,
 		leader:     pg.NewLeader(pool.Primary(), leaderLockKey),
 		httpClient: &http.Client{Timeout: meshHTTPTimeout},
 		queues:     make(map[NodeID]*peerQueue),
@@ -176,11 +177,11 @@ func (c *meshCluster) heartbeat() error {
 // advertise URL (the retired queue's remainder was headed for a dead address anyway), and prunes
 // the stale state of departed peers. New and replacement queues are created lazily by Relay, not
 // here, so a freshly joined peer is reachable immediately.
-func (c *meshCluster) reconcilePeers(peers []peer) {
+func (c *meshCluster) reconcilePeers(peers []registry.Peer) {
 	metrics.ClusterPeers.Set(float64(len(peers)))
 	alive := make(map[NodeID]string, len(peers)) // node ID -> advertise URL
 	for _, p := range peers {
-		alive[p.nodeID] = p.advertiseURL
+		alive[NodeID(p.NodeID)] = p.AdvertiseURL
 	}
 	c.mu.Lock()
 	for nodeID, q := range c.queues {
@@ -205,19 +206,20 @@ func (c *meshCluster) reconcilePeers(peers []peer) {
 
 // queueFor returns the send queue for the given peer, creating it (and its delivery worker) if it
 // does not exist yet. The caller must hold c.mu.
-func (c *meshCluster) queueFor(p peer) *peerQueue {
-	q, ok := c.queues[p.nodeID]
+func (c *meshCluster) queueFor(p registry.Peer) *peerQueue {
+	nodeID := NodeID(p.NodeID)
+	q, ok := c.queues[nodeID]
 	if ok {
 		return q
 	}
 	q = &peerQueue{
-		advertiseURL: p.advertiseURL,
+		advertiseURL: p.AdvertiseURL,
 		queue: util.NewLingerQueue(peerQueueSize, batchMaxMessages, batchMaxBytes,
 			func(frag []byte) int { return len(frag) }, c.conf.BatchLinger),
 	}
-	c.queues[p.nodeID] = q
+	c.queues[nodeID] = q
 	c.wg.Add(1)
-	go c.peerWorker(p.nodeID, q)
+	go c.peerWorker(nodeID, q)
 	return q
 }
 
@@ -246,13 +248,13 @@ func (c *meshCluster) Relay(msg *model.Message) error {
 	for _, p := range peers {
 		// Route around peers whose fresh state provably excludes this topic; anything less
 		// certain (no state, stale state) falls back to broadcasting
-		if !c.mayNeed(p.nodeID, msg.Topic) {
+		if !c.mayNeed(NodeID(p.NodeID), msg.Topic) {
 			metrics.ClusterRouteSkipped.Inc()
 			continue
 		}
 		if !c.queueFor(p).queue.TryEnqueue(frag) {
 			metrics.ClusterQueueDropped.Inc()
-			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.nodeID, msg.ID)
+			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
 		}
 	}
 	return nil
@@ -371,7 +373,7 @@ func (c *meshCluster) applyTopicState(origin NodeID, topics *apiStateTopics) err
 // currently have local subscribers. Sent directly (not via the linger queues -- state must not
 // wait behind message batches); a lost push self-heals at the next interval. Topics without
 // subscribers disappear simply by not being in the next snapshot.
-func (c *meshCluster) pushState(peers []peer) {
+func (c *meshCluster) pushState(peers []registry.Peer) {
 	if len(peers) == 0 {
 		return
 	}
@@ -389,7 +391,7 @@ func (c *meshCluster) pushState(peers []peer) {
 		return
 	}
 	for _, p := range peers {
-		go c.postToPeer(p.nodeID, stateURL(p.advertiseURL), contentTypeJSON, body)
+		go c.postToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), contentTypeJSON, body)
 	}
 	metrics.ClusterStatePushes.Inc()
 }
@@ -410,7 +412,7 @@ func (c *meshCluster) AnnounceTopics(topics []string) {
 		return
 	}
 	for _, p := range peers {
-		go c.postToPeer(p.nodeID, stateURL(p.advertiseURL), contentTypeJSON, body)
+		go c.postToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), contentTypeJSON, body)
 	}
 }
 

@@ -18,9 +18,9 @@ const (
 type Leader struct {
 	db   *sql.DB
 	key  int64
-	mu   sync.Mutex
 	conn *sql.Conn // holds the advisory lock while this process is leader
 	held bool
+	mu   sync.Mutex // Protects conn and held
 }
 
 // NewLeader creates a Leader competing for the advisory lock identified by key. It does not

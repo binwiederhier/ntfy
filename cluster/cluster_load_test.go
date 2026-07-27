@@ -103,8 +103,7 @@ func BenchmarkRelay(b *testing.B) {
 	mesh, err := newMeshCluster(conf, pool, nil, nil)
 	require.Nil(b, err)
 	defer mesh.Close()
-	_, err = pool.Exec(upsertNodeQuery, "node-peer", "http://127.0.0.1:1", time.Now().Unix())
-	require.Nil(b, err)
+	registerFakePeer(b, pool, "node-peer", "http://127.0.0.1:1")
 	m := model.NewDefaultMessage("mytopic", "benchmark message body of typical size for a push")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

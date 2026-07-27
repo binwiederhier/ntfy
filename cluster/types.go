@@ -38,12 +38,6 @@ type peerState struct {
 	updatedAt time.Time
 }
 
-// peer is a live remote node as read from the registry.
-type peer struct {
-	nodeID       NodeID
-	advertiseURL string
-}
-
 // peerQueue is the bounded, batching send queue for a single peer, pinned to the advertise URL
 // the peer was created with: a peer re-registering under a different advertise URL is treated
 // as a replacement (reconcile retires the old queue; Relay creates a fresh one on demand).

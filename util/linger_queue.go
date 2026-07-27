@@ -28,8 +28,8 @@ type LingerQueue[T any] struct {
 	maxSize int           // max cumulative size per batch; 0 = no size cap
 	size    func(T) int   // element size function; nil = no size cap
 	linger  time.Duration // max time the first element of a batch waits; 0 = emit immediately
-	mu      sync.Mutex
 	closed  bool
+	mu      sync.Mutex // Protects closed, and guards TryEnqueue's send against Close's close(in)
 }
 
 // NewLingerQueue creates a LingerQueue holding up to capacity queued elements, emitting batches

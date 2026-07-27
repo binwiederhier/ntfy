@@ -51,8 +51,9 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 // heartbeat caches the peer list. The fake never refreshes its heartbeat.
 func registerFakePeer(t testing.TB, pool *db.DB, nodeID NodeID, url string) {
 	t.Helper()
-	_, err := registry.New(pool, string(nodeID), url, time.Minute)
+	reg, err := registry.New(pool, string(nodeID), url, time.Minute)
 	require.Nil(t, err)
+	require.Nil(t, reg.Register())
 }
 
 func waitFor(t *testing.T, f func() bool) {

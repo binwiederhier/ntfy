@@ -56,15 +56,20 @@ type meshCluster struct {
 	statesMu      sync.Mutex // Protects states
 }
 
-// newMeshCluster creates the mesh cluster: it ensures the registry table exists, registers this
-// node, and starts the heartbeat/leader-election loop. Peer delivery workers are started lazily
-// as peers appear in the registry.
+// newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
+// (synchronously, so it is discoverable before New returns), and starts the heartbeat loop.
+// Peer delivery workers are started lazily as peers appear in the registry.
 func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc, topics TopicsFunc) (*meshCluster, error) {
 	if topics == nil {
 		topics = func() []string { return nil } // No known topics; peers will broadcast to us
 	}
 	reg, err := registry.New(pool, string(conf.NodeID), conf.AdvertiseURL, conf.NodeTTL)
 	if err != nil {
+		return nil, err
+	}
+	// Register synchronously so the node is discoverable before the constructor returns; the
+	// heartbeat loop refreshes the registration from here on
+	if err := reg.Register(); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())

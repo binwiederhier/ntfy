@@ -20,13 +20,28 @@ func openTestPool(t *testing.T, dsn string) *db.DB {
 	return d
 }
 
+func TestRegistry_NewDoesNotRegister(t *testing.T) {
+	// New only sets up the schema and the identity handle; joining the cluster is an explicit
+	// Register call, owned by the caller (the mesh registers synchronously at construction).
+	// This keeps read-only uses (ops tooling, future admin endpoints) side-effect free.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	require.Nil(t, err)
+	require.Equal(t, 0, countRows(t, pool, "node-1"))
+	require.Nil(t, r1.Register())
+	require.Equal(t, 1, countRows(t, pool, "node-1"))
+}
+
 func TestRegistry_RegisterAndPeers(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
+	require.Nil(t, r1.Register())
 	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
 	require.Nil(t, err)
+	require.Nil(t, r2.Register())
 	// Each node sees the other, never itself
 	peers, err := r1.Peers()
 	require.Nil(t, err)
@@ -45,10 +60,12 @@ func TestRegistry_ReRegisterUpdatesAdvertiseURL(t *testing.T) {
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
 	// The same node comes back under a new address; the upsert replaces the row
-	_, err = New(pool, "node-2", "http://old:2587", time.Minute)
+	old, err := New(pool, "node-2", "http://old:2587", time.Minute)
 	require.Nil(t, err)
-	_, err = New(pool, "node-2", "http://new:2587", time.Minute)
+	require.Nil(t, old.Register())
+	renewed, err := New(pool, "node-2", "http://new:2587", time.Minute)
 	require.Nil(t, err)
+	require.Nil(t, renewed.Register())
 	expireCache(r1)
 	peers, err := r1.Peers()
 	require.Nil(t, err)
@@ -65,8 +82,9 @@ func TestRegistry_PeersCachedForTTL(t *testing.T) {
 	require.Nil(t, err)
 	require.Empty(t, peers)
 	// A node joining after the cache was populated is invisible until the cache expires
-	_, err = New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
+	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
 	require.Nil(t, err)
+	require.Nil(t, r2.Register())
 	peers, err = r1.Peers()
 	require.Nil(t, err)
 	require.Empty(t, peers)
@@ -109,6 +127,7 @@ func TestRegistry_Deregister(t *testing.T) {
 	pool := openTestPool(t, schemaDSN)
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
+	require.Nil(t, r1.Register())
 	require.Equal(t, 1, countRows(t, pool, "node-1"))
 	require.Nil(t, r1.Deregister())
 	require.Equal(t, 0, countRows(t, pool, "node-1"))
@@ -122,8 +141,9 @@ func TestRegistry_PeersStaleCacheOnError(t *testing.T) {
 	pool := openTestPool(t, schemaDSN)
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
-	_, err = New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
+	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
 	require.Nil(t, err)
+	require.Nil(t, r2.Register())
 	peers, err := r1.Peers()
 	require.Nil(t, err)
 	require.Len(t, peers, 1)

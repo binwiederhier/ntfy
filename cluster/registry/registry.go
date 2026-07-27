@@ -74,7 +74,9 @@ type Registry struct {
 	mu           sync.Mutex // Protects peers and peersFetched
 }
 
-// New creates the registry table if it does not exist and registers this node.
+// New creates or migrates the registry schema and returns this node's membership handle. It
+// does NOT register the node: joining the cluster is an explicit Register call, owned by the
+// caller, so read-only uses of the registry stay side-effect free.
 func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry, error) {
 	r := &Registry{
 		pool:         pool,
@@ -83,9 +85,6 @@ func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry
 		ttl:          ttl,
 	}
 	if err := r.setup(); err != nil {
-		return nil, err
-	}
-	if err := r.Register(); err != nil {
 		return nil, err
 	}
 	return r, nil

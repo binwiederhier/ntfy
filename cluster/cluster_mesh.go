@@ -122,13 +122,17 @@ func (c *meshCluster) heartbeatLoop() {
 	defer c.wg.Done()
 	ticker := time.NewTicker(c.conf.HeartbeatInterval)
 	defer ticker.Stop()
-	c.heartbeat()
+	if err := c.heartbeat(); err != nil {
+		log.Tag(tag).Err(err).Warn("Cluster heartbeat failed")
+	}
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
 		case <-ticker.C:
-			c.heartbeat()
+			if err := c.heartbeat(); err != nil {
+				log.Tag(tag).Err(err).Warn("Cluster heartbeat failed")
+			}
 		}
 	}
 }
@@ -136,25 +140,33 @@ func (c *meshCluster) heartbeatLoop() {
 // heartbeat is one control-plane tick: refresh this node's registry row, retry/confirm the
 // leader lock, prune long-dead registry rows (as leader), reconcile the per-peer queues, and
 // periodically push our subscription state to peers.
-func (c *meshCluster) heartbeat() {
+//
+// A node that cannot even register itself aborts the tick: the remaining database work would
+// fail against the same database, and everything downstream degrades safely without it -- Relay
+// serves the stale peer cache on its own, and peers fall back to broadcasting to us once our
+// last pushed state expires.
+func (c *meshCluster) heartbeat() error {
 	if err := c.registry.Register(); err != nil {
-		log.Tag(tag).Err(err).Warn("Failed to refresh node registry heartbeat")
+		return err
 	}
 	if c.leader.TryAcquire(c.ctx) {
 		metrics.ClusterLeader.Set(1)
 		if err := c.registry.Prune(); err != nil {
-			log.Tag(tag).Err(err).Warn("Failed to prune stale nodes")
+			log.Tag(tag).Err(err).Warn("Failed to prune stale nodes") // Housekeeping only; not fatal for the tick
 		}
 	} else {
 		metrics.ClusterLeader.Set(0)
 	}
-	if peers, err := c.registry.Peers(); err == nil {
-		c.reconcileQueues(peers)
-		if time.Since(c.lastStatePush) >= c.conf.StateInterval {
-			c.pushState(peers)
-			c.lastStatePush = time.Now()
-		}
+	peers, err := c.registry.Peers()
+	if err != nil {
+		return err
 	}
+	c.reconcileQueues(peers)
+	if time.Since(c.lastStatePush) >= c.conf.StateInterval {
+		c.pushState(peers)
+		c.lastStatePush = time.Now()
+	}
+	return nil
 }
 
 // reconcileQueues aligns the per-peer queues with the given live peer set: it updates the URLs of

@@ -591,3 +591,31 @@ func TestMesh_AnnounceClosesWindow(t *testing.T) {
 		return ok && state.topics.Contains("fresh-topic")
 	})
 }
+
+func TestMesh_StateOfDepartedPeerPruned(t *testing.T) {
+	// peerState is push-driven and can arrive before the peer is visible in the registry, so it
+	// must survive reconcile while fresh -- but a departed peer's state must not leak forever:
+	// once it is both absent from the registry and stale past the trust window, it is pruned.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	rr := postState(mesh, "node-gone", &apiState{Topics: &apiStateTopics{Filter: topicFilter(t, "some-topic")}})
+	require.Equal(t, 200, rr.Code)
+	// Fresh state of an unknown peer survives reconcile (the new-node visibility window)
+	mesh.reconcileQueues(nil)
+	mesh.statesMu.Lock()
+	_, ok := mesh.states["node-gone"]
+	mesh.statesMu.Unlock()
+	require.True(t, ok)
+	// Stale state of an absent peer is pruned
+	mesh.statesMu.Lock()
+	mesh.states["node-gone"].updatedAt = time.Now().Add(-time.Hour)
+	mesh.statesMu.Unlock()
+	mesh.reconcileQueues(nil)
+	mesh.statesMu.Lock()
+	_, ok = mesh.states["node-gone"]
+	mesh.statesMu.Unlock()
+	require.False(t, ok)
+}

@@ -182,13 +182,24 @@ func (c *meshCluster) reconcileQueues(peers []peer) {
 		alive[p.nodeID] = p.advertiseURL
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	for nodeID, q := range c.queues {
 		if url, ok := alive[nodeID]; !ok || q.advertiseURL != url {
 			q.queue.Close() // Flushes the remainder; the worker exits when the queue is drained
 			delete(c.queues, nodeID)
 		}
 	}
+	c.mu.Unlock()
+	// Prune the state of departed peers, but only once stale: state is push-driven and can
+	// arrive before a new peer is visible in the (up to NodeTTL stale) registry view, so fresh
+	// state must survive even when its peer is not in the live set. Without this, the states of
+	// long-gone nodes would accumulate forever.
+	c.statesMu.Lock()
+	for nodeID, state := range c.states {
+		if _, ok := alive[nodeID]; !ok && time.Since(state.updatedAt) > 3*c.conf.StateInterval {
+			delete(c.states, nodeID)
+		}
+	}
+	c.statesMu.Unlock()
 }
 
 // queueFor returns the send queue for the given peer, creating it (and its delivery worker) if it

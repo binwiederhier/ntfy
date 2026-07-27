@@ -6,12 +6,11 @@ package registry
 
 import (
 	"database/sql"
-	"errors"
-	"fmt"
 	"sync"
 	"time"
 
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/schema"
 )
 
 // schemaVersion is the current node_registry schema version, tracked in the shared
@@ -21,13 +20,9 @@ const (
 	storeKey      = "node_registry"
 )
 
-// Registry queries. Setup and migrations run inside a single advisory-locked transaction, so
-// concurrently cold-booting nodes serialize instead of racing on DDL.
+// Registry queries
 const (
-	createSchemaVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`
-	selectSchemaVersionQuery      = `SELECT version FROM schema_version WHERE store = $1`
-	upsertSchemaVersionQuery      = `INSERT INTO schema_version (store, version) VALUES ($1, $2) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`
-	createTableQuery              = `
+	createTableQuery = `
 		CREATE TABLE IF NOT EXISTS node_registry (
 			node_id        TEXT PRIMARY KEY,
 			advertise_url  TEXT NOT NULL,
@@ -39,19 +34,14 @@ const (
 		VALUES ($1, $2, $3)
 		ON CONFLICT (node_id) DO UPDATE SET advertise_url = EXCLUDED.advertise_url, last_heartbeat = EXCLUDED.last_heartbeat
 	`
-	selectPeersQuery         = `SELECT node_id, advertise_url FROM node_registry WHERE last_heartbeat >= $1 AND node_id != $2`
-	pruneStaleNodesQuery     = `DELETE FROM node_registry WHERE last_heartbeat < $1`
-	deleteNodeQuery          = `DELETE FROM node_registry WHERE node_id = $1`
-	tryAdvisoryXactLockQuery = `SELECT pg_advisory_xact_lock($1)`
+	selectPeersQuery     = `SELECT node_id, advertise_url FROM node_registry WHERE last_heartbeat >= $1 AND node_id != $2`
+	pruneStaleNodesQuery = `DELETE FROM node_registry WHERE last_heartbeat < $1`
+	deleteNodeQuery      = `DELETE FROM node_registry WHERE node_id = $1`
 )
 
-// schemaLockKey is the advisory-lock key serializing registry table creation across nodes. It is
-// distinct from the cluster leader lock key, which is session-scoped and long-held.
-const schemaLockKey = int64(0x6e746679c) // "ntfy" + c (create)
-
-// migrations maps a schema version to the migration upgrading it to the next version; each runs
-// inside the setup transaction. Always append migrations at the end, never insert in the middle.
-var migrations = map[int]func(tx *sql.Tx) error{}
+// migrations maps a schema version to the migration upgrading it to the next version. Always
+// append migrations at the end, never insert in the middle.
+var migrations = map[int]schema.MigrateFunc{}
 
 // Peer is a live remote node as read from the registry.
 type Peer struct {
@@ -139,56 +129,13 @@ func (r *Registry) Deregister() error {
 	return err
 }
 
-// setup creates or migrates the registry schema, serialized via a transaction-scoped advisory
-// lock: CREATE TABLE IF NOT EXISTS is not atomic in PostgreSQL, so multiple nodes cold-booting
-// concurrently on a fresh database would otherwise race and crash with a duplicate-key error
-// on pg_class. The whole setup (version check, creation or migrations, version bump) commits as
-// one transaction.
+// setup creates or migrates the registry schema via the shared schema framework (one advisory-
+// locked transaction; see db/schema).
 func (r *Registry) setup() error {
-	tx, err := r.pool.Begin()
-	if err != nil {
+	return schema.Migrate(r.pool.Primary(), schema.Postgres, storeKey, schemaVersion, func(tx *sql.Tx) error {
+		_, err := tx.Exec(createTableQuery)
 		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.Exec(tryAdvisoryXactLockQuery, schemaLockKey); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(createSchemaVersionTableQuery); err != nil {
-		return err
-	}
-	var version int
-	err = tx.QueryRow(selectSchemaVersionQuery, storeKey).Scan(&version)
-	if errors.Is(err, sql.ErrNoRows) {
-		// Fresh database: create the table at the current version
-		if _, err := tx.Exec(createTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(upsertSchemaVersionQuery, storeKey, schemaVersion); err != nil {
-			return err
-		}
-		return tx.Commit()
-	} else if err != nil {
-		return err
-	}
-	if version == schemaVersion {
-		return tx.Commit()
-	}
-	if version > schemaVersion {
-		return fmt.Errorf("unexpected %s schema version %d, this version of ntfy supports up to %d", storeKey, version, schemaVersion)
-	}
-	for v := version; v < schemaVersion; v++ {
-		migrate, ok := migrations[v]
-		if !ok {
-			return fmt.Errorf("cannot find %s migration step from version %d to %d", storeKey, v, v+1)
-		}
-		if err := migrate(tx); err != nil {
-			return err
-		}
-	}
-	if _, err := tx.Exec(upsertSchemaVersionQuery, storeKey, schemaVersion); err != nil {
-		return err
-	}
-	return tx.Commit()
+	}, migrations)
 }
 
 // queryPeers reads the current live peer set from the registry table.

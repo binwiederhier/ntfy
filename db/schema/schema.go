@@ -1,0 +1,111 @@
+// Package schema tracks and migrates database schemas for any store: each store records its
+// version in the shared schema_version table (keyed by store name), and Migrate creates or
+// step-by-step upgrades the store's schema inside a single transaction. It works on PostgreSQL
+// and SQLite, and takes a bare *sql.DB so any package can use it without further dependencies.
+package schema
+
+import (
+	"database/sql"
+	"errors"
+	"fmt"
+)
+
+// Queries by dialect. The version table is shared by all stores; on PostgreSQL its creation and
+// all migrations are additionally serialized by an advisory lock, because CREATE TABLE IF NOT
+// EXISTS is not atomic and concurrently cold-booting nodes would otherwise race on DDL.
+const (
+	createVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`
+
+	postgresSelectVersionQuery = `SELECT version FROM schema_version WHERE store = $1`
+	postgresUpsertVersionQuery = `INSERT INTO schema_version (store, version) VALUES ($1, $2) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`
+	postgresAdvisoryLockQuery  = `SELECT pg_advisory_xact_lock($1)`
+
+	sqliteSelectVersionQuery = `SELECT version FROM schema_version WHERE store = ?`
+	sqliteUpsertVersionQuery = `INSERT INTO schema_version (store, version) VALUES (?, ?) ON CONFLICT (store) DO UPDATE SET version = excluded.version`
+)
+
+// lockKey is the PostgreSQL advisory-lock key serializing all schema setup ("ntfy" + s).
+const lockKey = int64(0x6e746679a)
+
+// Dialect selects the SQL flavor Migrate speaks to the version table.
+type Dialect int
+
+// Supported dialects
+const (
+	Postgres Dialect = iota
+	SQLite
+)
+
+// MigrateFunc applies one schema change inside the setup transaction: either the initial
+// creation of a store's tables, or one step upgrading a store from version N to N+1.
+type MigrateFunc func(tx *sql.Tx) error
+
+// Migrate creates or upgrades the named store's schema to targetVersion, all inside one
+// transaction: a fresh database gets the create func at the target version; an existing one is
+// upgraded step by step through the migrations map (keyed by the FROM version; always append,
+// never insert in the middle); a database migrated by newer code is refused. Multiple stores
+// share the version table, keyed by store name.
+func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, create MigrateFunc, migrations map[int]MigrateFunc) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if dialect == Postgres {
+		if _, err := tx.Exec(postgresAdvisoryLockQuery, lockKey); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(createVersionTableQuery); err != nil {
+		return err
+	}
+	var version int
+	err = tx.QueryRow(selectVersionQuery(dialect), store).Scan(&version)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Fresh database: create the store's tables at the target version
+		if err := create(tx); err != nil {
+			return err
+		}
+		if err := writeVersion(tx, dialect, store, targetVersion); err != nil {
+			return err
+		}
+		return tx.Commit()
+	} else if err != nil {
+		return err
+	}
+	if version == targetVersion {
+		return tx.Commit()
+	}
+	if version > targetVersion {
+		return fmt.Errorf("unexpected %s schema version %d, this version of ntfy supports up to %d", store, version, targetVersion)
+	}
+	for v := version; v < targetVersion; v++ {
+		migrate, ok := migrations[v]
+		if !ok {
+			return fmt.Errorf("cannot find %s migration step from version %d to %d", store, v, v+1)
+		}
+		if err := migrate(tx); err != nil {
+			return err
+		}
+	}
+	if err := writeVersion(tx, dialect, store, targetVersion); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func selectVersionQuery(dialect Dialect) string {
+	if dialect == SQLite {
+		return sqliteSelectVersionQuery
+	}
+	return postgresSelectVersionQuery
+}
+
+func writeVersion(tx *sql.Tx, dialect Dialect, store string, version int) error {
+	query := postgresUpsertVersionQuery
+	if dialect == SQLite {
+		query = sqliteUpsertVersionQuery
+	}
+	_, err := tx.Exec(query, store, version)
+	return err
+}

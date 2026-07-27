@@ -295,7 +295,7 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	require.Equal(t, 1, received) // Only the first message arrived
 	mu.Unlock()
 	// The peer comes back (same node ID, fresh heartbeat) and receives messages again; the
-	// broadcast retries because the peer list is cached for up to a second
+	// relay retries because the peer list is cached for up to the node TTL
 	_, err = pool.Exec(upsertNodeQuery, "node-dead", srv.URL, time.Now().Unix())
 	require.Nil(t, err)
 	waitFor(t, func() bool {

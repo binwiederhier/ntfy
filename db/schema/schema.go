@@ -28,10 +28,10 @@ const lockKey = int64(0x6e746679a)
 // Dialect selects the SQL flavor Migrate speaks to the version table.
 type Dialect int
 
-// Supported dialects
+// Supported dialects; SQLite is the zero value
 const (
-	Postgres Dialect = iota
-	SQLite
+	SQLite Dialect = iota
+	Postgres
 )
 
 // MigrateFunc applies one schema change inside the setup transaction: the initial creation of

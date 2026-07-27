@@ -146,6 +146,8 @@ func (c *meshCluster) heartbeatLoop() {
 // serves the stale peer cache on its own, and peers fall back to broadcasting to us once our
 // last pushed state expires.
 func (c *meshCluster) heartbeat() error {
+	// TODO(T8): record the last successful Register here to back the future Healthy() method
+	// (see the Cluster interface)
 	if err := c.registry.Register(); err != nil {
 		return err
 	}

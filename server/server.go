@@ -370,6 +370,8 @@ func New(conf *Config) (*Server, error) {
 // be reached from the outside even before any firewalling.
 func (s *Server) clusterHandler() http.Handler {
 	mux := http.NewServeMux()
+	// TODO(T8): reflect s.cluster.Healthy() here (and in handleHealth) instead of a static
+	// response, so health checks can pull a node that lost its registry heartbeat
 	mux.HandleFunc(apiHealthPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, `{"healthy":true}`+"\n")
@@ -827,6 +829,8 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	// TODO(T8): in cluster mode, reflect s.cluster.Healthy() so DNS/LB health checks stop
+	// routing NEW clients to a node whose peers no longer relay to it (see Cluster interface)
 	response := &apiHealthResponse{
 		Healthy: true,
 	}

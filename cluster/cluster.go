@@ -95,6 +95,12 @@ type Cluster interface {
 	// IsLeader reports whether this node holds the cluster leader lock. Singleton background
 	// jobs (e.g. the Firebase keepaliver) are gated on the leader.
 	IsLeader() bool
+	// TODO(T8): add Healthy() bool reflecting registration health (unhealthy when the last
+	// successful Register is older than NodeTTL, i.e. when peers stop relaying to this node),
+	// so /v1/health can pull a DB-partitioned node out of DNS rotation. Needs a fail-open
+	// answer at the health checker first: during a full DB outage ALL nodes fail to register
+	// while the mesh keeps delivering on stale peer caches, and naively pulling every node
+	// would turn a control-plane blip into a total outage.
 	// Close stops the cluster and releases its resources.
 	Close() error
 }

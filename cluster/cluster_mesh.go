@@ -163,7 +163,7 @@ func (c *meshCluster) heartbeat() error {
 	if err != nil {
 		return err
 	}
-	c.reconcileQueues(peers)
+	c.reconcilePeers(peers)
 	if time.Since(c.lastStatePush) >= c.conf.StateInterval {
 		c.pushState(peers)
 		c.lastStatePush = time.Now()
@@ -171,11 +171,12 @@ func (c *meshCluster) heartbeat() error {
 	return nil
 }
 
-// reconcileQueues retires the queues (and workers) of peers that have left the registry or
-// re-registered under a new advertise URL; the retired queue's remainder was headed for a dead
-// address anyway. New and replacement queues are created lazily by Relay, not here, so a freshly
-// joined peer is reachable immediately.
-func (c *meshCluster) reconcileQueues(peers []peer) {
+// reconcilePeers aligns this node's per-peer attachments with the live peer set: it retires the
+// queues (and workers) of peers that have left the registry or re-registered under a new
+// advertise URL (the retired queue's remainder was headed for a dead address anyway), and prunes
+// the stale state of departed peers. New and replacement queues are created lazily by Relay, not
+// here, so a freshly joined peer is reachable immediately.
+func (c *meshCluster) reconcilePeers(peers []peer) {
 	metrics.ClusterPeers.Set(float64(len(peers)))
 	alive := make(map[NodeID]string, len(peers)) // node ID -> advertise URL
 	for _, p := range peers {

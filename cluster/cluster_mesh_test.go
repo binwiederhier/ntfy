@@ -604,7 +604,7 @@ func TestMesh_StateOfDepartedPeerPruned(t *testing.T) {
 	rr := postState(mesh, "node-gone", &apiState{Topics: &apiStateTopics{Filter: topicFilter(t, "some-topic")}})
 	require.Equal(t, 200, rr.Code)
 	// Fresh state of an unknown peer survives reconcile (the new-node visibility window)
-	mesh.reconcileQueues(nil)
+	mesh.reconcilePeers(nil)
 	mesh.statesMu.Lock()
 	_, ok := mesh.states["node-gone"]
 	mesh.statesMu.Unlock()
@@ -613,7 +613,7 @@ func TestMesh_StateOfDepartedPeerPruned(t *testing.T) {
 	mesh.statesMu.Lock()
 	mesh.states["node-gone"].updatedAt = time.Now().Add(-time.Hour)
 	mesh.statesMu.Unlock()
-	mesh.reconcileQueues(nil)
+	mesh.reconcilePeers(nil)
 	mesh.statesMu.Lock()
 	_, ok = mesh.states["node-gone"]
 	mesh.statesMu.Unlock()

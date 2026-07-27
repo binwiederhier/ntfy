@@ -39,7 +39,7 @@ const (
 type meshCluster struct {
 	conf       *Config
 	deliver    DeliverFunc
-	topics     TopicSource
+	topics     TopicsFunc
 	registry   *registry
 	leader     *pg.Leader
 	httpClient *http.Client
@@ -57,7 +57,7 @@ type meshCluster struct {
 // newMeshCluster creates the mesh cluster: it ensures the registry table exists, registers this
 // node, and starts the heartbeat/leader-election loop. Peer delivery workers are started lazily
 // as peers appear in the registry.
-func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc, topics TopicSource) (*meshCluster, error) {
+func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc, topics TopicsFunc) (*meshCluster, error) {
 	if topics == nil {
 		topics = func() []string { return nil } // No known topics; peers will broadcast to us
 	}

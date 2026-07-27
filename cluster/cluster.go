@@ -73,10 +73,10 @@ type Config struct {
 // server supplies it, which inverts the dependency: this package never imports the server.
 type DeliverFunc func(m *model.Message)
 
-// TopicSource returns the topics that currently have at least one live subscriber, computed
+// TopicsFunc returns the topics that currently have at least one live subscriber, computed
 // fresh on every call: membership is never tracked as a list, so topics "leave" simply by not
 // appearing in the next snapshot. The server supplies it (same inversion as DeliverFunc).
-type TopicSource func() []string
+type TopicsFunc func() []string
 
 // Cluster fans published messages out to peer cluster nodes and receives their fan-out requests.
 // Local delivery to a node's own subscribers still happens inline in the server; the cluster
@@ -101,7 +101,7 @@ type Cluster interface {
 
 // New creates the cluster for the given config: the nop cluster when clustering is disabled (the
 // single-node default), or the peer-mesh cluster otherwise.
-func New(conf *Config, pool *db.DB, deliver DeliverFunc, topics TopicSource) (Cluster, error) {
+func New(conf *Config, pool *db.DB, deliver DeliverFunc, topics TopicsFunc) (Cluster, error) {
 	if !conf.Enabled {
 		return &nopCluster{}, nil
 	}

@@ -101,6 +101,12 @@ func TestMigrate_ClosureCarriesConfig(t *testing.T) {
 	})
 }
 
+func TestMigrate_InvalidDialect(t *testing.T) {
+	d := openTestSQLite(t)
+	err := schema.Migrate(d, schema.Dialect(99), "things", 1, testCreate, nil)
+	require.Error(t, err)
+}
+
 func TestMigrate_RefusesFutureVersion(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
 		require.Nil(t, schema.Migrate(d, dialect, "things", 2, testCreate, map[int]schema.MigrateFunc{}))

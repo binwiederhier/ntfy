@@ -46,6 +46,9 @@ type MigrateFunc func(tx *sql.Tx) error
 // statements that refuse transaction blocks (Postgres CREATE INDEX CONCURRENTLY, VACUUM) cannot
 // go through Migrate, and DDL holds exclusive locks until commit, so keep migrations fast.
 func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, create MigrateFunc, migrations map[int]MigrateFunc) error {
+	if dialect != Postgres && dialect != SQLite {
+		return fmt.Errorf("unsupported schema dialect %d", dialect)
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -95,16 +98,16 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 }
 
 func selectVersionQuery(dialect Dialect) string {
-	if dialect == SQLite {
-		return sqliteSelectVersionQuery
+	if dialect == Postgres {
+		return postgresSelectVersionQuery
 	}
-	return postgresSelectVersionQuery
+	return sqliteSelectVersionQuery
 }
 
 func writeVersion(tx *sql.Tx, dialect Dialect, store string, version int) error {
-	query := postgresUpsertVersionQuery
-	if dialect == SQLite {
-		query = sqliteUpsertVersionQuery
+	query := sqliteUpsertVersionQuery
+	if dialect == Postgres {
+		query = postgresUpsertVersionQuery
 	}
 	_, err := tx.Exec(query, store, version)
 	return err

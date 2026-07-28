@@ -5,7 +5,6 @@
 package registry
 
 import (
-	"database/sql"
 	"sync"
 	"time"
 
@@ -22,13 +21,6 @@ const (
 
 // Registry queries
 const (
-	createTableQuery = `
-		CREATE TABLE IF NOT EXISTS node_registry (
-			node_id        TEXT PRIMARY KEY,
-			advertise_url  TEXT NOT NULL,
-			last_heartbeat BIGINT NOT NULL
-		)
-	`
 	upsertNodeQuery = `
 		INSERT INTO node_registry (node_id, advertise_url, last_heartbeat)
 		VALUES ($1, $2, $3)
@@ -38,6 +30,15 @@ const (
 	pruneStaleNodesQuery = `DELETE FROM node_registry WHERE last_heartbeat < $1`
 	deleteNodeQuery      = `DELETE FROM node_registry WHERE node_id = $1`
 )
+
+// createTable sets up the initial registry schema, applied through db/schema (see New)
+var createTable = schema.AsMigrateFunc(`
+	CREATE TABLE IF NOT EXISTS node_registry (
+		node_id        TEXT PRIMARY KEY,
+		advertise_url  TEXT NOT NULL,
+		last_heartbeat BIGINT NOT NULL
+	)
+`)
 
 // migrations maps a schema version to the migration upgrading it to the next version. Always
 // append migrations at the end, never insert in the middle.
@@ -68,16 +69,15 @@ type Registry struct {
 // does NOT register the node: joining the cluster is an explicit Register call, owned by the
 // caller, so read-only uses of the registry stay side-effect free.
 func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry, error) {
-	r := &Registry{
+	if err := schema.Migrate(pool.Primary(), schema.Postgres, storeKey, schemaVersion, createTable, migrations); err != nil {
+		return nil, err
+	}
+	return &Registry{
 		pool:         pool,
 		nodeID:       nodeID,
 		advertiseURL: advertiseURL,
 		ttl:          ttl,
-	}
-	if err := r.setup(); err != nil {
-		return nil, err
-	}
-	return r, nil
+	}, nil
 }
 
 // Register upserts this node into the registry with a fresh heartbeat. It is a pure write: it
@@ -127,15 +127,6 @@ func (r *Registry) Prune() error {
 func (r *Registry) Deregister() error {
 	_, err := r.pool.Exec(deleteNodeQuery, r.nodeID)
 	return err
-}
-
-// setup creates or migrates the registry schema via the shared schema framework (one advisory-
-// locked transaction; see db/schema).
-func (r *Registry) setup() error {
-	return schema.Migrate(r.pool.Primary(), schema.Postgres, storeKey, schemaVersion, func(tx *sql.Tx) error {
-		_, err := tx.Exec(createTableQuery)
-		return err
-	}, migrations)
 }
 
 // queryPeers reads the current live peer set from the registry table.

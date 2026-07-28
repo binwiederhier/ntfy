@@ -14,6 +14,8 @@ const (
 	subscriptionIDPrefix                     = "wps_"
 	subscriptionIDLength                     = 10
 	subscriptionEndpointLimitPerSubscriberIP = 10
+
+	schemaStore = "webpush"
 )
 
 // Errors returned by the store

@@ -40,7 +40,6 @@ var createTable = schema.AsMigrateFunc(`
 	)
 `)
 
-
 // Peer is a live remote node as read from the registry.
 type Peer struct {
 	NodeID       string

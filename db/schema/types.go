@@ -23,3 +23,9 @@ func AsMigrateFunc(query string) MigrateFunc {
 		return err
 	}
 }
+
+// NopMigrateFunc is a migration step that does nothing, for versions where a dialect has no
+// work to do (e.g. when only the other dialect's schema changed).
+func NopMigrateFunc(_ *sql.Tx) error {
+	return nil
+}

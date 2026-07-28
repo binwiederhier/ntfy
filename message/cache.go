@@ -17,6 +17,7 @@ import (
 
 const (
 	tagMessageCache = "message_cache"
+	schemaStore     = "message" // Store name in the schema_version table (see db/schema)
 )
 
 var errNoRows = errors.New("no rows found")

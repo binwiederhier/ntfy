@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/schema"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -113,7 +114,10 @@ func NewSQLiteStore(filename, startupQueries string, cacheDuration time.Duration
 	if err != nil {
 		return nil, err
 	}
-	if err := setupSQLite(d, startupQueries, cacheDuration); err != nil {
+	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {
+		return nil, err
+	}
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
 		return nil, err
 	}
 	return newCache(db.New(&db.Host{DB: d}, nil), sqliteQueries, &sync.Mutex{}, batchSize, batchTimeout, nop), nil

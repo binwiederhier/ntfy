@@ -2065,6 +2065,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Fix Twilio phone calls and phone number verifications failing silently when Twilio rejected the request, and move the Twilio integration into its own `twilio` package
 * Move the Prometheus metrics into a dedicated `metrics` package
+* Message cache databases from ntfy older than v1.10.0 (November 2021) can no longer be migrated; upgrade via an older ntfy version first, or delete the cache database
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

@@ -10,6 +10,11 @@ import (
 	"fmt"
 
 	"heckel.io/ntfy/v2/db/pg"
+	"heckel.io/ntfy/v2/log"
+)
+
+const (
+	tag = "schema"
 )
 
 const (
@@ -68,6 +73,7 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 		if !ok {
 			return fmt.Errorf("cannot find %s migration step from version %d to %d", store, v, v+1)
 		}
+		log.Tag(tag).Info("Migrating %s database schema: from %d to %d", store, v, v+1)
 		if err := migrate(tx); err != nil {
 			return fmt.Errorf("%s migration step from version %d to %d failed: %w", store, v, v+1, err)
 		}

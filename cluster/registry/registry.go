@@ -31,14 +31,16 @@ const (
 	deleteNodeQuery      = `DELETE FROM node_registry WHERE node_id = $1`
 )
 
-// createTable sets up the initial registry schema, applied through db/schema (see New)
-var createTable = schema.AsMigrateFunc(`
-	CREATE TABLE IF NOT EXISTS node_registry (
-		node_id        TEXT PRIMARY KEY,
-		advertise_url  TEXT NOT NULL,
-		last_heartbeat BIGINT NOT NULL
-	)
-`)
+var (
+	// createTable sets up the initial registry schema, applied through db/schema (see New)
+	createTable = schema.AsMigrateFunc(`
+		CREATE TABLE IF NOT EXISTS node_registry (
+			node_id        TEXT PRIMARY KEY,
+			advertise_url  TEXT NOT NULL,
+			last_heartbeat BIGINT NOT NULL
+		)
+	`)
+)
 
 // Peer is a live remote node as read from the registry.
 type Peer struct {

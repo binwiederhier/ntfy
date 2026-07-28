@@ -32,12 +32,14 @@ const (
 // IS a node, which is why peer values carry a NodeID.
 type NodeID string
 
-// secretHeader carries the shared secret authenticating node-to-node fan-out requests.
-const secretHeader = "X-Cluster-Secret"
+const (
+	// secretHeader carries the shared secret authenticating node-to-node fan-out requests.
+	secretHeader = "X-Cluster-Secret"
 
-// originHeader carries the sending node's ID on fan-out requests, so a node can skip requests
-// that carry its own broadcasts (loop prevention).
-const originHeader = "X-Cluster-Origin"
+	// originHeader carries the sending node's ID on fan-out requests, so a node can skip
+	// requests that carry its own broadcasts (loop prevention).
+	originHeader = "X-Cluster-Origin"
+)
 
 // Content types of the peer API: message bodies are NDJSON (one JSON message per line, matching
 // the framing of ntfy's own /topic/json subscribe stream), state bodies are plain JSON. Future

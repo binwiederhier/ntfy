@@ -21,7 +21,9 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-const testSecret = "s3cret"
+const (
+	testSecret = "s3cret"
+)
 
 // openTestPool opens a dedicated connection pool to the given test schema, so that each simulated
 // node has its own pool like real nodes would.

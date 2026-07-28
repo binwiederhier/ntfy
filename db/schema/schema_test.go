@@ -14,7 +14,9 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const testCreateQuery = `CREATE TABLE IF NOT EXISTS things (id TEXT PRIMARY KEY, name TEXT NOT NULL)`
+const (
+	testCreateQuery = `CREATE TABLE IF NOT EXISTS things (id TEXT PRIMARY KEY, name TEXT NOT NULL)`
+)
 
 func testCreate(tx *sql.Tx) error {
 	_, err := tx.Exec(testCreateQuery)

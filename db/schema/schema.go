@@ -12,8 +12,6 @@ import (
 	"heckel.io/ntfy/v2/db/pg"
 )
 
-// Queries by dialect; the version table is shared by all stores on Postgres, and per database
-// file on SQLite
 const (
 	sqliteCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schemaVersion (id INT PRIMARY KEY, version INT NOT NULL)`
 	sqliteSelectVersionQuery      = `SELECT version FROM schemaVersion WHERE id = 1`

@@ -12,13 +12,6 @@ import (
 	"heckel.io/ntfy/v2/db/schema"
 )
 
-// schemaVersion is the current node_registry schema version, tracked in the shared
-// schema_version table like every other store's schema.
-const (
-	schemaVersion = 1
-	storeKey      = "node_registry"
-)
-
 // Registry queries
 const (
 	upsertNodeQuery = `
@@ -31,8 +24,14 @@ const (
 	deleteNodeQuery      = `DELETE FROM node_registry WHERE node_id = $1`
 )
 
+// Schema version and queries
+
+const (
+	schemaVersion  = 1
+	schemaStoreKey = "node_registry"
+)
+
 var (
-	// createTable sets up the initial registry schema, applied through db/schema (see New)
 	createTable = schema.AsMigrateFunc(`
 		CREATE TABLE IF NOT EXISTS node_registry (
 			node_id        TEXT PRIMARY KEY,
@@ -67,7 +66,7 @@ type Registry struct {
 // does NOT register the node: joining the cluster is an explicit Register call, owned by the
 // caller, so read-only uses of the registry stay side-effect free.
 func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry, error) {
-	if err := schema.Migrate(pool.Primary(), schema.Postgres, storeKey, schemaVersion, createTable, nil); err != nil {
+	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, createTable, nil); err != nil {
 		return nil, err
 	}
 	return &Registry{

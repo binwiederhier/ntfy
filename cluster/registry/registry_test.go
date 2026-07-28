@@ -188,7 +188,7 @@ func TestRegistry_SchemaVersionWritten(t *testing.T) {
 	_, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
 	var version int
-	require.Nil(t, pool.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, storeKey).Scan(&version))
+	require.Nil(t, pool.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, schemaStoreKey).Scan(&version))
 	require.Equal(t, schemaVersion, version)
 	// Setup is idempotent: a second node boots against the migrated schema
 	_, err = New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
@@ -201,7 +201,7 @@ func TestRegistry_SchemaVersionFromTheFuture(t *testing.T) {
 	pool := openTestPool(t, schemaDSN)
 	_, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
-	_, err = pool.Exec(`UPDATE schema_version SET version = 99 WHERE store = $1`, storeKey)
+	_, err = pool.Exec(`UPDATE schema_version SET version = 99 WHERE store = $1`, schemaStoreKey)
 	require.Nil(t, err)
 	_, err = New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
 	require.Error(t, err)

@@ -1,39 +1,11 @@
 package webpush
 
 import (
-	"database/sql"
-	"fmt"
-
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/schema"
 )
 
 const (
-	postgresCreateTablesQuery = `
-		CREATE TABLE IF NOT EXISTS webpush_subscription (
-			id TEXT PRIMARY KEY,
-			endpoint TEXT NOT NULL UNIQUE,
-			key_auth TEXT NOT NULL,
-			key_p256dh TEXT NOT NULL,
-			user_id TEXT NOT NULL,
-			subscriber_ip TEXT NOT NULL,
-			updated_at BIGINT NOT NULL,
-			warned_at BIGINT NOT NULL DEFAULT 0
-		);
-		CREATE INDEX IF NOT EXISTS idx_webpush_subscriber_ip ON webpush_subscription (subscriber_ip);
-		CREATE INDEX IF NOT EXISTS idx_webpush_updated_at ON webpush_subscription (updated_at);
-		CREATE INDEX IF NOT EXISTS idx_webpush_user_id ON webpush_subscription (user_id);
-		CREATE TABLE IF NOT EXISTS webpush_subscription_topic (
-			subscription_id TEXT NOT NULL REFERENCES webpush_subscription (id) ON DELETE CASCADE,
-			topic TEXT NOT NULL,
-			PRIMARY KEY (subscription_id, topic)
-		);
-		CREATE INDEX IF NOT EXISTS idx_webpush_topic ON webpush_subscription_topic (topic);
-		CREATE TABLE IF NOT EXISTS schema_version (
-			store TEXT PRIMARY KEY,
-			version INT NOT NULL
-		);
-	`
-
 	postgresSelectSubscriptionIDByEndpointQuery        = `SELECT id FROM webpush_subscription WHERE endpoint = $1`
 	postgresSelectSubscriptionCountBySubscriberIPQuery = `SELECT COUNT(*) FROM webpush_subscription WHERE subscriber_ip = $1`
 	postgresSelectSubscriptionsForTopicQuery           = `
@@ -66,16 +38,38 @@ const (
 	postgresDeleteSubscriptionTopicWithoutSubscriptionQuery = `DELETE FROM webpush_subscription_topic WHERE subscription_id NOT IN (SELECT id FROM webpush_subscription)`
 )
 
-// PostgreSQL schema management queries
+// Schema version and queries
 const (
-	pgCurrentSchemaVersion           = 1
-	postgresInsertSchemaVersionQuery = `INSERT INTO schema_version (store, version) VALUES ('webpush', $1)`
-	postgresSelectSchemaVersionQuery = `SELECT version FROM schema_version WHERE store = 'webpush'`
+	postgresCurrentSchemaVersion = 1
+)
+
+var (
+	postgresCreateTables = schema.AsMigrateFunc(`
+		CREATE TABLE IF NOT EXISTS webpush_subscription (
+			id TEXT PRIMARY KEY,
+			endpoint TEXT NOT NULL UNIQUE,
+			key_auth TEXT NOT NULL,
+			key_p256dh TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			subscriber_ip TEXT NOT NULL,
+			updated_at BIGINT NOT NULL,
+			warned_at BIGINT NOT NULL DEFAULT 0
+		);
+		CREATE INDEX IF NOT EXISTS idx_webpush_subscriber_ip ON webpush_subscription (subscriber_ip);
+		CREATE INDEX IF NOT EXISTS idx_webpush_updated_at ON webpush_subscription (updated_at);
+		CREATE INDEX IF NOT EXISTS idx_webpush_user_id ON webpush_subscription (user_id);
+		CREATE TABLE IF NOT EXISTS webpush_subscription_topic (
+			subscription_id TEXT NOT NULL REFERENCES webpush_subscription (id) ON DELETE CASCADE,
+			topic TEXT NOT NULL,
+			PRIMARY KEY (subscription_id, topic)
+		);
+		CREATE INDEX IF NOT EXISTS idx_webpush_topic ON webpush_subscription_topic (topic);
+	`)
 )
 
 // NewPostgresStore creates a new PostgreSQL-backed web push store using an existing database connection pool.
 func NewPostgresStore(d *db.DB) (*Store, error) {
-	if err := setupPostgres(d.Primary()); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, nil); err != nil {
 		return nil, err
 	}
 	return &Store{
@@ -96,28 +90,4 @@ func NewPostgresStore(d *db.DB) (*Store, error) {
 			deleteSubscriptionTopicWithoutSubscription: postgresDeleteSubscriptionTopicWithoutSubscriptionQuery,
 		},
 	}, nil
-}
-
-func setupPostgres(d *sql.DB) error {
-	var schemaVersion int
-	err := d.QueryRow(postgresSelectSchemaVersionQuery).Scan(&schemaVersion)
-	if err != nil {
-		return setupNewPostgres(d)
-	}
-	if schemaVersion > pgCurrentSchemaVersion {
-		return fmt.Errorf("unexpected schema version: version %d is higher than current version %d", schemaVersion, pgCurrentSchemaVersion)
-	}
-	return nil
-}
-
-func setupNewPostgres(d *sql.DB) error {
-	return db.ExecTx(d, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(postgresCreateTablesQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(postgresInsertSchemaVersionQuery, pgCurrentSchemaVersion); err != nil {
-			return err
-		}
-		return nil
-	})
 }

@@ -48,13 +48,13 @@ func forEachDialect(t *testing.T, f func(t *testing.T, d *sql.DB, dialect schema
 
 func TestMigrate_FreshCreate(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
-		require.Nil(t, schema.Migrate(d, dialect, "things", 1, testCreate, nil))
-		// Table exists and the version is recorded
+		// A fresh database jumps straight to the target version; migration steps are not consulted
+		require.Nil(t, schema.Migrate(d, dialect, "things", 3, testCreate, nil))
 		_, err := d.Exec(`INSERT INTO things (id, name) VALUES ('a', 'thing a')`)
 		require.Nil(t, err)
-		require.Equal(t, 1, storeVersion(t, d, dialect, "things"))
+		require.Equal(t, 3, storeVersion(t, d, dialect, "things"))
 		// Idempotent: a second node boots against the migrated schema
-		require.Nil(t, schema.Migrate(d, dialect, "things", 1, testCreate, nil))
+		require.Nil(t, schema.Migrate(d, dialect, "things", 3, testCreate, nil))
 	})
 }
 
@@ -84,10 +84,7 @@ func TestMigrate_ClosureCarriesConfig(t *testing.T) {
 	// params plumbing in the framework itself
 	migrationsFor := func(defaultName string) map[int]schema.MigrateFunc {
 		return map[int]schema.MigrateFunc{
-			1: func(tx *sql.Tx) error {
-				_, err := tx.Exec(fmt.Sprintf(`ALTER TABLE things ADD COLUMN nick TEXT NOT NULL DEFAULT '%s'`, defaultName))
-				return err
-			},
+			1: schema.AsMigrateFunc(fmt.Sprintf(`ALTER TABLE things ADD COLUMN nick TEXT NOT NULL DEFAULT '%s'`, defaultName)),
 		}
 	}
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
@@ -124,15 +121,39 @@ func TestMigrate_MissingStepFails(t *testing.T) {
 }
 
 func TestMigrate_StoresAreIndependent(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
-		require.Nil(t, schema.Migrate(d, dialect, "things", 1, testCreate, nil))
-		require.Nil(t, schema.Migrate(d, dialect, "gadgets", 4, func(tx *sql.Tx) error {
-			_, err := tx.Exec(`CREATE TABLE IF NOT EXISTS gadgets (id TEXT PRIMARY KEY)`)
+	// Postgres only: stores share one database, tracked as rows in schema_version. On SQLite
+	// every store has its own database file, so independence is by file.
+	d := openTestPostgres(t)
+	require.Nil(t, schema.Migrate(d, schema.Postgres, "things", 1, testCreate, nil))
+	require.Nil(t, schema.Migrate(d, schema.Postgres, "gadgets", 4, func(tx *sql.Tx) error {
+		_, err := tx.Exec(`CREATE TABLE IF NOT EXISTS gadgets (id TEXT PRIMARY KEY)`)
+		return err
+	}, nil))
+	require.Equal(t, 1, storeVersion(t, d, schema.Postgres, "things"))
+	require.Equal(t, 4, storeVersion(t, d, schema.Postgres, "gadgets"))
+}
+
+func TestMigrate_SQLiteReadsExistingSchemaVersionTable(t *testing.T) {
+	// Existing ntfy SQLite databases (message, user, webpush) track their version in a
+	// schemaVersion (id, version) table keyed by id = 1; the framework uses that table as-is
+	// on SQLite, so existing databases migrate without any adoption step
+	d := openTestSQLite(t)
+	_, err := d.Exec(testCreateQuery)
+	require.Nil(t, err)
+	_, err = d.Exec(`CREATE TABLE schemaVersion (id INT PRIMARY KEY, version INT NOT NULL)`)
+	require.Nil(t, err)
+	_, err = d.Exec(`INSERT INTO schemaVersion VALUES (1, 1)`)
+	require.Nil(t, err)
+	migrations := map[int]schema.MigrateFunc{
+		1: func(tx *sql.Tx) error {
+			_, err := tx.Exec(`ALTER TABLE things ADD COLUMN color TEXT NOT NULL DEFAULT ''`)
 			return err
-		}, nil))
-		require.Equal(t, 1, storeVersion(t, d, dialect, "things"))
-		require.Equal(t, 4, storeVersion(t, d, dialect, "gadgets"))
-	})
+		},
+	}
+	require.Nil(t, schema.Migrate(d, schema.SQLite, "things", 2, testCreate, migrations))
+	_, err = d.Exec(`INSERT INTO things (id, name, color) VALUES ('a', 'thing a', 'red')`)
+	require.Nil(t, err)
+	require.Equal(t, 2, storeVersion(t, d, schema.SQLite, "things"))
 }
 
 func TestMigrate_ConcurrentFreshCreate(t *testing.T) {
@@ -159,11 +180,11 @@ func TestMigrate_ConcurrentFreshCreate(t *testing.T) {
 
 func storeVersion(t *testing.T, d *sql.DB, dialect schema.Dialect, store string) int {
 	t.Helper()
-	query := `SELECT version FROM schema_version WHERE store = $1`
-	if dialect == schema.SQLite {
-		query = `SELECT version FROM schema_version WHERE store = ?`
-	}
 	var version int
-	require.Nil(t, d.QueryRow(query, store).Scan(&version), fmt.Sprintf("store %s", store))
+	if dialect == schema.Postgres {
+		require.Nil(t, d.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, store).Scan(&version), fmt.Sprintf("store %s", store))
+	} else {
+		require.Nil(t, d.QueryRow(`SELECT version FROM schemaVersion WHERE id = 1`).Scan(&version), fmt.Sprintf("store %s", store))
+	}
 	return version
 }

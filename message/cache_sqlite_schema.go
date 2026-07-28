@@ -2,16 +2,15 @@ package message
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
-	"heckel.io/ntfy/v2/db"
-	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/db/schema"
 )
 
 // Initial SQLite schema
 const (
-	sqliteCreateTablesQuery = `
+	sqliteCurrentSchemaVersion = 15
+	sqliteCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			mid TEXT NOT NULL,
@@ -55,29 +54,9 @@ const (
 	`
 )
 
-// Schema version management for SQLite
+// Schema migrations for SQLite. Databases older than schema version 1 (ntfy < v1.10.0,
+// November 2021) can no longer be migrated.
 const (
-	sqliteCurrentSchemaVersion          = 15
-	sqliteCreateSchemaVersionTableQuery = `
-		CREATE TABLE IF NOT EXISTS schemaVersion (
-			id INT PRIMARY KEY,
-			version INT NOT NULL
-		);
-	`
-	sqliteInsertSchemaVersionQuery = `INSERT INTO schemaVersion VALUES (1, ?)`
-	sqliteUpdateSchemaVersionQuery = `UPDATE schemaVersion SET version = ? WHERE id = 1`
-	sqliteSelectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
-)
-
-// Schema migrations for SQLite
-const (
-	// 0 -> 1
-	sqliteMigrate0To1AlterMessagesTableQuery = `
-		ALTER TABLE messages ADD COLUMN title TEXT NOT NULL DEFAULT('');
-		ALTER TABLE messages ADD COLUMN priority INT NOT NULL DEFAULT(0);
-		ALTER TABLE messages ADD COLUMN tags TEXT NOT NULL DEFAULT('');
-	`
-
 	// 1 -> 2
 	sqliteMigrate1To2AlterMessagesTableQuery = `
 		ALTER TABLE messages ADD COLUMN published INT NOT NULL DEFAULT(1);
@@ -193,67 +172,35 @@ const (
 )
 
 var (
-	sqliteMigrations = map[int]func(db *sql.DB, cacheDuration time.Duration) error{
-		0:  sqliteMigrateFrom0,
-		1:  sqliteMigrateFrom1,
-		2:  sqliteMigrateFrom2,
-		3:  sqliteMigrateFrom3,
-		4:  sqliteMigrateFrom4,
-		5:  sqliteMigrateFrom5,
-		6:  sqliteMigrateFrom6,
-		7:  sqliteMigrateFrom7,
-		8:  sqliteMigrateFrom8,
-		9:  sqliteMigrateFrom9,
-		10: sqliteMigrateFrom10,
-		11: sqliteMigrateFrom11,
-		12: sqliteMigrateFrom12,
-		13: sqliteMigrateFrom13,
-		14: sqliteMigrateFrom14,
-	}
+	sqliteCreateTables = schema.AsMigrateFunc(sqliteCreateTablesQuery)
 )
 
-func setupSQLite(db *sql.DB, startupQueries string, cacheDuration time.Duration) error {
-	if err := runSQLiteStartupQueries(db, startupQueries); err != nil {
-		return err
-	}
-	// If 'messages' table does not exist, this must be a new database
-	var messagesCount int
-	if err := db.QueryRow(sqliteSelectMessagesCountQuery).Scan(&messagesCount); err != nil {
-		return setupNewSQLite(db)
-	}
-	// If 'messages' table exists (schema >= 0), check 'schemaVersion' table
-	var schemaVersion int
-	db.QueryRow(sqliteSelectSchemaVersionQuery).Scan(&schemaVersion) // Error means schema version is zero!
-	// Do migrations
-	if schemaVersion == sqliteCurrentSchemaVersion {
-		return nil
-	} else if schemaVersion > sqliteCurrentSchemaVersion {
-		return fmt.Errorf("unexpected schema version: version %d is higher than current version %d", schemaVersion, sqliteCurrentSchemaVersion)
-	}
-	for i := schemaVersion; i < sqliteCurrentSchemaVersion; i++ {
-		fn, ok := sqliteMigrations[i]
-		if !ok {
-			return fmt.Errorf("cannot find migration step from schema version %d to %d", i, i+1)
-		} else if err := fn(db, cacheDuration); err != nil {
+// sqliteMigrations returns the migration steps, keyed by the version they upgrade FROM. The
+// cache duration is carried into the 9 -> 10 step via closure (it backfills "expires" from it).
+// Always append migrations at the end, never insert in the middle.
+func sqliteMigrations(cacheDuration time.Duration) map[int]schema.MigrateFunc {
+	return map[int]schema.MigrateFunc{
+		1: schema.AsMigrateFunc(sqliteMigrate1To2AlterMessagesTableQuery),
+		2: schema.AsMigrateFunc(sqliteMigrate2To3AlterMessagesTableQuery),
+		3: schema.AsMigrateFunc(sqliteMigrate3To4AlterMessagesTableQuery),
+		4: schema.AsMigrateFunc(sqliteMigrate4To5AlterMessagesTableQuery),
+		5: schema.AsMigrateFunc(sqliteMigrate5To6AlterMessagesTableQuery),
+		6: schema.AsMigrateFunc(sqliteMigrate6To7AlterMessagesTableQuery),
+		7: schema.AsMigrateFunc(sqliteMigrate7To8AlterMessagesTableQuery),
+		8: schema.AsMigrateFunc(sqliteMigrate8To9AlterMessagesTableQuery),
+		9: func(tx *sql.Tx) error {
+			if _, err := tx.Exec(sqliteMigrate9To10AlterMessagesTableQuery); err != nil {
+				return err
+			}
+			_, err := tx.Exec(sqliteMigrate9To10UpdateMessageExpiryQuery, int64(cacheDuration.Seconds()))
 			return err
-		}
+		},
+		10: schema.AsMigrateFunc(sqliteMigrate10To11AlterMessagesTableQuery),
+		11: schema.AsMigrateFunc(sqliteMigrate11To12AlterMessagesTableQuery),
+		12: schema.AsMigrateFunc(sqliteMigrate12To13AlterMessagesTableQuery),
+		13: schema.AsMigrateFunc(sqliteMigrate13To14AlterMessagesTableQuery),
+		14: schema.NopMigrateFunc, // Corresponds to Postgres migration
 	}
-	return nil
-}
-
-func setupNewSQLite(sqlDB *sql.DB) error {
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteCreateTablesQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteCreateSchemaVersionTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteInsertSchemaVersionQuery, sqliteCurrentSchemaVersion); err != nil {
-			return err
-		}
-		return nil
-	})
 }
 
 func runSQLiteStartupQueries(db *sql.DB, startupQueries string) error {
@@ -263,204 +210,4 @@ func runSQLiteStartupQueries(db *sql.DB, startupQueries string) error {
 		}
 	}
 	return nil
-}
-
-func sqliteMigrateFrom0(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 0 to 1")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate0To1AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteCreateSchemaVersionTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteInsertSchemaVersionQuery, 1); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom1(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 1 to 2")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate1To2AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 2); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom2(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 2 to 3")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate2To3AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 3); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom3(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 3 to 4")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate3To4AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 4); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom4(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 4 to 5")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate4To5AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 5); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom5(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 5 to 6")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate5To6AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 6); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom6(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 6 to 7")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate6To7AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 7); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom7(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 7 to 8")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate7To8AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 8); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom8(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 8 to 9")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate8To9AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 9); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom9(sqlDB *sql.DB, cacheDuration time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 9 to 10")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate9To10AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteMigrate9To10UpdateMessageExpiryQuery, int64(cacheDuration.Seconds())); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 10); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom10(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 10 to 11")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate10To11AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 11); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom11(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 11 to 12")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate11To12AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 12); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom12(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 12 to 13")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate12To13AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 13); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom13(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 13 to 14")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate13To14AlterMessagesTableQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 14); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-// sqliteMigrateFrom14 is a no-op; the corresponding Postgres migration adds
-// idx_message_attachment_expires, which SQLite already has from the initial schema.
-func sqliteMigrateFrom14(sqlDB *sql.DB, _ time.Duration) error {
-	log.Tag(tagMessageCache).Info("Migrating cache database schema: from 14 to 15")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 15); err != nil {
-			return err
-		}
-		return nil
-	})
 }

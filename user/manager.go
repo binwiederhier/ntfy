@@ -33,6 +33,7 @@ const (
 	tokenLength                     = 32
 	tokenMaxCount                   = 60 // Only keep this many tokens in the table per user
 	tag                             = "user_manager"
+	schemaStore                     = "user" // Store name in the schema_version table (see db/schema)
 )
 
 // Default constants that may be overridden by configs

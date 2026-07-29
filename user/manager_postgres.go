@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/schema"
 )
 
 // PostgreSQL queries
@@ -348,7 +349,7 @@ var postgresQueries = queries{
 
 // NewPostgresManager creates a new Manager backed by a PostgreSQL database
 func NewPostgresManager(d *db.DB, config *Config) (*Manager, error) {
-	if err := setupPostgres(d.Primary()); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, postgresMigrations); err != nil {
 		return nil, err
 	}
 	return newManager(d, postgresQueries, config)

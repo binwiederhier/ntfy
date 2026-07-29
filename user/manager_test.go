@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
+	"heckel.io/ntfy/v2/db/schema"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/util"
 )
@@ -3352,7 +3353,7 @@ func TestManager_Emails_PrimaryFlagAndHelpers(t *testing.T) {
 func openReplicaTestSQLite(t *testing.T, filename string) *sql.DB {
 	d, err := sql.Open("sqlite3", filename+"?_case_sensitive_like=on")
 	require.Nil(t, err)
-	require.Nil(t, setupSQLite(d))
+	require.Nil(t, schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations))
 	return d
 }
 

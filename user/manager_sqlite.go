@@ -9,6 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/schema"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -351,14 +352,17 @@ func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager
 	// Open with case-sensitive LIKE. ACL topic matching is done via LIKE (see
 	// selectTopicPerms), and SQLite's LIKE is case-insensitive for ASCII by
 	// default -- without this, an ACL rule for "secret" would also match a
-	// request for "SECRET", which is a security iisue. PostgreSQL's LIKE is
+	// request for "SECRET", which is a security issue. PostgreSQL's LIKE is
 	// already case-sensitive, so this only affects SQLite. The pragma is
 	// applied to every pooled connection by the driver.
 	d, err := sql.Open("sqlite3", fmt.Sprintf("%s?_case_sensitive_like=on", filename))
 	if err != nil {
 		return nil, err
 	}
-	if err := setupSQLite(d); err != nil {
+	// Migrations must run before the startup queries: the 5 -> 6 table rebuilds rely on
+	// foreign keys being OFF, which is only guaranteed on fresh connections (the foreign_keys
+	// pragma is enabled as part of the builtin startup queries below)
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations); err != nil {
 		return nil, err
 	}
 	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {

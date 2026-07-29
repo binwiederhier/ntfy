@@ -2060,7 +2060,8 @@ func (s *Server) resetStats() {
 	for _, v := range s.visitors {
 		v.ResetStats()
 	}
-	if s.userManager != nil {
+	// The user database is shared; only the cluster leader resets it (always true single-node)
+	if s.userManager != nil && s.cluster.IsLeader() {
 		if err := s.userManager.ResetStats(); err != nil {
 			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
 		}

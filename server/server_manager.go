@@ -10,12 +10,16 @@ func (s *Server) execManager() {
 	// WARNING: Make sure to only selectively lock with the mutex, and be aware that this
 	//          there is no mutex for the entire function.
 
-	// Prune all the things
+	// Prune all the things. In-memory state is pruned on every node; jobs touching shared
+	// databases (and the web push job, which also sends expiry-warning notifications) run on
+	// the cluster leader only. In a single-node setup, IsLeader is always true.
 	s.pruneVisitors()
-	s.pruneTokens()
-	s.pruneAttachments()
-	s.pruneMessages()
-	s.pruneAndNotifyWebPushSubscriptions()
+	if s.cluster.IsLeader() {
+		s.pruneTokens()
+		s.pruneAttachments()
+		s.pruneMessages()
+		s.pruneAndNotifyWebPushSubscriptions()
+	}
 
 	// Message count
 	messagesCached, err := s.messageCache.MessagesCount()

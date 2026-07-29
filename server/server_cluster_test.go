@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,7 @@ type fakeCluster struct {
 	mu        sync.Mutex
 	messages  []*model.Message
 	announced []string
+	notLeader bool
 }
 
 func (b *fakeCluster) Relay(m *model.Message) error {
@@ -39,7 +41,17 @@ func (b *fakeCluster) AnnounceTopics(topics []string) {
 	b.announced = append(b.announced, topics...)
 }
 
-func (b *fakeCluster) IsLeader() bool { return true }
+func (b *fakeCluster) IsLeader() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return !b.notLeader
+}
+
+func (b *fakeCluster) setLeader(leader bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.notLeader = !leader
+}
 
 func (b *fakeCluster) Close() error { return nil }
 
@@ -219,4 +231,66 @@ func TestServer_Cluster_FirstSubscriberAnnounces(t *testing.T) {
 	topics[0].Subscribe(subscriber, "", func() {})
 	time.Sleep(250 * time.Millisecond)
 	require.Len(t, b.Announced(), 1)
+}
+
+func TestServer_Cluster_ManagerPrunesOnlyOnLeader(t *testing.T) {
+	c := newTestConfig(t, "")
+	s := newTestServer(t, c)
+	cl := &fakeCluster{notLeader: true}
+	s.cluster = cl
+
+	// Publish and expire a message
+	rr := request(t, s, "POST", "/mytopic", "hi", nil)
+	require.Equal(t, 200, rr.Code)
+	m := toMessage(t, rr.Body.String())
+	require.Nil(t, s.messageCache.ExpireMessages("mytopic"))
+
+	// A non-leader node leaves shared-database pruning to the leader
+	s.execManager()
+	_, err := s.messageCache.Message(m.ID)
+	require.Nil(t, err)
+
+	// Once this node is the leader, the same run prunes
+	cl.setLeader(true)
+	s.execManager()
+	_, err = s.messageCache.Message(m.ID)
+	require.Equal(t, model.ErrMessageNotFound, err)
+}
+
+func TestServer_Cluster_StatsResetOnlyOnLeader(t *testing.T) {
+	c := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, c)
+	cl := &fakeCluster{notLeader: true}
+	s.cluster = cl
+
+	// An anonymous visitor with an in-memory message count
+	v := newVisitor(c, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
+	require.True(t, v.MessageAllowed())
+	s.mu.Lock()
+	s.visitors["ip:1.2.3.4"] = v
+	s.mu.Unlock()
+	require.Equal(t, int64(1), v.Stats().Messages)
+
+	// A user with persisted stats in the (shared) user database
+	require.Nil(t, s.userManager.AddUser("phil", "phil1234", user.RoleUser, false))
+	authDB, err := sql.Open("sqlite3", c.AuthFile)
+	require.Nil(t, err)
+	defer authDB.Close()
+	_, err = authDB.Exec(`UPDATE user SET stats_messages = 5 WHERE user = 'phil'`)
+	require.Nil(t, err)
+
+	// A non-leader node resets its own in-memory visitor stats, but leaves the user database
+	// to the leader
+	s.resetStats()
+	require.Equal(t, int64(0), v.Stats().Messages)
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, int64(5), u.Stats.Messages)
+
+	// The leader resets the user database too
+	cl.setLeader(true)
+	s.resetStats()
+	u, err = s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, int64(0), u.Stats.Messages)
 }

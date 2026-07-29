@@ -9,6 +9,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"github.com/stretchr/testify/require"
+	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/model"
 )
@@ -49,6 +50,19 @@ func TestSqliteStore_Migration_From1(t *testing.T) {
 	// Create store to trigger migration
 	s := newSqliteTestStoreFromFile(t, filename, "")
 	checkSqliteSchemaVersion(t, filename)
+
+	// The migrated database must be structurally identical to a freshly created one
+	freshFile := newSqliteTestStoreFile(t)
+	fresh, err := message.NewSQLiteStore(freshFile, "", time.Hour, 0, 0, false)
+	require.Nil(t, err)
+	t.Cleanup(func() { fresh.Close() })
+	freshDB, err := sql.Open("sqlite3", freshFile)
+	require.Nil(t, err)
+	defer freshDB.Close()
+	migratedDB, err := sql.Open("sqlite3", filename)
+	require.Nil(t, err)
+	defer migratedDB.Close()
+	require.Equal(t, dbtest.SQLiteSchema(t, freshDB), dbtest.SQLiteSchema(t, migratedDB))
 
 	// Add delayed message
 	delayedMessage := model.NewDefaultMessage("mytopic", "some delayed message")

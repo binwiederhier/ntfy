@@ -68,6 +68,12 @@ func TestPostgresStore_Migration_From14(t *testing.T) {
 			encoding TEXT NOT NULL,
 			published BOOLEAN NOT NULL DEFAULT FALSE
 		);
+		CREATE INDEX idx_message_mid ON message (mid);
+		CREATE INDEX idx_message_sequence_id ON message (sequence_id);
+		CREATE INDEX idx_message_topic_published_time ON message (topic, published, time, id);
+		CREATE INDEX idx_message_published_expires ON message (published, expires);
+		CREATE INDEX idx_message_sender_attachment_expires ON message (sender, attachment_expires) WHERE user_id = '';
+		CREATE INDEX idx_message_user_id_attachment_expires ON message (user_id, attachment_expires);
 		CREATE TABLE message_stats (key TEXT PRIMARY KEY, value BIGINT);
 		INSERT INTO message_stats (key, value) VALUES ('messages', 0);
 		CREATE TABLE schema_version (store TEXT PRIMARY KEY, version INT NOT NULL);
@@ -88,6 +94,12 @@ func TestPostgresStore_Migration_From14(t *testing.T) {
 	messages, err := store.Messages("mytopic", model.SinceAllMessages, false)
 	require.Nil(t, err)
 	require.Len(t, messages, 1)
+
+	// The migrated database must be structurally identical to a freshly created one
+	freshDB := dbtest.CreateTestPostgres(t)
+	_, err = message.NewPostgresStore(freshDB, 0, 0)
+	require.Nil(t, err)
+	require.Equal(t, dbtest.PostgresSchema(t, freshDB), dbtest.PostgresSchema(t, testDB))
 }
 
 func forEachBackend(t *testing.T, f func(t *testing.T, s *message.Cache)) {

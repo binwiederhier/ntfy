@@ -32,11 +32,14 @@ const (
 			warned_at INT NOT NULL DEFAULT 0
 		);
 		CREATE UNIQUE INDEX idx_endpoint ON subscription (endpoint);
+		CREATE INDEX idx_subscriber_ip ON subscription (subscriber_ip);
 		CREATE TABLE subscription_topic (
 			subscription_id TEXT NOT NULL,
 			topic TEXT NOT NULL,
-			PRIMARY KEY (subscription_id, topic)
+			PRIMARY KEY (subscription_id, topic),
+			FOREIGN KEY (subscription_id) REFERENCES subscription (id) ON DELETE CASCADE
 		);
+		CREATE INDEX idx_topic ON subscription_topic (topic);
 		CREATE TABLE schemaVersion (id INT PRIMARY KEY, version INT NOT NULL);
 		INSERT INTO schemaVersion VALUES (1, 1);
 	`
@@ -51,15 +54,57 @@ const (
 			updated_at BIGINT NOT NULL,
 			warned_at BIGINT NOT NULL DEFAULT 0
 		);
+		CREATE INDEX idx_webpush_subscriber_ip ON webpush_subscription (subscriber_ip);
+		CREATE INDEX idx_webpush_updated_at ON webpush_subscription (updated_at);
+		CREATE INDEX idx_webpush_user_id ON webpush_subscription (user_id);
 		CREATE TABLE webpush_subscription_topic (
 			subscription_id TEXT NOT NULL REFERENCES webpush_subscription (id) ON DELETE CASCADE,
 			topic TEXT NOT NULL,
 			PRIMARY KEY (subscription_id, topic)
 		);
+		CREATE INDEX idx_webpush_topic ON webpush_subscription_topic (topic);
 		CREATE TABLE schema_version (store TEXT PRIMARY KEY, version INT NOT NULL);
 		INSERT INTO schema_version (store, version) VALUES ('webpush', 1);
 	`
 )
+
+// TestStoreSchemaEquivalence verifies that a database adopted from the pre-framework layout is
+// structurally identical to a freshly created one: same tables, columns, indexes and keys.
+func TestStoreSchemaEquivalence(t *testing.T) {
+	t.Run("sqlite", func(t *testing.T) {
+		freshFile := filepath.Join(t.TempDir(), "fresh.db")
+		fresh, err := webpush.NewSQLiteStore(freshFile, "")
+		require.Nil(t, err)
+		defer fresh.Close()
+		migratedFile := filepath.Join(t.TempDir(), "migrated.db")
+		d, err := sql.Open("sqlite3", migratedFile)
+		require.Nil(t, err)
+		_, err = d.Exec(testPreFrameworkSQLiteSchema)
+		require.Nil(t, err)
+		require.Nil(t, d.Close())
+		migrated, err := webpush.NewSQLiteStore(migratedFile, "")
+		require.Nil(t, err)
+		defer migrated.Close()
+		freshDB, err := sql.Open("sqlite3", freshFile)
+		require.Nil(t, err)
+		defer freshDB.Close()
+		migratedDB, err := sql.Open("sqlite3", migratedFile)
+		require.Nil(t, err)
+		defer migratedDB.Close()
+		require.Equal(t, dbtest.SQLiteSchema(t, freshDB), dbtest.SQLiteSchema(t, migratedDB))
+	})
+	t.Run("postgres", func(t *testing.T) {
+		freshDB := dbtest.CreateTestPostgres(t)
+		_, err := webpush.NewPostgresStore(freshDB)
+		require.Nil(t, err)
+		migratedDB := dbtest.CreateTestPostgres(t)
+		_, err = migratedDB.Exec(testPreFrameworkPostgresSchema)
+		require.Nil(t, err)
+		_, err = webpush.NewPostgresStore(migratedDB)
+		require.Nil(t, err)
+		require.Equal(t, dbtest.PostgresSchema(t, freshDB), dbtest.PostgresSchema(t, migratedDB))
+	})
+}
 
 func TestStoreSQLiteOpensExistingDatabase(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "webpush.db")

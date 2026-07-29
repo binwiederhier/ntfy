@@ -14,6 +14,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
+	"heckel.io/ntfy/v2/db/schema"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/util"
 )
@@ -1566,6 +1567,83 @@ func TestToFromSQLWildcard(t *testing.T) {
 	require.Equal(t, "foo", fromSQLWildcard(toSQLWildcard("foo")))
 }
 
+// testPostgresV6Schema is the PostgreSQL schema exactly as created by the version that first
+// shipped Postgres support (schema version 6), taken from the code at that time; used to
+// verify the migration chain from its oldest supported version.
+const testPostgresV6Schema = `
+	CREATE TABLE IF NOT EXISTS tier (
+		id TEXT PRIMARY KEY,
+		code TEXT NOT NULL,
+		name TEXT NOT NULL,
+		messages_limit BIGINT NOT NULL,
+		messages_expiry_duration BIGINT NOT NULL,
+		emails_limit BIGINT NOT NULL,
+		calls_limit BIGINT NOT NULL,
+		reservations_limit BIGINT NOT NULL,
+		attachment_file_size_limit BIGINT NOT NULL,
+		attachment_total_size_limit BIGINT NOT NULL,
+		attachment_expiry_duration BIGINT NOT NULL,
+		attachment_bandwidth_limit BIGINT NOT NULL,
+		stripe_monthly_price_id TEXT,
+		stripe_yearly_price_id TEXT,
+		UNIQUE(code),
+		UNIQUE(stripe_monthly_price_id),
+		UNIQUE(stripe_yearly_price_id)
+	);
+	CREATE TABLE IF NOT EXISTS "user" (
+	    id TEXT PRIMARY KEY,
+		tier_id TEXT REFERENCES tier(id),
+		user_name TEXT NOT NULL UNIQUE,
+		pass TEXT NOT NULL,
+		role TEXT NOT NULL CHECK (role IN ('anonymous', 'admin', 'user')),
+		prefs JSONB NOT NULL DEFAULT '{}',
+		sync_topic TEXT NOT NULL,
+		provisioned BOOLEAN NOT NULL,
+		stats_messages BIGINT NOT NULL DEFAULT 0,
+		stats_emails BIGINT NOT NULL DEFAULT 0,
+		stats_calls BIGINT NOT NULL DEFAULT 0,
+		stripe_customer_id TEXT UNIQUE,
+		stripe_subscription_id TEXT UNIQUE,
+		stripe_subscription_status TEXT,
+		stripe_subscription_interval TEXT,
+		stripe_subscription_paid_until BIGINT,
+		stripe_subscription_cancel_at BIGINT,
+		created BIGINT NOT NULL,
+		deleted BIGINT
+	);
+	CREATE TABLE IF NOT EXISTS user_access (
+		user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+		topic TEXT NOT NULL,
+		read BOOLEAN NOT NULL,
+		write BOOLEAN NOT NULL,
+		owner_user_id TEXT REFERENCES "user"(id) ON DELETE CASCADE,
+		provisioned BOOLEAN NOT NULL,
+		PRIMARY KEY (user_id, topic)
+	);
+	CREATE TABLE IF NOT EXISTS user_token (
+		user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+		token TEXT NOT NULL UNIQUE,
+		label TEXT NOT NULL,
+		last_access BIGINT NOT NULL,
+		last_origin TEXT NOT NULL,
+		expires BIGINT NOT NULL,
+		provisioned BOOLEAN NOT NULL,
+		PRIMARY KEY (user_id, token)
+	);
+	CREATE TABLE IF NOT EXISTS user_phone (
+		user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+		phone_number TEXT NOT NULL,
+		PRIMARY KEY (user_id, phone_number)
+	);
+	CREATE TABLE IF NOT EXISTS schema_version (
+		store TEXT PRIMARY KEY,
+		version INT NOT NULL
+	);
+	INSERT INTO "user" (id, user_name, pass, role, sync_topic, provisioned, created)
+	VALUES ('u_everyone', '*', '', 'anonymous', '', false, EXTRACT(EPOCH FROM NOW())::BIGINT)
+	ON CONFLICT (id) DO NOTHING;
+`
+
 func TestMigrationFrom1(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "user.db")
 	db, err := sql.Open("sqlite3", filename)
@@ -1649,6 +1727,8 @@ func TestMigrationFrom1(t *testing.T) {
 	require.Equal(t, 1, len(everyoneGrants))
 	require.Equal(t, "stats", everyoneGrants[0].TopicPattern)
 	require.Equal(t, PermissionRead, everyoneGrants[0].Permission)
+
+	checkMigratedSqliteSchema(t, filename)
 }
 
 func TestMigrationFrom4(t *testing.T) {
@@ -1740,12 +1820,15 @@ func TestMigrationFrom4(t *testing.T) {
 	`)
 	require.Nil(t, err)
 
-	// Insert a few ACL entries
+	// Insert a few ACL entries, and phone numbers: one for a live user, one orphaned (its user
+	// is gone; the broken pre-v9 foreign key never cascade-deleted it)
 	_, err = db.Exec(`
 		BEGIN;
 		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'mytopic_', 1, 1);
 		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'up%', 1, 1);
 		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'down_%', 1, 1);
+		INSERT INTO user_phone (user_id, phone_number) VALUES ('u_everyone', '+12223334444');
+		INSERT INTO user_phone (user_id, phone_number) VALUES ('u_gone', '+15556667777');
 		COMMIT;
 	`)
 	require.Nil(t, err)
@@ -1795,6 +1878,68 @@ func TestMigrationFrom4(t *testing.T) {
 
 	require.Nil(t, a.Authorize(nil, "up123", PermissionRead))
 	require.Nil(t, a.Authorize(nil, "up", PermissionRead)) // % matches 0 or more characters
+
+	// The 8 -> 9 repair kept the live user's phone number and dropped the orphaned row
+	phoneNumbers := make([]string, 0)
+	rows, err = db.Query(`SELECT phone_number FROM user_phone ORDER BY phone_number`)
+	require.Nil(t, err)
+	for rows.Next() {
+		var phoneNumber string
+		require.Nil(t, rows.Scan(&phoneNumber))
+		phoneNumbers = append(phoneNumbers, phoneNumber)
+	}
+	require.Nil(t, rows.Close())
+	require.Equal(t, []string{"+12223334444"}, phoneNumbers)
+
+	checkMigratedSqliteSchema(t, filename)
+}
+
+// TestMigrationFrom6Postgres tests the Postgres migration chain from its oldest supported
+// version (6, the version PostgreSQL support first shipped with).
+func TestMigrationFrom6Postgres(t *testing.T) {
+	testDB := dbtest.CreateTestPostgres(t)
+	_, err := testDB.Exec(testPostgresV6Schema)
+	require.Nil(t, err)
+	_, err = testDB.Exec(`INSERT INTO schema_version (store, version) VALUES ('user', 6)`)
+	require.Nil(t, err)
+	// Create manager to trigger migration
+	a, err := NewPostgresManager(testDB, &Config{DefaultAccess: PermissionDenyAll, BcryptCost: bcrypt.MinCost, QueueWriterInterval: DefaultUserStatsQueueWriterInterval})
+	require.Nil(t, err)
+	var version int
+	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'user'`).Scan(&version))
+	require.Equal(t, postgresCurrentSchemaVersion, version)
+	// The manager works against the migrated schema
+	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
+	u, err := a.User("phil")
+	require.Nil(t, err)
+	require.Nil(t, a.AddEmail(u.ID, "phil@example.com"))
+	// The migrated database must be structurally identical to a freshly created one
+	freshDB := dbtest.CreateTestPostgres(t)
+	_, err = NewPostgresManager(freshDB, &Config{DefaultAccess: PermissionDenyAll, BcryptCost: bcrypt.MinCost, QueueWriterInterval: DefaultUserStatsQueueWriterInterval})
+	require.Nil(t, err)
+	require.Equal(t, dbtest.PostgresSchema(t, freshDB), dbtest.PostgresSchema(t, testDB))
+}
+
+// checkMigratedSqliteSchema verifies that a migrated database is structurally identical to a
+// freshly created one (this pins, among other things, that the foreign keys of the tables
+// rebuilt in migration 5 -> 6 still point at "user", not at a dropped "user_old"), and that
+// its data passes SQLite's foreign key consistency check.
+func checkMigratedSqliteSchema(t *testing.T, filename string) {
+	t.Helper()
+	freshFile := filepath.Join(t.TempDir(), "fresh.db")
+	fresh := newTestManagerFromFile(t, freshFile, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	defer fresh.Close()
+	freshDB, err := sql.Open("sqlite3", freshFile)
+	require.Nil(t, err)
+	defer freshDB.Close()
+	migratedDB, err := sql.Open("sqlite3", filename)
+	require.Nil(t, err)
+	defer migratedDB.Close()
+	require.Equal(t, dbtest.SQLiteSchema(t, freshDB), dbtest.SQLiteSchema(t, migratedDB))
+	rows, err := migratedDB.Query(`PRAGMA foreign_key_check`)
+	require.Nil(t, err)
+	defer rows.Close()
+	require.False(t, rows.Next(), "foreign_key_check reported violations in the migrated database")
 }
 
 func checkSchemaVersion(t *testing.T, d *db.DB) {
@@ -3352,7 +3497,7 @@ func TestManager_Emails_PrimaryFlagAndHelpers(t *testing.T) {
 func openReplicaTestSQLite(t *testing.T, filename string) *sql.DB {
 	d, err := sql.Open("sqlite3", filename+"?_case_sensitive_like=on")
 	require.Nil(t, err)
-	require.Nil(t, setupSQLite(d))
+	require.Nil(t, schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations))
 	return d
 }
 

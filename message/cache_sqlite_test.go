@@ -9,49 +9,10 @@ import (
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"github.com/stretchr/testify/require"
+	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/model"
 )
-
-func TestSqliteStore_Migration_From0(t *testing.T) {
-	filename := newSqliteTestStoreFile(t)
-	db, err := sql.Open("sqlite3", filename)
-	require.Nil(t, err)
-
-	// Create "version 0" schema
-	_, err = db.Exec(`
-		BEGIN;
-		CREATE TABLE IF NOT EXISTS messages (
-			id VARCHAR(20) PRIMARY KEY,
-			time INT NOT NULL,
-			topic VARCHAR(64) NOT NULL,
-			message VARCHAR(1024) NOT NULL
-		);
-		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
-		COMMIT;
-	`)
-	require.Nil(t, err)
-
-	// Insert a bunch of messages
-	for i := 0; i < 10; i++ {
-		_, err = db.Exec(`INSERT INTO messages (id, time, topic, message) VALUES (?, ?, ?, ?)`,
-			fmt.Sprintf("abcd%d", i), time.Now().Unix(), "mytopic", fmt.Sprintf("some message %d", i))
-		require.Nil(t, err)
-	}
-	require.Nil(t, db.Close())
-
-	// Create store to trigger migration
-	s := newSqliteTestStoreFromFile(t, filename, "")
-	checkSqliteSchemaVersion(t, filename)
-
-	messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
-	require.Nil(t, err)
-	require.Equal(t, 10, len(messages))
-	require.Equal(t, "some message 5", messages[5].Message)
-	require.Equal(t, "", messages[5].Title)
-	require.Nil(t, messages[5].Tags)
-	require.Equal(t, 0, messages[5].Priority)
-}
 
 func TestSqliteStore_Migration_From1(t *testing.T) {
 	filename := newSqliteTestStoreFile(t)
@@ -89,6 +50,19 @@ func TestSqliteStore_Migration_From1(t *testing.T) {
 	// Create store to trigger migration
 	s := newSqliteTestStoreFromFile(t, filename, "")
 	checkSqliteSchemaVersion(t, filename)
+
+	// The migrated database must be structurally identical to a freshly created one
+	freshFile := newSqliteTestStoreFile(t)
+	fresh, err := message.NewSQLiteStore(freshFile, "", time.Hour, 0, 0, false)
+	require.Nil(t, err)
+	t.Cleanup(func() { fresh.Close() })
+	freshDB, err := sql.Open("sqlite3", freshFile)
+	require.Nil(t, err)
+	defer freshDB.Close()
+	migratedDB, err := sql.Open("sqlite3", filename)
+	require.Nil(t, err)
+	defer migratedDB.Close()
+	require.Equal(t, dbtest.SQLiteSchema(t, freshDB), dbtest.SQLiteSchema(t, migratedDB))
 
 	// Add delayed message
 	delayedMessage := model.NewDefaultMessage("mytopic", "some delayed message")

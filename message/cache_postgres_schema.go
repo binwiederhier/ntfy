@@ -1,16 +1,13 @@
 package message
 
 import (
-	"database/sql"
-	"fmt"
-
-	"heckel.io/ntfy/v2/db"
-	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/db/schema"
 )
 
 // Initial PostgreSQL schema
 const (
-	postgresCreateTablesQuery = `
+	postgresCurrentSchemaVersion = 15
+	postgresCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
 			mid TEXT NOT NULL,
@@ -50,19 +47,7 @@ const (
 			value BIGINT
 		);
 		INSERT INTO message_stats (key, value) VALUES ('messages', 0);
-		CREATE TABLE IF NOT EXISTS schema_version (
-			store TEXT PRIMARY KEY,
-			version INT NOT NULL
-		);
 	`
-)
-
-// PostgreSQL schema management queries
-const (
-	postgresCurrentSchemaVersion     = 15
-	postgresInsertSchemaVersionQuery = `INSERT INTO schema_version (store, version) VALUES ('message', $1)`
-	postgresUpdateSchemaVersionQuery = `UPDATE schema_version SET version = $1 WHERE store = 'message'`
-	postgresSelectSchemaVersionQuery = `SELECT version FROM schema_version WHERE store = 'message'`
 )
 
 // PostgreSQL schema migrations
@@ -73,51 +58,12 @@ const (
 	`
 )
 
-var postgresMigrations = map[int]func(d *sql.DB) error{
-	14: postgresMigrateFrom14,
-}
+var (
+	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQuery)
 
-func setupPostgres(d *sql.DB) error {
-	var schemaVersion int
-	if err := d.QueryRow(postgresSelectSchemaVersionQuery).Scan(&schemaVersion); err != nil {
-		return setupNewPostgresDB(d)
-	} else if schemaVersion == postgresCurrentSchemaVersion {
-		return nil
-	} else if schemaVersion > postgresCurrentSchemaVersion {
-		return fmt.Errorf("unexpected schema version: version %d is higher than current version %d", schemaVersion, postgresCurrentSchemaVersion)
+	// postgresMigrations maps a schema version to the migration upgrading it to the next
+	// version. Always append migrations at the end, never insert in the middle.
+	postgresMigrations = map[int]schema.MigrateFunc{
+		14: schema.AsMigrateFunc(postgresMigrate14To15CreateIndexQuery),
 	}
-	for i := schemaVersion; i < postgresCurrentSchemaVersion; i++ {
-		fn, ok := postgresMigrations[i]
-		if !ok {
-			return fmt.Errorf("cannot find migration step from schema version %d to %d", i, i+1)
-		} else if err := fn(d); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func postgresMigrateFrom14(d *sql.DB) error {
-	log.Tag(tagMessageCache).Info("Migrating message cache database schema: from 14 to 15")
-	return db.ExecTx(d, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(postgresMigrate14To15CreateIndexQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(postgresUpdateSchemaVersionQuery, 15); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func setupNewPostgresDB(sqlDB *sql.DB) error {
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(postgresCreateTablesQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(postgresInsertSchemaVersionQuery, postgresCurrentSchemaVersion); err != nil {
-			return err
-		}
-		return nil
-	})
-}
+)

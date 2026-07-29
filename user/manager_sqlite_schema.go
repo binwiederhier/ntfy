@@ -2,10 +2,8 @@ package user
 
 import (
 	"database/sql"
-	"fmt"
 
-	"heckel.io/ntfy/v2/db"
-	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/db/schema"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -105,10 +103,6 @@ const (
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
 		CREATE INDEX idx_magic_link_user_kind ON user_magic_link (user_id, kind);
-		CREATE TABLE IF NOT EXISTS schemaVersion (
-			id INT PRIMARY KEY,
-			version INT NOT NULL
-		);
 		INSERT INTO user (id, user, pass, role, sync_topic, provisioned, created)
 		VALUES ('` + everyoneID + `', '*', '', 'anonymous', '', false, UNIXEPOCH())
 		ON CONFLICT (id) DO NOTHING;
@@ -119,12 +113,8 @@ const (
 	sqliteBuiltinStartupQueries = `PRAGMA foreign_keys = ON;`
 )
 
-// Schema version table management for SQLite
 const (
-	sqliteCurrentSchemaVersion     = 8
-	sqliteInsertSchemaVersionQuery = `INSERT INTO schemaVersion VALUES (1, ?)`
-	sqliteUpdateSchemaVersionQuery = `UPDATE schemaVersion SET version = ? WHERE id = 1`
-	sqliteSelectSchemaVersionQuery = `SELECT version FROM schemaVersion WHERE id = 1`
+	sqliteCurrentSchemaVersion = 9
 )
 
 // Schema migrations for SQLite
@@ -189,10 +179,6 @@ const (
 			expires INT NOT NULL,
 			PRIMARY KEY (user_id, token),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
-		);
-		CREATE TABLE IF NOT EXISTS schemaVersion (
-			id INT PRIMARY KEY,
-			version INT NOT NULL
 		);
 		INSERT INTO user (id, user, pass, role, sync_topic, created)
 		VALUES ('u_everyone', '*', '', 'anonymous', '', UNIXEPOCH())
@@ -270,10 +256,11 @@ const (
 		CREATE INDEX idx_magic_link_user_kind ON user_magic_link (user_id, kind);
 	`
 
-	// 5 -> 6
+	// 5 -> 6. The table rebuilds below rely on foreign keys being OFF (otherwise RENAME
+	// would rewrite the childrens' REFERENCES clauses to point at the _old tables). This is
+	// guaranteed because migrations run on fresh connections, before the startup queries
+	// enable the foreign_keys pragma; see NewSQLiteManager.
 	sqliteMigrate5To6UpdateQueries = `
-		PRAGMA foreign_keys=off;
-
 		-- Alter user table: Add provisioned column
 		ALTER TABLE user RENAME TO user_old;
 		CREATE TABLE IF NOT EXISTS user (
@@ -359,56 +346,44 @@ const (
 		CREATE UNIQUE INDEX idx_user_stripe_customer_id ON user (stripe_customer_id);
 		CREATE UNIQUE INDEX idx_user_stripe_subscription_id ON user (stripe_subscription_id);
 		CREATE UNIQUE INDEX idx_user_token ON user_token (token);
+	`
 
-		-- Re-enable foreign keys
-		PRAGMA foreign_keys=on;
+	// 8 -> 9: Repair the user_phone foreign key. The 5 -> 6 migration renamed user to
+	// user_old, which rewrote user_phone's REFERENCES clause to user_old -- a table that was
+	// then dropped (the rebuilt tables got correct fresh foreign keys; user_phone was the only
+	// child table not rebuilt). Rebuilding user_phone re-points the foreign key at user; on
+	// healthy databases the rebuild is a harmless no-op schema-wise.
+	sqliteMigrate8To9UpdateQueries = `
+		ALTER TABLE user_phone RENAME TO user_phone_old;
+		CREATE TABLE user_phone (
+			user_id TEXT NOT NULL,
+			phone_number TEXT NOT NULL,
+			PRIMARY KEY (user_id, phone_number),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		INSERT INTO user_phone (user_id, phone_number)
+		SELECT user_id, phone_number FROM user_phone_old
+		WHERE user_id IN (SELECT id FROM user); -- Drop orphaned rows that the broken foreign key failed to cascade-delete
+		DROP TABLE user_phone_old;
 	`
 )
 
 var (
-	sqliteMigrations = map[int]func(db *sql.DB) error{
+	sqliteCreateTables = schema.AsMigrateFunc(sqliteCreateTablesQueries)
+
+	// sqliteMigrations maps a schema version to the migration upgrading it to the next
+	// version. Always append migrations at the end, never insert in the middle.
+	sqliteMigrations = map[int]schema.MigrateFunc{
 		1: sqliteMigrateFrom1,
-		2: sqliteMigrateFrom2,
-		3: sqliteMigrateFrom3,
-		4: sqliteMigrateFrom4,
-		5: sqliteMigrateFrom5,
-		6: sqliteMigrateFrom6,
-		7: sqliteMigrateFrom7,
+		2: schema.AsMigrateFunc(sqliteMigrate2To3UpdateQueries),
+		3: schema.AsMigrateFunc(sqliteMigrate3To4UpdateQueries),
+		4: schema.AsMigrateFunc(sqliteMigrate4To5UpdateQueries),
+		5: schema.AsMigrateFunc(sqliteMigrate5To6UpdateQueries),
+		6: schema.AsMigrateFunc(sqliteMigrate6To7UpdateQueries),
+		7: schema.AsMigrateFunc(sqliteMigrate7To8UpdateQueries),
+		8: schema.AsMigrateFunc(sqliteMigrate8To9UpdateQueries),
 	}
 )
-
-func setupSQLite(db *sql.DB) error {
-	var schemaVersion int
-	if err := db.QueryRow(sqliteSelectSchemaVersionQuery).Scan(&schemaVersion); err != nil {
-		return setupNewSQLite(db)
-	}
-	if schemaVersion == sqliteCurrentSchemaVersion {
-		return nil
-	} else if schemaVersion > sqliteCurrentSchemaVersion {
-		return fmt.Errorf("unexpected schema version: version %d is higher than current version %d", schemaVersion, sqliteCurrentSchemaVersion)
-	}
-	for i := schemaVersion; i < sqliteCurrentSchemaVersion; i++ {
-		fn, ok := sqliteMigrations[i]
-		if !ok {
-			return fmt.Errorf("cannot find migration step from schema version %d to %d", i, i+1)
-		} else if err := fn(db); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func setupNewSQLite(sqlDB *sql.DB) error {
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteCreateTablesQueries); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteInsertSchemaVersionQuery, sqliteCurrentSchemaVersion); err != nil {
-			return err
-		}
-		return nil
-	})
-}
 
 func runSQLiteStartupQueries(db *sql.DB, startupQueries string) error {
 	if _, err := db.Exec(sqliteBuiltinStartupQueries); err != nil {
@@ -422,122 +397,36 @@ func runSQLiteStartupQueries(db *sql.DB, startupQueries string) error {
 	return nil
 }
 
-func sqliteMigrateFrom1(sqlDB *sql.DB) error {
-	log.Tag(tag).Info("Migrating user database schema: from 1 to 2")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		// Rename user -> user_old, and create new tables
-		if _, err := tx.Exec(sqliteMigrate1To2CreateTablesQueries); err != nil {
+func sqliteMigrateFrom1(tx *sql.Tx) error {
+	// Rename user -> user_old, and create new tables
+	if _, err := tx.Exec(sqliteMigrate1To2CreateTablesQueries); err != nil {
+		return err
+	}
+	// Insert users from user_old into new user table, with ID and sync_topic
+	rows, err := tx.Query(sqliteMigrate1To2SelectAllOldUsernamesNoTxQuery)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	usernames := make([]string, 0)
+	for rows.Next() {
+		var username string
+		if err := rows.Scan(&username); err != nil {
 			return err
 		}
-		// Insert users from user_old into new user table, with ID and sync_topic
-		rows, err := tx.Query(sqliteMigrate1To2SelectAllOldUsernamesNoTxQuery)
-		if err != nil {
+		usernames = append(usernames, username)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, username := range usernames {
+		userID := util.RandomStringPrefix(userIDPrefix, userIDLength)
+		syncTopic := util.RandomStringPrefix(syncTopicPrefix, syncTopicLength)
+		if _, err := tx.Exec(sqliteMigrate1To2InsertUserNoTxQuery, userID, syncTopic, username); err != nil {
 			return err
 		}
-		defer rows.Close()
-		usernames := make([]string, 0)
-		for rows.Next() {
-			var username string
-			if err := rows.Scan(&username); err != nil {
-				return err
-			}
-			usernames = append(usernames, username)
-		}
-		if err := rows.Close(); err != nil {
-			return err
-		}
-		for _, username := range usernames {
-			userID := util.RandomStringPrefix(userIDPrefix, userIDLength)
-			syncTopic := util.RandomStringPrefix(syncTopicPrefix, syncTopicLength)
-			if _, err := tx.Exec(sqliteMigrate1To2InsertUserNoTxQuery, userID, syncTopic, username); err != nil {
-				return err
-			}
-		}
-		// Migrate old "access" table to "user_access" and drop "access" and "user_old"
-		if _, err := tx.Exec(sqliteMigrate1To2InsertFromOldTablesAndDropNoTxQuery); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 2); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom2(sqlDB *sql.DB) error {
-	log.Tag(tag).Info("Migrating user database schema: from 2 to 3")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate2To3UpdateQueries); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 3); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom3(sqlDB *sql.DB) error {
-	log.Tag(tag).Info("Migrating user database schema: from 3 to 4")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate3To4UpdateQueries); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 4); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom4(sqlDB *sql.DB) error {
-	log.Tag(tag).Info("Migrating user database schema: from 4 to 5")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate4To5UpdateQueries); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 5); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom5(sqlDB *sql.DB) error {
-	log.Tag(tag).Info("Migrating user database schema: from 5 to 6")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate5To6UpdateQueries); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 6); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom6(sqlDB *sql.DB) error {
-	log.Tag(tag).Info("Migrating user database schema: from 6 to 7")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate6To7UpdateQueries); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 7); err != nil {
-			return err
-		}
-		return nil
-	})
-}
-
-func sqliteMigrateFrom7(sqlDB *sql.DB) error {
-	log.Tag(tag).Info("Migrating user database schema: from 7 to 8")
-	return db.ExecTx(sqlDB, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(sqliteMigrate7To8UpdateQueries); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(sqliteUpdateSchemaVersionQuery, 8); err != nil {
-			return err
-		}
-		return nil
-	})
+	}
+	// Migrate old "access" table to "user_access" and drop "access" and "user_old"
+	_, err = tx.Exec(sqliteMigrate1To2InsertFromOldTablesAndDropNoTxQuery)
+	return err
 }

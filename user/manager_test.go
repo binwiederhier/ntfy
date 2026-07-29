@@ -1820,12 +1820,15 @@ func TestMigrationFrom4(t *testing.T) {
 	`)
 	require.Nil(t, err)
 
-	// Insert a few ACL entries
+	// Insert a few ACL entries, and phone numbers: one for a live user, one orphaned (its user
+	// is gone; the broken pre-v9 foreign key never cascade-deleted it)
 	_, err = db.Exec(`
 		BEGIN;
 		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'mytopic_', 1, 1);
 		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'up%', 1, 1);
 		INSERT INTO user_access (user_id, topic, read, write) values ('u_everyone', 'down_%', 1, 1);
+		INSERT INTO user_phone (user_id, phone_number) VALUES ('u_everyone', '+12223334444');
+		INSERT INTO user_phone (user_id, phone_number) VALUES ('u_gone', '+15556667777');
 		COMMIT;
 	`)
 	require.Nil(t, err)
@@ -1875,6 +1878,18 @@ func TestMigrationFrom4(t *testing.T) {
 
 	require.Nil(t, a.Authorize(nil, "up123", PermissionRead))
 	require.Nil(t, a.Authorize(nil, "up", PermissionRead)) // % matches 0 or more characters
+
+	// The 8 -> 9 repair kept the live user's phone number and dropped the orphaned row
+	phoneNumbers := make([]string, 0)
+	rows, err = db.Query(`SELECT phone_number FROM user_phone ORDER BY phone_number`)
+	require.Nil(t, err)
+	for rows.Next() {
+		var phoneNumber string
+		require.Nil(t, rows.Scan(&phoneNumber))
+		phoneNumbers = append(phoneNumbers, phoneNumber)
+	}
+	require.Nil(t, rows.Close())
+	require.Equal(t, []string{"+12223334444"}, phoneNumbers)
 
 	checkMigratedSqliteSchema(t, filename)
 }

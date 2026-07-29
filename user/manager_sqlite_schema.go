@@ -361,7 +361,9 @@ const (
 			PRIMARY KEY (user_id, phone_number),
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
-		INSERT INTO user_phone SELECT * FROM user_phone_old;
+		INSERT INTO user_phone (user_id, phone_number)
+		SELECT user_id, phone_number FROM user_phone_old
+		WHERE user_id IN (SELECT id FROM user); -- Drop orphaned rows that the broken foreign key failed to cascade-delete
 		DROP TABLE user_phone_old;
 	`
 )

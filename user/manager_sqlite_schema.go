@@ -114,7 +114,7 @@ const (
 )
 
 const (
-	sqliteCurrentSchemaVersion = 8
+	sqliteCurrentSchemaVersion = 9
 )
 
 // Schema migrations for SQLite
@@ -347,6 +347,25 @@ const (
 		CREATE UNIQUE INDEX idx_user_stripe_subscription_id ON user (stripe_subscription_id);
 		CREATE UNIQUE INDEX idx_user_token ON user_token (token);
 	`
+
+	// 8 -> 9: Repair the user_phone foreign key. The 5 -> 6 migration renamed user to
+	// user_old, which rewrote user_phone's REFERENCES clause to user_old -- a table that was
+	// then dropped (the rebuilt tables got correct fresh foreign keys; user_phone was the only
+	// child table not rebuilt). Rebuilding user_phone re-points the foreign key at user; on
+	// healthy databases the rebuild is a harmless no-op schema-wise.
+	sqliteMigrate8To9UpdateQueries = `
+		ALTER TABLE user_phone RENAME TO user_phone_old;
+		CREATE TABLE user_phone (
+			user_id TEXT NOT NULL,
+			phone_number TEXT NOT NULL,
+			PRIMARY KEY (user_id, phone_number),
+			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		INSERT INTO user_phone (user_id, phone_number)
+		SELECT user_id, phone_number FROM user_phone_old
+		WHERE user_id IN (SELECT id FROM user); -- Drop orphaned rows that the broken foreign key failed to cascade-delete
+		DROP TABLE user_phone_old;
+	`
 )
 
 var (
@@ -362,6 +381,7 @@ var (
 		5: schema.AsMigrateFunc(sqliteMigrate5To6UpdateQueries),
 		6: schema.AsMigrateFunc(sqliteMigrate6To7UpdateQueries),
 		7: schema.AsMigrateFunc(sqliteMigrate7To8UpdateQueries),
+		8: schema.AsMigrateFunc(sqliteMigrate8To9UpdateQueries),
 	}
 )
 

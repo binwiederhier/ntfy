@@ -294,3 +294,25 @@ func TestServer_Cluster_StatsResetOnlyOnLeader(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(0), u.Stats.Messages)
 }
+
+func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
+	// Every FCM keepalive wakes all subscribed phones, so only the leader may send them;
+	// N nodes sending N keepalives would multiply the battery cost for every user
+	c := newTestConfig(t, "")
+	c.FirebaseKeepaliveInterval = 20 * time.Millisecond
+	s := newTestServer(t, c)
+	sender := newTestFirebaseSender(100)
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+	cl := &fakeCluster{notLeader: true}
+	s.cluster = cl
+	s.closeChan = make(chan bool) // Closed by Stop() in the test cleanup
+	go s.runFirebaseKeepaliver()
+
+	// A non-leader node stays silent
+	time.Sleep(150 * time.Millisecond)
+	require.Empty(t, sender.Messages())
+
+	// The leader sends keepalives
+	cl.setLeader(true)
+	waitFor(t, func() bool { return len(sender.Messages()) > 0 })
+}

@@ -2076,7 +2076,11 @@ func (s *Server) runFirebaseKeepaliver() {
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
-			s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
+			// Leader only: every FCM keepalive wakes all subscribed phones, so a cluster must
+			// send it exactly once, not once per node (checked per tick to survive failover)
+			if s.cluster.IsLeader() {
+				s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
+			}
 		/*
 			FIXME: Disable iOS polling entirely for now due to thundering herd problem (see #677)
 			       To solve this, we'd have to shard the iOS poll topics to spread out the polling evenly.

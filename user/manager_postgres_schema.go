@@ -135,7 +135,6 @@ var (
 	postgresMigrations = map[int]schema.MigrateFunc{
 		6: schema.AsMigrateFunc(postgresMigrate6To7UpdateQueries),
 		7: schema.AsMigrateFunc(postgresMigrate7To8UpdateQueries),
-		// 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
-		8: schema.NopMigrateFunc,
+		8: schema.NopMigrateFunc, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
 	}
 )

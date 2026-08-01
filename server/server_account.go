@@ -985,7 +985,8 @@ func (s *Server) publishSyncEventForUser(v *visitor, u *user.User) error {
 		return err
 	}
 	m := model.NewDefaultMessage(syncTopic.ID, string(messageBytes))
-	if err := syncTopic.Publish(v, m); err != nil {
+	// Dispatch so the sync event also reaches the user's devices connected to peer cluster nodes
+	if err := s.dispatch(v, syncTopic, m, dispatchOpts{}); err != nil {
 		return err
 	}
 	return nil

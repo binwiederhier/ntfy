@@ -10,6 +10,8 @@ import (
 	"text/template"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster"
+
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/user"
 )
@@ -119,8 +121,13 @@ type Config struct {
 	ListenUnixMode                       fs.FileMode
 	KeyFile                              string
 	CertFile                             string
-	DatabaseURL                          string   // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
-	DatabaseReplicaURLs                  []string // PostgreSQL read replica connection strings
+	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
+	DatabaseReplicaURLs                  []string      // PostgreSQL read replica connection strings
+	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; required in cluster mode
+	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
+	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
+	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
+	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
@@ -236,6 +243,11 @@ func NewConfig() *Config {
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",
+		ClusterNodeID:                        "",
+		ClusterListen:                        "",
+		ClusterAdvertiseURL:                  "",
+		ClusterSecret:                        "",
+		ClusterBatchLinger:                   cluster.DefaultBatchLinger,
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,

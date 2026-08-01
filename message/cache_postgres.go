@@ -61,6 +61,13 @@ const (
 		WHERE time <= $1 AND published = FALSE
 		ORDER BY time, id
 	`
+	postgresSelectMessagesDueForUpdateQuery = `
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		FROM message
+		WHERE time <= $1 AND published = FALSE
+		ORDER BY time, id
+		FOR UPDATE SKIP LOCKED
+	`
 	postgresUpdateMessagePublishedQuery = `UPDATE message SET published = TRUE WHERE mid = $1`
 	postgresSelectMessagesCountQuery    = `SELECT COUNT(*) FROM message`
 	postgresSelectTopicsQuery           = `SELECT topic FROM message GROUP BY topic`
@@ -88,6 +95,7 @@ var postgresQueries = queries{
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,
 	selectMessagesDue:                postgresSelectMessagesDueQuery,
+	selectMessagesDueForUpdate:       postgresSelectMessagesDueForUpdateQuery,
 	deleteExpiredMessages:            postgresDeleteExpiredMessagesQuery,
 	updateMessagePublished:           postgresUpdateMessagePublishedQuery,
 	selectMessagesCount:              postgresSelectMessagesCountQuery,

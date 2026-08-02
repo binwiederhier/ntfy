@@ -67,9 +67,10 @@ func TestNop(t *testing.T) {
 	b, err := New(&Config{}, nil, nil, nil) // not enabled -> nop cluster, no database required
 	require.Nil(t, err)
 	require.IsType(t, &nopCluster{}, b)
-	require.Nil(t, b.Relay(model.NewDefaultMessage("mytopic", "hi")))
+	require.Nil(t, b.ForwardMessage(model.NewDefaultMessage("mytopic", "hi")))
 	// A single node is trivially the leader, so leader-gated jobs run without special-casing
 	require.True(t, b.IsLeader())
+	require.True(t, b.Healthy())
 	rr := httptest.NewRecorder()
 	b.ServeHTTP(rr, httptest.NewRequest("POST", MessagePath, nil))
 	require.Equal(t, 404, rr.Code)

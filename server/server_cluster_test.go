@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/cluster"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
@@ -20,13 +21,14 @@ import (
 // fakeCluster records relayed messages and topic announcements so tests can assert that every
 // publish path passes through the cluster exactly once, and that subscription hooks fire.
 type fakeCluster struct {
-	mu        sync.Mutex
-	messages  []*model.Message
-	announced []string
-	notLeader bool
+	mu         sync.Mutex
+	messages   []*model.Message
+	announced  []string
+	notLeader  bool
+	notHealthy bool
 }
 
-func (b *fakeCluster) Relay(m *model.Message) error {
+func (b *fakeCluster) ForwardMessage(m *model.Message) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.messages = append(b.messages, m)
@@ -35,10 +37,22 @@ func (b *fakeCluster) Relay(m *model.Message) error {
 
 func (b *fakeCluster) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {}
 
-func (b *fakeCluster) AnnounceTopics(topics []string) {
+func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.announced = append(b.announced, topics...)
+	b.announced = append(b.announced, state.AddedTopics...)
+}
+
+func (b *fakeCluster) Healthy() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return !b.notHealthy
+}
+
+func (b *fakeCluster) setHealthy(healthy bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.notHealthy = !healthy
 }
 
 func (b *fakeCluster) IsLeader() bool {
@@ -67,7 +81,7 @@ func (b *fakeCluster) Announced() []string {
 	return append([]string{}, b.announced...)
 }
 
-func TestServer_Cluster_PublishRelaysOnce(t *testing.T) {
+func TestServer_Cluster_PublishForwardsOnce(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t, ""))
 	b := &fakeCluster{}
 	s.cluster = b
@@ -79,7 +93,7 @@ func TestServer_Cluster_PublishRelaysOnce(t *testing.T) {
 	require.Equal(t, "hi there", messages[0].Message)
 }
 
-func TestServer_Cluster_SyncEventRelays(t *testing.T) {
+func TestServer_Cluster_SyncEventForwards(t *testing.T) {
 	// Account sync events are delivered via the user's st_... sync topic; without relaying
 	// them, cross-device account sync silently breaks when a user's devices land on different
 	// cluster nodes.
@@ -315,4 +329,25 @@ func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
 	// The leader sends keepalives
 	cl.setLeader(true)
 	waitFor(t, func() bool { return len(sender.Messages()) > 0 })
+}
+
+func TestServer_Cluster_HealthReflectsCluster(t *testing.T) {
+	// A node whose registry heartbeat went stale no longer receives forwarded messages, so
+	// health checks must pull it from rotation (the fail-open policy lives in the checker)
+	s := newTestServer(t, newTestConfig(t, ""))
+	cl := &fakeCluster{}
+	s.cluster = cl
+	rr := request(t, s, "GET", "/v1/health", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.Contains(t, rr.Body.String(), `"healthy":true`)
+	cl.setHealthy(false)
+	rr = request(t, s, "GET", "/v1/health", "", nil)
+	require.Equal(t, 503, rr.Code)
+	require.Contains(t, rr.Body.String(), `"healthy":false`)
+	// The cluster listener's health endpoint reflects the same state
+	rr2 := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "/v1/health", nil)
+	require.Nil(t, err)
+	s.clusterHandler().ServeHTTP(rr2, req)
+	require.Equal(t, 503, rr2.Code)
 }

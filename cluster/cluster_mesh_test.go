@@ -37,14 +37,15 @@ func openTestPool(t testing.TB, dsn string) *db.DB {
 
 func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 	return &Config{
-		Enabled:           true,
-		NodeID:            NodeID(nodeID),
-		AdvertiseURL:      advertiseURL,
-		Secret:            testSecret,
-		HeartbeatInterval: 100 * time.Millisecond,
-		NodeTTL:           time.Second, // Also the peer cache bound; short so fake peers registered mid-test are seen quickly
-		MaxMessageBytes:   1 << 20,
-		StateInterval:     time.Minute, // Individual tests lower this to exercise state pushes
+		Enabled:             true,
+		NodeID:              NodeID(nodeID),
+		AdvertiseURL:        advertiseURL,
+		Secret:              testSecret,
+		HeartbeatInterval:   100 * time.Millisecond,
+		LeaderRenewInterval: 20 * time.Millisecond, // Lease duration 60ms, hold-off 120ms; keeps leadership tests fast
+		NodeTTL:             time.Second,           // Also the peer cache bound; short so fake peers registered mid-test are seen quickly
+		MaxMessageBytes:     1 << 20,
+		StateInterval:       time.Minute, // Individual tests lower this to exercise state pushes
 	}
 }
 
@@ -92,7 +93,7 @@ func TestMesh_CrossNodeDelivery(t *testing.T) {
 	require.Nil(t, err)
 	defer meshA.Close()
 	msg := model.NewDefaultMessage("mytopic", "hello cross-node")
-	require.Nil(t, meshA.Relay(msg))
+	require.Nil(t, meshA.ForwardMessage(msg))
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -207,7 +208,7 @@ func TestMesh_SlowPeerIsolation(t *testing.T) {
 	defer mesh.Close()
 	const n = 20
 	for i := 0; i < n; i++ {
-		require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i))))
+		require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i))))
 	}
 	waitFor(t, func() bool {
 		mu.Lock()
@@ -243,7 +244,7 @@ func TestMesh_BatchCoalescing(t *testing.T) {
 	defer mesh.Close()
 	const n = 20
 	for i := 0; i < n; i++ {
-		require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i))))
+		require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i))))
 	}
 	waitFor(t, func() bool {
 		mu.Lock()
@@ -281,7 +282,7 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	defer mesh.Close()
 	// The fake peer registers once and then "dies": its heartbeat is never refreshed
 	registerFakePeer(t, pool, "node-dead", srv.URL)
-	require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", "while alive")))
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("mytopic", "while alive")))
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -299,7 +300,7 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 		require.Nil(t, pool.QueryRow(`SELECT COUNT(*) FROM node_registry WHERE node_id = 'node-dead'`).Scan(&count))
 		return count == 0
 	})
-	require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", "while dead")))
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("mytopic", "while dead")))
 	time.Sleep(250 * time.Millisecond) // Give a wrong implementation time to deliver anyway
 	mu.Lock()
 	require.Equal(t, 1, received) // Only the first message arrived
@@ -308,15 +309,15 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	// relay retries because the peer list is cached for up to the node TTL
 	registerFakePeer(t, pool, "node-dead", srv.URL)
 	waitFor(t, func() bool {
-		require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", "after rejoin")))
+		require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("mytopic", "after rejoin")))
 		mu.Lock()
 		defer mu.Unlock()
 		return received > 1
 	})
 }
 
-func TestMesh_RelayAfterClose(t *testing.T) {
-	// A Relay racing shutdown (e.g. an in-flight publish during server Stop) must not spawn
+func TestMesh_ForwardAfterClose(t *testing.T) {
+	// A ForwardMessage racing shutdown (e.g. an in-flight publish during server Stop) must not spawn
 	// a new peer queue and worker after Close: the worker would never exit (its queue is never
 	// closed) and nothing waits for it.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
@@ -325,7 +326,7 @@ func TestMesh_RelayAfterClose(t *testing.T) {
 	require.Nil(t, err)
 	registerFakePeer(t, pool, "node-peer", "http://127.0.0.1:1")
 	require.Nil(t, mesh.Close())
-	require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", "too late"))) // Dropped silently
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("mytopic", "too late"))) // Dropped silently
 	mesh.mu.Lock()
 	defer mesh.mu.Unlock()
 	require.Empty(t, mesh.queues)
@@ -418,13 +419,13 @@ func TestMesh_RouteSkipsUnsubscribedPeer(t *testing.T) {
 	rr := postState(mesh, "node-b", &apiState{Topics: &apiStateTopics{Filter: topicFilter(t, "subscribed-topic")}})
 	require.Equal(t, 200, rr.Code)
 	// A topic outside the peer's state is skipped
-	require.Nil(t, mesh.Relay(model.NewDefaultMessage("other-topic", "skipped")))
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("other-topic", "skipped")))
 	time.Sleep(300 * time.Millisecond) // Give a wrong implementation time to deliver anyway
 	mu.Lock()
 	require.Equal(t, 0, received)
 	mu.Unlock()
 	// A topic inside the peer's state is delivered
-	require.Nil(t, mesh.Relay(model.NewDefaultMessage("subscribed-topic", "delivered")))
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("subscribed-topic", "delivered")))
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -457,7 +458,7 @@ func TestMesh_RouteBroadcastsOnStaleState(t *testing.T) {
 	mesh.statesMu.Lock()
 	mesh.states["node-b"].updatedAt = time.Now().Add(-time.Hour)
 	mesh.statesMu.Unlock()
-	require.Nil(t, mesh.Relay(model.NewDefaultMessage("other-topic", "broadcast anyway")))
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("other-topic", "broadcast anyway")))
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -534,7 +535,7 @@ func TestMesh_AnnounceClosesWindow(t *testing.T) {
 		return ok
 	})
 	// Announcements merge into the baseline right away
-	meshA.AnnounceTopics([]string{"fresh-topic"})
+	meshA.BroadcastState(&State{AddedTopics: []string{"fresh-topic"}})
 	waitFor(t, func() bool {
 		meshB.statesMu.Lock()
 		defer meshB.statesMu.Unlock()
@@ -569,4 +570,21 @@ func TestMesh_StateOfDepartedPeerPruned(t *testing.T) {
 	_, ok = mesh.states["node-gone"]
 	mesh.statesMu.Unlock()
 	require.False(t, ok)
+}
+
+func TestMesh_HealthyReflectsRegistration(t *testing.T) {
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.True(t, mesh.Healthy()) // Registered synchronously at construction
+	// Stale heartbeat: peers stop forwarding to this node, so it must report unhealthy
+	mesh.mu.Lock()
+	mesh.lastRegistered = time.Now().Add(-2 * mesh.conf.NodeTTL)
+	mesh.mu.Unlock()
+	require.False(t, mesh.Healthy())
+	// A successful heartbeat restores health
+	require.Nil(t, mesh.heartbeat())
+	require.True(t, mesh.Healthy())
 }

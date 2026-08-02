@@ -1,7 +1,6 @@
 package pg_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -10,33 +9,33 @@ import (
 	dbtest "heckel.io/ntfy/v2/db/test"
 )
 
+const testRenewInterval = 20 * time.Millisecond // Lease duration 60ms, hold-off 120ms
+
 func TestLeader_AcquireAndFailover(t *testing.T) {
 	testDB := dbtest.CreateTestPostgres(t) // skips if NTFY_TEST_DATABASE_URL is unset
 	const key = int64(42)
-	ctx := context.Background()
-	l1 := pg.NewLeader(testDB.Primary(), key)
-	l2 := pg.NewLeader(testDB.Primary(), key)
-	defer l1.Release()
-	defer l2.Release()
-	// First to try wins; the second stays follower
-	require.True(t, l1.TryAcquire(ctx))
-	require.False(t, l2.TryAcquire(ctx))
-	require.True(t, l1.IsLeader())
-	require.False(t, l2.IsLeader())
-	// Repeated TryAcquire on the leader is a no-op ping and reports leadership
-	require.True(t, l1.TryAcquire(ctx))
-	// Release -> the follower can take over
-	l1.Release()
+	l1 := pg.NewLeader(testDB.Primary(), key, testRenewInterval)
+	defer l1.Close()
+	// Belief follows the hold-off, it is never instant
 	require.False(t, l1.IsLeader())
-	require.True(t, l2.TryAcquire(ctx))
-	require.True(t, l2.IsLeader())
+	waitForLeader(t, l1)
+	// A competitor never becomes leader while the leader lives
+	l2 := pg.NewLeader(testDB.Primary(), key, testRenewInterval)
+	defer l2.Close()
+	time.Sleep(300 * time.Millisecond) // Several verification rounds
+	require.False(t, l2.IsLeader())
+	require.True(t, l1.IsLeader())
+	// Close -> the follower takes over
+	l1.Close()
+	require.False(t, l1.IsLeader())
+	waitForLeader(t, l2)
+	require.False(t, l1.IsLeader())
 }
 
 func TestLeader_ConnectionLossFailover(t *testing.T) {
-	// A leader that dies without calling Release (crash, network loss) must not wedge the
-	// cluster: the advisory lock is session-scoped, so Postgres releases it when the pinned
-	// connection dies, and a follower can take over. Simulated by terminating the lock-holding
-	// backend server-side.
+	// A crashed leader must not wedge the cluster: Postgres releases the session-scoped lock
+	// when the pinned connection dies (simulated by terminating the backend), and someone
+	// re-acquires. Either node may win; the invariant is one leader eventually, never two.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	hostA, err := pg.Open(schemaDSN)
 	require.Nil(t, err)
@@ -45,40 +44,47 @@ func TestLeader_ConnectionLossFailover(t *testing.T) {
 	require.Nil(t, err)
 	defer hostB.DB.Close()
 	const key = int64(43)
-	ctx := context.Background()
-	l1 := pg.NewLeader(hostA.DB, key)
-	l2 := pg.NewLeader(hostB.DB, key)
-	defer l1.Release()
-	defer l2.Release()
-	require.True(t, l1.TryAcquire(ctx))
-	require.False(t, l2.TryAcquire(ctx))
+	l1 := pg.NewLeader(hostA.DB, key, testRenewInterval)
+	defer l1.Close()
+	waitForLeader(t, l1)
+	l2 := pg.NewLeader(hostB.DB, key, testRenewInterval)
+	defer l2.Close()
 	// Kill the backend holding the lock (advisory lock keys map to classid/objid)
 	_, err = hostB.DB.Exec(`SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype = 'advisory' AND objid = $1 AND granted`, key)
 	require.Nil(t, err)
-	// The lock is auto-released; the follower takes over
-	waitForCond(t, func() bool { return l2.TryAcquire(ctx) })
-	// The old leader discovers its dead connection on the next attempt and stays follower
-	require.False(t, l1.TryAcquire(ctx))
-}
-
-func waitForCond(t *testing.T, f func() bool) {
-	t.Helper()
-	for i := 0; i < 100; i++ {
-		if f() {
+	// Eventually exactly one leader again, and never two along the way
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		leader1, leader2 := l1.IsLeader(), l2.IsLeader()
+		require.False(t, leader1 && leader2, "two leaders at once")
+		if leader1 != leader2 {
 			return
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("timed out waiting for condition")
+	t.Fatal("no leader re-emerged after connection loss")
 }
 
 func TestLeader_DistinctKeysAreIndependent(t *testing.T) {
 	testDB := dbtest.CreateTestPostgres(t)
-	ctx := context.Background()
-	l1 := pg.NewLeader(testDB.Primary(), 1)
-	l2 := pg.NewLeader(testDB.Primary(), 2)
-	defer l1.Release()
-	defer l2.Release()
-	require.True(t, l1.TryAcquire(ctx))
-	require.True(t, l2.TryAcquire(ctx)) // Different keys do not compete
+	l1 := pg.NewLeader(testDB.Primary(), 1, testRenewInterval)
+	defer l1.Close()
+	l2 := pg.NewLeader(testDB.Primary(), 2, testRenewInterval)
+	defer l2.Close()
+	// Different keys do not compete: both become effective leaders
+	waitForLeader(t, l1)
+	waitForLeader(t, l2)
+}
+
+// waitForLeader waits until the node believes it is the leader, or fails the test
+func waitForLeader(t *testing.T, l *pg.Leader) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if l.IsLeader() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("node never became effective leader")
 }

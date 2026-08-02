@@ -67,7 +67,7 @@ func TestMesh_Soak(t *testing.T) {
 			ticker := time.NewTicker(publishInterval)
 			defer ticker.Stop()
 			for i := 0; i < messagesPerPublisher; i++ {
-				require.Nil(t, mesh.Relay(model.NewDefaultMessage("mytopic", fmt.Sprintf("p%d-m%d", p, i))))
+				require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("mytopic", fmt.Sprintf("p%d-m%d", p, i))))
 				<-ticker.C
 			}
 		}(p)
@@ -89,10 +89,10 @@ func TestMesh_Soak(t *testing.T) {
 		total, requests, float64(total)/float64(requests), float64(total)/elapsed.Seconds())
 }
 
-// BenchmarkRelay measures the publish-path cost of Relay: marshal + peer lookup (cached)
+// BenchmarkForwardMessage measures the publish-path cost of ForwardMessage: marshal + peer lookup (cached)
 // + enqueue. The peer never drains, so enqueued fragments are dropped once the queue fills;
 // the benchmark measures the hot path, not HTTP delivery.
-func BenchmarkRelay(b *testing.B) {
+func BenchmarkForwardMessage(b *testing.B) {
 	if os.Getenv("NTFY_TEST_DATABASE_URL") == "" {
 		b.Skip("NTFY_TEST_DATABASE_URL not set")
 	}
@@ -107,7 +107,7 @@ func BenchmarkRelay(b *testing.B) {
 	m := model.NewDefaultMessage("mytopic", "benchmark message body of typical size for a push")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := mesh.Relay(m); err != nil {
+		if err := mesh.ForwardMessage(m); err != nil {
 			b.Fatal(err)
 		}
 	}

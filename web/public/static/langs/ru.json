@@ -405,5 +405,6 @@
     "prefs_appearance_theme_dark": "Тёмная",
     "prefs_appearance_theme_light": "Светлая",
     "account_basics_cannot_edit_or_delete_provisioned_user": "Пользователя, созданного автоматически, нельзя изменить или удалить",
-    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Автоматически созданный токен нельзя изменить или удалить"
+    "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Автоматически созданный токен нельзя изменить или удалить",
+    "common_refresh": "Обновить"
 }

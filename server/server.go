@@ -833,6 +833,41 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
+// dispatch delivers m to local subscribers and fires the requested side-effect targets. It is
+// the single choke point through which every published message must pass; t may be nil when
+// the topic has no local subscribers (delayed sender).
+func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchOpts) error {
+	// Deliver to local subscribers
+	if t != nil {
+		if opts.async {
+			go func() {
+				if err := t.Publish(v, m); err != nil {
+					logvm(v, m).Err(err).Warn("Unable to publish message")
+				}
+			}()
+		} else if err := t.Publish(v, m); err != nil {
+			return err
+		}
+	}
+	// Fire the requested side-effect targets
+	if s.firebaseClient != nil && opts.firebase {
+		go s.sendToFirebase(v, m)
+	}
+	if s.mailer != nil && opts.email != "" {
+		go s.sendEmail(v, m, opts.email)
+	}
+	if s.config.TwilioAccount != "" && opts.call != "" {
+		go s.callPhone(v, m, opts.call)
+	}
+	if s.config.UpstreamBaseURL != "" && opts.upstream {
+		go s.forwardPollRequest(v, m)
+	}
+	if s.config.WebPushPublicKey != "" && opts.webPush {
+		go s.publishToWebPushEndpoints(v, m)
+	}
+	return nil
+}
+
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
 	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
@@ -911,23 +946,15 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		ev.Debug("Received message")
 	}
 	if !delayed {
-		if err := t.Publish(v, m); err != nil {
+		err := s.dispatch(v, t, m, dispatchOpts{
+			firebase: firebase,
+			email:    email,
+			call:     call,
+			upstream: !unifiedpush, // UP messages are not sent to upstream
+			webPush:  true,
+		})
+		if err != nil {
 			return nil, err
-		}
-		if s.firebaseClient != nil && firebase {
-			go s.sendToFirebase(v, m)
-		}
-		if s.mailer != nil && email != "" {
-			go s.sendEmail(v, m, email)
-		}
-		if s.config.TwilioAccount != "" && call != "" {
-			go s.callPhone(v, m, call)
-		}
-		if s.config.UpstreamBaseURL != "" && !unifiedpush { // UP messages are not sent to upstream
-			go s.forwardPollRequest(v, m)
-		}
-		if s.config.WebPushPublicKey != "" {
-			go s.publishToWebPushEndpoints(v, m)
 		}
 	} else {
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
@@ -1027,17 +1054,9 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 	m.Sender = v.IP()
 	m.User = v.MaybeUserID()
 	m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
-	// Publish to subscribers
-	if err := t.Publish(v, m); err != nil {
+	// Publish to subscribers, Firebase (for Android clients), and web push endpoints
+	if err := s.dispatch(v, t, m, dispatchOpts{firebase: true, webPush: true}); err != nil {
 		return err
-	}
-	// Send to Firebase for Android clients
-	if s.firebaseClient != nil {
-		go s.sendToFirebase(v, m)
-	}
-	// Send to web push endpoints
-	if s.config.WebPushPublicKey != "" {
-		go s.publishToWebPushEndpoints(v, m)
 	}
 	if event == model.MessageDeleteEvent {
 		// Delete any existing scheduled message with the same sequence ID
@@ -1987,24 +2006,18 @@ func (s *Server) sendDelayedMessages() error {
 func (s *Server) sendDelayedMessage(v *visitor, m *model.Message) error {
 	logvm(v, m).Debug("Sending delayed message")
 	s.mu.RLock()
-	t, ok := s.topics[m.Topic] // If no subscribers, just mark message as published
+	t := s.topics[m.Topic] // May be nil if there are no local subscribers; dispatch handles that
 	s.mu.RUnlock()
-	if ok {
-		go func() {
-			// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler
-			if err := t.Publish(v, m); err != nil {
-				logvm(v, m).Err(err).Warn("Unable to publish message")
-			}
-		}()
-	}
-	if s.firebaseClient != nil { // Firebase subscribers may not show up in topics map
-		go s.sendToFirebase(v, m)
-	}
-	if s.config.UpstreamBaseURL != "" {
-		go s.forwardPollRequest(v, m)
-	}
-	if s.config.WebPushPublicKey != "" {
-		go s.publishToWebPushEndpoints(v, m)
+	// We do not rate-limit messages here, since we've rate limited them in the PUT/POST handler.
+	// Firebase subscribers may not show up in the topics map, so side effects fire regardless.
+	err := s.dispatch(v, t, m, dispatchOpts{
+		firebase: true,
+		upstream: true,
+		webPush:  true,
+		async:    true,
+	})
+	if err != nil {
+		return err
 	}
 	if err := s.messageCache.MarkPublished(m); err != nil {
 		return err

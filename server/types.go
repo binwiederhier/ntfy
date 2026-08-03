@@ -29,6 +29,17 @@ type publishMessage struct {
 	Delay      string         `json:"delay"`
 }
 
+// dispatchOpts selects which delivery targets fire for a published message, beyond delivery
+// to local subscribers (see Server.dispatch)
+type dispatchOpts struct {
+	firebase bool   // Send to Firebase (if configured)
+	email    string // Send an email to this address (if a mailer is configured)
+	call     string // Call this phone number (if Twilio is configured)
+	upstream bool   // Forward a poll request to the upstream server (if configured)
+	webPush  bool   // Publish to web push endpoints (if configured)
+	async    bool   // Deliver to local subscribers in a goroutine, logging errors instead of returning them
+}
+
 // messageEncoder is a function that knows how to encode a message
 type messageEncoder func(msg *model.Message) (string, error)
 

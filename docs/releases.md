@@ -2056,6 +2056,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Security:**
 
 * Exclude secrets (Stripe/Twilio/web push keys, SMTP password, provisioned users and tokens) from the config hash served to the web app
+* Limit message templates (`Template: yes`) to 32 KB, limit `printf` widths and precisions to below 1000, and limit `indent`/`nindent` to 100 spaces, preventing excessive memory use from a single small template
 
 **Features:**
 

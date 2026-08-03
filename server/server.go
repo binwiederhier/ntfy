@@ -150,17 +150,6 @@ var (
 	//go:embed docs
 	docsStaticFs     embed.FS
 	docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
-
-	//go:embed templates
-	templatesFs  embed.FS // Contains template config files (e.g. grafana.yml, github.yml, ...)
-	templatesDir = "templates"
-
-	templateNameRegex = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
-
-	// templateMaxExecutionTime is the wall-clock deadline for a single template render, a DoS guard
-	// (GHSA-rhwf-xgc9-m9fp). It is a var (not a const) solely so tests can raise it; it is never
-	// mutated in production.
-	templateMaxExecutionTime = 100 * time.Millisecond
 )
 
 const (
@@ -174,8 +163,6 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
-	templateMaxOutputBytes   = 1024 * 1024               // Maximum number of bytes a template can output, used to prevent DoS attacks
-	templateFileExtension    = ".yml"                    // Template files must end with this extension
 )
 
 // WebSocket constants

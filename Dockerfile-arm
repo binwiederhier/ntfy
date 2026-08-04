@@ -9,7 +9,9 @@ LABEL org.opencontainers.image.licenses="Apache-2.0, GPL-2.0"
 LABEL org.opencontainers.image.title="ntfy"
 LABEL org.opencontainers.image.description="Send push notifications to your phone or desktop using PUT/POST"
 
-RUN apk add --no-cache tzdata
+# Alpine does not support adding "tzdata" on ARM anymore, see
+# https://github.com/binwiederhier/ntfy/issues/894
+
 COPY ntfy /usr/bin
 
 EXPOSE 80/tcp

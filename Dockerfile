@@ -1,4 +1,52 @@
+FROM golang:1.25-bookworm AS builder
+
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG NODE_MAJOR=24
+
+RUN apt-get update && apt-get install -y \
+       build-essential ca-certificates curl gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" >> /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y \
+      nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ADD Makefile .
+
+# web
+ADD ./web/package.json ./web/package-lock.json ./web/
+RUN --mount=type=cache,target=/root/.npm make web-deps
+ADD ./web ./web
+RUN make web-build
+
+# cli & server
+ADD go.mod go.sum main.go ./
+ADD ./client ./client
+ADD ./cmd ./cmd
+ADD ./log ./log
+ADD ./server ./server
+ADD ./user ./user
+ADD ./util ./util
+ADD ./payments ./payments
+ADD ./db ./db
+ADD ./message ./message
+ADD ./model ./model
+ADD ./webpush ./webpush
+ADD ./attachment ./attachment
+ADD ./mail ./mail
+ADD ./s3 ./s3
+ADD ./action ./action
+ADD ./template/gotext ./template/gotext
+
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server
+
 FROM alpine
+
+ARG VERSION=dev
 
 LABEL org.opencontainers.image.authors="philipp.heckel@gmail.com"
 LABEL org.opencontainers.image.url="https://ntfy.sh/"
@@ -8,9 +56,9 @@ LABEL org.opencontainers.image.vendor="Philipp C. Heckel"
 LABEL org.opencontainers.image.licenses="Apache-2.0, GPL-2.0"
 LABEL org.opencontainers.image.title="ntfy"
 LABEL org.opencontainers.image.description="Send push notifications to your phone or desktop using PUT/POST"
+LABEL org.opencontainers.image.version="$VERSION"
 
-RUN apk add --no-cache tzdata
-COPY ntfy /usr/bin
+COPY --from=builder /app/dist/ntfy_linux_server/ntfy /usr/bin/ntfy
 
 EXPOSE 80/tcp
 ENTRYPOINT ["ntfy"]

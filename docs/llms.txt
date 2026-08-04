@@ -1,0 +1,29 @@
+# ntfy
+
+> ntfy lets you **send push notifications to your phone or desktop via scripts from any computer**, using simple HTTP PUT or POST requests. I use it to notify myself when scripts fail, or long-running commands complete.
+
+## Documentation
+
+- [Getting started](/): ntfy lets you **send push notifications to your phone or desktop via scripts from any computer**, using simple HTTP PUT or POST requests. I use it to notify myself when scripts fail, or long-running commands complete.
+- [Publishing](/publish/): Publishing messages can be done via HTTP PUT/POST or via the ntfy CLI (install instructions). Topics are created on the fly by subscribing or publishing to them. Because there is no sign-up, **the topic is essentially a password**, so pick something that's not easily guessable (see picking a topic for a handy topic name generator).
+- [Subscribe from your phone](/subscribe/phone/): You can use the ntfy Android App or iOS app to receive notifications directly on your phone. Just like the server, this app is also open source, and the code is available on GitHub (Android, iOS). Feel free to contribute, or build your own.
+- [Subscribe from the web app](/subscribe/web/): The web app lets you subscribe and publish messages to ntfy topics. For ntfy.sh, the web app is available at ntfy.sh/app. To subscribe, simply type in the topic name and click the *Subscribe* button. **After subscribing, messages published to the topic will appear in the web app, and pop up as a notification.**
+- [Using the progressive web app (PWA)](/subscribe/pwa/): While ntfy doesn't have a native desktop app, it is built as a progressive web app (PWA) and thus can be **installed on both desktop and mobile devices**.
+- [Subscribe via ntfy CLI](/subscribe/cli/): In addition to subscribing via the web UI, the phone app, or the API, you can subscribe to topics via the ntfy CLI. The CLI is included in the same `ntfy` binary that can be used to self-host a server.
+- [Subscribe via API](/subscribe/api/): You can create and subscribe to a topic in the web UI, via the phone app, via the ntfy CLI, or in your own app or script by subscribing the API. This page describes how to subscribe via API. You may also want to check out the page that describes how to publish messages.
+- [Installing ntfy](/install/): The `ntfy` CLI allows you to publish messages, subscribe to topics as well as to self-host your own ntfy server. It's all pretty straight forward. Just install the binary, package or Docker image, configure it and run it. Just like any other software. No fuzz.
+- [Configuring the ntfy server](/config/): The ntfy server can be configured in three ways: using a config file (typically at `/etc/ntfy/server.yml`, see server.yml), via command line arguments or using environment variables.
+- [Frequently asked questions (FAQ)](/faq/): Who knows. I didn't do a lot of research before making this. It was fun making it.
+- [Examples](/examples/): There are a million ways to use ntfy, but here are some inspirations. I try to collect <a href="https://github.com/binwiederhier/ntfy/tree/main/examples">examples on GitHub</a>, so be sure to check those out, too.
+- [Integrations + community projects](/integrations/): There are quite a few projects that work with ntfy, integrate ntfy, or have been built around ntfy. It's super exciting to see what you guys have come up with. Feel free to create a pull request on GitHub to add your own project here.
+- [Release notes](/releases/): Binaries for all releases can be found on the GitHub releases pages for the ntfy server and the ntfy Android app.
+- [Emoji reference](/emojis/): You can tag messages with emojis 🥳 🎉 and other relevant strings. Matching tags are automatically converted to emojis. This is a reference of all supported emojis. To learn more about the feature, please refer to the tagging and emojis page.
+- [Template Functions](/publish/template-functions/): These template functions may be used in the **message template** feature of ntfy. Please refer to the examples in the documentation for how to use them.
+- [Troubleshooting](/troubleshooting/): This page lists a few suggestions of what to do when things don't work as expected. This is not a complete list. If this page does not help, feel free to reach out via one of the channels listed on the contact page. We're happy to help.
+- [Known issues](/known-issues/): This is an incomplete list of known issues with the ntfy server, web app, Android app, and iOS app. You can find a complete list on GitHub, but I thought it may be helpful to have the prominent ones here to link to.
+- [Deprecations and breaking changes](/deprecations/): This page is used to list deprecation notices for ntfy. Deprecated commands and options will be **removed after 1-3 months** from the time they were deprecated. How long the feature is deprecated before the behavior is changed depends on the severity of the change, and how prominent the feature is.
+- [Development](/develop/): Hurray 🥳 🎉, you are interested in writing code for ntfy! **That's awesome.** 😎
+- [Contributing](/contributing/): Thank you for your interest in contributing to ntfy! There are many ways to help, whether you're a developer, translator, or just an enthusiastic user.
+- [Privacy policy](/privacy/): **Last updated:** June 15, 2026
+- [Terms of Service](/terms/): **Last updated:** January 26, 2026
+- [Contact](/contact/): This service is run by Philipp C. Heckel. There are several ways to get in touch with me and the ntfy community. Please choose the appropriate channel based on your needs.

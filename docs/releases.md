@@ -6,11 +6,38 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.26.3 | Jul 20, 2026  |
+| ntfy server      | v2.27.0 | Aug 4, 2026   |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.27.0
+Released August 4, 2026
+
+This release lets you sign in with your verified email address instead of your username, which should help if you ever
+signed up with an email and then forgot which username you picked. It also hardens the message templating engine against
+a few ways a small template could eat a lot of memory, and it drops the "experimental" label from
+[PostgreSQL support](config.md#postgresql), which has been running ntfy.sh for a while now.
+
+I also did a bunch of refactoring in, mostly in preparation for being able to cluster ntfy nodes and scale the service
+horizontally. It'll be a while until then, ... baby steps.
+
+**Security:**
+
+* Limit message templates (`Template: yes`) to 32 KB, limit `printf` widths and precisions to below 1000, and limit `indent`/`nindent` to 100 spaces, preventing excessive memory use from a single small template
+* Exclude secrets from the config hash served to the web app, preventing a rather theoretical information leak
+
+**Features:**
+
+* Allow logging in with your verified primary email address (in addition to your username), so a password reset no longer leaves you unable to sign in when you only remember the email you signed up with
+
+**Bug fixes + maintenance:**
+
+* Fix Twilio phone calls and phone number verifications failing silently when Twilio rejected the request, and move the Twilio integration into its own `twilio` package
+* Move the Prometheus metrics into a dedicated `metrics` package
+* Message cache databases from ntfy older than v1.10.0 (November 2021) can no longer be migrated; upgrade via an older ntfy version first, or delete the cache database
+* Fix `user_phone` table in the SQLite user database referencing a dropped table after the v2.14 schema migration; repaired automatically by a new migration
 
 ## ntfy Android v1.25.2
 Released July 23, 2026
@@ -2050,23 +2077,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.27.0 (UNRELEASED)
-
-**Security:**
-
-* Exclude secrets (Stripe/Twilio/web push keys, SMTP password, provisioned users and tokens) from the config hash served to the web app
-
-**Features:**
-
-* Allow logging in with your verified primary email address (in addition to your username), so a password reset no longer leaves you unable to sign in when you only remember the email you signed up with
-
-**Bug fixes + maintenance:**
-
-* Fix Twilio phone calls and phone number verifications failing silently when Twilio rejected the request, and move the Twilio integration into its own `twilio` package
-* Move the Prometheus metrics into a dedicated `metrics` package
-* Message cache databases from ntfy older than v1.10.0 (November 2021) can no longer be migrated; upgrade via an older ntfy version first, or delete the cache database
-* Fix `user_phone` table in the SQLite user database referencing a dropped table after the v2.14 schema migration; repaired automatically by a new migration
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

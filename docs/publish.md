@@ -3227,7 +3227,10 @@ your templates there first ([example for Grafana alert](https://repeatit.io/#/sh
 !!! info
     A few Go template features are disabled for user-supplied templates: `{{define}}`, `{{template}}`,
     `{{block}}`, and `{{call}}` are not allowed. Templates also run with a short execution time limit --
-    a template that loops too long is stopped and rejected with an HTTP 400 error.
+    a template that loops too long is stopped and rejected with an HTTP 400 error. Templates are
+    limited to 32 KB in size, `printf` widths and precisions must be below 1000 (`%999d` is
+    allowed, `%1000d` is not), including the `%*d` form that takes the width from an argument, and
+    `indent`/`nindent` are limited to 100 spaces.
 
 ### Template functions
 ntfy supports a subset of the **[Sprig template functions](publish/template-functions.md)** (originally copied from [Sprig](https://github.com/Masterminds/sprig),

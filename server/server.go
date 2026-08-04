@@ -153,17 +153,6 @@ var (
 	//go:embed docs
 	docsStaticFs     embed.FS
 	docsStaticCached = &util.CachingEmbedFS{ModTime: time.Now(), FS: docsStaticFs}
-
-	//go:embed templates
-	templatesFs  embed.FS // Contains template config files (e.g. grafana.yml, github.yml, ...)
-	templatesDir = "templates"
-
-	templateNameRegex = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
-
-	// templateMaxExecutionTime is the wall-clock deadline for a single template render, a DoS guard
-	// (GHSA-rhwf-xgc9-m9fp). It is a var (not a const) solely so tests can raise it; it is never
-	// mutated in production.
-	templateMaxExecutionTime = 100 * time.Millisecond
 )
 
 const (
@@ -177,8 +166,6 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
-	templateMaxOutputBytes   = 1024 * 1024               // Maximum number of bytes a template can output, used to prevent DoS attacks
-	templateFileExtension    = ".yml"                    // Template files must end with this extension
 )
 
 // WebSocket constants
@@ -938,18 +925,7 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
-// dispatchOpts selects which delivery targets fire for a published message, beyond delivery to
-// local subscribers and the cross-node broadcast (which always happen).
-type dispatchOpts struct {
-	firebase bool   // Send to Firebase (if configured)
-	email    string // Send an email to this address (if a mailer is configured)
-	call     string // Call this phone number (if Twilio is configured)
-	upstream bool   // Forward a poll request to the upstream server (if configured)
-	webPush  bool   // Publish to web push endpoints (if configured)
-	async    bool   // Deliver to local subscribers in a goroutine, logging errors instead of returning them
-}
-
-// dispatch delivers m to local subscribers, relays it to peer cluster nodes, and fires the
+// dispatch delivers m to local subscribers, forwards it to peer cluster nodes, and fires the
 // requested side-effect targets. It is the single choke point through which every published
 // message must pass; t may be nil when the topic has no local subscribers (delayed sender).
 //
@@ -969,9 +945,9 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 			return err
 		}
 	}
-	// ForwardMessage to peer cluster nodes, whose subscribers do not show up in this node's topics map
+	// Forward to peer cluster nodes, whose subscribers do not show up in this node's topics map
 	if err := s.cluster.ForwardMessage(m); err != nil {
-		logvm(v, m).Err(err).Warn("Cluster: unable to relay message to peer nodes")
+		logvm(v, m).Err(err).Warn("Cluster: unable to forward message to peer nodes")
 	}
 	// Fire the requested side-effect targets
 	if s.firebaseClient != nil && opts.firebase {

@@ -116,6 +116,7 @@ func cat(v ...any) string {
 }
 
 // indent adds a specified number of spaces at the beginning of each line in a string.
+// It has a safety limit to prevent excessive memory usage.
 //
 // Parameters:
 //   - spaces: The number of spaces to add
@@ -123,7 +124,13 @@ func cat(v ...any) string {
 //
 // Returns:
 //   - string: The indented string
+//
+// Panics:
+//   - If spaces exceeds indentSpacesLimit
 func indent(spaces int, v string) string {
+	if spaces > indentSpacesLimit {
+		panic(fmt.Sprintf("indent %d exceeds limit of %d", spaces, indentSpacesLimit))
+	}
 	pad := strings.Repeat(" ", spaces)
 	return pad + strings.Replace(v, "\n", "\n"+pad, -1)
 }

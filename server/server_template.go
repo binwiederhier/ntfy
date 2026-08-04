@@ -3,18 +3,48 @@ package server
 import (
 	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template/parse"
+	"time"
 
 	"gopkg.in/yaml.v2"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/template/gotext"
 	"heckel.io/ntfy/v2/util"
 	"heckel.io/ntfy/v2/util/sprig"
+)
+
+var (
+	//go:embed templates
+	templatesFs  embed.FS // Contains template config files (e.g. grafana.yml, github.yml, ...)
+	templatesDir = "templates"
+
+	templateNameRegex = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
+
+	// templatePrintfLargeSizeRegex matches a printf directive whose width or precision is a star
+	// (taken from an argument) or has four or more digits, i.e. is at least 1000. It deliberately
+	// scans the flag/width/precision characters after a % without requiring a well-formed
+	// directive: fmt pads even malformed ones (e.g. "%000 9999999#" emits 10 MB), so anything
+	// unrecognized must still be caught.
+	templatePrintfLargeSizeRegex = regexp.MustCompile(`%[-+# 0-9.*\[\]]*(\*|[0-9]{4})`)
+
+	// templateMaxExecutionTime is the wall-clock deadline for a single template render, a DoS guard
+	// (GHSA-rhwf-xgc9-m9fp). It is a var (not a const) solely so tests can raise it; it is never
+	// mutated in production.
+	templateMaxExecutionTime = 100 * time.Millisecond
+)
+
+const (
+	templateMaxOutputBytes   = 1024 * 1024 // Maximum number of bytes a template can output, used to prevent DoS attacks
+	templateMaxTemplateBytes = 32 * 1024   // Maximum size of a template (inline or from a template file), used to prevent DoS attacks
+	templateFileExtension    = ".yml"      // Template files must end with this extension
 )
 
 func (s *Server) handleBodyAsTemplatedTextMessage(ctx context.Context, m *model.Message, template templateMode, body *util.PeekedReadCloser, priorityStr string) error {
@@ -106,11 +136,14 @@ func (s *Server) renderTemplateFromParams(ctx context.Context, m *model.Message,
 
 // renderTemplate renders a template with the given JSON source data.
 func (s *Server) renderTemplate(ctx context.Context, name, tpl, source string) (string, error) {
+	if len(tpl) > templateMaxTemplateBytes {
+		return "", errHTTPBadRequestTemplateTooLarge
+	}
 	var data any
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
 		return "", errHTTPBadRequestTemplateMessageNotJSON
 	}
-	t, err := gotext.New("").Funcs(sprig.TxtFuncMap()).Parse(tpl)
+	t, err := gotext.New("").Funcs(sprig.TxtFuncMap()).Funcs(gotext.FuncMap{"printf": templatePrintf}).Parse(tpl)
 	if err != nil {
 		return "", errHTTPBadRequestTemplateInvalid.Wrap("%s", err.Error())
 	}
@@ -168,6 +201,8 @@ func treeContainsDisallowedNode(node parse.Node) bool {
 		return treeContainsDisallowedNode(n.Pipe) || treeContainsDisallowedNode(n.List) || treeContainsDisallowedNode(n.ElseList)
 	case *parse.TemplateNode: // {{template}} or {{block}} invocation
 		return true
+	case *parse.ChainNode: // A term followed by field accesses, e.g. (call .x).y
+		return treeContainsDisallowedNode(n.Node)
 	case *parse.PipeNode:
 		if n == nil {
 			return false
@@ -187,4 +222,19 @@ func treeContainsDisallowedNode(node parse.Node) bool {
 		return n.Ident == "call"
 	}
 	return false
+}
+
+// templatePrintf is the template builtin printf, guarded against memory amplification: fmt
+// allows widths and precisions up to 1e6 per verb, so a small template like
+// {{printf "%999999d%999999d..." ...}} can allocate gigabytes inside a single fmt call -- and the
+// executor's cancellation context is only checked between template nodes, never inside one.
+// Widths and precisions of 1000 or more are therefore rejected, as is the star (*) form, which
+// takes the width from an argument. Combined with the template size limit, this bounds a single
+// render to a few MB. Registered via Funcs, which takes precedence over the builtin, and checked
+// at call time so a format string assembled during execution is covered too.
+func templatePrintf(format string, args ...any) (string, error) {
+	if templatePrintfLargeSizeRegex.MatchString(strings.ReplaceAll(format, "%%", "")) { // Strip escaped percent signs, they take no width
+		return "", errors.New("printf width or precision too large")
+	}
+	return fmt.Sprintf(format, args...), nil
 }

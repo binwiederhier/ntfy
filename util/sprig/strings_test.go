@@ -4,6 +4,7 @@ import (
 	"encoding/base32"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -211,6 +212,25 @@ func TestNindent(t *testing.T) {
 	tpl := `{{nindent 4 "a\nb\nc"}}`
 	if err := runt(tpl, "\n    a\n    b\n    c"); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestIndentLimit(t *testing.T) {
+	// Indentation beyond a sane width is an amplification attempt: indent allocates
+	// spaces * lines bytes in a single uninterruptible call
+	if err := runt(`{{indent 100 "a"}}`, strings.Repeat(" ", 100)+"a"); err != nil {
+		t.Error(err)
+	}
+	for _, tpl := range []string{
+		`{{indent 101 "a"}}`,
+		`{{nindent 101 "a"}}`,
+		`{{indent 1000000000 "a"}}`,
+	} {
+		if _, err := runRaw(tpl, nil); err == nil {
+			t.Errorf("expected %s to be rejected", tpl)
+		} else if !strings.Contains(err.Error(), "exceeds limit") {
+			t.Errorf("expected limit error for %s, got: %v", tpl, err)
+		}
 	}
 }
 

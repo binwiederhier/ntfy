@@ -68,5 +68,8 @@ LABEL org.opencontainers.image.version="$VERSION"
 
 COPY --from=builder /app/dist/ntfy_linux_server/ntfy /usr/bin/ntfy
 
-EXPOSE 80/tcp
+ENV NTFY_LISTEN_HTTP=:10000
+
+EXPOSE 10000/tcp
 ENTRYPOINT ["ntfy"]
+CMD ["serve"]

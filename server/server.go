@@ -42,6 +42,7 @@ import (
 	"heckel.io/ntfy/v2/payments"
 	"heckel.io/ntfy/v2/twilio"
 	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/apns"
 	"heckel.io/ntfy/v2/util"
 	"heckel.io/ntfy/v2/webpush"
 )
@@ -68,6 +69,8 @@ type Server struct {
 	userManager       *user.Manager                       // Might be nil!
 	messageCache      *message.Cache                      // Database that stores the messages
 	webPush           *webpush.Store                      // Database that stores web push subscriptions
+	apnsStore         *apns.Store                         // Database that stores APNs registrations
+	apnsClient        *apns.Client                        // APNs client for direct push notifications
 	attachment        *attachment.Store                   // Attachment store (file system or S3)
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
@@ -227,6 +230,32 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 	}
+	var apnsStore *apns.Store
+	var apnsClient *apns.Client
+	if conf.APNSKeyFile != "" {
+		if pool != nil {
+			apnsStore, err = apns.NewPostgresStore(pool)
+		} else {
+			apnsFile := conf.APNSFile
+			if apnsFile == "" {
+				apnsFile = "apns.db"
+			}
+			apnsStore, err = apns.NewSQLiteStore(apnsFile, conf.APNSStartupQueries)
+		}
+		if err != nil {
+			return nil, err
+		}
+		apnsClient, err = apns.NewClient(apns.Config{
+			KeyFile:     conf.APNSKeyFile,
+			KeyID:       conf.APNSKeyID,
+			TeamID:      conf.APNSTeamID,
+			AppBundleID: conf.APNSAppBundleID,
+			Sandbox:     conf.APNSSandbox,
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 	topicIDs, err := messageCache.Topics()
 	if err != nil {
 		return nil, err
@@ -308,6 +337,8 @@ func New(conf *Config) (*Server, error) {
 		db:              pool,
 		messageCache:    messageCache,
 		webPush:         wp,
+		apnsStore:       apnsStore,
+		apnsClient:      apnsClient,
 		attachment:      attachmentStore,
 		firebaseClient:  firebaseClient,
 		twilio:          twilioClient,
@@ -647,6 +678,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureEmailsEnabled(s.limitRequests(s.handleAccountPasswordResetRequest))(w, r, v) // Unauthenticated
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPasswordResetPath {
 		return s.ensureEmailsEnabled(s.limitRequests(s.handleAccountPasswordReset))(w, r, v) // Unauthenticated
+	} else if r.Method == http.MethodPost && r.URL.Path == "/v1/devices/apns" {
+		return s.limitRequests(s.handleAPNSRegister)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == "/v1/devices/apns" {
+		return s.limitRequests(s.handleAPNSUnregister)(w, r, v)
 	} else if r.Method == http.MethodPost && apiWebPushPath == r.URL.Path {
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushUpdate))(w, r, v)
 	} else if r.Method == http.MethodDelete && apiWebPushPath == r.URL.Path {
@@ -852,6 +887,9 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 	if s.config.WebPushPublicKey != "" && opts.webPush {
 		go s.publishToWebPushEndpoints(v, m)
 	}
+	if s.apnsClient != nil && opts.apns {
+		go s.publishToAPNSEndpoints(v, m)
+	}
 	return nil
 }
 
@@ -939,6 +977,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 			call:     call,
 			upstream: !unifiedpush, // UP messages are not sent to upstream
 			webPush:  true,
+			apns:     firebase,
 		})
 		if err != nil {
 			return nil, err
@@ -1042,7 +1081,7 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 	m.User = v.MaybeUserID()
 	m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
 	// Publish to subscribers, Firebase (for Android clients), and web push endpoints
-	if err := s.dispatch(v, t, m, dispatchOpts{firebase: true, webPush: true}); err != nil {
+	if err := s.dispatch(v, t, m, dispatchOpts{firebase: true, webPush: true, apns: true}); err != nil {
 		return err
 	}
 	if event == model.MessageDeleteEvent {
@@ -2001,6 +2040,7 @@ func (s *Server) sendDelayedMessage(v *visitor, m *model.Message) error {
 		firebase: true,
 		upstream: true,
 		webPush:  true,
+		apns:     true,
 		async:    true,
 	})
 	if err != nil {

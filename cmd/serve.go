@@ -41,6 +41,13 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"key_file", "K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"cert_file", "E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "apns-key-file", Aliases: []string{"apns_key_file"}, EnvVars: []string{"NTFY_APNS_KEY_FILE"}, Usage: "APNs credentials key (.p8) file"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "apns-key-id", Aliases: []string{"apns_key_id"}, EnvVars: []string{"NTFY_APNS_KEY_ID"}, Usage: "APNs credentials key ID"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "apns-team-id", Aliases: []string{"apns_team_id"}, EnvVars: []string{"NTFY_APNS_TEAM_ID"}, Usage: "APNs Apple Developer team ID"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "apns-app-bundle-id", Aliases: []string{"apns_app_bundle_id"}, EnvVars: []string{"NTFY_APNS_APP_BUNDLE_ID"}, Usage: "APNs application bundle ID (topic)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "apns-file", Aliases: []string{"apns_file"}, EnvVars: []string{"NTFY_APNS_FILE"}, Usage: "SQLite database file used for APNs device registrations"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "apns-startup-queries", Aliases: []string{"apns_startup_queries"}, EnvVars: []string{"NTFY_APNS_STARTUP_QUERIES"}, Usage: "Queries run when the APNs database is initialized"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "apns-sandbox", Aliases: []string{"apns_sandbox"}, EnvVars: []string{"NTFY_APNS_SANDBOX"}, Usage: "Use APNs sandbox/development environment"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
@@ -155,6 +162,13 @@ func execServe(c *cli.Context) error {
 	keyFile := c.String("key-file")
 	certFile := c.String("cert-file")
 	firebaseKeyFile := c.String("firebase-key-file")
+	apnsKeyFile := c.String("apns-key-file")
+	apnsKeyID := c.String("apns-key-id")
+	apnsTeamID := c.String("apns-team-id")
+	apnsAppBundleID := c.String("apns-app-bundle-id")
+	apnsFile := c.String("apns-file")
+	apnsStartupQueries := c.String("apns-startup-queries")
+	apnsSandbox := c.Bool("apns-sandbox")
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
 	webPushPrivateKey := c.String("web-push-private-key")
@@ -487,6 +501,13 @@ func execServe(c *cli.Context) error {
 	conf.KeyFile = keyFile
 	conf.CertFile = certFile
 	conf.FirebaseKeyFile = firebaseKeyFile
+	conf.APNSKeyFile = apnsKeyFile
+	conf.APNSKeyID = apnsKeyID
+	conf.APNSTeamID = apnsTeamID
+	conf.APNSAppBundleID = apnsAppBundleID
+	conf.APNSFile = apnsFile
+	conf.APNSStartupQueries = apnsStartupQueries
+	conf.APNSSandbox = apnsSandbox
 	conf.CacheFile = cacheFile
 	conf.CacheDuration = cacheDuration
 	conf.CacheStartupQueries = cacheStartupQueries

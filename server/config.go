@@ -122,6 +122,13 @@ type Config struct {
 	DatabaseURL                          string   // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
 	DatabaseReplicaURLs                  []string // PostgreSQL read replica connection strings
 	FirebaseKeyFile                      string
+	APNSKeyFile                          string
+	APNSKeyID                            string
+	APNSTeamID                           string
+	APNSAppBundleID                      string
+	APNSFile                             string
+	APNSStartupQueries                   string
+	APNSSandbox                          bool
 	CacheFile                            string
 	CacheDuration                        time.Duration
 	CacheStartupQueries                  string
@@ -237,6 +244,13 @@ func NewConfig() *Config {
 		CertFile:                             "",
 		DatabaseURL:                          "",
 		FirebaseKeyFile:                      "",
+		APNSKeyFile:                          "",
+		APNSKeyID:                            "",
+		APNSTeamID:                           "",
+		APNSAppBundleID:                      "",
+		APNSFile:                             "",
+		APNSStartupQueries:                   "",
+		APNSSandbox:                          false,
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
 		CacheStartupQueries:                  "",

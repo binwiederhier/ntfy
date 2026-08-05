@@ -37,6 +37,7 @@ type dispatchOpts struct {
 	call     string // Call this phone number (if Twilio is configured)
 	upstream bool   // Forward a poll request to the upstream server (if configured)
 	webPush  bool   // Publish to web push endpoints (if configured)
+	apns     bool   // Send to direct APNs (if configured)
 	async    bool   // Deliver to local subscribers in a goroutine, logging errors instead of returning them
 }
 

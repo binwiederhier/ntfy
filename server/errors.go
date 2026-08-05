@@ -149,6 +149,8 @@ var (
 	errHTTPBadRequestAnonymousEmailNotAllowed        = &errHTTP{40053, http.StatusBadRequest, "invalid request: anonymous email sending is not allowed", "https://ntfy.sh/docs/publish/#e-mail-notifications", nil}
 	errHTTPBadRequestResetLinkInvalid                = &errHTTP{40054, http.StatusBadRequest, "invalid request: password reset link invalid or expired", "", nil}
 	errHTTPBadRequestTemplateTooLarge                = &errHTTP{40056, http.StatusBadRequest, "invalid request: template too large", "https://ntfy.sh/docs/publish/#message-templating", nil}
+	errHTTPBadRequestAPNSRegistrationInvalid          = &errHTTP{40057, http.StatusBadRequest, "invalid request: APNs registration payload malformed", "", nil}
+	errHTTPBadRequestAPNSNotEnabled                   = &errHTTP{40058, http.StatusBadRequest, "invalid request: direct APNs is not enabled on this server", "", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

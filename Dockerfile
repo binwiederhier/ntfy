@@ -47,7 +47,12 @@ ADD ./template/gotext ./template/gotext
 
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server
 
-FROM alpine
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
 ARG VERSION=dev
 

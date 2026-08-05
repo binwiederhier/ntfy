@@ -70,6 +70,13 @@ LABEL org.opencontainers.image.version="$VERSION"
 COPY --from=builder /app/dist/ntfy_linux_server/ntfy /usr/bin/ntfy
 
 ENV NTFY_LISTEN_HTTP=:10000
+ENV NTFY_BASE_URL=https://ntfy-nmxw.onrender.com
+ENV NTFY_AUTH_DEFAULT_ACCESS=read-write
+ENV NTFY_APNS_KEY_FILE=/etc/secrets/AuthKey_TP3RYX3ZKD.p8
+ENV NTFY_APNS_KEY_ID=TP3RYX3ZKD
+ENV NTFY_APNS_TEAM_ID=N26FZ4GW28
+ENV NTFY_APNS_APP_BUNDLE_ID=com.projectus.ntfy
+ENV NTFY_APNS_SANDBOX=true
 
 EXPOSE 10000/tcp
 ENTRYPOINT ["ntfy"]

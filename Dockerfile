@@ -43,6 +43,7 @@ ADD ./action ./action
 ADD ./ban ./ban
 ADD ./metrics ./metrics
 ADD ./twilio ./twilio
+ADD ./apns ./apns
 ADD ./template/gotext ./template/gotext
 
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server

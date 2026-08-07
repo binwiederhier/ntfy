@@ -3352,8 +3352,8 @@ If you use [access tokens](#access-tokens), that will change the format of the e
 ntfy-$topic+$token@ntfy.sh
 ```
 
-To use a username/password (or an access token as the password with an empty username), you can use SMTP AUTH PLAIN when
-authenticating to the ntfy server. See [authenticating to protected topics](config.md#authenticating-to-protected-topics)
+You can also authenticate with SMTP AUTH PLAIN, using either a ntfy username and password, or an access token as the
+password with an empty username. See [authenticating to protected topics](config.md#authenticating-to-protected-topics)
 for details.
 
 The e-mail subject becomes the [message title](#message-title), and the e-mail body becomes the message. The body is

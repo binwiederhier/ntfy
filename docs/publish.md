@@ -3356,9 +3356,12 @@ To use a username/password (or an access token as the password with an empty use
 authenticating to the ntfy server. See [authenticating to protected topics](config.md#authenticating-to-protected-topics)
 for details.
 
-The email subject becomes the [notification title](#message-title), and the email body becomes the message (treated as
-plain text — [Markdown](#markdown-formatting) is not supported via email). Tags, priority, delay and other features are
-not supported (yet). Here's an example that will publish a message with the 
+The e-mail subject becomes the [message title](#message-title), and the e-mail body becomes the message. The body is
+always treated as plain text, so [Markdown](#markdown-formatting) is not supported when publishing via e-mail. For
+multipart e-mails, ntfy uses the `text/plain` part. If there is none, it falls back to the `text/html` part and strips
+the tags. Tags, priority, delay and other features are not supported (yet).
+
+Here's an example that will publish a message with the 
 title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://ntfy.sh/sometopic)):
 
 <figure markdown>

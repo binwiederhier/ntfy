@@ -1077,14 +1077,11 @@ Here's an example config (this is how it is configured for `ntfy.sh`):
     smtp-server-addr-prefix: "ntfy-"
     ```
 
-Whether you need DNS records depends on how mail reaches your server. If **other mail servers** deliver to your domain
-via an [MX lookup](https://en.wikipedia.org/wiki/MX_record) (the usual case for receiving regular email), you have to
-create two DNS records: an MX record and a corresponding A record, so incoming mail will find its way to your server.
-If instead your sender connects **directly** to the SMTP server's host and port — e.g. a router's push-mail feature, or
-any appliance where you enter the SMTP server address yourself — no DNS records are needed, and publishing works from
-anywhere the port is reachable. See [local-only email](#local-only-email) below for that case.
-
-The following is an example of how `ntfy.sh` is configured for MX-based delivery (in [Amazon Route 53](https://aws.amazon.com/route53/)):
+In addition to configuring the ntfy server, you have to create two DNS records (an [MX record](https://en.wikipedia.org/wiki/MX_record) 
+and a corresponding A record), so incoming mail will find its way to your server. This applies if other mail servers
+deliver to your domain via an MX lookup, which is the usual case. If your sender connects directly to the SMTP server's
+host and port instead, you don't need any DNS records. See [local-only email](#local-only-email) below. Here's an
+example of how `ntfy.sh` is configured (in [Amazon Route 53](https://aws.amazon.com/route53/)):
 
 <figure markdown>
   ![DNS records for incoming mail](static/img/screenshot-email-publishing-dns.png){ width=600 }
@@ -1152,48 +1149,24 @@ to include an access token in the "To" address, such as `email-alerts+tk_AbC123d
 If the internal service lets you use define an email "Subject", it will become the title of the notification.
 The body of the email will become the message of the notification.
 
-### Message format and content
-When publishing via email, the **email subject becomes the notification title**, and the **email body becomes the
-message**. If the email has no body, the subject becomes the message and the notification has no separate title. The
-body is always treated as **plain text** — [Markdown formatting](publish.md#markdown-formatting) is not supported when
-publishing via email, even if the body contains Markdown syntax.
-
-For multipart emails (the common case, with both a plain text and an HTML part), ntfy uses the `text/plain` part. The
-`text/html` part is only used as a fallback when no plain text part is present, in which case all HTML tags are stripped
-and only the text content remains. Other publishing features such as tags, priority, and delay are not supported via
-email (yet).
-
 ### Authenticating to protected topics
-If your topics are access-restricted (e.g. via `auth-default-access: deny-all`), email publishing won't work for
-anonymous senders. Besides putting an [access token in the email address](#local-only-email)
-(`ntfy-$topic+$token@ntfy.sh`), the SMTP server also accepts **SMTP AUTH PLAIN** and validates the credentials against
-the ntfy user database. This lets you authenticate at connection time, which is how most mail clients and appliances
-expect to log in.
+If your topics are access-restricted (e.g. with `auth-default-access: deny-all`), anonymous senders cannot publish.
+One option is to put an access token into the email address, as described above (`ntfy-$topic+$token@ntfy.sh`). The
+other option is SMTP AUTH PLAIN. The SMTP server accepts it and checks the credentials against the ntfy user database.
+Most mail clients and appliances expect to log in this way.
 
-There are two ways to authenticate, mirroring ntfy's [HTTP authentication](publish.md#authentication):
+In the SMTP settings of your sending client, use either of these:
 
-```
-Email to a protected topic
-│
-├─ Token in the address:  ntfy-mytopic+tk_AgQdq7mVBoFD...@ntfy.sh
-│      → token takes precedence over SMTP AUTH (if both are present)
-│
-└─ SMTP AUTH PLAIN (at connection time):
-   ├─ username + password                  → validated as a ntfy user/password
-   └─ empty username + token as password   → the password is treated as an access token
-```
+* A ntfy username and password.
+* An access token as the password, and leave the username empty. This works the same way as
+  [token auth](publish.md#access-tokens) over HTTP. Note that many mail clients insist on a username, so the
+  username/password variant is usually easier.
 
-So in your sending client's SMTP settings, use either:
-
-* a ntfy **username and password**, or
-* an **access token** as the password, with an **empty username** (same behavior as
-  [token auth](publish.md#access-tokens) over HTTP). Note that many mail clients require a username, in which case the
-  username/password method is the practical choice.
+If the address contains a token and the client also uses SMTP AUTH, the token in the address wins.
 
 !!! warning
-    The ntfy SMTP server does **not** advertise STARTTLS, so credentials sent via SMTP AUTH PLAIN are transmitted
-    unencrypted over the connection. Only use this over a trusted network, or place a TLS-terminating proxy in front of
-    the SMTP server.
+    The ntfy SMTP server does not advertise STARTTLS, so SMTP AUTH PLAIN sends the credentials unencrypted. Only use
+    this on a trusted network, or put a TLS-terminating proxy in front of the SMTP server.
 
 ## Behind a proxy (TLS, etc.)
 !!! warning

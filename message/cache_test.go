@@ -795,6 +795,11 @@ func TestStore_MessageFieldRoundTrip(t *testing.T) {
 		}
 		m.ContentType = "text/markdown"
 		m.Encoding = "base64"
+		m.Apple = &model.AppleOptions{
+			Critical: true,
+			Sound:    "warning",
+			Volume:   0.5,
+		}
 		m.Sender = netip.MustParseAddr("9.8.7.6")
 		m.User = "u_TestUser123"
 		require.Nil(t, s.AddMessage(m))
@@ -817,6 +822,7 @@ func TestStore_MessageFieldRoundTrip(t *testing.T) {
 		require.Equal(t, "https://example.com/icon.png", retrieved.Icon)
 		require.Equal(t, "text/markdown", retrieved.ContentType)
 		require.Equal(t, "base64", retrieved.Encoding)
+		require.Equal(t, &model.AppleOptions{Critical: true, Sound: "warning", Volume: 0.5}, retrieved.Apple)
 		require.Equal(t, netip.MustParseAddr("9.8.7.6"), retrieved.Sender)
 		require.Equal(t, "u_TestUser123", retrieved.User)
 

@@ -445,7 +445,7 @@ The following priorities exist:
 
 | Priority             | Icon                                       | ID  | Name           | Description                                                                                            |
 |----------------------|--------------------------------------------|-----|----------------|--------------------------------------------------------------------------------------------------------|
-| Max priority         | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification.                 |
+| Max priority         | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification. On iOS, delivered as a [critical alert](#ios-critical-alerts) by default. |
 | High priority        | ![min priority](static/img/priority-4.svg) | `4` | `high`         | Long vibration burst, default notification sound with a pop-over notification.                         |
 | **Default priority** | *(none)*                                   | `3` | `default`      | Short default vibration and sound. Default notification behavior.                                      |
 | Low priority         | ![min priority](static/img/priority-2.svg) | `2` | `low`          | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |

@@ -404,6 +404,82 @@ func TestServer_PublishPriority(t *testing.T) {
 	})
 }
 
+func TestPublishAppleCriticalHeaders(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// Explicit critical with sound and volume
+		response := request(t, s, "POST", "/mytopic", "critical message", map[string]string{
+			"X-Apple-Critical": "1",
+			"X-Apple-Sound":    "warning",
+			"X-Apple-Volume":   "0.5",
+		})
+		msg := toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.True(t, msg.Apple.Critical)
+		require.Equal(t, "warning", msg.Apple.Sound)
+		require.Equal(t, 0.5, msg.Apple.Volume)
+
+		// Explicit opt-out, sound/volume ignored without critical
+		response = request(t, s, "POST", "/mytopic", "opt-out", map[string]string{
+			"X-Apple-Critical": "no",
+			"X-Apple-Sound":    "ignored",
+		})
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.False(t, msg.Apple.Critical)
+		require.Equal(t, "", msg.Apple.Sound)
+
+		// No header, no Apple options
+		response = request(t, s, "POST", "/mytopic", "normal message", nil)
+		msg = toMessage(t, response.Body.String())
+		require.Nil(t, msg.Apple)
+
+		// Query parameter variant
+		response = request(t, s, "GET", "/mytopic/publish?apple-critical=true", "via query", nil)
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.True(t, msg.Apple.Critical)
+
+		// JSON publish variant
+		body := `{"topic":"mytopic","message":"via json","apple":{"critical":true,"volume":0.7}}`
+		response = request(t, s, "PUT", "/", body, nil)
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.True(t, msg.Apple.Critical)
+		require.Equal(t, 0.7, msg.Apple.Volume)
+	})
+}
+
+func TestPublishAppleCriticalInvalid(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+			"X-Apple-Critical": "definitely",
+		})
+		require.Equal(t, 40059, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
+func TestPublishAppleVolumeInvalid(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for _, volume := range []string{"7", "-0.1", "1.01", "loud", "nan", "NaN", "0", "0.0"} {
+			response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+				"X-Apple-Critical": "1",
+				"X-Apple-Volume":   volume,
+			})
+			require.Equal(t, 40061, toHTTPError(t, response.Body.String()).Code)
+		}
+		// Sound with path separator is rejected
+		response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+			"X-Apple-Critical": "1",
+			"X-Apple-Sound":    "../../etc/passwd",
+		})
+		require.Equal(t, 40060, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
 func TestServer_PublishPriority_SpecialHTTPHeader(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))

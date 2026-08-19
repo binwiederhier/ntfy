@@ -1215,6 +1215,33 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		}
 		priorityStr = "" // Clear since it's already parsed
 	}
+	appleCriticalStr := readParam(r, "x-apple-critical", "apple-critical")
+	if appleCriticalStr != "" {
+		if !isBoolValue(appleCriticalStr) {
+			return false, false, "", "", "", false, "", errHTTPBadRequestAppleCriticalInvalid
+		}
+		// The struct is only created if X-Apple-Critical was set explicitly, so that an unset header
+		// can fall back to the priority-based default (see appleCritical). Sound and volume are only
+		// read for critical messages, since they have no effect otherwise.
+		m.Apple = &model.AppleOptions{Critical: toBool(appleCriticalStr)}
+		if m.Apple.Critical {
+			appleSound := readParam(r, "x-apple-sound", "apple-sound")
+			if len(appleSound) > 128 || strings.ContainsAny(appleSound, "/\\") {
+				return false, false, "", "", "", false, "", errHTTPBadRequestAppleSoundInvalid
+			}
+			m.Apple.Sound = appleSound
+			if appleVolumeStr := readParam(r, "x-apple-volume", "apple-volume"); appleVolumeStr != "" {
+				appleVolume, e := strconv.ParseFloat(appleVolumeStr, 64)
+				// The negated range check also rejects NaN, which ParseFloat accepts. Zero is
+				// rejected too: it would silently be treated as "not set" (and delivered at
+				// full volume), since the FCM SDK cannot transmit a zero volume
+				if e != nil || !(appleVolume > 0 && appleVolume <= 1) {
+					return false, false, "", "", "", false, "", errHTTPBadRequestAppleVolumeInvalid
+				}
+				m.Apple.Volume = appleVolume
+			}
+		}
+	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
 	// Measured across all tags, not each one: a publisher can add arbitrarily many
 	tagsSize := 0
@@ -2107,6 +2134,15 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.SequenceID != "" {
 			r.Header.Set("X-Sequence-ID", m.SequenceID)
+		}
+		if m.Apple != nil {
+			r.Header.Set("X-Apple-Critical", fmt.Sprintf("%t", m.Apple.Critical))
+			if m.Apple.Sound != "" {
+				r.Header.Set("X-Apple-Sound", m.Apple.Sound)
+			}
+			if m.Apple.Volume > 0 {
+				r.Header.Set("X-Apple-Volume", fmt.Sprintf("%g", m.Apple.Volume))
+			}
 		}
 		return next(w, r, v)
 	}

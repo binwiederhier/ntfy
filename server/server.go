@@ -1105,6 +1105,14 @@ func (s *Server) forwardPollRequest(v *visitor, m *model.Message) {
 	}
 	req.Header.Set("User-Agent", "ntfy/"+s.config.BuildVersion)
 	req.Header.Set("X-Poll-ID", m.ID)
+	if m.Apple != nil && m.Apple.Critical {
+		// Forward the critical flag, so the upstream server can deliver the poll request as a
+		// critical alert. Older upstream servers ignore the unknown headers.
+		req.Header.Set("X-Apple-Critical", "1")
+		if m.Apple.Volume > 0 {
+			req.Header.Set("X-Apple-Volume", fmt.Sprintf("%g", m.Apple.Volume))
+		}
+	}
 	if s.config.UpstreamAccessToken != "" {
 		req.Header.Set("Authorization", util.BearerAuth(s.config.UpstreamAccessToken))
 	}

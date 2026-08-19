@@ -143,6 +143,13 @@ func toFirebaseMessage(m *model.Message, auther user.Auther) (*messaging.Message
 			"message": newMessageBody,
 			"poll_id": m.PollID,
 		}
+		if m.Apple != nil {
+			apple, err := json.Marshal(m.Apple)
+			if err != nil {
+				return nil, err
+			}
+			data["apple"] = string(apple)
+		}
 		apnsConfig = createAPNSAlertConfig(m, data)
 	case model.MessageDeleteEvent, model.MessageClearEvent:
 		data = map[string]string{
@@ -187,6 +194,13 @@ func toFirebaseMessage(m *model.Message, auther user.Auther) (*messaging.Message
 				return nil, err
 			}
 			data["actions"] = string(actions)
+		}
+		if m.Apple != nil {
+			apple, err := json.Marshal(m.Apple)
+			if err != nil {
+				return nil, err
+			}
+			data["apple"] = string(apple)
 		}
 		if m.Attachment != nil {
 			data["attachment_name"] = m.Attachment.Name
@@ -233,26 +247,66 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 	return m
 }
 
+// appleCritical decides whether a message is delivered as an iOS critical alert. An explicit
+// X-Apple-Critical value always wins; without it, max priority messages are critical, so that
+// existing publishers get critical alerts without changes (see
+// https://github.com/binwiederhier/ntfy/issues/1235).
+func appleCritical(m *model.Message) bool {
+	if m.Apple != nil {
+		return m.Apple.Critical
+	}
+	return m.Priority == 5
+}
+
 // createAPNSAlertConfig creates an APNS config for iOS notifications that show up as an alert (only relevant for iOS).
 // We must set the Alert struct ("alert"), and we need to set MutableContent ("mutable-content"), so the Notification Service
 // Extension in iOS can modify the message.
+//
+// For critical alerts (see appleCritical), we set the critical sound and interruption level, which
+// makes iOS break through Focus, Do Not Disturb and the mute switch. This only works if the app
+// has the critical alerts entitlement, and the user has allowed critical alerts for the app.
 func createAPNSAlertConfig(m *model.Message, data map[string]string) *messaging.APNSConfig {
 	apnsData := make(map[string]any)
 	for k, v := range data {
 		apnsData[k] = v
 	}
-	return &messaging.APNSConfig{
-		Payload: &messaging.APNSPayload{
-			CustomData: apnsData,
-			Aps: &messaging.Aps{
-				MutableContent: true,
-				Alert: &messaging.ApsAlert{
-					Title: m.Title,
-					Body:  maybeTruncateAPNSBodyMessage(m.Message),
-				},
-			},
+	aps := &messaging.Aps{
+		MutableContent: true,
+		Alert: &messaging.ApsAlert{
+			Title: m.Title,
+			Body:  maybeTruncateAPNSBodyMessage(m.Message),
 		},
 	}
+	config := &messaging.APNSConfig{
+		Payload: &messaging.APNSPayload{
+			CustomData: apnsData,
+			Aps:        aps,
+		},
+	}
+	if appleCritical(m) {
+		sound, volume := "default", 1.0
+		if m.Apple != nil {
+			if m.Apple.Sound != "" {
+				sound = m.Apple.Sound
+			}
+			if m.Apple.Volume > 0 {
+				volume = m.Apple.Volume
+			}
+		}
+		config.Headers = map[string]string{
+			"apns-push-type": "alert",
+			"apns-priority":  "10",
+		}
+		aps.CriticalSound = &messaging.CriticalSound{
+			Critical: true,
+			Name:     sound,
+			Volume:   volume,
+		}
+		aps.CustomData = map[string]any{
+			"interruption-level": "critical",
+		}
+	}
+	return config
 }
 
 // createAPNSBackgroundConfig creates an APNS config for a silent background message (only relevant for iOS). Apple only
@@ -304,5 +358,6 @@ func toPollRequest(m *model.Message) *model.Message {
 	pr.Priority = m.Priority // Keep priority
 	pr.ContentType = m.ContentType
 	pr.Encoding = m.Encoding
+	pr.Apple = m.Apple // Keep iOS options, so critical alerts work on topics without anonymous read access
 	return pr
 }

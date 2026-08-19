@@ -30,25 +30,26 @@ var (
 
 // Message represents a message published to a topic
 type Message struct {
-	ID          string      `json:"id"`                    // Random message ID
-	SequenceID  string      `json:"sequence_id,omitempty"` // Message sequence ID for updating message contents (omitted if same as ID)
-	Time        int64       `json:"time"`                  // Unix time in seconds
-	Expires     int64       `json:"expires,omitempty"`     // Unix time in seconds (not required for open/keepalive)
-	Event       string      `json:"event"`                 // One of the above
-	Topic       string      `json:"topic"`
-	Title       string      `json:"title,omitempty"`
-	Message     string      `json:"message,omitempty"`
-	Priority    int         `json:"priority,omitempty"`
-	Tags        []string    `json:"tags,omitempty"`
-	Click       string      `json:"click,omitempty"`
-	Icon        string      `json:"icon,omitempty"`
-	Actions     []*Action   `json:"actions,omitempty"`
-	Attachment  *Attachment `json:"attachment,omitempty"`
-	PollID      string      `json:"poll_id,omitempty"`
-	ContentType string      `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
-	Encoding    string      `json:"encoding,omitempty"`     // Empty for raw UTF-8, or "base64" for encoded bytes
-	Sender      netip.Addr  `json:"-"`                      // IP address of uploader, used for rate limiting
-	User        string      `json:"-"`                      // UserID of the uploader, used to associated attachments
+	ID          string        `json:"id"`                    // Random message ID
+	SequenceID  string        `json:"sequence_id,omitempty"` // Message sequence ID for updating message contents (omitted if same as ID)
+	Time        int64         `json:"time"`                  // Unix time in seconds
+	Expires     int64         `json:"expires,omitempty"`     // Unix time in seconds (not required for open/keepalive)
+	Event       string        `json:"event"`                 // One of the above
+	Topic       string        `json:"topic"`
+	Title       string        `json:"title,omitempty"`
+	Message     string        `json:"message,omitempty"`
+	Priority    int           `json:"priority,omitempty"`
+	Tags        []string      `json:"tags,omitempty"`
+	Click       string        `json:"click,omitempty"`
+	Icon        string        `json:"icon,omitempty"`
+	Actions     []*Action     `json:"actions,omitempty"`
+	Attachment  *Attachment   `json:"attachment,omitempty"`
+	PollID      string        `json:"poll_id,omitempty"`
+	ContentType string        `json:"content_type,omitempty"` // text/plain by default (if empty), or text/markdown
+	Encoding    string        `json:"encoding,omitempty"`     // Empty for raw UTF-8, or "base64" for encoded bytes
+	Apple       *AppleOptions `json:"apple,omitempty"`        // iOS-specific delivery options (see X-Apple-* headers), only set if explicitly requested
+	Sender      netip.Addr    `json:"-"`                      // IP address of uploader, used for rate limiting
+	User        string        `json:"-"`                      // UserID of the uploader, used to associated attachments
 }
 
 // Context returns a log context for the message
@@ -88,6 +89,9 @@ func (m *Message) SanitizeUTF8() {
 		m.Attachment.Type = util.SanitizeUTF8(m.Attachment.Type)
 		m.Attachment.URL = util.SanitizeUTF8(m.Attachment.URL)
 	}
+	if m.Apple != nil {
+		m.Apple.Sound = util.SanitizeUTF8(m.Apple.Sound)
+	}
 }
 
 // ForJSON returns a copy of the message suitable for JSON output.
@@ -126,6 +130,18 @@ type Attachment struct {
 	Size    int64  `json:"size,omitempty"`
 	Expires int64  `json:"expires,omitempty"`
 	URL     string `json:"url"`
+}
+
+// AppleOptions represents iOS-specific delivery options, set via the X-Apple-Critical, X-Apple-Sound
+// and X-Apple-Volume headers. If Critical is set, the message is delivered as a critical alert on iOS,
+// breaking through Focus, Do Not Disturb and the mute switch (requires the user to allow critical
+// alerts for the ntfy app). An explicit Critical value (true or false) always overrides the
+// priority-based default (max priority means critical). Sound and Volume are only used if Critical
+// is set.
+type AppleOptions struct {
+	Critical bool    `json:"critical"`
+	Sound    string  `json:"sound,omitempty"`  // Sound name from the app bundle, defaults to "default"
+	Volume   float64 `json:"volume,omitempty"` // Sound volume between 0.0 and 1.0, defaults to 1.0
 }
 
 // Action represents a user-defined action on a message

@@ -6,7 +6,7 @@ import (
 
 // Initial PostgreSQL schema
 const (
-	postgresCurrentSchemaVersion = 15
+	postgresCurrentSchemaVersion = 16
 	postgresCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
@@ -33,6 +33,7 @@ const (
 			user_id TEXT NOT NULL,
 			content_type TEXT NOT NULL,
 			encoding TEXT NOT NULL,
+			apple TEXT NOT NULL,
 			published BOOLEAN NOT NULL DEFAULT FALSE
 		);
 		CREATE INDEX IF NOT EXISTS idx_message_mid ON message (mid);
@@ -56,6 +57,11 @@ const (
 	postgresMigrate14To15CreateIndexQuery = `
 		CREATE INDEX IF NOT EXISTS idx_message_attachment_expires ON message (attachment_expires) WHERE attachment_deleted = FALSE;
 	`
+
+	// 15 -> 16
+	postgresMigrate15To16AlterMessageTableQuery = `
+		ALTER TABLE message ADD COLUMN apple TEXT NOT NULL DEFAULT('');
+	`
 )
 
 var (
@@ -65,5 +71,6 @@ var (
 	// version. Always append migrations at the end, never insert in the middle.
 	postgresMigrations = map[int]schema.MigrateFunc{
 		14: schema.AsMigrateFunc(postgresMigrate14To15CreateIndexQuery),
+		15: schema.AsMigrateFunc(postgresMigrate15To16AlterMessageTableQuery),
 	}
 )

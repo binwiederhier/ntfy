@@ -247,17 +247,6 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 	return m
 }
 
-// appleCritical decides whether a message is delivered as an iOS critical alert. An explicit
-// X-Apple-Critical value always wins; without it, max priority messages are critical, so that
-// existing publishers get critical alerts without changes (see
-// https://github.com/binwiederhier/ntfy/issues/1235).
-func appleCritical(m *model.Message) bool {
-	if m.Apple != nil {
-		return m.Apple.Critical
-	}
-	return m.Priority == 5
-}
-
 // createAPNSAlertConfig creates an APNS config for iOS notifications that show up as an alert (only relevant for iOS).
 // We must set the Alert struct ("alert"), and we need to set MutableContent ("mutable-content"), so the Notification Service
 // Extension in iOS can modify the message.

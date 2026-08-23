@@ -198,6 +198,10 @@ type Config struct {
 	BehindProxy                          bool           // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
 	ProxyForwardedHeader                 string         // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
 	ProxyTrustedPrefixes                 []netip.Prefix // List of trusted proxy networks (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
+	AuthUserHeader                       string         // Header to read the authenticated username from, requires BehindProxy (e.g. Remote-User)
+	AuthUserAutoCreate                   bool           // If true, users named by AuthUserHeader are created on first request
+	AuthGroupsHeader                     string         // Header to read the authenticated user's groups from (e.g. Remote-Groups)
+	AuthAdminGroup                       string         // Group in AuthGroupsHeader that maps to the admin role
 	StripeSecretKey                      string         `hash:"-"`
 	StripeWebhookKey                     string         `hash:"-"`
 	StripePriceCacheDuration             time.Duration
@@ -307,6 +311,10 @@ func NewConfig() *Config {
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address
 		ProxyForwardedHeader:                 "X-Forwarded-For",            // Default header for reverse proxy client IPs
+		AuthUserHeader:                       "",
+		AuthUserAutoCreate:                   false,
+		AuthGroupsHeader:                     "",
+		AuthAdminGroup:                       "",
 		StripeSecretKey:                      "",
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,

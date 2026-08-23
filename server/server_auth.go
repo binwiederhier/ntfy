@@ -32,6 +32,16 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*http.Request, *visitor, er
 	if s.userManager == nil {
 		return r, vip, nil
 	}
+	if s.config.BehindProxy && s.config.AuthUserHeader != "" {
+		u, err := s.authenticateProxyHeader(r)
+		if err != nil {
+			logr(r).Err(err).Debug("Proxy header authentication failed")
+			return r, vip, errHTTPUnauthorized
+		} else if u != nil {
+			return r, s.visitor(ip, u), nil
+		}
+		return r, vip, nil
+	}
 	header, err := readAuthHeader(r)
 	if err != nil {
 		return r, vip, err

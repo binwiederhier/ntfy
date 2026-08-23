@@ -12,6 +12,7 @@ import (
 const (
 	proxyUserPasswordLength = 32
 	proxyUsernameMaxLength  = 64
+	everyoneTopicPattern    = "*"
 )
 
 var errProxyUsernameInvalid = errors.New("invalid username in auth user header")
@@ -64,6 +65,11 @@ func (s *Server) createProxyUser(username string, role user.Role) (*user.User, e
 	password := util.RandomString(proxyUserPasswordLength)
 	if err := s.userManager.AddUser(username, password, role, false); err != nil && !errors.Is(err, user.ErrUserExists) {
 		return nil, err
+	}
+	if s.config.AuthUserAutoCreateAccess != user.PermissionDenyAll {
+		if err := s.userManager.AllowAccess(username, everyoneTopicPattern, s.config.AuthUserAutoCreateAccess); err != nil {
+			return nil, err
+		}
 	}
 	return s.userManager.User(username)
 }

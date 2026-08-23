@@ -109,6 +109,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-trusted-hosts", Aliases: []string{"proxy_trusted_hosts"}, EnvVars: []string{"NTFY_PROXY_TRUSTED_HOSTS"}, Value: "", Usage: "comma-separated list of trusted IP addresses, hosts, or CIDRs to remove from forwarded header"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-user-header", Aliases: []string{"auth_user_header"}, EnvVars: []string{"NTFY_AUTH_USER_HEADER"}, Value: "", Usage: "header set by a trusted reverse proxy to identify the authenticated user (e.g. Remote-User)"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "auth-user-auto-create", Aliases: []string{"auth_user_auto_create"}, EnvVars: []string{"NTFY_AUTH_USER_AUTO_CREATE"}, Value: false, Usage: "if set, create users named by auth-user-header on their first request"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-user-auto-create-access", Aliases: []string{"auth_user_auto_create_access"}, EnvVars: []string{"NTFY_AUTH_USER_AUTO_CREATE_ACCESS"}, Value: "deny-all", Usage: "permissions granted on all topics to users created by auth-user-auto-create"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-groups-header", Aliases: []string{"auth_groups_header"}, EnvVars: []string{"NTFY_AUTH_GROUPS_HEADER"}, Value: "", Usage: "header set by a trusted reverse proxy with the authenticated user's groups (e.g. Remote-Groups)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-admin-group", Aliases: []string{"auth_admin_group"}, EnvVars: []string{"NTFY_AUTH_ADMIN_GROUP"}, Value: "", Usage: "group in auth-groups-header that grants the admin role"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-secret-key", Aliases: []string{"stripe_secret_key"}, EnvVars: []string{"NTFY_STRIPE_SECRET_KEY"}, Value: "", Usage: "key used for the Stripe API communication, this enables payments"}),
@@ -234,6 +235,7 @@ func execServe(c *cli.Context) error {
 	proxyTrustedHosts := util.SplitNoEmpty(c.String("proxy-trusted-hosts"), ",")
 	authUserHeader := c.String("auth-user-header")
 	authUserAutoCreate := c.Bool("auth-user-auto-create")
+	authUserAutoCreateAccess := c.String("auth-user-auto-create-access")
 	authGroupsHeader := c.String("auth-groups-header")
 	authAdminGroup := c.String("auth-admin-group")
 	stripeSecretKey := c.String("stripe-secret-key")
@@ -430,6 +432,10 @@ func execServe(c *cli.Context) error {
 	}
 
 	// Convert default auth permission, read provisioned users
+	authUserAutoCreateDefault, err := user.ParsePermission(authUserAutoCreateAccess)
+	if err != nil {
+		return errors.New("if set, auth-user-auto-create-access must be 'read-write', 'read-only', 'write-only' or 'deny-all'")
+	}
 	authDefault, err := user.ParsePermission(authDefaultAccess)
 	if err != nil {
 		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
@@ -563,6 +569,7 @@ func execServe(c *cli.Context) error {
 	conf.ProxyTrustedPrefixes = trustedProxyPrefixes
 	conf.AuthUserHeader = authUserHeader
 	conf.AuthUserAutoCreate = authUserAutoCreate
+	conf.AuthUserAutoCreateAccess = authUserAutoCreateDefault
 	conf.AuthGroupsHeader = authGroupsHeader
 	conf.AuthAdminGroup = authAdminGroup
 	conf.StripeSecretKey = stripeSecretKey

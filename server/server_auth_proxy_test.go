@@ -163,3 +163,36 @@ func TestServer_ProxyAuth_DeletedUserRejected(t *testing.T) {
 	})
 	require.Equal(t, 401, rr.Code)
 }
+
+func TestServer_ProxyAuth_AutoCreatedUserGetsConfiguredAccess(t *testing.T) {
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.BehindProxy = true
+	conf.AuthUserHeader = "Remote-User"
+	conf.AuthUserAutoCreate = true
+	conf.AuthUserAutoCreateAccess = user.PermissionReadWrite
+	conf.AuthDefault = user.PermissionDenyAll
+	s := newTestServer(t, conf)
+
+	rr := request(t, s, "PUT", "/mytopic", "hi", map[string]string{
+		"Remote-User": "phil",
+	})
+	require.Equal(t, 200, rr.Code)
+
+	rr = request(t, s, "GET", "/mytopic/json?poll=1", "", map[string]string{
+		"Remote-User": "phil",
+	})
+	require.Equal(t, 200, rr.Code)
+	require.Contains(t, rr.Body.String(), "hi")
+
+	rr = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 403, rr.Code)
+}
+
+func TestServer_ProxyAuth_AutoCreatedUserDeniedWithoutConfiguredAccess(t *testing.T) {
+	s := newProxyAuthTestServer(t, true, "", "")
+
+	rr := request(t, s, "PUT", "/mytopic", "hi", map[string]string{
+		"Remote-User": "phil",
+	})
+	require.Equal(t, 403, rr.Code)
+}

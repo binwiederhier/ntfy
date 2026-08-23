@@ -191,19 +191,20 @@ type Config struct {
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
-	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
-	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
-	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
-	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
-	BehindProxy                          bool           // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
-	ProxyForwardedHeader                 string         // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
-	ProxyTrustedPrefixes                 []netip.Prefix // List of trusted proxy networks (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
-	AuthUserHeader                       string         // Header to read the authenticated username from, requires BehindProxy (e.g. Remote-User)
-	AuthUserAutoCreate                   bool           // If true, users named by AuthUserHeader are created on first request
-	AuthGroupsHeader                     string         // Header to read the authenticated user's groups from (e.g. Remote-Groups)
-	AuthAdminGroup                       string         // Group in AuthGroupsHeader that maps to the admin role
-	StripeSecretKey                      string         `hash:"-"`
-	StripeWebhookKey                     string         `hash:"-"`
+	VisitorStatsResetTime                time.Time       // Time of the day at which to reset visitor stats
+	VisitorSubscriberRateLimiting        bool            // Enable subscriber-based rate limiting for UnifiedPush topics
+	VisitorPrefixBitsIPv4                int             // Number of bits for IPv4 rate limiting (default: 32)
+	VisitorPrefixBitsIPv6                int             // Number of bits for IPv6 rate limiting (default: 64)
+	BehindProxy                          bool            // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
+	ProxyForwardedHeader                 string          // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
+	ProxyTrustedPrefixes                 []netip.Prefix  // List of trusted proxy networks (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
+	AuthUserHeader                       string          // Header to read the authenticated username from, requires BehindProxy (e.g. Remote-User)
+	AuthUserAutoCreate                   bool            // If true, users named by AuthUserHeader are created on first request
+	AuthUserAutoCreateAccess             user.Permission // Access granted on all topics to users created from AuthUserHeader
+	AuthGroupsHeader                     string          // Header to read the authenticated user's groups from (e.g. Remote-Groups)
+	AuthAdminGroup                       string          // Group in AuthGroupsHeader that maps to the admin role
+	StripeSecretKey                      string          `hash:"-"`
+	StripeWebhookKey                     string          `hash:"-"`
 	StripePriceCacheDuration             time.Duration
 	BillingContact                       string
 	EnableSignup                         bool // Enable creation of accounts via API and UI
@@ -313,6 +314,7 @@ func NewConfig() *Config {
 		ProxyForwardedHeader:                 "X-Forwarded-For",            // Default header for reverse proxy client IPs
 		AuthUserHeader:                       "",
 		AuthUserAutoCreate:                   false,
+		AuthUserAutoCreateAccess:             user.PermissionDenyAll,
 		AuthGroupsHeader:                     "",
 		AuthAdminGroup:                       "",
 		StripeSecretKey:                      "",

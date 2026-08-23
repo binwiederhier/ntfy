@@ -170,6 +170,7 @@
 #
 # auth-user-header: "Remote-User"
 # auth-user-auto-create: false
+# auth-user-auto-create-access: "deny-all"
 # auth-groups-header: "Remote-Groups"
 # auth-admin-group:
 

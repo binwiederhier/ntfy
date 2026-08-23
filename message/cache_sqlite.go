@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	_ "modernc.org/sqlite" // SQLite driver
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
 	"heckel.io/ntfy/v2/util"
@@ -110,7 +110,7 @@ func NewSQLiteStore(filename, startupQueries string, cacheDuration time.Duration
 	if !util.FileExists(parentDir) {
 		return nil, fmt.Errorf("cache database directory %s does not exist or is not accessible", parentDir)
 	}
-	d, err := sql.Open("sqlite3", filename)
+	d, err := sql.Open("sqlite", filename)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func NewNopStore() (*Cache, error) {
 }
 
 // createMemoryFilename creates a unique memory filename to use for the SQLite backend.
-// From mattn/go-sqlite3: "Each connection to ":memory:" opens a brand new in-memory
+// SQLite: "Each connection to ":memory:" opens a brand new in-memory
 // sql database, so if the stdlib's sql engine happens to open another connection and
 // you've only specified ":memory:", that connection will see a brand new database.
 // A workaround is to use "file::memory:?cache=shared" (or "file:foobar?mode=memory&cache=shared").

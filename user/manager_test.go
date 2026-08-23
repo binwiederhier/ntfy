@@ -1646,7 +1646,7 @@ const testPostgresV6Schema = `
 
 func TestMigrationFrom1(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "user.db")
-	db, err := sql.Open("sqlite3", filename)
+	db, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 
 	// Create "version 1" schema
@@ -1733,7 +1733,7 @@ func TestMigrationFrom1(t *testing.T) {
 
 func TestMigrationFrom4(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "user.db")
-	db, err := sql.Open("sqlite3", filename)
+	db, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 
 	// Create "version 4" schema
@@ -1929,10 +1929,10 @@ func checkMigratedSqliteSchema(t *testing.T, filename string) {
 	freshFile := filepath.Join(t.TempDir(), "fresh.db")
 	fresh := newTestManagerFromFile(t, freshFile, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
 	defer fresh.Close()
-	freshDB, err := sql.Open("sqlite3", freshFile)
+	freshDB, err := sql.Open("sqlite", freshFile)
 	require.Nil(t, err)
 	defer freshDB.Close()
-	migratedDB, err := sql.Open("sqlite3", filename)
+	migratedDB, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 	defer migratedDB.Close()
 	require.Equal(t, dbtest.SQLiteSchema(t, freshDB), dbtest.SQLiteSchema(t, migratedDB))
@@ -3495,7 +3495,7 @@ func TestManager_Emails_PrimaryFlagAndHelpers(t *testing.T) {
 
 // openReplicaTestSQLite opens a fresh SQLite database file with the user schema applied.
 func openReplicaTestSQLite(t *testing.T, filename string) *sql.DB {
-	d, err := sql.Open("sqlite3", filename+"?_case_sensitive_like=on")
+	d, err := sql.Open("sqlite", filename+"?_pragma=case_sensitive_like(1)")
 	require.Nil(t, err)
 	require.Nil(t, schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations))
 	return d

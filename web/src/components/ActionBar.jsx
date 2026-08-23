@@ -71,6 +71,7 @@ const ActionBar = (props) => {
         }}
       >
         <IconButton
+          data-testid="nav-mobile-toggle"
           color="inherit"
           edge="start"
           aria-label={t("action_bar_show_menu")}

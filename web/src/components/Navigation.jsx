@@ -149,7 +149,7 @@ const NavList = (props) => {
         {showNotificationIOSInstallRequired && <NotificationIOSInstallRequiredAlert />}
         {alertVisible && <Divider />}
         {!showSubscriptionsList && (
-          <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
+          <ListItemButton data-testid="nav-all" onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
             <ListItemIcon>
               <ChatBubble />
             </ListItemIcon>
@@ -159,7 +159,7 @@ const NavList = (props) => {
         {showSubscriptionsList && (
           <>
             <ListSubheader>{t("nav_topics_title")}</ListSubheader>
-            <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
+            <ListItemButton data-testid="nav-all" onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
               <ListItemIcon>
                 <ChatBubble />
               </ListItemIcon>
@@ -170,14 +170,14 @@ const NavList = (props) => {
           </>
         )}
         {session.exists() && (
-          <ListItemButton onClick={handleAccountClick} selected={location.pathname === routes.account}>
+          <ListItemButton data-testid="nav-account" onClick={handleAccountClick} selected={location.pathname === routes.account}>
             <ListItemIcon>
               <Person />
             </ListItemIcon>
             <ListItemText primary={t("nav_button_account")} />
           </ListItemButton>
         )}
-        <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
+        <ListItemButton data-testid="nav-settings" onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
           <ListItemIcon>
             <SettingsIcon />
           </ListItemIcon>
@@ -189,13 +189,13 @@ const NavList = (props) => {
           </ListItemIcon>
           <ListItemText primary={t("nav_button_documentation")} />
         </ListItemButton>
-        <ListItemButton onClick={() => props.onPublishMessageClick()}>
+        <ListItemButton data-testid="nav-publish" onClick={() => props.onPublishMessageClick()}>
           <ListItemIcon>
             <Send />
           </ListItemIcon>
           <ListItemText primary={t("nav_button_publish_message")} />
         </ListItemButton>
-        <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
+        <ListItemButton data-testid="nav-subscribe" onClick={() => setSubscribeDialogOpen(true)}>
           <ListItemIcon>
             <AddIcon />
           </ListItemIcon>

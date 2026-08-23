@@ -57,6 +57,7 @@ const Navigation = (props) => {
     <Box component="nav" role="navigation" sx={{ width: { sm: Navigation.width }, flexShrink: { sm: 0 } }}>
       {/* Mobile drawer; only shown if menu icon clicked (mobile open) and display is small */}
       <Drawer
+        data-testid="nav-drawer-mobile"
         variant="temporary"
         role="menubar"
         open={props.mobileDrawerOpen}
@@ -71,6 +72,7 @@ const Navigation = (props) => {
       </Drawer>
       {/* Big screen drawer; persistent, shown if screen is big */}
       <Drawer
+        data-testid="nav-drawer-desktop"
         open
         variant="permanent"
         role="menubar"

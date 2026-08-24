@@ -138,10 +138,10 @@ func TestServer_WebPush_EndpointRegex(t *testing.T) {
 		"https://notify.windows.com/w/?token=abc",
 	}
 	for _, endpoint := range allowed {
-		require.Truef(t, webPushEndpointAllowed(endpoint), "expected endpoint to be allowed: %s", endpoint)
+		require.Truef(t, webPushEndpointAllowed(endpoint, nil), "expected endpoint to be allowed: %s", endpoint)
 	}
 	for _, endpoint := range denied {
-		require.Falsef(t, webPushEndpointAllowed(endpoint), "expected endpoint to be denied: %s", endpoint)
+		require.Falsef(t, webPushEndpointAllowed(endpoint, nil), "expected endpoint to be denied: %s", endpoint)
 	}
 }
 
@@ -389,4 +389,12 @@ func newTestConfigWithWebPush(t *testing.T, databaseURL string) *Config {
 	conf.WebPushPrivateKey = privateKey
 	conf.WebPushPublicKey = publicKey
 	return conf
+}
+
+func TestWebPushEndpointAllowedExtraPrefixes(t *testing.T) {
+	endpoint := "http://push.example.com:8090/push/abc"
+	require.False(t, webPushEndpointAllowed(endpoint, nil))
+	require.True(t, webPushEndpointAllowed(endpoint, []string{"http://push.example.com:8090/"}))
+	require.False(t, webPushEndpointAllowed(endpoint, []string{""}))
+	require.False(t, webPushEndpointAllowed("http://evil.example.com/push", []string{"http://push.example.com:8090/"}))
 }

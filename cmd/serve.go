@@ -111,6 +111,7 @@ var flagsServe = append(
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "auth-user-auto-create", Aliases: []string{"auth_user_auto_create"}, EnvVars: []string{"NTFY_AUTH_USER_AUTO_CREATE"}, Value: false, Usage: "if set, create users named by auth-user-header on their first request"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-user-auto-create-access", Aliases: []string{"auth_user_auto_create_access"}, EnvVars: []string{"NTFY_AUTH_USER_AUTO_CREATE_ACCESS"}, Value: "deny-all", Usage: "permissions granted on all topics to users created by auth-user-auto-create"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-groups-header", Aliases: []string{"auth_groups_header"}, EnvVars: []string{"NTFY_AUTH_GROUPS_HEADER"}, Value: "", Usage: "header set by a trusted reverse proxy with the authenticated user's groups (e.g. Remote-Groups)"}),
+	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "web-push-allowed-endpoints", Aliases: []string{"web_push_allowed_endpoints"}, EnvVars: []string{"NTFY_WEB_PUSH_ALLOWED_ENDPOINTS"}, Usage: "additional web push endpoint URL prefixes to deliver to, on top of the well-known services"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-logout-url", Aliases: []string{"auth_logout_url"}, EnvVars: []string{"NTFY_AUTH_LOGOUT_URL"}, Value: "", Usage: "URL the web app sends the user to when logging out, for proxy authentication"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-admin-group", Aliases: []string{"auth_admin_group"}, EnvVars: []string{"NTFY_AUTH_ADMIN_GROUP"}, Value: "", Usage: "group in auth-groups-header that grants the admin role"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-secret-key", Aliases: []string{"stripe_secret_key"}, EnvVars: []string{"NTFY_STRIPE_SECRET_KEY"}, Value: "", Usage: "key used for the Stripe API communication, this enables payments"}),
@@ -240,6 +241,7 @@ func execServe(c *cli.Context) error {
 	authGroupsHeader := c.String("auth-groups-header")
 	authAdminGroup := c.String("auth-admin-group")
 	authLogoutURL := c.String("auth-logout-url")
+	webPushAllowedEndpoints := c.StringSlice("web-push-allowed-endpoints")
 	stripeSecretKey := c.String("stripe-secret-key")
 	stripeWebhookKey := c.String("stripe-webhook-key")
 	billingContact := c.String("billing-contact")
@@ -575,6 +577,7 @@ func execServe(c *cli.Context) error {
 	conf.AuthGroupsHeader = authGroupsHeader
 	conf.AuthAdminGroup = authAdminGroup
 	conf.AuthLogoutURL = authLogoutURL
+	conf.WebPushAllowedEndpoints = webPushAllowedEndpoints
 	conf.StripeSecretKey = stripeSecretKey
 	conf.StripeWebhookKey = stripeWebhookKey
 	conf.BillingContact = billingContact

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/v2/log"
@@ -38,9 +39,19 @@ var webPushAllowedEndpointsRegexes = []*regexp.Regexp{
 	regexp.MustCompile(`^https://[^/]+\.notify\.windows\.com/`),
 }
 
-func webPushEndpointAllowed(endpoint string) bool {
+// webPushEndpointAllowed reports whether ntfy will deliver to the endpoint. Extra prefixes come
+// from web-push-allowed-endpoints and are matched literally rather than as patterns, so that a
+// careless entry cannot widen the allow-list beyond one origin. They exist for deployments whose
+// browsers are pointed at a self-hosted push service, and for testing; the default is empty and
+// only the well-known services above are accepted. See GHSA-w9hq-5jg7-q4j7.
+func webPushEndpointAllowed(endpoint string, extraPrefixes []string) bool {
 	for _, re := range webPushAllowedEndpointsRegexes {
 		if re.MatchString(endpoint) {
+			return true
+		}
+	}
+	for _, prefix := range extraPrefixes {
+		if prefix != "" && strings.HasPrefix(endpoint, prefix) {
 			return true
 		}
 	}
@@ -51,7 +62,7 @@ func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *
 	req, err := readJSONWithLimit[apiWebPushUpdateSubscriptionRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil || req.Endpoint == "" || req.P256dh == "" || req.Auth == "" {
 		return errHTTPBadRequestWebPushSubscriptionInvalid
-	} else if !webPushEndpointAllowed(req.Endpoint) {
+	} else if !webPushEndpointAllowed(req.Endpoint, s.config.WebPushAllowedEndpoints) {
 		return errHTTPBadRequestWebPushEndpointUnknown
 	} else if len(req.Topics) > webPushTopicSubscribeLimit {
 		return errHTTPBadRequestWebPushTopicCountTooHigh

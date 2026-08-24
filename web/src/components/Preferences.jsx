@@ -354,9 +354,13 @@ const WebPushEnabled = () => {
       description={enabled ? t("prefs_notifications_web_push_enabled_description") : t("prefs_notifications_web_push_disabled_description")}
     >
       <FormControl fullWidth variant="standard" sx={{ m: 1 }}>
-        <Select value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
-          <MenuItem value>{t("prefs_notifications_web_push_enabled", { server: shortUrl(config.base_url) })}</MenuItem>
-          <MenuItem value={false}>{t("prefs_notifications_web_push_disabled")}</MenuItem>
+        <Select data-testid="pref-web-push" value={enabled ?? false} onChange={handleChange} aria-labelledby={labelId}>
+          <MenuItem data-testid="pref-web-push-enabled" value>
+            {t("prefs_notifications_web_push_enabled", { server: shortUrl(config.base_url) })}
+          </MenuItem>
+          <MenuItem data-testid="pref-web-push-disabled" value={false}>
+            {t("prefs_notifications_web_push_disabled")}
+          </MenuItem>
         </Select>
       </FormControl>
     </Pref>

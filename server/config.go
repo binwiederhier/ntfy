@@ -218,7 +218,6 @@ type Config struct {
 	WebPushPublicKey                     string
 	WebPushFile                          string
 	WebPushEmailAddress                  string
-	WebPushAllowedEndpoints              []string
 	WebPushStartupQueries                string
 	WebPushExpiryDuration                time.Duration
 	WebPushExpiryWarningDuration         time.Duration

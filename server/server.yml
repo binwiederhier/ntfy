@@ -167,12 +167,15 @@
 # - auth-groups-header and auth-admin-group map a group membership to the ntfy admin role. When both
 #   are set, the role is re-synced from the header on every request, so removing a user from the admin
 #   group in the identity provider demotes them in ntfy as well.
+# - auth-logout-url, if set, adds a logout entry to the web app's navigation pointing at it. The
+#   proxy owns the session, so ntfy cannot end it itself.
 #
 # auth-user-header: "Remote-User"
 # auth-user-auto-create: false
 # auth-user-auto-create-access: "deny-all"
 # auth-groups-header: "Remote-Groups"
 # auth-admin-group:
+# auth-logout-url:
 
 # If enabled, clients can attach files to notifications as attachments. Minimum settings to enable attachments
 # are "attachment-cache-dir" and "base-url".

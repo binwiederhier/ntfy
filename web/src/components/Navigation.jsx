@@ -25,6 +25,7 @@ import { useContext, useState } from "react";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import Person from "@mui/icons-material/Person";
 import SettingsIcon from "@mui/icons-material/Settings";
+import Logout from "@mui/icons-material/Logout";
 import AddIcon from "@mui/icons-material/Add";
 import { useLocation, useNavigate } from "react-router-dom";
 import ChatBubble from "@mui/icons-material/ChatBubble";
@@ -185,6 +186,19 @@ const NavList = (props) => {
           </ListItemIcon>
           <ListItemText primary={t("nav_button_settings")} />
         </ListItemButton>
+        {config.auth_logout_url && (
+          <ListItemButton
+            data-testid="nav-logout"
+            onClick={() => {
+              window.location.href = config.auth_logout_url;
+            }}
+          >
+            <ListItemIcon>
+              <Logout />
+            </ListItemIcon>
+            <ListItemText primary={t("action_bar_profile_logout")} />
+          </ListItemButton>
+        )}
         <ListItemButton onClick={() => openUrl("/docs")}>
           <ListItemIcon>
             <ArticleIcon />

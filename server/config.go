@@ -203,6 +203,7 @@ type Config struct {
 	AuthUserAutoCreateAccess             user.Permission // Access granted on all topics to users created from AuthUserHeader
 	AuthGroupsHeader                     string          // Header to read the authenticated user's groups from (e.g. Remote-Groups)
 	AuthAdminGroup                       string          // Group in AuthGroupsHeader that maps to the admin role
+	AuthLogoutURL                        string          // URL to send the user to when logging out, if authentication is delegated to a proxy
 	StripeSecretKey                      string          `hash:"-"`
 	StripeWebhookKey                     string          `hash:"-"`
 	StripePriceCacheDuration             time.Duration
@@ -317,6 +318,7 @@ func NewConfig() *Config {
 		AuthUserAutoCreateAccess:             user.PermissionDenyAll,
 		AuthGroupsHeader:                     "",
 		AuthAdminGroup:                       "",
+		AuthLogoutURL:                        "",
 		StripeSecretKey:                      "",
 		StripeWebhookKey:                     "",
 		StripePriceCacheDuration:             DefaultStripePriceCacheDuration,

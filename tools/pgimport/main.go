@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"gopkg.in/yaml.v2"
@@ -465,7 +465,7 @@ func openSQLite(filename string) (*sql.DB, error) {
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return nil, fmt.Errorf("file %s does not exist", filename)
 	}
-	return sql.Open("sqlite3", filename+"?mode=ro")
+	return sql.Open("sqlite", filename+"?mode=ro")
 }
 
 // User import

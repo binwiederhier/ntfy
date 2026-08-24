@@ -90,5 +90,6 @@ func (s *Server) configResponse() *apiConfigResponse {
 		WebPushPublicKey:    s.config.WebPushPublicKey,
 		DisallowedTopics:    s.config.DisallowedTopics,
 		ConfigHash:          s.config.Hash(),
+		AuthLogoutURL:       s.config.AuthLogoutURL,
 	}
 }

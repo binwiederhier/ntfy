@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	_ "modernc.org/sqlite" // SQLite driver
 	"github.com/stretchr/testify/require"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/message"
@@ -16,7 +16,7 @@ import (
 
 func TestSqliteStore_Migration_From1(t *testing.T) {
 	filename := newSqliteTestStoreFile(t)
-	db, err := sql.Open("sqlite3", filename)
+	db, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 
 	// Create "version 1" schema
@@ -56,10 +56,10 @@ func TestSqliteStore_Migration_From1(t *testing.T) {
 	fresh, err := message.NewSQLiteStore(freshFile, "", time.Hour, 0, 0, false)
 	require.Nil(t, err)
 	t.Cleanup(func() { fresh.Close() })
-	freshDB, err := sql.Open("sqlite3", freshFile)
+	freshDB, err := sql.Open("sqlite", freshFile)
 	require.Nil(t, err)
 	defer freshDB.Close()
-	migratedDB, err := sql.Open("sqlite3", filename)
+	migratedDB, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 	defer migratedDB.Close()
 	require.Equal(t, dbtest.SQLiteSchema(t, freshDB), dbtest.SQLiteSchema(t, migratedDB))
@@ -80,7 +80,7 @@ func TestSqliteStore_Migration_From1(t *testing.T) {
 	require.Equal(t, 11, len(messages))
 
 	// Check that index "idx_topic" exists
-	verifyDB, err := sql.Open("sqlite3", filename)
+	verifyDB, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 	defer verifyDB.Close()
 	rows, err := verifyDB.Query(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_topic'`)
@@ -97,7 +97,7 @@ func TestSqliteStore_Migration_From9(t *testing.T) {
 	// The migration logic has to update the column, using the existing "cache-duration" value.
 
 	filename := newSqliteTestStoreFile(t)
-	db, err := sql.Open("sqlite3", filename)
+	db, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 
 	// Create "version 9" schema
@@ -175,7 +175,7 @@ func TestSqliteStore_Migration_From9(t *testing.T) {
 	checkSqliteSchemaVersion(t, filename)
 
 	// Check version
-	verifyDB, err := sql.Open("sqlite3", filename)
+	verifyDB, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 	defer verifyDB.Close()
 	rows, err := verifyDB.Query(`SELECT version FROM schemaVersion WHERE id = 1`)
@@ -253,7 +253,7 @@ func newSqliteTestStoreFromFile(t *testing.T, filename, startupQueries string) *
 }
 
 func checkSqliteSchemaVersion(t *testing.T, filename string) {
-	db, err := sql.Open("sqlite3", filename)
+	db, err := sql.Open("sqlite", filename)
 	require.Nil(t, err)
 	defer db.Close()
 	rows, err := db.Query(`SELECT version FROM schemaVersion`)

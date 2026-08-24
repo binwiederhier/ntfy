@@ -107,6 +107,12 @@ var flagsServe = append(
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "behind-proxy", Aliases: []string{"behind_proxy", "P"}, EnvVars: []string{"NTFY_BEHIND_PROXY"}, Value: false, Usage: "if set, use forwarded header (e.g. X-Forwarded-For, X-Client-IP) to determine visitor IP address (for rate limiting)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-forwarded-header", Aliases: []string{"proxy_forwarded_header"}, EnvVars: []string{"NTFY_PROXY_FORWARDED_HEADER"}, Value: "X-Forwarded-For", Usage: "use specified header to determine visitor IP address (for rate limiting)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "proxy-trusted-hosts", Aliases: []string{"proxy_trusted_hosts"}, EnvVars: []string{"NTFY_PROXY_TRUSTED_HOSTS"}, Value: "", Usage: "comma-separated list of trusted IP addresses, hosts, or CIDRs to remove from forwarded header"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-user-header", Aliases: []string{"auth_user_header"}, EnvVars: []string{"NTFY_AUTH_USER_HEADER"}, Value: "", Usage: "header set by a trusted reverse proxy to identify the authenticated user (e.g. Remote-User)"}),
+	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "auth-user-auto-create", Aliases: []string{"auth_user_auto_create"}, EnvVars: []string{"NTFY_AUTH_USER_AUTO_CREATE"}, Value: false, Usage: "if set, create users named by auth-user-header on their first request"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-user-auto-create-access", Aliases: []string{"auth_user_auto_create_access"}, EnvVars: []string{"NTFY_AUTH_USER_AUTO_CREATE_ACCESS"}, Value: "deny-all", Usage: "permissions granted on all topics to users created by auth-user-auto-create"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-groups-header", Aliases: []string{"auth_groups_header"}, EnvVars: []string{"NTFY_AUTH_GROUPS_HEADER"}, Value: "", Usage: "header set by a trusted reverse proxy with the authenticated user's groups (e.g. Remote-Groups)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-logout-url", Aliases: []string{"auth_logout_url"}, EnvVars: []string{"NTFY_AUTH_LOGOUT_URL"}, Value: "", Usage: "URL the web app sends the user to when logging out, for proxy authentication"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-admin-group", Aliases: []string{"auth_admin_group"}, EnvVars: []string{"NTFY_AUTH_ADMIN_GROUP"}, Value: "", Usage: "group in auth-groups-header that grants the admin role"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-secret-key", Aliases: []string{"stripe_secret_key"}, EnvVars: []string{"NTFY_STRIPE_SECRET_KEY"}, Value: "", Usage: "key used for the Stripe API communication, this enables payments"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "stripe-webhook-key", Aliases: []string{"stripe_webhook_key"}, EnvVars: []string{"NTFY_STRIPE_WEBHOOK_KEY"}, Value: "", Usage: "key required to validate the authenticity of incoming webhooks from Stripe"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "billing-contact", Aliases: []string{"billing_contact"}, EnvVars: []string{"NTFY_BILLING_CONTACT"}, Value: "", Usage: "e-mail or website to display in upgrade dialog (only if payments are enabled)"}),
@@ -228,6 +234,12 @@ func execServe(c *cli.Context) error {
 	behindProxy := c.Bool("behind-proxy")
 	proxyForwardedHeader := c.String("proxy-forwarded-header")
 	proxyTrustedHosts := util.SplitNoEmpty(c.String("proxy-trusted-hosts"), ",")
+	authUserHeader := c.String("auth-user-header")
+	authUserAutoCreate := c.Bool("auth-user-auto-create")
+	authUserAutoCreateAccess := c.String("auth-user-auto-create-access")
+	authGroupsHeader := c.String("auth-groups-header")
+	authAdminGroup := c.String("auth-admin-group")
+	authLogoutURL := c.String("auth-logout-url")
 	stripeSecretKey := c.String("stripe-secret-key")
 	stripeWebhookKey := c.String("stripe-webhook-key")
 	billingContact := c.String("billing-contact")
@@ -388,6 +400,12 @@ func execServe(c *cli.Context) error {
 		return errors.New("web push expiry warning duration cannot be higher than web push expiry duration")
 	} else if behindProxy && proxyForwardedHeader == "" {
 		return errors.New("if behind-proxy is set, proxy-forwarded-header must also be set")
+	} else if authUserHeader != "" && (!behindProxy || (authFile == "" && databaseURL == "")) {
+		return errors.New("if auth-user-header is set, behind-proxy and auth-file (or database-url) must also be set")
+	} else if authUserHeader == "" && (authUserAutoCreate || authGroupsHeader != "" || authAdminGroup != "") {
+		return errors.New("if auth-user-auto-create, auth-groups-header or auth-admin-group is set, auth-user-header must also be set")
+	} else if (authGroupsHeader == "") != (authAdminGroup == "") {
+		return errors.New("if auth-groups-header is set, auth-admin-group must also be set, and vice versa")
 	} else if visitorPrefixBitsIPv4 < 1 || visitorPrefixBitsIPv4 > 32 {
 		return errors.New("visitor-prefix-bits-ipv4 must be between 1 and 32")
 	} else if visitorPrefixBitsIPv6 < 1 || visitorPrefixBitsIPv6 > 128 {
@@ -416,6 +434,10 @@ func execServe(c *cli.Context) error {
 	}
 
 	// Convert default auth permission, read provisioned users
+	authUserAutoCreateDefault, err := user.ParsePermission(authUserAutoCreateAccess)
+	if err != nil {
+		return errors.New("if set, auth-user-auto-create-access must be 'read-write', 'read-only', 'write-only' or 'deny-all'")
+	}
 	authDefault, err := user.ParsePermission(authDefaultAccess)
 	if err != nil {
 		return errors.New("if set, auth-default-access must start set to 'read-write', 'read-only', 'write-only' or 'deny-all'")
@@ -547,6 +569,12 @@ func execServe(c *cli.Context) error {
 	conf.BehindProxy = behindProxy
 	conf.ProxyForwardedHeader = proxyForwardedHeader
 	conf.ProxyTrustedPrefixes = trustedProxyPrefixes
+	conf.AuthUserHeader = authUserHeader
+	conf.AuthUserAutoCreate = authUserAutoCreate
+	conf.AuthUserAutoCreateAccess = authUserAutoCreateDefault
+	conf.AuthGroupsHeader = authGroupsHeader
+	conf.AuthAdminGroup = authAdminGroup
+	conf.AuthLogoutURL = authLogoutURL
 	conf.StripeSecretKey = stripeSecretKey
 	conf.StripeWebhookKey = stripeWebhookKey
 	conf.BillingContact = billingContact

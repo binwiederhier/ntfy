@@ -64,7 +64,7 @@ const SubscribeDialog = (props) => {
   };
 
   return (
-    <Dialog open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
+    <Dialog data-testid="subscribe-dialog" open={props.open} onClose={props.onCancel} fullScreen={fullScreen}>
       {!showLoginPage && (
         <SubscribePage
           baseUrl={baseUrl}
@@ -183,6 +183,7 @@ const SubscribePage = (props) => {
               htmlInput: {
                 maxLength: 64,
                 "aria-label": t("subscribe_dialog_subscribe_topic_placeholder"),
+                "data-testid": "subscribe-topic",
               },
             }}
           />
@@ -265,7 +266,7 @@ const SubscribePage = (props) => {
       </DialogContent>
       <DialogFooter status={error}>
         <Button onClick={props.onCancel}>{t("subscribe_dialog_subscribe_button_cancel")}</Button>
-        <Button onClick={handleSubscribe} disabled={!subscribeButtonEnabled}>
+        <Button data-testid="subscribe-submit" onClick={handleSubscribe} disabled={!subscribeButtonEnabled}>
           {t("subscribe_dialog_subscribe_button_subscribe")}
         </Button>
       </DialogFooter>

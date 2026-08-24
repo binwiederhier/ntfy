@@ -292,7 +292,7 @@ const PublishDialog = (props) => {
   return (
     <>
       {dropZone && <DropArea onDrop={handleAttachFileDrop} onDragLeave={handleAttachFileDragLeave} />}
-      <Dialog maxWidth="md" open={open} onClose={props.onClose} fullScreen={fullScreen}>
+      <Dialog data-testid="publish-dialog" maxWidth="md" open={open} onClose={props.onClose} fullScreen={fullScreen}>
         <DialogTitle>
           {baseUrl && topic
             ? t("publish_dialog_title_topic", {

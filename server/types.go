@@ -366,6 +366,7 @@ type apiConfigResponse struct {
 	WebPushPublicKey    string   `json:"web_push_public_key"`
 	DisallowedTopics    []string `json:"disallowed_topics"`
 	ConfigHash          string   `json:"config_hash"`
+	AuthLogoutURL       string   `json:"auth_logout_url,omitempty"`
 }
 
 type apiAccountBillingPrices struct {

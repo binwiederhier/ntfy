@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	_ "modernc.org/sqlite" // SQLite driver
 
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
@@ -355,7 +355,7 @@ func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager
 	// request for "SECRET", which is a security issue. PostgreSQL's LIKE is
 	// already case-sensitive, so this only affects SQLite. The pragma is
 	// applied to every pooled connection by the driver.
-	d, err := sql.Open("sqlite3", fmt.Sprintf("%s?_case_sensitive_like=on", filename))
+	d, err := sql.Open("sqlite", fmt.Sprintf("%s?_pragma=case_sensitive_like(1)", filename))
 	if err != nil {
 		return nil, err
 	}

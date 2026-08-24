@@ -11,7 +11,7 @@ import (
 	"heckel.io/ntfy/v2/db/schema"
 	dbtest "heckel.io/ntfy/v2/db/test"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 const testCreateQuery = `CREATE TABLE IF NOT EXISTS things (id TEXT PRIMARY KEY, name TEXT NOT NULL)`
@@ -31,7 +31,7 @@ func openTestPostgres(t *testing.T) *sql.DB {
 
 func openTestSQLite(t *testing.T) *sql.DB {
 	t.Helper()
-	d, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
+	d, err := sql.Open("sqlite", filepath.Join(t.TempDir(), "test.db"))
 	require.Nil(t, err)
 	t.Cleanup(func() { d.Close() })
 	return d

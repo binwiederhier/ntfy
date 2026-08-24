@@ -25,6 +25,7 @@ import { useContext, useState } from "react";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
 import Person from "@mui/icons-material/Person";
 import SettingsIcon from "@mui/icons-material/Settings";
+import Logout from "@mui/icons-material/Logout";
 import AddIcon from "@mui/icons-material/Add";
 import { useLocation, useNavigate } from "react-router-dom";
 import ChatBubble from "@mui/icons-material/ChatBubble";
@@ -57,6 +58,7 @@ const Navigation = (props) => {
     <Box component="nav" role="navigation" sx={{ width: { sm: Navigation.width }, flexShrink: { sm: 0 } }}>
       {/* Mobile drawer; only shown if menu icon clicked (mobile open) and display is small */}
       <Drawer
+        data-testid="nav-drawer-mobile"
         variant="temporary"
         role="menubar"
         open={props.mobileDrawerOpen}
@@ -71,6 +73,7 @@ const Navigation = (props) => {
       </Drawer>
       {/* Big screen drawer; persistent, shown if screen is big */}
       <Drawer
+        data-testid="nav-drawer-desktop"
         open
         variant="permanent"
         role="menubar"
@@ -149,7 +152,7 @@ const NavList = (props) => {
         {showNotificationIOSInstallRequired && <NotificationIOSInstallRequiredAlert />}
         {alertVisible && <Divider />}
         {!showSubscriptionsList && (
-          <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
+          <ListItemButton data-testid="nav-all" onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
             <ListItemIcon>
               <ChatBubble />
             </ListItemIcon>
@@ -159,7 +162,7 @@ const NavList = (props) => {
         {showSubscriptionsList && (
           <>
             <ListSubheader>{t("nav_topics_title")}</ListSubheader>
-            <ListItemButton onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
+            <ListItemButton data-testid="nav-all" onClick={() => navigate(routes.app)} selected={location.pathname === config.app_root}>
               <ListItemIcon>
                 <ChatBubble />
               </ListItemIcon>
@@ -170,32 +173,45 @@ const NavList = (props) => {
           </>
         )}
         {session.exists() && (
-          <ListItemButton onClick={handleAccountClick} selected={location.pathname === routes.account}>
+          <ListItemButton data-testid="nav-account" onClick={handleAccountClick} selected={location.pathname === routes.account}>
             <ListItemIcon>
               <Person />
             </ListItemIcon>
             <ListItemText primary={t("nav_button_account")} />
           </ListItemButton>
         )}
-        <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
+        <ListItemButton data-testid="nav-settings" onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>
           <ListItemIcon>
             <SettingsIcon />
           </ListItemIcon>
           <ListItemText primary={t("nav_button_settings")} />
         </ListItemButton>
+        {config.auth_logout_url && (
+          <ListItemButton
+            data-testid="nav-logout"
+            onClick={() => {
+              window.location.href = config.auth_logout_url;
+            }}
+          >
+            <ListItemIcon>
+              <Logout />
+            </ListItemIcon>
+            <ListItemText primary={t("action_bar_profile_logout")} />
+          </ListItemButton>
+        )}
         <ListItemButton onClick={() => openUrl("/docs")}>
           <ListItemIcon>
             <ArticleIcon />
           </ListItemIcon>
           <ListItemText primary={t("nav_button_documentation")} />
         </ListItemButton>
-        <ListItemButton onClick={() => props.onPublishMessageClick()}>
+        <ListItemButton data-testid="nav-publish" onClick={() => props.onPublishMessageClick()}>
           <ListItemIcon>
             <Send />
           </ListItemIcon>
           <ListItemText primary={t("nav_button_publish_message")} />
         </ListItemButton>
-        <ListItemButton onClick={() => setSubscribeDialogOpen(true)}>
+        <ListItemButton data-testid="nav-subscribe" onClick={() => setSubscribeDialogOpen(true)}>
           <ListItemIcon>
             <AddIcon />
           </ListItemIcon>

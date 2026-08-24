@@ -3,7 +3,7 @@ package webpush
 import (
 	"database/sql"
 
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	_ "modernc.org/sqlite" // SQLite driver
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
 )
@@ -76,7 +76,7 @@ var (
 
 // NewSQLiteStore creates a new SQLite-backed web push store.
 func NewSQLiteStore(filename, startupQueries string) (*Store, error) {
-	d, err := sql.Open("sqlite3", filename)
+	d, err := sql.Open("sqlite", filename)
 	if err != nil {
 		return nil, err
 	}

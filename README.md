@@ -24,7 +24,6 @@
 [![Matrix space](https://img.shields.io/matrix/ntfy-space:matrix.org?label=Matrix+space)](https://matrix.to/#/#ntfy-space:matrix.org)
 [![Healthcheck](https://healthchecks.io/badge/68b65976-b3b0-4102-aec9-980921/kcoEgrLY.svg)](https://ntfy.statuspage.io/)
 [![Gitpod](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/binwiederhier/ntfy)
-[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/ntfy/)
 
 **ntfy** (pronounced "*notify*") is a simple HTTP-based [pub-sub](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) 
 notification service. With ntfy, you can **send notifications to your phone or desktop via scripts** from any computer, 
@@ -62,6 +61,10 @@ I would be very humbled by your sponsorship. ❤️
 [API](https://ntfy.sh/docs/publish/) |
 [Install / Self-hosting](https://ntfy.sh/docs/install/) |
 [Building](https://ntfy.sh/docs/develop/)
+
+## Cloud Hosting
+
+Deploy your own ntfy instance with one click on [RepoCloud](https://repocloud.io/details/ntfy/).
 
 ## Chat/forum
 There are a few ways to get in touch with me and/or the rest of the community. Feel free to use any of these methods. Whatever

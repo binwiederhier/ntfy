@@ -327,15 +327,6 @@
 # - message-delay-limit defines the max delay of a message when using the "Delay" header.
 #
 # message-size-limit: "4k"
-
-# Max number of cached messages returned per topic when the cache is replayed, i.e. a poll or a
-# "since" request. A poll without a "since" cursor returns a topic's entire cache, which is
-# unbounded in size. Uncapped by default, to preserve the historical behavior; set it to bound
-# how large a single replay can get. The newest messages are kept, and a truncated response
-# carries an "X-Messages-Truncated: 1" header. Together with message-size-limit this bounds the
-# memory one replay can allocate: limit x message-size-limit (e.g. 5000 x 4096 = ~20 MB).
-#
-# message-poll-limit: 5000
 # message-delay-limit: "3d"
 
 # Rate limiting: Total number of topics before the server rejects new topics.

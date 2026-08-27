@@ -1147,6 +1147,9 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
+	if len(m.Title) > messageTitleSizeLimit {
+		return false, false, "", "", "", false, "", errHTTPBadRequestTitleTooLarge
+	}
 	m.Click = readParam(r, "x-click", "click")
 	icon := readParam(r, "x-icon", "icon")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
@@ -1213,6 +1216,14 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		priorityStr = "" // Clear since it's already parsed
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
+	// Measured across all tags, not each one: a publisher can add arbitrarily many
+	tagsSize := 0
+	for _, tag := range m.Tags {
+		tagsSize += len(tag)
+	}
+	if tagsSize > messageTagsSizeLimit {
+		return false, false, "", "", "", false, "", errHTTPBadRequestTagsTooLarge
+	}
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
@@ -1442,13 +1453,14 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		if !filters.Pass(msg) {
 			return nil
 		}
-		m, err := encoder(msg)
+		encoded, err := encoder(msg)
 		if err != nil {
 			return err
 		}
-		// Charge before writing, so an exhausted budget fails the first message and surfaces as a
-		// clean 429 with nothing written.
-		if meterPollBandwidth && !v.BandwidthAllowed(int64(len(m))) {
+		// Charge the encoded length, i.e. what actually goes over the wire. Charge before writing,
+		// so an exhausted budget fails the first message and surfaces as a clean 429 with nothing
+		// written.
+		if meterPollBandwidth && !v.BandwidthAllowed(int64(len(encoded))) {
 			return errHTTPTooManyRequestsLimitAttachmentBandwidth
 		}
 		wlock.Lock()
@@ -1456,7 +1468,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		if closed {
 			return nil
 		}
-		if _, err := w.Write([]byte(m)); err != nil {
+		if _, err := w.Write([]byte(encoded)); err != nil {
 			return err
 		}
 		if fl, ok := w.(http.Flusher); ok {
@@ -1741,7 +1753,7 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
-		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollLimit)
+		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
 		if err != nil {
 			return err
 		}
@@ -1753,8 +1765,9 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	sort.SliceStable(messages, func(i, j int) bool {
 		return messages[i].Time < messages[j].Time
 	})
-	// Must be set before the first message is written, or the header is already on the wire
-	if truncated && w != nil {
+	// Must be set before the first message is written, or the header is already on the wire. On the
+	// WebSocket path the response has been hijacked by then, so this is a no-op there.
+	if truncated {
 		w.Header().Set("X-Messages-Truncated", "1")
 	}
 	for _, m := range messages {

@@ -4931,6 +4931,7 @@ but just in case, let's list them all:
 | **Subscription limit**     | By default, the server allows each visitor to keep 30 connections to the server open.                                                                                                                                   |
 | **Attachment size limit**  | By default, the server allows attachments up to 15 MB in size, up to 100 MB in total per visitor and up to 5 GB across all visitors. On ntfy.sh, the attachment size limit is 2 MB, and the per-visitor total is 20 MB. |
 | **Attachment expiry**      | By default, the server deletes attachments after 3 hours and thereby frees up space from the total visitor attachment limit.                                                                                            |
+| **Title and tag size**    | The message title is limited to 1 KB, and all tags combined to 512 bytes. Requests exceeding either are rejected with HTTP 400. |
 | **Daily bandwidth**        | By default, the server allows 500 MB of traffic per visitor in a 24 hour period, covering attachment GET/PUT/POST traffic and messages replayed from the cache by [poll requests](subscribe/api.md#replay-limits). Traffic exceeding that is rejected. On ntfy.sh, the daily bandwidth limit is 200 MB.  |
 | **Total number of topics** | By default, the server is configured to allow 15,000 topics. The ntfy.sh server has higher limits though.                                                                                                               |
 

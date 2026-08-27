@@ -2082,7 +2082,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Add `message-poll-limit`, an optional cap on the number of cached messages returned by a single replay (uncapped by default, so existing behavior is unchanged). A poll without a `since` cursor returns a topic's entire cache, which was previously unbounded and could reach tens of megabytes on a busy topic; when the cap is set, the newest messages are kept and a truncated response carries an `X-Messages-Truncated: 1` header. Combined with `message-size-limit` this bounds the memory a single replay can allocate
+* Limit the message title to 1 KB and all tags combined to 512 bytes, rejecting larger requests with HTTP 400 (error codes `40057` and `40058`). Neither field had a size limit before, unlike the message body; on ntfy.sh the 99.9th percentile is 212 bytes for titles and 244 for tags
+* Cap a single cache replay at 10 MB of messages per topic. A poll without a `since` cursor returns a topic's entire cache, which was previously unbounded and could reach tens of megabytes on a busy topic, so one request could allocate that much on the server. The newest messages that fit are kept and a truncated response carries an `X-Messages-Truncated: 1` header
 * `visitor-attachment-daily-bandwidth-limit` now also covers messages replayed from the message cache by poll requests, not just attachment traffic. A poll without a `since` cursor returns a topic's entire cache, so a topic that is cheap to fill can be re-read for many times its own size; polls beyond the budget are rejected with HTTP 429 (error code 42905) before anything is written. **Note that heavy pollers now consume the same budget as attachment downloads**, so operators serving both may want to raise the limit
 
 **Bug fixes + maintenance:**

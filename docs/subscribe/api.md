@@ -283,10 +283,10 @@ Reading cached messages (a `poll=1` request, or any request with `since=`) repla
 already stored, so unlike a live subscription its cost grows with the size of the topic's cache. Two
 server-side limits apply, both of which a well-behaved client should handle:
 
-* **The number of messages may be capped.** If the server sets `message-poll-limit`, a replay returns
-  at most that many messages **per topic**, keeping the newest ones, and the response carries an
-  `X-Messages-Truncated: 1` header. If you see that header, older messages were dropped: you did not
-  receive the full cache. It is uncapped by default; ntfy.sh caps it.
+* **The response is size-capped.** A replay returns only the newest messages that fit in 10 MB
+  **per topic** (counting body, title, tags and every other publisher-set field), and a capped response carries an `X-Messages-Truncated: 1` header. If you see that
+  header, older messages were dropped and you did not receive the full cache. In practice this only
+  affects very large topics; a client polling with `since=` never comes close.
 * **Replayed bytes count against your daily bandwidth budget**, the same one attachment downloads use
   (see [limitations](../publish.md#limitations)). Exceeding it returns `HTTP 429` with ntfy error code
   `42905`, and no messages are written.

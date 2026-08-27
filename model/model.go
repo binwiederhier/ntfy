@@ -102,6 +102,24 @@ func (m *Message) ForJSON() *Message {
 }
 
 // Attachment represents a file attachment on a message
+// Size returns an approximate byte size of the variable-length, publisher-controlled parts of a
+// message. It is used to budget cache replays, so it deliberately counts every field a publisher
+// can grow rather than trying to match the exact wire size.
+func (m *Message) Size() int {
+	size := len(m.ID) + len(m.SequenceID) + len(m.Event) + len(m.Topic) + len(m.Title) +
+		len(m.Message) + len(m.Click) + len(m.Icon) + len(m.ContentType) + len(m.Encoding) + len(m.PollID)
+	for _, tag := range m.Tags {
+		size += len(tag)
+	}
+	for _, action := range m.Actions {
+		size += action.Size()
+	}
+	if m.Attachment != nil {
+		size += len(m.Attachment.Name) + len(m.Attachment.Type) + len(m.Attachment.URL)
+	}
+	return size
+}
+
 type Attachment struct {
 	Name    string `json:"name"`
 	Type    string `json:"type,omitempty"`
@@ -123,6 +141,18 @@ type Action struct {
 	Intent  string            `json:"intent,omitempty"`  // used in "broadcast" action
 	Extras  map[string]string `json:"extras,omitempty"`  // used in "broadcast" action
 	Value   string            `json:"value,omitempty"`   // used in "copy" action
+}
+
+// Size returns an approximate byte size of an action's variable-length fields.
+func (a *Action) Size() int {
+	size := len(a.ID) + len(a.Action) + len(a.Label) + len(a.URL) + len(a.Method) + len(a.Body) + len(a.Intent) + len(a.Value)
+	for key, value := range a.Headers {
+		size += len(key) + len(value)
+	}
+	for key, value := range a.Extras {
+		size += len(key) + len(value)
+	}
+	return size
 }
 
 // NewAction creates a new action with initialized maps

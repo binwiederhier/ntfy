@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"heckel.io/ntfy/v2/message"
 	"io/fs"
 	"net/netip"
 	"reflect"
@@ -67,14 +66,23 @@ func banWeight(err *errHTTP, weight int) string {
 // - total topic limit: max number of topics overall
 // - various attachment limits
 const (
-	DefaultMessageSizeLimit            = 4096            // Bytes; note that FCM/APNS have a limit of ~4 KB for the entire message
-	DefaultMessagePollLimit            = message.NoLimit // Uncapped by default; operators cap it to bound replay memory (limit x MessageSizeLimit)
+	DefaultMessageSizeLimit            = 4096 // Bytes; note that FCM/APNS have a limit of ~4 KB for the entire message
 	DefaultTotalTopicLimit             = 15000
 	DefaultAttachmentTotalSizeLimit    = int64(5 * 1024 * 1024 * 1024) // 5 GB
 	DefaultAttachmentFileSizeLimit     = int64(15 * 1024 * 1024)       // 15 MB
 	DefaultAttachmentExpiryDuration    = 3 * time.Hour
 	DefaultAttachmentOrphanGracePeriod = time.Hour // Don't delete orphaned objects younger than this to avoid races with in-flight uploads
 
+	// DefaultMessagePollSizeLimit caps what one cache replay returns per topic. It is a backstop
+	// against a single request materializing an entire topic cache, not a tunable: on ntfy.sh it
+	// would fire on 2 of ~98k cached topics. See docs/subscribe/api.md#replay-limits.
+	DefaultMessagePollSizeLimit = 10 * 1024 * 1024
+
+	// messageTitleSizeLimit and messageTagsSizeLimit cap two publisher-controlled fields that
+	// otherwise have no limit of their own. Sized off ntfy.sh's own cache: title p999 is 212 bytes
+	// (16 of ~3M messages exceed 1 KB), tags p999 is 244 (197 exceed 512).
+	messageTitleSizeLimit = 1024
+	messageTagsSizeLimit  = 512
 )
 
 // Defines all per-visitor limits
@@ -176,7 +184,7 @@ type Config struct {
 	MessageDelayMin                      time.Duration
 	MessageDelayMax                      time.Duration
 	MessageSizeLimit                     int
-	MessagePollLimit                     int
+	MessagePollSizeLimit                 int64
 	TotalTopicLimit                      int
 	TotalAttachmentSizeLimit             int64
 	VisitorSubscriptionLimit             int
@@ -285,7 +293,7 @@ func NewConfig() *Config {
 		TwilioVerifyService:                  "",
 		TwilioCallFormat:                     nil,
 		MessageSizeLimit:                     DefaultMessageSizeLimit,
-		MessagePollLimit:                     DefaultMessagePollLimit,
+		MessagePollSizeLimit:                 DefaultMessagePollSizeLimit,
 		MessageDelayMin:                      DefaultMessageDelayMin,
 		MessageDelayMax:                      DefaultMessageDelayMax,
 		TotalTopicLimit:                      DefaultTotalTopicLimit,

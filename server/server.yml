@@ -417,7 +417,10 @@
 
 # Rate limiting: Attachment size and bandwidth limits per visitor:
 # - visitor-attachment-total-size-limit is the total storage limit used for attachments per visitor
-# - visitor-attachment-daily-bandwidth-limit is the total daily attachment download/upload traffic limit per visitor
+# - visitor-attachment-daily-bandwidth-limit is the total daily traffic limit per visitor. It covers
+#   attachment downloads/uploads AND messages replayed from the message cache by poll requests. A
+#   poll without a "since" cursor returns the topic's entire cache, so a busy topic can be re-read
+#   for many times its own size; charging it here caps what one visitor can pull per day.
 #
 # visitor-attachment-total-size-limit: "100M"
 # visitor-attachment-daily-bandwidth-limit: "500M"

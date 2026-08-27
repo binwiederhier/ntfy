@@ -1424,6 +1424,10 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	}
 	var wlock sync.Mutex
 	var closed bool
+	// Only messages replayed from the cache are charged against the visitor's daily bandwidth
+	// budget, the same one attachment traffic uses. This is set in the poll branch below, which
+	// returns before any Subscribe, so sub() is never called concurrently while it is true.
+	meterPollBandwidth := false
 	defer func() {
 		// This blocks until any in-flight sub() call finishes writing/flushing the response writer,
 		// then marks the connection as closed so future sub() calls are no-ops. This prevents a panic
@@ -1441,6 +1445,11 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		m, err := encoder(msg)
 		if err != nil {
 			return err
+		}
+		// Charge before writing, so an exhausted budget fails the first message and surfaces as a
+		// clean 429 with nothing written.
+		if meterPollBandwidth && !v.BandwidthAllowed(int64(len(m))) {
+			return errHTTPTooManyRequestsLimitAttachmentBandwidth
 		}
 		wlock.Lock()
 		defer wlock.Unlock()
@@ -1464,6 +1473,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		for _, t := range topics {
 			t.Keepalive()
 		}
+		meterPollBandwidth = true
 		return s.sendOldMessages(topics, since, scheduled, v, sub)
 	}
 	ctx, cancel := context.WithCancel(context.Background())

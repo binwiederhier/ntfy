@@ -2810,6 +2810,38 @@ func TestServer_PublishAttachmentBandwidthLimit(t *testing.T) {
 	})
 }
 
+func TestServer_PollBandwidthLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A poll without "since" replays the entire cache, so a topic that is cheap to fill is
+		// expensive to read over and over. Replayed bytes are charged against the same daily
+		// budget as attachment traffic. One message per poll keeps the accounting coarse: any
+		// shortfall hits the very first message, so the request is rejected before anything is
+		// written rather than truncated mid-stream.
+		c := newTestConfig(t, databaseURL)
+		c.VisitorAttachmentDailyBandwidthLimit = 9000 // Enough for two replays of the ~4 KB topic below, not three
+		s := newTestServer(t, c)
+
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", util.RandomString(4000), nil).Code)
+
+		// Two full replays fit in the budget
+		for i := 1; i <= 2; i++ {
+			response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+			require.Equal(t, 200, response.Code)
+			require.Equal(t, 1, len(toMessages(t, response.Body.String())))
+		}
+
+		// The third is rejected before a single byte is written
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 429, response.Code)
+		require.Equal(t, 42905, toHTTPError(t, response.Body.String()).Code)
+
+		// A subscription that replays nothing is not charged against the budget
+		response = request(t, s, "GET", "/mytopic/json?poll=1&since=none", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Empty(t, strings.TrimSpace(response.Body.String()))
+	})
+}
+
 func TestServer_PublishAttachmentBandwidthLimitUploadOnly(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		content := util.RandomString(5000) // > 4096

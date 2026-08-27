@@ -101,7 +101,6 @@ func (m *Message) ForJSON() *Message {
 	return m
 }
 
-// Attachment represents a file attachment on a message
 // Size returns an approximate byte size of the variable-length, publisher-controlled parts of a
 // message. It is used to budget cache replays, so it deliberately counts every field a publisher
 // can grow rather than trying to match the exact wire size.
@@ -120,6 +119,7 @@ func (m *Message) Size() int {
 	return size
 }
 
+// Attachment represents a file attachment on a message
 type Attachment struct {
 	Name    string `json:"name"`
 	Type    string `json:"type,omitempty"`

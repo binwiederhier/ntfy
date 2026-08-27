@@ -6,11 +6,26 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.27.0 | Aug 4, 2026   |
+| ntfy server      | v2.28.0 | Aug 27, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.28.0
+Released August 27, 2026
+
+This is a hardening release. A single topic on ntfy.sh was polled continuously with `poll=1` and no
+`since` cursor, which replays a topic's entire cache on every request. The changes below bound what one
+replay can cost, close two fields that had no size limit at all, and fix an ordering bug found while
+digging into it.
+
+**Bug fixes + maintenance:**
+
+* Fix messages being returned out of publish order when polling or replaying **several topics at once** (`/topic1,topic2/json?poll=1`). `Message.Time` has second granularity, so a multi-topic replay sorts many equal keys; the sort was unstable, which could shuffle a single topic's own messages. Single-topic replays were not affected ([#1297](https://github.com/binwiederhier/ntfy/issues/1297))
+* Limit the message title to 1 KB and all tags combined to 512 bytes, rejecting larger requests with HTTP 400 (error codes `40057` and `40058`). Neither field had a size limit before, unlike the message body; on ntfy.sh the 99.9th percentile is 212 bytes for titles and 244 for tags
+* Cap a single cache replay at 10 MB of messages per topic. A poll without a `since` cursor returns a topic's entire cache, which was previously unbounded and could reach tens of megabytes on a busy topic, so one request could allocate that much on the server. The newest messages that fit are kept and a truncated response carries an `X-Messages-Truncated: 1` header
+* `visitor-attachment-daily-bandwidth-limit` now also covers messages replayed from the message cache by poll requests, not just attachment traffic. A poll without a `since` cursor returns a topic's entire cache, so a topic that is cheap to fill can be re-read for many times its own size; polls beyond the budget are rejected with HTTP 429 (error code 42905) before anything is written. **Note that heavy pollers now consume the same budget as attachment downloads**, so operators serving both may want to raise the limit
 
 ### ntfy server v2.27.0
 Released August 4, 2026
@@ -2077,18 +2092,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.28.0 (UNRELEASED)
-
-**Features:**
-
-* Limit the message title to 1 KB and all tags combined to 512 bytes, rejecting larger requests with HTTP 400 (error codes `40057` and `40058`). Neither field had a size limit before, unlike the message body; on ntfy.sh the 99.9th percentile is 212 bytes for titles and 244 for tags
-* Cap a single cache replay at 10 MB of messages per topic. A poll without a `since` cursor returns a topic's entire cache, which was previously unbounded and could reach tens of megabytes on a busy topic, so one request could allocate that much on the server. The newest messages that fit are kept and a truncated response carries an `X-Messages-Truncated: 1` header
-* `visitor-attachment-daily-bandwidth-limit` now also covers messages replayed from the message cache by poll requests, not just attachment traffic. A poll without a `since` cursor returns a topic's entire cache, so a topic that is cheap to fill can be re-read for many times its own size; polls beyond the budget are rejected with HTTP 429 (error code 42905) before anything is written. **Note that heavy pollers now consume the same budget as attachment downloads**, so operators serving both may want to raise the limit
-
-**Bug fixes + maintenance:**
-
-* Fix messages being returned out of publish order when polling or replaying **several topics at once** (`/topic1,topic2/json?poll=1`). `Message.Time` has second granularity, so a multi-topic replay sorts many equal keys; the sort was unstable, which could shuffle a single topic's own messages. Single-topic replays were not affected ([#1297](https://github.com/binwiederhier/ntfy/issues/1297))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

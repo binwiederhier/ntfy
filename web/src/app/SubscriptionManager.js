@@ -188,6 +188,27 @@ export class SubscriptionManager {
       .toArray();
   }
 
+  /**
+   * Read a compact notification-table state directly from IndexedDB. This bypasses Dexie's
+   * reactive cache, which may not observe service-worker writes in an iOS standalone PWA.
+   */
+  async notificationStateFromBackend() {
+    await this.db.open();
+    const transaction = this.db.backendDB().transaction("notifications", "readonly");
+    const notifications = transaction.objectStore("notifications");
+    const countRequest = notifications.count();
+    const unreadCountRequest = notifications.index("new").count(1);
+    const latestRequest = notifications.index("time").openCursor(null, "prev");
+    const result = (request) =>
+      new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+    const [count, unreadCount, latest] = await Promise.all([result(countRequest), result(unreadCountRequest), result(latestRequest)]);
+    return { count, unreadCount, latestId: latest?.value?.id ?? null };
+  }
+
   /** Adds notification, or returns false if it already exists */
   async addNotification(subscriptionId, notification) {
     const exists = await this.db.notifications.get(notification.id);

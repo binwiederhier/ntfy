@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -2807,6 +2808,77 @@ func TestServer_PublishAttachmentBandwidthLimit(t *testing.T) {
 		err := toHTTPError(t, response.Body.String())
 		require.Equal(t, 429, response.Code)
 		require.Equal(t, 42905, err.Code)
+	})
+}
+
+func TestServer_PollOrderAcrossTopics(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Replaying several topics at once concatenates each topic's messages and then sorts the
+		// lot by Time, which has second granularity. That sort must not reorder messages that
+		// share a timestamp, or a topic's own messages come back out of publish order. See #1297.
+		//
+		// The messages have to straddle a second boundary: if every timestamp is identical the
+		// concatenation is already sorted and Go's pdqsort leaves it alone, hiding the bug.
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		const perBatch = 10
+		publish := func(batch int) {
+			for _, topic := range []string{"topicA", "topicB"} {
+				for i := 0; i < perBatch; i++ {
+					body := fmt.Sprintf("%s-%02d", topic, batch*perBatch+i)
+					require.Equal(t, 200, request(t, s, "PUT", "/"+topic, body, nil).Code)
+				}
+			}
+		}
+		publish(0)
+		time.Sleep(1100 * time.Millisecond) // Cross a second boundary, so Time is not all-equal
+		publish(1)
+
+		response := request(t, s, "GET", "/topicA,topicB/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 4*perBatch, len(messages))
+
+		// Each topic's own messages must appear in publish order, whatever the interleaving
+		lastSeen := map[string]int{"topicA": -1, "topicB": -1}
+		for _, m := range messages {
+			topic, seqStr, found := strings.Cut(m.Message, "-")
+			require.True(t, found)
+			seq, err := strconv.Atoi(seqStr)
+			require.Nil(t, err)
+			require.Greater(t, seq, lastSeen[topic], "%s came back out of publish order", m.Message)
+			lastSeen[topic] = seq
+		}
+	})
+}
+
+func TestServer_PollMessageLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A poll without "since" replays the whole cache, so the response is unbounded unless the
+		// query is capped. The cap keeps the NEWEST messages and advertises the truncation, since
+		// "since" only moves forward and a client cannot fetch what was dropped.
+		c := newTestConfig(t, databaseURL)
+		c.MessagePollLimit = 5
+		s := newTestServer(t, c)
+
+		for i := 1; i <= 8; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil).Code)
+		}
+
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, "1", response.Header().Get("X-Messages-Truncated"))
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 5, len(messages))
+		require.Equal(t, "message 4", messages[0].Message) // newest 5, oldest first
+		require.Equal(t, "message 8", messages[4].Message)
+
+		// A topic under the limit is served in full, with no truncation header
+		require.Equal(t, 200, request(t, s, "PUT", "/othertopic", "only message", nil).Code)
+		response = request(t, s, "GET", "/othertopic/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Empty(t, response.Header().Get("X-Messages-Truncated"))
+		require.Equal(t, 1, len(toMessages(t, response.Body.String())))
 	})
 }
 

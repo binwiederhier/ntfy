@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,10 @@ import (
 const (
 	tagMessageCache = "message_cache"
 	schemaStore     = "message" // Store name in the schema_version table (see db/schema)
+
+	// NoLimit is the message limit for an uncapped read: large enough never to bind in practice,
+	// small enough that limit+1 stays well inside int32 for the SQL driver.
+	NoLimit = 1 << 30
 )
 
 var errNoRows = errors.New("no rows found")
@@ -186,46 +191,56 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 	return nil
 }
 
-// Messages returns messages for a topic since the given marker, optionally including scheduled messages
+// Messages returns all cached messages for a topic, oldest first. Prefer MessagesCapped on
+// request paths: an uncapped replay of a busy topic is as large as the topic's entire cache.
 func (c *Cache) Messages(topic string, since model.SinceMarker, scheduled bool) ([]*model.Message, error) {
+	messages, _, err := c.MessagesCapped(topic, since, scheduled, NoLimit)
+	return messages, err
+}
+
+// MessagesCapped returns cached messages for a topic, oldest first, at most limit of them,
+// keeping the newest. The bool reports whether older messages were dropped to stay under the
+// cap, so the caller can tell the client that what it got is incomplete.
+func (c *Cache) MessagesCapped(topic string, since model.SinceMarker, scheduled bool, limit int) ([]*model.Message, bool, error) {
 	if since.IsNone() {
-		return make([]*model.Message, 0), nil
+		return make([]*model.Message, 0), false, nil
 	} else if since.IsLatest() {
-		return c.messagesLatest(topic)
+		messages, err := c.messagesLatest(topic)
+		return messages, false, err
 	} else if since.IsID() {
-		return c.messagesSinceID(topic, since, scheduled)
+		return c.messagesSinceID(topic, since, scheduled, limit)
 	}
-	return c.messagesSinceTime(topic, since, scheduled)
+	return c.messagesSinceTime(topic, since, scheduled, limit)
 }
 
-func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, scheduled bool) ([]*model.Message, error) {
+func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, scheduled bool, limit int) ([]*model.Message, bool, error) {
 	var rows *sql.Rows
 	var err error
 	rdb := c.db.ReadOnly()
 	if scheduled {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceTimeScheduled, topic, since.Time().Unix())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceTimeScheduled, topic, since.Time().Unix(), limit+1)
 	} else {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceTime, topic, since.Time().Unix())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceTime, topic, since.Time().Unix(), limit+1)
 	}
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return readMessages(rows)
+	return readMessagesCapped(rows, limit)
 }
 
-func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool) ([]*model.Message, error) {
+func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, limit int) ([]*model.Message, bool, error) {
 	var rows *sql.Rows
 	var err error
 	rdb := c.db.ReadOnly()
 	if scheduled {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, since.ID())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, since.ID(), limit+1)
 	} else {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, since.ID())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, since.ID(), limit+1)
 	}
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return readMessages(rows)
+	return readMessagesCapped(rows, limit)
 }
 
 func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
@@ -456,6 +471,22 @@ func (c *Cache) processMessageBatches() {
 			log.Tag(tagMessageCache).Err(err).Error("Cannot write message batch")
 		}
 	}
+}
+
+// readMessagesCapped reads a newest-first result set that was queried with LIMIT limit+1. The
+// extra row is how overflow is detected without a second COUNT query: if it is there, older
+// messages exist beyond the cap. Rows are reversed into the oldest-first order callers expect.
+func readMessagesCapped(rows *sql.Rows, limit int) ([]*model.Message, bool, error) {
+	messages, err := readMessages(rows)
+	if err != nil {
+		return nil, false, err
+	}
+	truncated := len(messages) > limit
+	if truncated {
+		messages = messages[:limit]
+	}
+	slices.Reverse(messages)
+	return messages, truncated, nil
 }
 
 func readMessages(rows *sql.Rows) ([]*model.Message, error) {

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"heckel.io/ntfy/v2/message"
 	"io/fs"
 	"net/netip"
 	"reflect"
@@ -66,7 +67,8 @@ func banWeight(err *errHTTP, weight int) string {
 // - total topic limit: max number of topics overall
 // - various attachment limits
 const (
-	DefaultMessageSizeLimit            = 4096 // Bytes; note that FCM/APNS have a limit of ~4 KB for the entire message
+	DefaultMessageSizeLimit            = 4096            // Bytes; note that FCM/APNS have a limit of ~4 KB for the entire message
+	DefaultMessagePollLimit            = message.NoLimit // Uncapped by default; operators cap it to bound replay memory (limit x MessageSizeLimit)
 	DefaultTotalTopicLimit             = 15000
 	DefaultAttachmentTotalSizeLimit    = int64(5 * 1024 * 1024 * 1024) // 5 GB
 	DefaultAttachmentFileSizeLimit     = int64(15 * 1024 * 1024)       // 15 MB
@@ -174,6 +176,7 @@ type Config struct {
 	MessageDelayMin                      time.Duration
 	MessageDelayMax                      time.Duration
 	MessageSizeLimit                     int
+	MessagePollLimit                     int
 	TotalTopicLimit                      int
 	TotalAttachmentSizeLimit             int64
 	VisitorSubscriptionLimit             int
@@ -282,6 +285,7 @@ func NewConfig() *Config {
 		TwilioVerifyService:                  "",
 		TwilioCallFormat:                     nil,
 		MessageSizeLimit:                     DefaultMessageSizeLimit,
+		MessagePollLimit:                     DefaultMessagePollLimit,
 		MessageDelayMin:                      DefaultMessageDelayMin,
 		MessageDelayMax:                      DefaultMessageDelayMax,
 		TotalTopicLimit:                      DefaultTotalTopicLimit,

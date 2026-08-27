@@ -1474,7 +1474,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			t.Keepalive()
 		}
 		meterPollBandwidth = true
-		return s.sendOldMessages(topics, since, scheduled, v, sub)
+		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1490,7 +1490,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err := sub(v, model.NewOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
-	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
+	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
 	for {
@@ -1625,7 +1625,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		for _, t := range topics {
 			t.Keepalive()
 		}
-		return s.sendOldMessages(topics, since, scheduled, v, sub)
+		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
@@ -1639,7 +1639,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	if err := sub(v, model.NewOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
-	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
+	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
 	err = g.Wait()
@@ -1734,21 +1734,29 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the
 // marker, returning only messages that are newer than the marker.
-func (s *Server) sendOldMessages(topics []*topic, since model.SinceMarker, scheduled bool, v *visitor, sub subscriber) error {
+func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since model.SinceMarker, scheduled bool, v *visitor, sub subscriber) error {
 	if since.IsNone() {
 		return nil
 	}
 	messages := make([]*model.Message, 0)
+	truncated := false
 	for _, t := range topics {
-		topicMessages, err := s.messageCache.Messages(t.ID, since, scheduled)
+		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollLimit)
 		if err != nil {
 			return err
 		}
+		truncated = truncated || topicTruncated
 		messages = append(messages, topicMessages...)
 	}
-	sort.Slice(messages, func(i, j int) bool {
+	// Stable: Time has second granularity, so a multi-topic replay has many equal keys. An unstable
+	// sort reorders them and a topic's own messages come back out of publish order (#1297).
+	sort.SliceStable(messages, func(i, j int) bool {
 		return messages[i].Time < messages[j].Time
 	})
+	// Must be set before the first message is written, or the header is already on the wire
+	if truncated && w != nil {
+		w.Header().Set("X-Messages-Truncated", "1")
+	}
 	for _, m := range messages {
 		if err := sub(v, m); err != nil {
 			return err

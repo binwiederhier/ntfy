@@ -2082,7 +2082,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
+* Add `message-poll-limit`, an optional cap on the number of cached messages returned by a single replay (uncapped by default, so existing behavior is unchanged). A poll without a `since` cursor returns a topic's entire cache, which was previously unbounded and could reach tens of megabytes on a busy topic; when the cap is set, the newest messages are kept and a truncated response carries an `X-Messages-Truncated: 1` header. Combined with `message-size-limit` this bounds the memory a single replay can allocate
 * `visitor-attachment-daily-bandwidth-limit` now also covers messages replayed from the message cache by poll requests, not just attachment traffic. A poll without a `since` cursor returns a topic's entire cache, so a topic that is cheap to fill can be re-read for many times its own size; polls beyond the budget are rejected with HTTP 429 (error code 42905) before anything is written. **Note that heavy pollers now consume the same budget as attachment downloads**, so operators serving both may want to raise the limit
+
+**Bug fixes + maintenance:**
+
+* Fix messages being returned out of publish order when polling or replaying **several topics at once** (`/topic1,topic2/json?poll=1`). `Message.Time` has second granularity, so a multi-topic replay sorts many equal keys; the sort was unstable, which could shuffle a single topic's own messages. Single-topic replays were not affected ([#1297](https://github.com/binwiederhier/ntfy/issues/1297))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

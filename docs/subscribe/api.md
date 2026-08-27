@@ -245,6 +245,9 @@ combined with `since=` (defaults to `since=all`).
 curl -s "ntfy.sh/mytopic/json?poll=1"
 ```
 
+Note that a poll without `since=` returns a topic's **entire cache**, which on a busy topic can be
+large. See [replay limits](#replay-limits) below.
+
 ### Fetch cached messages
 Messages may be cached for a couple of hours (see [message caching](../config.md#message-cache)) to account for network
 interruptions of subscribers. If the server has configured message caching, you can read back what you missed by using 
@@ -273,6 +276,28 @@ parameter (makes most sense with the `poll=1` parameter):
 
 ```
 curl -s "ntfy.sh/mytopic/json?poll=1&sched=1"
+```
+
+### Replay limits
+Reading cached messages (a `poll=1` request, or any request with `since=`) replays messages the server
+already stored, so unlike a live subscription its cost grows with the size of the topic's cache. Two
+server-side limits apply, both of which a well-behaved client should handle:
+
+* **The number of messages may be capped.** If the server sets `message-poll-limit`, a replay returns
+  at most that many messages **per topic**, keeping the newest ones, and the response carries an
+  `X-Messages-Truncated: 1` header. If you see that header, older messages were dropped: you did not
+  receive the full cache. It is uncapped by default; ntfy.sh caps it.
+* **Replayed bytes count against your daily bandwidth budget**, the same one attachment downloads use
+  (see [limitations](../publish.md#limitations)). Exceeding it returns `HTTP 429` with ntfy error code
+  `42905`, and no messages are written.
+
+Both limits exist because a poll without `since=` re-reads the whole cache every time. If you are
+polling repeatedly, **pass `since=<last message ID>`** rather than re-fetching everything. The limits
+still apply to a `since=` replay, but it returns only what is new, so in practice you will not come
+near either one:
+
+```
+curl -s "ntfy.sh/mytopic/json?poll=1&since=nFS3knfcQ1xe"
 ```
 
 ### Filter messages
@@ -307,6 +332,11 @@ $ curl -s ntfy.sh/mytopic1,mytopic2/json
 {"id":"dzJJm7BCWs","time":1637182634,"event":"message","topic":"mytopic1","message":"for topic 1"}
 {"id":"Cm02DsxUHb","time":1637182643,"event":"message","topic":"mytopic2","message":"for topic 2"}
 ```
+
+When replaying cached messages for several topics at once, they are ordered by their `time` field.
+Because `time` has **second granularity**, messages published within the same second share a sort key:
+each topic's own messages stay in publish order, but the interleaving *between* topics is not defined.
+If you need a total order across topics, sort by `time` and fall back to the order received.
 
 ### Authentication
 Depending on whether the server is configured to support [access control](../config.md#access-control), some topics
@@ -427,7 +457,7 @@ and can be passed as **HTTP headers** or **query parameters in the URL**. They a
 
 | Parameter   | Aliases (case-insensitive) | Description                                                                     |
 |-------------|----------------------------|---------------------------------------------------------------------------------|
-| `poll`      | `X-Poll`, `po`             | Return cached messages and close connection                                     |
+| `poll`      | `X-Poll`, `po`             | Return cached messages and close connection (see [replay limits](#replay-limits)) |
 | `since`     | `X-Since`, `si`            | Return cached messages since timestamp, duration or message ID                  |
 | `scheduled` | `X-Scheduled`, `sched`     | Include scheduled/delayed messages in message list                              |
 | `id`        | `X-ID`                     | Filter: Only return messages that match this exact message ID                   |

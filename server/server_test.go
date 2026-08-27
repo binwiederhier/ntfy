@@ -5330,6 +5330,53 @@ func TestServer_HandleError_SkipsWriteHeaderOnHijackedConnection(t *testing.T) {
 	})
 }
 
+func TestServer_SubscribeWS_Failure_ReturnsErrorCodeAndHeaders(t *testing.T) {
+	// Regression test for binwiederhier/ntfy#535: a WebSocket subscription that fails before the
+	// upgrade completes (e.g. auth failure) must return the real HTTP status code (not 200) along
+	// with the ntfy error code and message in headers, so clients can distinguish failures.
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.AuthDefault = user.PermissionDenyAll
+		s := newTestServer(t, c)
+
+		require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+		require.Nil(t, s.userManager.AllowAccess("ben", "sometopic", user.PermissionReadWrite)) // Not mytopic!
+
+		response := request(t, s, "GET", "/mytopic/ws", "", map[string]string{
+			"Authorization": util.BasicAuth("ben", "ben"),
+			"Upgrade":       "websocket",
+			"Connection":    "Upgrade",
+		})
+		require.Equal(t, 403, response.Code) // Not 200!
+		require.Equal(t, "40301", response.Header().Get("X-Ntfy-Error-Code"))
+		require.Equal(t, "forbidden", response.Header().Get("X-Ntfy-Error"))
+	})
+}
+
+func TestServer_HandleError_WebSocketErrorHeaders(t *testing.T) {
+	// Ensure the ntfy error code/message headers are set for pre-upgrade WebSocket errors, but not
+	// for post-upgrade (hijacked) errors, where the connection can no longer carry HTTP headers.
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		r, _ := http.NewRequest("GET", "/mytopic/ws", nil)
+		r.Header.Set("Upgrade", "websocket")
+		r.Header.Set("Connection", "Upgrade")
+		v := newVisitor(s.config, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
+
+		// Pre-upgrade error: headers must be present
+		mock := newMockResponseWriter()
+		s.handleError(mock, r, v, errHTTPBadRequestWebSocketsUpgradeHeaderMissing)
+		require.Equal(t, "40016", mock.Header().Get("X-Ntfy-Error-Code"))
+		require.Equal(t, "invalid request: client not using the websocket protocol", mock.Header().Get("X-Ntfy-Error"))
+
+		// Post-upgrade error: connection is hijacked, no headers may be written
+		mock = newMockResponseWriter()
+		s.handleError(mock, r, v, &errWebSocketPostUpgrade{errors.New("websocket: close 1000 (normal)")})
+		require.Empty(t, mock.Header().Get("X-Ntfy-Error-Code"))
+		require.Empty(t, mock.Header().Get("X-Ntfy-Error"))
+	})
+}
+
 func TestServer_Publish_InvalidUTF8InBody(t *testing.T) {
 	// All byte sequences from production logs, sent as message body
 	tests := []struct {

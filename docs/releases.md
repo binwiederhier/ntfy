@@ -2093,6 +2093,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.28.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Failed WebSocket subscriptions (e.g. auth failures) now return the ntfy error code and message in the `X-Ntfy-Error-Code` and `X-Ntfy-Error` response headers, alongside the proper HTTP status code, so clients can distinguish real failures from a `200` page returned by a proxy ([#535](https://github.com/binwiederhier/ntfy/issues/535), thanks to [@alexhorner](https://github.com/alexhorner) for reporting)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

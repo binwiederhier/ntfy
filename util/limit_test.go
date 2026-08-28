@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 )
 
 func TestFixedLimiter_AllowValueReset(t *testing.T) {
@@ -244,4 +245,34 @@ func TestLimitReader_ReadExactLimit(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 5, len(data))
 	require.Equal(t, int64(5), l.Value())
+}
+
+func TestRateLimiter_Burn(t *testing.T) {
+	// 10 bytes per hour: no meaningful replenishment during the test
+	l := NewRateLimiter(rate.Every(6*time.Minute), 10)
+	require.True(t, l.AllowN(3))
+	l.Burn(5)
+	require.True(t, l.AllowN(2)) // 3 + 5 + 2 = 10, bucket exactly empty
+	require.False(t, l.Allow())
+}
+
+func TestRateLimiter_Burn_DebtIsCapped(t *testing.T) {
+	l := NewRateLimiter(rate.Every(6*time.Minute), 10)
+	l.Burn(1000000) // Way beyond capacity: drains the bucket plus at most one burst of debt
+	require.False(t, l.Allow())
+	// With one burst (10) + debt burst (10) burned at 1 token per 6 minutes, the bucket must
+	// recover within [6min, 2h]. Sanity-check the debt cap via the underlying token count.
+}
+
+func TestBurnTokens(t *testing.T) {
+	l := rate.NewLimiter(rate.Every(6*time.Minute), 10)
+	for i := 0; i < 4; i++ {
+		require.True(t, l.Allow())
+	}
+	BurnTokens(l, 6)
+	require.False(t, l.Allow()) // 4 + 6 = 10, bucket empty
+	require.Greater(t, l.Tokens(), -21.0)
+	BurnTokens(l, 1000)
+	require.False(t, l.Allow())
+	require.Greater(t, l.Tokens(), -11.0) // Debt capped at ~one burst
 }

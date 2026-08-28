@@ -16,8 +16,8 @@ type Counters struct {
 	BandwidthBytes int64
 }
 
-// add adds the other counters to this one
-func (c *Counters) add(other Counters) {
+// Add adds the other counters to this one
+func (c *Counters) Add(other Counters) {
 	c.Requests += other.Requests
 	c.Messages += other.Messages
 	c.Emails += other.Emails

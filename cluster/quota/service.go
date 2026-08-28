@@ -83,10 +83,11 @@ type Tracker struct {
 	flushed   map[Key]*Counters // Local increments already flushed to the database this day (peer-delta bookkeeping)
 	peerSeen  map[Key]*Counters // Peer consumption already reported via PeerUsageFunc this day
 	pulledAt  int64             // updated_at watermark for pulling changed usage rows
+	closing   bool              // Set in Close; the final pull skips PeerUsageFunc (the server is shutting down and may hold its own locks)
 	closeChan chan struct{}
 	closeOnce sync.Once
 	wg        sync.WaitGroup
-	mu        sync.Mutex // Protects day, deltas, totals, flushed, peerSeen, pulledAt
+	mu        sync.Mutex // Protects day, deltas, totals, flushed, peerSeen, pulledAt, closing
 }
 
 // New creates a tracker on the given (shared) database pool and starts its flush loop
@@ -149,6 +150,9 @@ func (t *Tracker) Prune() error {
 func (t *Tracker) Close() error {
 	var err error
 	t.closeOnce.Do(func() {
+		t.mu.Lock()
+		t.closing = true
+		t.mu.Unlock()
 		close(t.closeChan)
 		t.wg.Wait()
 		err = t.flushAndPull()
@@ -255,7 +259,7 @@ func (t *Tracker) pull() error {
 		// Cluster totals: database sums plus local increments that are not in them yet
 		total := *sum
 		if d, ok := t.deltas[key]; ok {
-			total.add(*d)
+			total.Add(*d)
 		}
 		t.totals[key] = &total
 		// Peer consumption: everything in the database that this node did not flush itself,
@@ -269,7 +273,7 @@ func (t *Tracker) pull() error {
 		}
 		if !peer.zero() {
 			addTo(t.peerSeen, key, peer)
-			if t.conf.PeerUsageFunc != nil {
+			if t.conf.PeerUsageFunc != nil && !t.closing {
 				if peerDeltas == nil {
 					peerDeltas = make(map[Key]Counters)
 				}
@@ -293,7 +297,7 @@ func (t *Tracker) currentDay() string {
 // addTo adds delta to the counters map entry for key, creating it if needed
 func addTo(m map[Key]*Counters, key Key, delta Counters) {
 	if c, ok := m[key]; ok {
-		c.add(delta)
+		c.Add(delta)
 	} else {
 		c := delta
 		m[key] = &c

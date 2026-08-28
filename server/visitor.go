@@ -353,7 +353,13 @@ func (v *visitor) AccountActionPerformed() {
 func (v *visitor) BandwidthAllowed(bytes int64) bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.bandwidthLimiter.AllowN(bytes)
+	if !v.bandwidthLimiter.AllowN(bytes) {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{BandwidthBytes: bytes})
+	}
+	return true
 }
 
 func (v *visitor) RemoveSubscription() {
@@ -371,7 +377,25 @@ func (v *visitor) Keepalive() {
 func (v *visitor) BandwidthLimiter() util.Limiter {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.bandwidthLimiter
+	if v.quota == nil {
+		return v.bandwidthLimiter
+	}
+	return &meteredBandwidthLimiter{v}
+}
+
+// BurnPeerUsage reflects request and bandwidth usage this visitor consumed on OTHER cluster
+// nodes into the local token buckets, so N nodes do not hand out N times the burst. Only the
+// time-replenished buckets need this; the daily quotas are enforced directly against cluster
+// totals (see quotaAllowedNoLock).
+func (v *visitor) BurnPeerUsage(delta quota.Counters) {
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
+	if delta.Requests > 0 {
+		util.BurnTokens(v.requestLimiter, delta.Requests)
+	}
+	if delta.BandwidthBytes > 0 {
+		v.bandwidthLimiter.Burn(delta.BandwidthBytes)
+	}
 }
 
 func (v *visitor) Stale() bool {
@@ -641,4 +665,42 @@ func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
 		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv6).Masked().Addr()
 	}
 	return fmt.Sprintf("ip:%s", ip.String())
+}
+
+// meteredBandwidthLimiter forwards to the visitor's bandwidth limiter and mirrors successfully
+// consumed bytes into the cluster-wide usage tracker. Refunds (negative n, from LimitWriter
+// reverts) are no-ops on the underlying RateLimiter and are not mirrored.
+type meteredBandwidthLimiter struct {
+	v *visitor
+}
+
+var _ util.Limiter = (*meteredBandwidthLimiter)(nil)
+
+func (l *meteredBandwidthLimiter) Allow() bool {
+	return l.AllowN(1)
+}
+
+func (l *meteredBandwidthLimiter) AllowN(n int64) bool {
+	l.v.mu.RLock() // limiters could be replaced!
+	limiter, key := l.v.bandwidthLimiter, l.v.quotaKey
+	l.v.mu.RUnlock()
+	if !limiter.AllowN(n) {
+		return false
+	}
+	if n > 0 {
+		l.v.quota.Inc(key, quota.Counters{BandwidthBytes: n})
+	}
+	return true
+}
+
+func (l *meteredBandwidthLimiter) Value() int64 {
+	l.v.mu.RLock() // limiters could be replaced!
+	defer l.v.mu.RUnlock()
+	return l.v.bandwidthLimiter.Value()
+}
+
+func (l *meteredBandwidthLimiter) Reset() {
+	l.v.mu.RLock() // limiters could be replaced!
+	defer l.v.mu.RUnlock()
+	l.v.bandwidthLimiter.Reset()
 }

@@ -67,7 +67,7 @@ func TestTracker_PullReportsPeerUsage(t *testing.T) {
 	peerUsage := make(map[Key]Counters)
 	a := newTestTracker(t, poolA, &Config{PeerUsageFunc: func(key Key, delta Counters) {
 		c := peerUsage[key]
-		c.add(delta)
+		c.Add(delta)
 		peerUsage[key] = c
 	}})
 	b := newTestTracker(t, poolB, nil)

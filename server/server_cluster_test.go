@@ -278,7 +278,7 @@ func TestServer_Cluster_StatsResetOnlyOnLeader(t *testing.T) {
 	s.cluster = cl
 
 	// An anonymous visitor with an in-memory message count
-	v := newVisitor(c, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
+	v := newVisitor(c, s.messageCache, s.userManager, s.quota, netip.MustParseAddr("1.2.3.4"), nil)
 	require.True(t, v.MessageAllowed())
 	s.mu.Lock()
 	s.visitors["ip:1.2.3.4"] = v
@@ -350,4 +350,70 @@ func TestServer_Cluster_HealthReflectsCluster(t *testing.T) {
 	require.Nil(t, err)
 	s.clusterHandler().ServeHTTP(rr2, req)
 	require.Equal(t, 503, rr2.Code)
+}
+
+func TestServer_Cluster_MessageQuotaEnforcedAcrossNodes(t *testing.T) {
+	// Two nodes sharing one Postgres schema: the daily message quota is cluster-wide, so a
+	// visitor spreading publishes across nodes must not get N times the limit. Enforcement is
+	// eventually consistent (usage flush interval), so the test waits between phases.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = "127.0.0.1:1" // Enables clustering; fan-out target never actually called
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		conf.VisitorUsageFlushInterval = 150 * time.Millisecond
+		conf.VisitorMessageDailyLimit = 4
+		return newTestServer(t, conf)
+	}
+	sA, sB := newNode("node-a"), newNode("node-b")
+
+	// Two publishes on each node, all within the limit of 4; generous sleeps between phases
+	// let each node push its own usage and pull the other's
+	for _, s := range []*Server{sA, sB} {
+		for i := 0; i < 2; i++ {
+			response := request(t, s, "PUT", "/mytopic", "test", nil)
+			require.Equal(t, 200, response.Code)
+		}
+		time.Sleep(600 * time.Millisecond)
+	}
+
+	// The cluster-wide quota (4) is exhausted: a single further publish on either node must be
+	// rejected. Each node locally only counted 2 of the 4 messages, so a 429 here can only come
+	// from cluster-wide enforcement, not from the local limiter.
+	require.Equal(t, 429, request(t, sB, "PUT", "/mytopic", "test", nil).Code)
+	require.Equal(t, 429, request(t, sA, "PUT", "/mytopic", "test", nil).Code)
+}
+
+func TestServer_Cluster_RequestLimitBurnsAcrossNodes(t *testing.T) {
+	// The request token bucket stays per-node (algorithm unchanged), but nodes burn tokens for
+	// usage their peers report, so a visitor rotating across N nodes gets roughly one bucket,
+	// not N of them.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = "127.0.0.1:1" // Enables clustering; fan-out target never actually called
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		conf.VisitorUsageFlushInterval = 150 * time.Millisecond
+		conf.VisitorRequestLimitBurst = 10
+		conf.VisitorRequestLimitReplenish = time.Minute // Effectively no replenishment during the test
+		return newTestServer(t, conf)
+	}
+	sA, sB := newNode("node-a"), newNode("node-b")
+
+	// Consume 6 of the 10 tokens on node A, let the usage propagate to node B
+	for i := 0; i < 6; i++ {
+		require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "test", nil).Code)
+	}
+	time.Sleep(600 * time.Millisecond)
+
+	// Node B must have burned A's 6 tokens from its own bucket: 4 requests left, the 5th fails.
+	// Without the burn-down, B would happily serve 10.
+	for i := 0; i < 4; i++ {
+		require.Equal(t, 200, request(t, sB, "PUT", "/mytopic", "test", nil).Code, "request %d on node B", i+1)
+	}
+	require.Equal(t, 429, request(t, sB, "PUT", "/mytopic", "test", nil).Code)
 }

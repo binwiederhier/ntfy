@@ -76,6 +76,7 @@ type Server struct {
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	cluster           cluster.Cluster                     // Fans messages out to peer cluster nodes (nop when not clustered)
 	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
+	pendingPeerUsage  map[string]*pendingPeerUsage        // Peer usage for visitors this node has not seen yet, burned when the visitor first appears
 	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
 	closeChan         chan bool
 	mu                sync.RWMutex
@@ -168,6 +169,7 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+	pendingPeerUsageTTL      = 5 * time.Minute           // How long peer usage for unseen visitors is remembered; burns are debt-capped, so late burns cost at most one burst
 )
 
 // WebSocket constants
@@ -309,21 +311,22 @@ func New(conf *Config) (*Server, error) {
 		})
 	}
 	s := &Server{
-		config:          conf,
-		db:              pool,
-		messageCache:    messageCache,
-		webPush:         wp,
-		attachment:      attachmentStore,
-		firebaseClient:  firebaseClient,
-		twilio:          twilioClient,
-		mailer:          sender,
-		ban:             banner,
-		topics:          topics,
-		userManager:     userManager,
-		messages:        messages,
-		messagesHistory: []int64{messages},
-		visitors:        make(map[string]*visitor),
-		stripe:          stripe,
+		config:           conf,
+		db:               pool,
+		messageCache:     messageCache,
+		webPush:          wp,
+		attachment:       attachmentStore,
+		firebaseClient:   firebaseClient,
+		twilio:           twilioClient,
+		mailer:           sender,
+		ban:              banner,
+		topics:           topics,
+		userManager:      userManager,
+		messages:         messages,
+		messagesHistory:  []int64{messages},
+		visitors:         make(map[string]*visitor),
+		pendingPeerUsage: make(map[string]*pendingPeerUsage),
+		stripe:           stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	// Cross-node cluster; delivery of peer messages to local subscribers is injected
@@ -351,6 +354,7 @@ func New(conf *Config) (*Server, error) {
 		s.quota, err = quota.New(&quota.Config{
 			FlushInterval:  conf.VisitorUsageFlushInterval,
 			StatsResetTime: conf.VisitorStatsResetTime,
+			PeerUsageFunc:  s.applyPeerUsage,
 		}, pool)
 		if err != nil {
 			return nil, err
@@ -2267,14 +2271,43 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	}
 }
 
+// applyPeerUsage burns request and bandwidth tokens that a visitor consumed on other cluster
+// nodes from this node's local buckets (see visitor.BurnPeerUsage). Called by the usage
+// tracker after each pull. Usage for visitors this node has not seen yet is remembered
+// briefly and burned when the visitor first appears, so a client rotating across nodes
+// cannot collect a fresh burst on every node; entries expire because old consumption would
+// have been replenished by now anyway (token buckets, not daily quotas).
+func (s *Server) applyPeerUsage(key quota.Key, delta quota.Counters) {
+	s.mu.Lock()
+	v, ok := s.visitors[string(key)]
+	if !ok {
+		if pending, exists := s.pendingPeerUsage[string(key)]; exists && pending.expires.After(time.Now()) {
+			pending.counters.Add(delta)
+		} else {
+			s.pendingPeerUsage[string(key)] = newPendingPeerUsage(delta)
+		}
+		s.mu.Unlock()
+		return
+	}
+	s.mu.Unlock()
+	v.BurnPeerUsage(delta)
+}
+
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := visitorID(ip, user, s.config)
 	v, exists := s.visitors[id]
 	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, s.quota, ip, user)
-		return s.visitors[id]
+		v = newVisitor(s.config, s.messageCache, s.userManager, s.quota, ip, user)
+		s.visitors[id] = v
+		if pending, ok := s.pendingPeerUsage[id]; ok {
+			delete(s.pendingPeerUsage, id)
+			if pending.expires.After(time.Now()) {
+				v.BurnPeerUsage(pending.counters)
+			}
+		}
+		return v
 	}
 	v.Keepalive()
 	v.SetUser(user) // Always update with the latest user, may be nil!
@@ -2300,5 +2333,19 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 	s.mu.Unlock()
 	if err := s.messageCache.UpdateStats(messagesCount); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
+	}
+}
+
+// pendingPeerUsage holds peer-node usage reported for a visitor before this node has seen it;
+// burned from the visitor's buckets on first contact, dropped when it expires unclaimed
+type pendingPeerUsage struct {
+	counters quota.Counters
+	expires  time.Time
+}
+
+func newPendingPeerUsage(delta quota.Counters) *pendingPeerUsage {
+	return &pendingPeerUsage{
+		counters: delta,
+		expires:  time.Now().Add(pendingPeerUsageTTL),
 	}
 }

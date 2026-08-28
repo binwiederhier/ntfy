@@ -1,6 +1,8 @@
 package server
 
 import (
+	"time"
+
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/util"
@@ -121,6 +123,13 @@ func (s *Server) pruneVisitors() {
 					log.Tag(tagManager).With(v).Trace("Deleting stale visitor")
 					delete(s.visitors, ip)
 					staleVisitors++
+				}
+			}
+			// Peer usage remembered for visitors that never showed up expires alongside
+			now := time.Now()
+			for key, pending := range s.pendingPeerUsage {
+				if pending.expires.Before(now) {
+					delete(s.pendingPeerUsage, key)
 				}
 			}
 		}).

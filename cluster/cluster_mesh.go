@@ -172,7 +172,9 @@ func (c *meshCluster) heartbeat() error {
 	} else {
 		metrics.ClusterLeader.Set(0)
 	}
-	peers, err := c.registry.Peers()
+	// A fresh read (not the cached view): heartbeat cadence bounds how long a newly joined
+	// peer can go unseen; ForwardMessage keeps using the cache on the hot path
+	peers, err := c.registry.Refresh()
 	if err != nil {
 		return err
 	}

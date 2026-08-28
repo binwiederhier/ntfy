@@ -126,6 +126,22 @@ func (r *Registry) Deregister() error {
 	return err
 }
 
+// Refresh reads the live peer set from the database, bypassing and replacing the cache. The
+// mesh calls it on every heartbeat tick, so peer-set staleness is bounded by the heartbeat
+// interval, not the (much longer) cache TTL: without this, a freshly joined node stays
+// invisible to established peers -- and receives no fan-out -- for up to a full TTL.
+func (r *Registry) Refresh() ([]*Peer, error) {
+	peers, err := r.queryPeers()
+	if err != nil {
+		return nil, err
+	}
+	r.mu.Lock()
+	r.peers = peers
+	r.peersFetched = time.Now()
+	r.mu.Unlock()
+	return peers, nil
+}
+
 // queryPeers reads the current live peer set from the registry table.
 func (r *Registry) queryPeers() ([]*Peer, error) {
 	cutoff := time.Now().Add(-r.ttl).Unix()

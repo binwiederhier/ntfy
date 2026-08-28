@@ -220,3 +220,31 @@ func countRows(t *testing.T, pool *db.DB, nodeID string) int {
 	require.Nil(t, pool.QueryRow(`SELECT COUNT(*) FROM node_registry WHERE node_id = $1`, nodeID).Scan(&count))
 	return count
 }
+
+func TestRegistry_RefreshBypassesCache(t *testing.T) {
+	// Peers() serves a cached view for up to the TTL; Refresh (called by the mesh heartbeat)
+	// must see a newly joined node immediately and replace the cache with the fresh view
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	require.Nil(t, err)
+	require.Nil(t, r1.Register())
+	peers, err := r1.Peers()
+	require.Nil(t, err)
+	require.Len(t, peers, 0) // Cache primed while alone
+
+	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
+	require.Nil(t, err)
+	require.Nil(t, r2.Register())
+	peers, err = r1.Peers()
+	require.Nil(t, err)
+	require.Len(t, peers, 0) // Still the cached view (TTL far away)
+
+	peers, err = r1.Refresh()
+	require.Nil(t, err)
+	require.Len(t, peers, 1)
+	require.Equal(t, "node-2", peers[0].NodeID)
+	peers, err = r1.Peers() // The cache now holds the fresh view
+	require.Nil(t, err)
+	require.Len(t, peers, 1)
+}

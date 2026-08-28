@@ -2093,7 +2093,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-### ntfy iOS app v1.8.0 (UNRELEASED)
+### ntfy server v2.29.0 (UNRELEASED)
+
+**Features:**
+
+* **Experimental clustering:** ntfy can now run as a cluster of stateless nodes behind a shared PostgreSQL database. Nodes discover each other via a node registry, deliver published messages to subscribers on any node over a private peer mesh (`cluster-listen`, `cluster-node-id`, `cluster-advertise-url`, `cluster-secret`), route by live subscription knowledge, and elect a leader for singleton background jobs. Scheduled (delayed) messages are delivered exactly once across the cluster, daily visitor quotas (messages, emails, calls) and the request/bandwidth budgets are enforced cluster-wide, UnifiedPush subscriber-based rate limiting works across nodes, and reservation takeover / access revocation disconnect subscribers on all nodes
+
+**Bug fixes + maintenance:**
+
+* Fix `since=<id>` replays resolving the message ID with an unscoped subquery: an ID that resolved to a message in another topic could silently skip messages, two messages sharing an ID made the lookup fail, and (with read replicas) an ID the replica had not seen yet replayed the topic's entire retained history
+* Fix the global message counter and per-user stats being overwritten by concurrent writers; both are now written as increments
 
 **Features:**
 

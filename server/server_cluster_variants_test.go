@@ -8,6 +8,7 @@ package server
 // schema with real, mutually reachable fan-out listeners.
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -19,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SherClockHolmes/webpush-go"
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/user"
@@ -410,4 +413,200 @@ func TestServer_ClusterVariant_Upstream_ForwardedOnceByOriginOnly(t *testing.T) 
 	require.Equal(t, 2, len(messages)) // Message did reach node B ...
 	time.Sleep(500 * time.Millisecond)
 	require.Equal(t, int32(1), upstreamRequests.Load()) // ... but only the origin forwarded it
+}
+
+func TestServer_ClusterVariant_CancelScheduled_ViaPeer(t *testing.T) {
+	// Variant of TestServer_DeleteScheduledMessage: canceling a scheduled message by sequence
+	// ID on another node must prevent delivery on every node and emit message_delete
+	cluster := newTestCluster(t, 2, nil)
+	sA, sB := cluster[0], cluster[1]
+
+	subscribeRR := httptest.NewRecorder()
+	subscribeCancel := subscribe(t, sA, "/mytopic/json", subscribeRR)
+
+	response := request(t, sA, "PUT", "/mytopic/cancel-seq", "never sent", map[string]string{"In": "1h"})
+	require.Equal(t, 200, response.Code)
+	msg := toMessage(t, response.Body.String())
+
+	// Cancel via the OTHER node before it is due
+	require.Equal(t, 200, request(t, sB, "DELETE", "/mytopic/cancel-seq", "", nil).Code)
+
+	// Even if it were due now, no node delivers it
+	_ = sA.messageCache.UpdateMessageTime(msg.ID, time.Now().Add(-10*time.Second).Unix())
+	require.Nil(t, sA.sendDelayedMessages())
+	require.Nil(t, sB.sendDelayedMessages())
+
+	subscribeCancel()
+	messages := toMessages(t, subscribeRR.Body.String())
+	for _, m := range messages {
+		require.NotEqual(t, "never sent", m.Message)
+	}
+	require.Equal(t, "message_delete", messages[len(messages)-1].Event)
+}
+
+func TestServer_ClusterVariant_SSEStream_FromPeerNode(t *testing.T) {
+	// Variant of the SSE subscription: the /sse serializer sits on the same delivery seam, but
+	// pin it anyway -- Android/web fallbacks rely on it
+	cluster := newTestCluster(t, 2, nil)
+	sA, sB := cluster[0], cluster[1]
+
+	subscribeRR := httptest.NewRecorder()
+	subscribeCancel := subscribe(t, sB, "/mytopic/sse", subscribeRR)
+
+	require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "sse hello", nil).Code)
+
+	subscribeCancel()
+	body := subscribeRR.Body.String()
+	require.Contains(t, body, "event: open")
+	require.Contains(t, body, "sse hello")
+}
+
+func TestServer_ClusterVariant_PollModes_OnPeer(t *testing.T) {
+	// Variants of "fetch latest message", "fetch scheduled messages", and the iOS NSE's
+	// fetch-by-ID (GET /topic/json?poll=1&id=<mid>): all read the shared cache, so they must
+	// work on any node regardless of where the message was published
+	cluster := newTestCluster(t, 2, nil)
+	sA, sB := cluster[0], cluster[1]
+
+	require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "older", nil).Code)
+	response := request(t, sA, "PUT", "/mytopic", "newest", nil)
+	require.Equal(t, 200, response.Code)
+	newest := toMessage(t, response.Body.String())
+	response = request(t, sA, "PUT", "/mytopic", "scheduled", map[string]string{"In": "1h"})
+	require.Equal(t, 200, response.Code)
+	scheduled := toMessage(t, response.Body.String())
+
+	// since=latest on the peer returns only the newest (non-scheduled) message
+	messages := toMessages(t, request(t, sB, "GET", "/mytopic/json?poll=1&since=latest", "", nil).Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, newest.ID, messages[0].ID)
+
+	// sched=1 on the peer includes the scheduled message
+	messages = toMessages(t, request(t, sB, "GET", "/mytopic/json?poll=1&sched=1", "", nil).Body.String())
+	ids := make([]string, 0)
+	for _, m := range messages {
+		ids = append(ids, m.ID)
+	}
+	require.Contains(t, ids, scheduled.ID)
+
+	// Fetch-by-ID on the peer (iOS notification service extension pattern)
+	messages = toMessages(t, request(t, sB, "GET", fmt.Sprintf("/mytopic/json?poll=1&id=%s", newest.ID), "", nil).Body.String())
+	require.Equal(t, 1, len(messages))
+	require.Equal(t, "newest", messages[0].Message)
+}
+
+func TestServer_ClusterVariant_TopicAuthEndpointAndQueryParamAuth(t *testing.T) {
+	// Variants of the Android read-access probe (GET /<topic>/auth) and query-param auth
+	// (?auth=<base64>, used where headers are impossible, e.g. WebSocket/EventSource):
+	// credentials and grants live in the shared database and must work via any node
+	cluster := newTestCluster(t, 2, func(i int, conf *Config) {
+		conf.AuthDefault = user.PermissionDenyAll
+		conf.AuthBcryptCost = 4
+	})
+	sA, sB := cluster[0], cluster[1]
+
+	require.Nil(t, sA.userManager.AddUser("phil", "phil12345", user.RoleUser, false))
+	require.Nil(t, sA.userManager.AllowAccess("phil", "mytopic", user.PermissionReadWrite))
+
+	// Android subscription probe against the peer node
+	require.Equal(t, 200, request(t, sB, "GET", "/mytopic/auth", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil12345"),
+	}).Code)
+	require.Equal(t, 403, request(t, sB, "GET", "/mytopic/auth", "", nil).Code)
+
+	// Query-param auth against the peer node
+	authParam := base64.RawURLEncoding.EncodeToString([]byte(util.BasicAuth("phil", "phil12345")))
+	require.Equal(t, 200, request(t, sB, "GET", "/mytopic/json?poll=1&auth="+authParam, "", nil).Code)
+}
+
+func TestServer_ClusterVariant_WebPush_SinglePushFromOrigin(t *testing.T) {
+	// Variant of TestServer_WebPush_Publish: web push subscriptions live in the shared
+	// database, but only the ORIGIN node sends the push -- a peer receiving the message via
+	// fan-out must not send a second one (double notifications on real devices)
+	var pushes atomic.Int32
+	pushService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.Copy(io.Discard, r.Body)
+		pushes.Add(1)
+	}))
+	defer pushService.Close()
+
+	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
+	require.Nil(t, err)
+	cluster := newTestCluster(t, 2, func(i int, conf *Config) {
+		conf.WebPushEmailAddress = "testing@example.com"
+		conf.WebPushPrivateKey = privateKey
+		conf.WebPushPublicKey = publicKey
+	})
+	sA, sB := cluster[0], cluster[1]
+
+	// Subscription registered via node B; live subscriber on B forces the cross-node hop
+	require.Nil(t, sB.webPush.UpsertSubscription(pushService.URL+"/push-receive", "kSC3T8aN1JCQxxPdrFLrZg", "BMKKbxdUU_xLS7G1Wh5AN8PvWOjCzkCuKZYb8apcqYrDxjOF_2piggBnoJLQYx9IeSD70fNuwawI3e9Y8m3S3PE", "u_123", netip.MustParseAddr("1.2.3.4"), []string{"mytopic"}))
+	subscribeRR := httptest.NewRecorder()
+	subscribeCancel := subscribe(t, sB, "/mytopic/json", subscribeRR)
+
+	require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "push once", nil).Code)
+
+	waitFor(t, func() bool { return pushes.Load() >= 1 })
+	subscribeCancel()
+	require.Equal(t, 2, len(toMessages(t, subscribeRR.Body.String()))) // Message crossed nodes
+	time.Sleep(500 * time.Millisecond)
+	require.Equal(t, int32(1), pushes.Load()) // ... but exactly one web push was sent
+}
+
+func TestServer_ClusterVariant_TierChange_PickedUpOnPeer(t *testing.T) {
+	// Tier changes are written to the shared database via one node; other nodes re-read the
+	// user per request and rebuild limiters when the tier changed, so new limits apply on the
+	// peer within one request
+	cluster := newTestCluster(t, 2, func(i int, conf *Config) {
+		conf.AuthDefault = user.PermissionReadWrite
+		conf.AuthBcryptCost = 4
+		conf.VisitorRequestLimitBurst = 100
+	})
+	sA, sB := cluster[0], cluster[1]
+
+	require.Nil(t, sA.userManager.AddTier(&user.Tier{Code: "tiny", MessageLimit: 2}))
+	require.Nil(t, sA.userManager.AddTier(&user.Tier{Code: "big", MessageLimit: 100}))
+	require.Nil(t, sA.userManager.AddUser("phil", "phil12345", user.RoleUser, false))
+	require.Nil(t, sA.userManager.ChangeTier("phil", "tiny"))
+	auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil12345")}
+
+	// Exhaust the tiny tier on node B
+	require.Equal(t, 200, request(t, sB, "PUT", "/mytopic", "1", auth).Code)
+	require.Equal(t, 200, request(t, sB, "PUT", "/mytopic", "2", auth).Code)
+	require.Equal(t, 429, request(t, sB, "PUT", "/mytopic", "3", auth).Code)
+
+	// Upgrade via node A; node B honors the new tier on the next request
+	require.Nil(t, sA.userManager.ChangeTier("phil", "big"))
+	require.Equal(t, 200, request(t, sB, "PUT", "/mytopic", "4", auth).Code)
+}
+
+func TestServer_ClusterVariant_WebSocket_SubscribeOnPeer(t *testing.T) {
+	// Variant of the Android app's primary transport: a real WebSocket subscription
+	// (GET /<topic>/ws?since=all) on node B receives a message published on node A.
+	// There is no single-node WebSocket-client test to mirror; this doubles as one.
+	cluster := newTestCluster(t, 2, nil)
+	sA, sB := cluster[0], cluster[1]
+
+	publicB := httptest.NewServer(http.HandlerFunc(sB.handle))
+	defer publicB.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(publicB.URL, "http") + "/mytopic/ws"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.Nil(t, err)
+	defer conn.Close()
+
+	// First frame is the open event
+	_, frame, err := conn.ReadMessage()
+	require.Nil(t, err)
+	require.Equal(t, "open", toMessage(t, string(frame)).Event)
+
+	require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "over the wire", map[string]string{"Title": "ws title"}).Code)
+
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	_, frame, err = conn.ReadMessage()
+	require.Nil(t, err)
+	m := toMessage(t, string(frame))
+	require.Equal(t, "message", m.Event)
+	require.Equal(t, "over the wire", m.Message)
+	require.Equal(t, "ws title", m.Title)
 }

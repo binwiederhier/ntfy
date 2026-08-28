@@ -62,6 +62,10 @@ I would be very humbled by your sponsorship. ❤️
 [Install / Self-hosting](https://ntfy.sh/docs/install/) |
 [Building](https://ntfy.sh/docs/develop/)
 
+## Cloud Hosting
+
+Deploy your own ntfy instance with one click on [RepoCloud](https://repocloud.io/details/ntfy/).
+
 ## Chat/forum
 There are a few ways to get in touch with me and/or the rest of the community. Feel free to use any of these methods. Whatever
 works best for you:

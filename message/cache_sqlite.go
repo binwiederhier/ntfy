@@ -75,7 +75,7 @@ const (
 	sqliteSelectAttachmentsWithSizesQuery    = `SELECT mid, attachment_size FROM messages WHERE attachment_expires > ? AND attachment_deleted = 0`
 
 	sqliteSelectStatsQuery       = `SELECT value FROM stats WHERE key = 'messages'`
-	sqliteUpdateStatsQuery       = `UPDATE stats SET value = ? WHERE key = 'messages'`
+	sqliteUpdateStatsQuery       = `UPDATE stats SET value = value + ? WHERE key = 'messages'`
 	sqliteUpdateMessageTimeQuery = `UPDATE messages SET time = ? WHERE mid = ?`
 )
 

@@ -80,6 +80,7 @@ type Server struct {
 	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
 	rateVisitors      *ratevisitor.Store                  // Shared topic -> rate-visitor assignments (UnifiedPush); nil when not clustered
 	pendingPeerUsage  map[string]*pendingPeerUsage        // Peer usage for visitors this node has not seen yet, burned when the visitor first appears
+	stopOnce          sync.Once                           // Makes Stop idempotent (double close panics otherwise)
 	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
 	closeChan         chan bool
 	mu                sync.RWMutex
@@ -571,6 +572,18 @@ func (s *Server) Run() error {
 
 // Stop stops HTTP (+HTTPS) server and all managers
 func (s *Server) Stop() {
+	s.stopOnce.Do(s.stop) // Idempotent: tests and signal handlers may stop more than once
+}
+
+func (s *Server) stop() {
+	// Close the usage tracker BEFORE taking the server lock: its flush loop calls back into
+	// applyPeerUsage, which takes s.mu -- closing it under the lock deadlocks with a flush
+	// tick that is already waiting for the lock (Close waits for the loop, the loop waits for
+	// s.mu, Stop holds s.mu). Usage counted during the remaining shutdown is discarded, which
+	// is fine: the final flush below the lock would race the closing databases anyway.
+	if s.quota != nil {
+		s.quota.Close()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.httpServer != nil {
@@ -593,9 +606,6 @@ func (s *Server) Stop() {
 	}
 	if s.cluster != nil {
 		s.cluster.Close()
-	}
-	if s.quota != nil {
-		s.quota.Close() // Flushes remaining usage deltas; must run before the databases close
 	}
 	s.closeDatabases()
 	if s.ban != nil {

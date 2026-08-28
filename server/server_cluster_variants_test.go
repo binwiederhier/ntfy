@@ -610,3 +610,51 @@ func TestServer_ClusterVariant_WebSocket_SubscribeOnPeer(t *testing.T) {
 	require.Equal(t, "over the wire", m.Message)
 	require.Equal(t, "ws title", m.Title)
 }
+
+func TestServer_ClusterVariant_StopCompletesWithBlockedUsageFlush(t *testing.T) {
+	// Regression: Stop used to hold s.mu while waiting for the usage tracker's flush loop; a
+	// flush tick blocked in applyPeerUsage (which needs s.mu) then deadlocked shutdown (seen
+	// as the full test suite hanging). Stop now closes the tracker before taking the lock, so
+	// it completes as soon as whoever holds s.mu releases it.
+	cluster := newTestCluster(t, 2, func(i int, conf *Config) {
+		conf.VisitorUsageFlushInterval = 50 * time.Millisecond
+	})
+	sA, sB := cluster[0], cluster[1]
+
+	// Continuous publishes on B ensure A's pulls keep reporting peer usage (each pull calls
+	// back into applyPeerUsage on A)
+	stopPublishing := make(chan struct{})
+	publishingDone := make(chan struct{})
+	go func() {
+		defer close(publishingDone)
+		for {
+			select {
+			case <-stopPublishing:
+				return
+			default:
+				request(t, sB, "PUT", "/mytopic", "x", nil)
+				time.Sleep(20 * time.Millisecond)
+			}
+		}
+	}()
+	time.Sleep(400 * time.Millisecond) // A has pulled peer usage at least once
+
+	// Hold the server lock so the next flush tick blocks inside applyPeerUsage, then stop the
+	// server while the lock is still held
+	sA.mu.Lock()
+	time.Sleep(200 * time.Millisecond) // > flush interval: a tick is now waiting for s.mu
+	stopDone := make(chan struct{})
+	go func() {
+		sA.Stop()
+		close(stopDone)
+	}()
+	time.Sleep(200 * time.Millisecond) // Stop is now underway with the tick still blocked
+	sA.mu.Unlock()
+	select {
+	case <-stopDone:
+	case <-time.After(15 * time.Second):
+		t.Fatal("Server.Stop deadlocked with the usage flush loop")
+	}
+	close(stopPublishing)
+	<-publishingDone
+}

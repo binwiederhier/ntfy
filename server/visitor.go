@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+	"heckel.io/ntfy/v2/cluster/quota"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/user"
@@ -57,6 +58,8 @@ type visitor struct {
 	config               *Config
 	messageCache         *message.Cache
 	userManager          *user.Manager      // May be nil
+	quota                *quota.Tracker     // Cluster-wide usage counters; nil when not clustered (see quotaAllowedNoLock)
+	quotaKey             quota.Key          // This visitor's usage key, same identity as the visitor ID; updated on SetUser
 	ip                   netip.Addr         // Visitor IP address
 	user                 *user.User         // Only set if authenticated user, otherwise nil
 	requestLimiter       *rate.Limiter      // Rate limiter for (almost) all requests (including messages)
@@ -118,7 +121,7 @@ const (
 	visitorLimitBasisTier = visitorLimitBasis("tier")
 )
 
-func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
+func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Manager, tracker *quota.Tracker, ip netip.Addr, user *user.User) *visitor {
 	var messages, emails, calls int64
 	if user != nil {
 		messages = user.Stats.Messages
@@ -129,6 +132,8 @@ func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Man
 		config:               conf,
 		messageCache:         messageCache,
 		userManager:          userManager, // May be nil
+		quota:                tracker,     // May be nil (not clustered)
+		quotaKey:             quota.Key(visitorID(ip, user, conf)),
 		ip:                   ip,
 		user:                 user,
 		firebase:             time.Unix(0, 0),
@@ -212,7 +217,13 @@ func visitorExtendedInfoContext(info *visitorInfo) log.Context {
 func (v *visitor) RequestAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.requestLimiter.Allow()
+	if !v.requestLimiter.Allow() {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{Requests: 1})
+	}
+	return true
 }
 
 func (v *visitor) FirebaseAllowed() bool {
@@ -230,19 +241,56 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 func (v *visitor) MessageAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.messagesLimiter.Allow()
+	if !v.quotaAllowedNoLock(v.limitsNoLock().MessageLimit, func(c quota.Counters) int64 { return c.Messages }) {
+		return false
+	}
+	if !v.messagesLimiter.Allow() {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{Messages: 1})
+	}
+	return true
 }
 
 func (v *visitor) EmailAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.emailsLimiter.Allow()
+	if !v.quotaAllowedNoLock(v.limitsNoLock().EmailLimit, func(c quota.Counters) int64 { return c.Emails }) {
+		return false
+	}
+	if !v.emailsLimiter.Allow() {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{Emails: 1})
+	}
+	return true
 }
 
 func (v *visitor) CallAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.callsLimiter.Allow()
+	if !v.quotaAllowedNoLock(v.limitsNoLock().CallLimit, func(c quota.Counters) int64 { return c.Calls }) {
+		return false
+	}
+	if !v.callsLimiter.Allow() {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{Calls: 1})
+	}
+	return true
+}
+
+// quotaAllowedNoLock reports whether the cluster-wide usage for this visitor is still below the
+// given daily limit. Always true when not clustered, or when the limit is zero (zero limits are
+// enforced by the local limiters, which know whether zero means "none allowed" or "unlimited").
+func (v *visitor) quotaAllowedNoLock(limit int64, counter func(quota.Counters) int64) bool {
+	if v.quota == nil || limit <= 0 {
+		return true
+	}
+	return counter(v.quota.Totals(v.quotaKey)) < limit
 }
 
 func (v *visitor) SubscriptionAllowed() bool {
@@ -407,6 +455,7 @@ func (v *visitor) SetUser(u *user.User) {
 	defer v.mu.Unlock()
 	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
 	v.user = u                                           // u may be nil!
+	v.quotaKey = quota.Key(visitorID(v.ip, u, v.config))
 	if shouldResetLimiters {
 		var messages, emails, calls int64
 		if u != nil {
@@ -452,7 +501,7 @@ func (v *visitor) resetLimitersNoLock(messages, emails, calls int64, enqueueUpda
 		v.authLimiter = nil    // Users are already logged in, no need to limit requests
 	}
 	v.statsPersisted = user.Stats{Messages: messages, Emails: emails, Calls: calls} // Seeds come from the persisted user stats, so nothing is owed to the queue
-	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor") // Must be after function, because contextNoLock() describes rate limiters
+	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor")          // Must be after function, because contextNoLock() describes rate limiters
 }
 
 func (v *visitor) Limits() *visitorLimits {

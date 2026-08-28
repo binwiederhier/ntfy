@@ -19,6 +19,7 @@ func (s *Server) execManager() {
 		s.pruneAttachments()
 		s.pruneMessages()
 		s.pruneAndNotifyWebPushSubscriptions()
+		s.pruneVisitorUsage()
 	}
 
 	// Message count
@@ -182,4 +183,15 @@ func (s *Server) pruneMessages() {
 			}
 		}).
 		Debug("Finished deleting expired messages")
+}
+
+// pruneVisitorUsage deletes old per-day visitor usage rows (cluster mode only); the retention
+// lives in the quota package. Leader-only, like the other shared-database prunes.
+func (s *Server) pruneVisitorUsage() {
+	if s.quota == nil {
+		return
+	}
+	if err := s.quota.Prune(); err != nil {
+		log.Tag(tagManager).Err(err).Warn("Error pruning visitor usage")
+	}
 }

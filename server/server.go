@@ -33,6 +33,7 @@ import (
 	"heckel.io/ntfy/v2/attachment"
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/cluster"
+	"heckel.io/ntfy/v2/cluster/quota"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -74,6 +75,7 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	cluster           cluster.Cluster                     // Fans messages out to peer cluster nodes (nop when not clustered)
+	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
 	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
 	closeChan         chan bool
 	mu                sync.RWMutex
@@ -342,6 +344,18 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Cluster-wide visitor usage: nodes count locally and converge via the shared database, so
+	// daily quotas hold across the cluster instead of multiplying by node count. Single-node
+	// setups (no cluster-listen) keep their purely local limiters (s.quota stays nil).
+	if conf.ClusterListen != "" && pool != nil {
+		s.quota, err = quota.New(&quota.Config{
+			FlushInterval:  conf.VisitorUsageFlushInterval,
+			StatsResetTime: conf.VisitorStatsResetTime,
+		}, pool)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// The cluster routes messages by subscription knowledge: peers learn this node's live topics
 	// via periodic state pushes (liveTopics) and immediate announcements on a topic's first
 	// subscriber (the hook below; also set in topicsFromIDs for topics created later)
@@ -566,6 +580,9 @@ func (s *Server) Stop() {
 	}
 	if s.cluster != nil {
 		s.cluster.Close()
+	}
+	if s.quota != nil {
+		s.quota.Close() // Flushes remaining usage deltas; must run before the databases close
 	}
 	s.closeDatabases()
 	if s.ban != nil {
@@ -2083,7 +2100,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
+	v := newVisitor(s.config, s.messageCache, s.userManager, s.quota, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -2256,7 +2273,7 @@ func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	id := visitorID(ip, user, s.config)
 	v, exists := s.visitors[id]
 	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, ip, user)
+		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, s.quota, ip, user)
 		return s.visitors[id]
 	}
 	v.Keepalive()

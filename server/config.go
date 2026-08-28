@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"heckel.io/ntfy/v2/cluster"
+	"heckel.io/ntfy/v2/cluster/quota"
 
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/user"
@@ -210,6 +211,7 @@ type Config struct {
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
 	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
+	VisitorUsageFlushInterval            time.Duration  // Cadence for flushing/pulling cluster-wide visitor usage (cluster mode only; no CLI flag, tests override it)
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
@@ -327,6 +329,7 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
+		VisitorUsageFlushInterval:            quota.DefaultFlushInterval,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address

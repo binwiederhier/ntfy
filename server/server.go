@@ -34,6 +34,7 @@ import (
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/cluster/quota"
+	"heckel.io/ntfy/v2/cluster/ratevisitor"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -77,6 +78,7 @@ type Server struct {
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	cluster           cluster.Cluster                     // Fans messages out to peer cluster nodes (nop when not clustered)
 	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
+	rateVisitors      *ratevisitor.Store                  // Shared topic -> rate-visitor assignments (UnifiedPush); nil when not clustered
 	pendingPeerUsage  map[string]*pendingPeerUsage        // Peer usage for visitors this node has not seen yet, burned when the visitor first appears
 	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
 	closeChan         chan bool
@@ -171,6 +173,7 @@ const (
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
 	pendingPeerUsageTTL      = 5 * time.Minute           // How long peer usage for unseen visitors is remembered; burns are debt-capped, so late burns cost at most one burst
+	rateVisitorMissTTL       = 30 * time.Second          // How long a failed shared-store rate-visitor lookup is cached on the topic
 )
 
 // WebSocket constants
@@ -357,6 +360,10 @@ func New(conf *Config) (*Server, error) {
 			StatsResetTime: conf.VisitorStatsResetTime,
 			PeerUsageFunc:  s.applyPeerUsage,
 		}, pool)
+		if err != nil {
+			return nil, err
+		}
+		s.rateVisitors, err = ratevisitor.New(pool)
 		if err != nil {
 			return nil, err
 		}
@@ -1009,7 +1016,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && s.rateVisitor(t) == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
@@ -1832,7 +1839,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	// Make a list of topics that we'll actually set the RateVisitor on
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
+		if isUnifiedPushTopic(t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
@@ -1875,8 +1882,21 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
 		t.SetRateVisitor(v)
+		// Cluster: persist the assignment so publishes on other nodes bill this subscriber too.
+		// Same lifetime as the in-memory assignment (the visitor goes stale after a day);
+		// failures are logged only, the local assignment still works (fail open).
+		if s.rateVisitors != nil {
+			if err := s.rateVisitors.Set(t.ID, string(v.QuotaKey()), v.MaybeUserID(), time.Now().Add(visitorExpungeAfter)); err != nil {
+				logvr(v, r).Tag(tagSubscribe).Err(err).With(t).Warn("Cannot persist rate visitor for topic %s", t.ID)
+			}
+		}
 	}
 	return nil
+}
+
+// isUnifiedPushTopic reports whether the topic ID has the UnifiedPush shape ("up" + 12 chars)
+func isUnifiedPushTopic(id string) bool {
+	return strings.HasPrefix(id, unifiedPushTopicPrefix) && len(id) == unifiedPushTopicLength
 }
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the
@@ -2270,6 +2290,56 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 		}
 		return nil
 	}
+}
+
+// rateVisitor returns the topic's rate visitor: the in-memory one if present, otherwise (in
+// cluster mode) resolved from the shared assignment store, so a UnifiedPush subscriber on one
+// node bills publishes arriving on any node. A successful resolution is cached on the topic
+// via SetRateVisitor; misses are cached briefly to keep the database off the publish path.
+func (s *Server) rateVisitor(t *topic) *visitor {
+	if v := t.RateVisitor(); v != nil {
+		return v
+	}
+	if s.rateVisitors == nil || !s.config.VisitorSubscriberRateLimiting || !isUnifiedPushTopic(t.ID) || t.RateVisitorMissedRecently(rateVisitorMissTTL) {
+		return nil
+	}
+	visitorKey, userID, err := s.rateVisitors.Get(t.ID)
+	if err != nil {
+		if !errors.Is(err, ratevisitor.ErrNotFound) {
+			log.Tag(tagSubscribe).Err(err).With(t).Warn("Cannot resolve rate visitor for topic %s", t.ID)
+		}
+		t.SetRateVisitorMiss()
+		return nil
+	}
+	v, err := s.visitorFromKey(visitorKey, userID)
+	if err != nil {
+		log.Tag(tagSubscribe).Err(err).With(t).Warn("Cannot reconstruct rate visitor %s for topic %s", visitorKey, t.ID)
+		t.SetRateVisitorMiss()
+		return nil
+	}
+	t.SetRateVisitor(v)
+	return v
+}
+
+// visitorFromKey rebuilds a visitor from its identity key ("ip:<addr>" or "user:<id>"), used
+// when another cluster node registered the visitor (e.g. as a rate visitor)
+func (s *Server) visitorFromKey(visitorKey, userID string) (*visitor, error) {
+	if userID != "" {
+		if s.userManager == nil {
+			return nil, errors.New("user-keyed visitor but no user manager")
+		}
+		u, err := s.userManager.UserByID(userID)
+		if err != nil {
+			return nil, err
+		}
+		// The IP is not part of a user-keyed visitor's identity; it is only informational
+		return s.visitor(netip.IPv4Unspecified(), u), nil
+	}
+	ip, err := netip.ParseAddr(strings.TrimPrefix(visitorKey, "ip:"))
+	if err != nil {
+		return nil, err
+	}
+	return s.visitor(ip, nil), nil
 }
 
 // applyPeerUsage burns request and bandwidth tokens that a visitor consumed on other cluster

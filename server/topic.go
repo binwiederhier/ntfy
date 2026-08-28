@@ -23,6 +23,7 @@ type topic struct {
 	ID                string
 	subscribers       map[int]*topicSubscriber
 	rateVisitor       *visitor
+	rateVisitorMissAt time.Time // Last failed shared-store lookup; throttles per-publish lookups for topics without a rate visitor
 	lastAccess        time.Time
 	onFirstSubscriber func() // Fired (async) when the subscriber count goes 0 -> 1; may be nil
 	mu                sync.RWMutex
@@ -99,6 +100,21 @@ func (t *topic) RateVisitor() *visitor {
 		t.rateVisitor = nil
 	}
 	return t.rateVisitor
+}
+
+// SetRateVisitorMiss records that a shared-store rate-visitor lookup found nothing, so the
+// next publishes do not hit the database again right away
+func (t *topic) SetRateVisitorMiss() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rateVisitorMissAt = time.Now()
+}
+
+// RateVisitorMissedRecently reports whether a shared-store lookup failed within the TTL
+func (t *topic) RateVisitorMissedRecently(ttl time.Duration) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return time.Since(t.rateVisitorMissAt) < ttl
 }
 
 // Unsubscribe removes the subscription from the list of subscribers

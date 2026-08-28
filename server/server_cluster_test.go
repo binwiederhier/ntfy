@@ -417,3 +417,38 @@ func TestServer_Cluster_RequestLimitBurnsAcrossNodes(t *testing.T) {
 	}
 	require.Equal(t, 429, request(t, sB, "PUT", "/mytopic", "test", nil).Code)
 }
+
+func TestServer_Cluster_UnifiedPushRateVisitorAcrossNodes(t *testing.T) {
+	// With subscriber-based rate limiting, a UnifiedPush publish requires a prior subscriber
+	// (else 507) and is billed to the subscriber, not the publisher. In-memory that only works
+	// when both hit the same node; the shared assignment store must bridge nodes: subscribe on
+	// node B, publish on node A.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = "127.0.0.1:1" // Enables clustering; fan-out target never actually called
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		conf.VisitorUsageFlushInterval = 150 * time.Millisecond
+		conf.VisitorSubscriberRateLimiting = true
+		return newTestServer(t, conf)
+	}
+	sA, sB := newNode("node-a"), newNode("node-b")
+
+	// Publishing without any subscriber must return 507 (checked on node B; the failed lookup
+	// is cached per topic for a while, so node A must not probe before the subscribe)
+	require.Equal(t, 507, request(t, sB, "PUT", "/up123456789012?up=1", "test", nil).Code)
+
+	// Subscribe on node B (default test IP 9.9.9.9 becomes the rate visitor)
+	require.Equal(t, 200, request(t, sB, "GET", "/up123456789012/json?poll=1", "", nil).Code)
+
+	// Publish on node A from a DIFFERENT IP: must succeed (no 507) and be billed to the
+	// subscriber's visitor (9.9.9.9), not the publisher's (8.8.8.8)
+	response := request(t, sA, "PUT", "/up123456789012?up=1", "test", nil, func(r *http.Request) {
+		r.RemoteAddr = "8.8.8.8:1234"
+	})
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, int64(1), sA.quota.Totals("ip:9.9.9.9").Messages)
+	require.Equal(t, int64(0), sA.quota.Totals("ip:8.8.8.8").Messages)
+}

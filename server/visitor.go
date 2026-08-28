@@ -452,6 +452,13 @@ func (v *visitor) enqueueUserStatsDeltaNoLock() {
 	v.userManager.EnqueueUserStats(v.user.ID, &delta)
 }
 
+// QuotaKey returns the visitor's usage-tracking identity key ("ip:<addr>" or "user:<id>")
+func (v *visitor) QuotaKey() quota.Key {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.quotaKey
+}
+
 // User returns the visitor user, or nil if there is none
 func (v *visitor) User() *user.User {
 	v.mu.RLock()

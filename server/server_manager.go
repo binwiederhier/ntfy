@@ -203,4 +203,7 @@ func (s *Server) pruneVisitorUsage() {
 	if err := s.quota.Prune(); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Error pruning visitor usage")
 	}
+	if err := s.rateVisitors.Prune(); err != nil {
+		log.Tag(tagManager).Err(err).Warn("Error pruning rate visitor assignments")
+	}
 }

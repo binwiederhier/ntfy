@@ -1260,6 +1260,9 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
+	if len(m.Title) > messageTitleSizeLimit {
+		return false, false, "", "", "", false, "", errHTTPBadRequestTitleTooLarge
+	}
 	m.Click = readParam(r, "x-click", "click")
 	icon := readParam(r, "x-icon", "icon")
 	filename := readParam(r, "x-filename", "filename", "file", "f")
@@ -1326,6 +1329,14 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		priorityStr = "" // Clear since it's already parsed
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
+	// Measured across all tags, not each one: a publisher can add arbitrarily many
+	tagsSize := 0
+	for _, tag := range m.Tags {
+		tagsSize += len(tag)
+	}
+	if tagsSize > messageTagsSizeLimit {
+		return false, false, "", "", "", false, "", errHTTPBadRequestTagsTooLarge
+	}
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")
 	if delayStr != "" {
 		if !cache {
@@ -1537,6 +1548,10 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	}
 	var wlock sync.Mutex
 	var closed bool
+	// Only messages replayed from the cache are charged against the visitor's daily bandwidth
+	// budget, the same one attachment traffic uses. This is set in the poll branch below, which
+	// returns before any Subscribe, so sub() is never called concurrently while it is true.
+	meterPollBandwidth := false
 	defer func() {
 		// This blocks until any in-flight sub() call finishes writing/flushing the response writer,
 		// then marks the connection as closed so future sub() calls are no-ops. This prevents a panic
@@ -1551,16 +1566,22 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		if !filters.Pass(msg) {
 			return nil
 		}
-		m, err := encoder(msg)
+		encoded, err := encoder(msg)
 		if err != nil {
 			return err
+		}
+		// Charge the encoded length, i.e. what actually goes over the wire. Charge before writing,
+		// so an exhausted budget fails the first message and surfaces as a clean 429 with nothing
+		// written.
+		if meterPollBandwidth && !v.BandwidthAllowed(int64(len(encoded))) {
+			return errHTTPTooManyRequestsLimitAttachmentBandwidth
 		}
 		wlock.Lock()
 		defer wlock.Unlock()
 		if closed {
 			return nil
 		}
-		if _, err := w.Write([]byte(m)); err != nil {
+		if _, err := w.Write([]byte(encoded)); err != nil {
 			return err
 		}
 		if fl, ok := w.(http.Flusher); ok {
@@ -1577,7 +1598,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		for _, t := range topics {
 			t.Keepalive()
 		}
-		return s.sendOldMessages(topics, since, scheduled, v, sub)
+		meterPollBandwidth = true
+		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1593,7 +1615,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err := sub(v, model.NewOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
-	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
+	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
 	for {
@@ -1728,7 +1750,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		for _, t := range topics {
 			t.Keepalive()
 		}
-		return s.sendOldMessages(topics, since, scheduled, v, sub)
+		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
@@ -1742,7 +1764,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	if err := sub(v, model.NewOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
-	if err := s.sendOldMessages(topics, since, scheduled, v, sub); err != nil {
+	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
 	err = g.Wait()
@@ -1837,21 +1859,30 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the
 // marker, returning only messages that are newer than the marker.
-func (s *Server) sendOldMessages(topics []*topic, since model.SinceMarker, scheduled bool, v *visitor, sub subscriber) error {
+func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since model.SinceMarker, scheduled bool, v *visitor, sub subscriber) error {
 	if since.IsNone() {
 		return nil
 	}
 	messages := make([]*model.Message, 0)
+	truncated := false
 	for _, t := range topics {
-		topicMessages, err := s.messageCache.Messages(t.ID, since, scheduled)
+		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
 		if err != nil {
 			return err
 		}
+		truncated = truncated || topicTruncated
 		messages = append(messages, topicMessages...)
 	}
-	sort.Slice(messages, func(i, j int) bool {
+	// Stable: Time has second granularity, so a multi-topic replay has many equal keys. An unstable
+	// sort reorders them and a topic's own messages come back out of publish order (#1297).
+	sort.SliceStable(messages, func(i, j int) bool {
 		return messages[i].Time < messages[j].Time
 	})
+	// Must be set before the first message is written, or the header is already on the wire. On the
+	// WebSocket path the response has been hijacked by then, so this is a no-op there.
+	if truncated {
+		w.Header().Set("X-Messages-Truncated", "1")
+	}
 	for _, m := range messages {
 		if err := sub(v, m); err != nil {
 			return err

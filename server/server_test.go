@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -2807,6 +2808,201 @@ func TestServer_PublishAttachmentBandwidthLimit(t *testing.T) {
 		err := toHTTPError(t, response.Body.String())
 		require.Equal(t, 429, response.Code)
 		require.Equal(t, 42905, err.Code)
+	})
+}
+
+func TestServer_PollOrderAcrossTopics(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Replaying several topics at once concatenates each topic's messages and then sorts the
+		// lot by Time, which has second granularity. That sort must not reorder messages that
+		// share a timestamp, or a topic's own messages come back out of publish order. See #1297.
+		//
+		// The messages have to straddle a second boundary: if every timestamp is identical the
+		// concatenation is already sorted and Go's pdqsort leaves it alone, hiding the bug.
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		const perBatch = 10
+		publish := func(batch int) {
+			for _, topic := range []string{"topicA", "topicB"} {
+				for i := 0; i < perBatch; i++ {
+					body := fmt.Sprintf("%s-%02d", topic, batch*perBatch+i)
+					require.Equal(t, 200, request(t, s, "PUT", "/"+topic, body, nil).Code)
+				}
+			}
+		}
+		publish(0)
+		time.Sleep(1100 * time.Millisecond) // Cross a second boundary, so Time is not all-equal
+		publish(1)
+
+		response := request(t, s, "GET", "/topicA,topicB/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 4*perBatch, len(messages))
+
+		// Each topic's own messages must appear in publish order, whatever the interleaving
+		lastSeen := map[string]int{"topicA": -1, "topicB": -1}
+		for _, m := range messages {
+			topic, seqStr, found := strings.Cut(m.Message, "-")
+			require.True(t, found)
+			seq, err := strconv.Atoi(seqStr)
+			require.Nil(t, err)
+			require.Greater(t, seq, lastSeen[topic], "%s came back out of publish order", m.Message)
+			lastSeen[topic] = seq
+		}
+	})
+}
+
+func TestServer_PublishTitleTooLarge(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Title has no length limit of its own, unlike the body, so it is capped here. Prod p999
+		// is 212 bytes and only 16 of ~3M cached messages exceed 1 KB.
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "x", map[string]string{
+			"Title": strings.Repeat("t", messageTitleSizeLimit),
+		}).Code)
+
+		response := request(t, s, "PUT", "/mytopic", "x", map[string]string{
+			"Title": strings.Repeat("t", messageTitleSizeLimit+1),
+		})
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40057, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
+func TestServer_PublishTagsTooLarge(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Same for tags, measured across all of them: prod p999 is 244 bytes and only 197 of ~3M
+		// cached messages exceed 512.
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "x", map[string]string{
+			"Tags": strings.Repeat("g", messageTagsSizeLimit),
+		}).Code)
+
+		response := request(t, s, "PUT", "/mytopic", "x", map[string]string{
+			"Tags": strings.Repeat("g", messageTagsSizeLimit+1),
+		})
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40058, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
+func TestServer_PollSizeLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A poll without "since" replays the entire cache, which is unbounded in size. The cap is
+		// a byte budget rather than a message count, because message sizes vary ~20x in practice:
+		// a count cap truncates cheap high-volume topics while barely touching the expensive
+		// large-message ones it is meant to catch. The newest messages are kept.
+		c := newTestConfig(t, databaseURL)
+		c.MessagePollSizeLimit = 3500 // Fits three 1000-byte messages, not four
+		s := newTestServer(t, c)
+
+		for i := 0; i < 6; i++ {
+			body := fmt.Sprintf("%04d%s", i, strings.Repeat("x", 996)) // 1000 bytes, ordered prefix
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", body, nil).Code)
+		}
+
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, "1", response.Header().Get("X-Messages-Truncated"))
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 3, len(messages))
+		require.Equal(t, "0003", messages[0].Message[:4]) // newest three, oldest first
+		require.Equal(t, "0004", messages[1].Message[:4])
+		require.Equal(t, "0005", messages[2].Message[:4])
+
+		// A topic under the budget is served whole, with no truncation header
+		require.Equal(t, 200, request(t, s, "PUT", "/othertopic", "small", nil).Code)
+		response = request(t, s, "GET", "/othertopic/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Empty(t, response.Header().Get("X-Messages-Truncated"))
+		require.Equal(t, 1, len(toMessages(t, response.Body.String())))
+	})
+}
+
+func TestServer_PollSizeLimitCountsTitle(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Title is user-controlled and has no length limit of its own, so it has to count against
+		// the replay budget too; otherwise a topic of title-heavy messages sails past the cap.
+		c := newTestConfig(t, databaseURL)
+		c.MessagePollSizeLimit = 1600 // Fits one 500-byte title + 500-byte body, not two
+		s := newTestServer(t, c)
+
+		for i := 0; i < 4; i++ {
+			body := fmt.Sprintf("%04d%s", i, strings.Repeat("b", 496))  // 500 bytes
+			title := fmt.Sprintf("%04d%s", i, strings.Repeat("t", 496)) // 500 bytes
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", body, map[string]string{"Title": title}).Code)
+		}
+
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, "1", response.Header().Get("X-Messages-Truncated"))
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 1, len(messages)) // 3 if the title were not counted
+		require.Equal(t, "0003", messages[0].Message[:4])
+	})
+}
+
+func TestServer_PollSizeLimitCountsEveryField(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Every field a publisher can grow has to count against the replay budget, not just the
+		// body and title: tags, click, icon and actions are all user-controlled, so anything left
+		// out is a hole the budget can be walked through.
+		c := newTestConfig(t, databaseURL)
+		c.MessagePollSizeLimit = 900 // Two messages fit if only body+title count; one if all fields do
+		s := newTestServer(t, c)
+
+		tags := make([]string, 5)
+		for i := range tags {
+			tags[i] = strings.Repeat("g", 79) // 395 bytes of tags
+		}
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", fmt.Sprintf("%04d%s", i, strings.Repeat("b", 196)), map[string]string{
+				"Title": strings.Repeat("t", 200),
+				"Tags":  strings.Join(tags, ","),
+				"Click": "https://example.com/" + strings.Repeat("c", 180),
+			}).Code)
+		}
+
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, "1", response.Header().Get("X-Messages-Truncated"))
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 1, len(messages)) // 2 if only body+title were counted
+		require.Equal(t, "0002", messages[0].Message[:4])
+	})
+}
+
+func TestServer_PollBandwidthLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A poll without "since" replays the entire cache, so a topic that is cheap to fill is
+		// expensive to read over and over. Replayed bytes are charged against the same daily
+		// budget as attachment traffic. One message per poll keeps the accounting coarse: any
+		// shortfall hits the very first message, so the request is rejected before anything is
+		// written rather than truncated mid-stream.
+		c := newTestConfig(t, databaseURL)
+		c.VisitorAttachmentDailyBandwidthLimit = 9000 // Enough for two replays of the ~4 KB topic below, not three
+		s := newTestServer(t, c)
+
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", util.RandomString(4000), nil).Code)
+
+		// Two full replays fit in the budget
+		for i := 1; i <= 2; i++ {
+			response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+			require.Equal(t, 200, response.Code)
+			require.Equal(t, 1, len(toMessages(t, response.Body.String())))
+		}
+
+		// The third is rejected before a single byte is written
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 429, response.Code)
+		require.Equal(t, 42905, toHTTPError(t, response.Body.String()).Code)
+
+		// A subscription that replays nothing is not charged against the budget
+		response = request(t, s, "GET", "/mytopic/json?poll=1&since=none", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Empty(t, strings.TrimSpace(response.Body.String()))
 	})
 }
 

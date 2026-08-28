@@ -31,25 +31,25 @@ const (
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
 		WHERE topic = ? AND time >= ? AND published = 1
-		ORDER BY time, id
+		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceTimeIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
 		WHERE topic = ? AND time >= ?
-		ORDER BY time, id
+		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
 		WHERE topic = ? AND id > COALESCE((SELECT id FROM messages WHERE mid = ?), 0) AND published = 1
-		ORDER BY time, id
+		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
 		WHERE topic = ? AND (id > COALESCE((SELECT id FROM messages WHERE mid = ?), 0) OR published = 0)
-		ORDER BY time, id
+		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesLatestQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding

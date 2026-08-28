@@ -65,7 +65,7 @@ type visitor struct {
 	callsLimiter         *util.FixedLimiter // Rate limiter for calls
 	subscriptionLimiter  *util.FixedLimiter // Fixed limiter for active subscriptions (ongoing connections)
 	topicCreationLimiter *rate.Limiter      // Rate limiter for inserting new topics into the in-memory topic map
-	bandwidthLimiter     *util.RateLimiter  // Limiter for attachment bandwidth downloads
+	bandwidthLimiter     *util.RateLimiter  // Limiter for attachment downloads and cached-message replay (polls)
 	accountLimiter       *rate.Limiter      // Rate limiter for account actions (signup, password-reset requests), may be nil
 	authLimiter          *rate.Limiter      // Limiter for incorrect login attempts, may be nil
 	firebase             time.Time          // Next allowed Firebase message

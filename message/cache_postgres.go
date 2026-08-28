@@ -25,13 +25,13 @@ const (
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE topic = $1 AND time >= $2 AND published = TRUE
-		ORDER BY time, id
+		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesSinceTimeIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE topic = $1 AND time >= $2
-		ORDER BY time, id
+		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
@@ -39,14 +39,14 @@ const (
 		WHERE topic = $1
 		  AND id > COALESCE((SELECT id FROM message WHERE mid = $2), 0)
 		  AND published = TRUE
-		ORDER BY time, id
+		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE topic = $1
 		  AND (id > COALESCE((SELECT id FROM message WHERE mid = $2), 0) OR published = FALSE)
-		ORDER BY time, id
+		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesLatestQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding

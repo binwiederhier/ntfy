@@ -1,0 +1,2370 @@
+openapi: 3.1.0
+info:
+  title: ntfy API
+  description: 'This is the **OpenAPI (Swagger) documentation** for the ntfy API.
+    **For lots of examples, screenshots, and detailed usage guides, please visit the
+    [main ntfy documentation](https://docs.ntfy.sh/).**
+
+
+    ntfy is a simple HTTP-based pub-sub notification service. It allows
+    you to send push notifications to your phone or desktop via scripts from any computer.
+
+
+    ## Features
+
+    - **[Publish messages](https://docs.ntfy.sh/publish/)**: Send messages to topics via PUT/POST
+
+    - **[Subscribe to topics](https://docs.ntfy.sh/subscribe/api/)**: Receive messages via JSON stream, SSE, raw stream,
+    or WebSocket
+
+    - **User management**: Authentication, tiered access, and account management
+
+    - **[Attachments](https://docs.ntfy.sh/publish/#attachments)**: Upload and attach files to messages
+
+    - **[Email](https://docs.ntfy.sh/publish/#e-mail-notifications) & [Phone](https://docs.ntfy.sh/publish/#phone-calls)**: Forward notifications to email or via phone calls
+
+    - **[UnifiedPush](https://docs.ntfy.sh/publish/#unifiedpush)**: Support for UnifiedPush protocol
+
+
+    ## [Authentication](https://docs.ntfy.sh/publish/#authentication)
+
+    Some endpoints require authentication if access control is enabled. Use either:
+
+    - Basic Auth: `Authorization: Basic base64(username:password)`
+
+    - Bearer Token: `Authorization: Bearer <token>`
+
+
+    ## [Rate Limiting](https://docs.ntfy.sh/#limitations)
+
+    Requests may be rate-limited based on IP address or user tier.
+
+    '
+  version: 2.0.0
+  contact:
+    name: ntfy
+    url: https://ntfy.sh
+    license:
+      name: Apache-2.0 OR GPLv2
+      url: https://github.com/binwiederhier/ntfy
+servers:
+  - url: https://ntfy.sh
+    description: Public ntfy server
+tags:
+  - name: Publish API
+    description: |
+      Publishing messages to topics.
+      
+      **For detailed examples and usage, please check out the [Publishing documentation](../publish/).**
+  - name: Subscribe API
+    description: Subscribing to topics and receiving messages
+  - name: Account API (Internal)
+    description: |
+      User account management.
+      
+      **These are internal endpoints and may change or be removed in the future.**
+  - name: Admin API (Internal)
+    description: |
+      Administrative operations.
+      
+      **These are internal endpoints and may change or be removed in the future.**
+  - name: Matrix
+    description: Matrix push gateway
+paths:
+  /{topic}:
+    post:
+      tags:
+        - Publish API
+      summary: Publish message
+      description: 'Publishes a message to a topic. The message body can be plain
+        text, or you can use various headers to customize the notification.
+
+
+        Topics are created on the fly when first used. Choose a topic name that''s
+        not easily guessable as it acts like a password.
+
+        '
+      operationId: publishMessage
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name (1-64 characters, alphanumeric, dash, underscore)
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}$
+        - $ref: '#/components/parameters/XTitle'
+        - $ref: '#/components/parameters/XPriority'
+        - $ref: '#/components/parameters/XTags'
+        - $ref: '#/components/parameters/XClick'
+        - $ref: '#/components/parameters/XIcon'
+        - $ref: '#/components/parameters/XAttach'
+        - $ref: '#/components/parameters/XFilename'
+        - $ref: '#/components/parameters/XActions'
+        - $ref: '#/components/parameters/XEmail'
+        - $ref: '#/components/parameters/XCall'
+        - $ref: '#/components/parameters/XDelay'
+        - $ref: '#/components/parameters/XCache'
+        - $ref: '#/components/parameters/XFirebase'
+        - $ref: '#/components/parameters/XMarkdown'
+        - $ref: '#/components/parameters/XTemplate'
+        - $ref: '#/components/parameters/XPollId'
+        - $ref: '#/components/parameters/XUnifiedPush'
+      requestBody:
+        description: Message body (plain text or binary data)
+        content:
+          text/plain:
+            schema:
+              type: string
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Message published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    put:
+      tags:
+        - Publish API
+      summary: Publish message (PUT)
+      description: Same as POST but uses PUT method
+      operationId: publishMessagePut
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}$
+        - $ref: '#/components/parameters/XTitle'
+        - $ref: '#/components/parameters/XPriority'
+        - $ref: '#/components/parameters/XTags'
+        - $ref: '#/components/parameters/XClick'
+        - $ref: '#/components/parameters/XIcon'
+        - $ref: '#/components/parameters/XAttach'
+        - $ref: '#/components/parameters/XFilename'
+        - $ref: '#/components/parameters/XActions'
+        - $ref: '#/components/parameters/XEmail'
+        - $ref: '#/components/parameters/XCall'
+        - $ref: '#/components/parameters/XDelay'
+        - $ref: '#/components/parameters/XCache'
+        - $ref: '#/components/parameters/XFirebase'
+        - $ref: '#/components/parameters/XMarkdown'
+        - $ref: '#/components/parameters/XTemplate'
+        - $ref: '#/components/parameters/XPollId'
+        - $ref: '#/components/parameters/XUnifiedPush'
+      requestBody:
+        description: Message body
+        content:
+          text/plain:
+            schema:
+              type: string
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Message published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /{topic}/json:
+    get:
+      tags:
+        - Subscribe API
+      summary: Subscribe to JSON stream
+      description: 'Subscribes to a topic and returns a streaming HTTP response with
+        JSON messages.
+
+
+        The connection stays open indefinitely. Messages are sent as newline-delimited
+        JSON (NDJSON).
+
+        Control messages (open, keepalive) are also sent.
+
+        '
+      operationId: subscribeJson
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name or comma-separated list of topics
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*$
+        - $ref: '#/components/parameters/Poll'
+        - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Scheduled'
+        - $ref: '#/components/parameters/FilterId'
+        - $ref: '#/components/parameters/FilterMessage'
+        - $ref: '#/components/parameters/FilterTitle'
+        - $ref: '#/components/parameters/FilterPriority'
+        - $ref: '#/components/parameters/FilterTags'
+      responses:
+        '200':
+          description: Streaming JSON response
+          content:
+            application/x-ndjson:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /{topic}/sse:
+    get:
+      tags:
+        - Subscribe API
+      summary: Subscribe to SSE stream
+      description: 'Subscribes to a topic using Server-Sent Events (SSE). This is
+        ideal for JavaScript clients using EventSource.
+
+
+        Messages are sent as SSE events with JSON data.
+
+        '
+      operationId: subscribeSse
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name or comma-separated list of topics
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*$
+        - $ref: '#/components/parameters/Poll'
+        - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Scheduled'
+        - $ref: '#/components/parameters/FilterId'
+        - $ref: '#/components/parameters/FilterMessage'
+        - $ref: '#/components/parameters/FilterTitle'
+        - $ref: '#/components/parameters/FilterPriority'
+        - $ref: '#/components/parameters/FilterTags'
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /{topic}/raw:
+    get:
+      tags:
+        - Subscribe API
+      summary: Subscribe to raw stream
+      description: 'Subscribes to a topic and returns raw text messages, one per line.
+
+
+        Only the message body is returned. No other fields are included.
+
+        Keepalive messages are sent as empty lines.
+
+        '
+      operationId: subscribeRaw
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name or comma-separated list of topics
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*$
+        - $ref: '#/components/parameters/Poll'
+        - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Scheduled'
+      responses:
+        '200':
+          description: Raw text stream
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /{topic}/ws:
+    get:
+      tags:
+        - Subscribe API
+      summary: Subscribe via WebSocket
+      description: 'Subscribes to a topic using WebSocket. Messages are sent as JSON
+        objects.
+
+
+        This is ideal for real-time applications. The connection supports bi-directional
+        communication
+
+        with ping/pong keepalive.
+
+        '
+      operationId: subscribeWs
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name or comma-separated list of topics
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*$
+        - $ref: '#/components/parameters/Poll'
+        - $ref: '#/components/parameters/Since'
+        - $ref: '#/components/parameters/Scheduled'
+        - $ref: '#/components/parameters/FilterId'
+        - $ref: '#/components/parameters/FilterMessage'
+        - $ref: '#/components/parameters/FilterTitle'
+        - $ref: '#/components/parameters/FilterPriority'
+        - $ref: '#/components/parameters/FilterTags'
+      responses:
+        '101':
+          description: WebSocket connection established
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /{topic}/publish:
+    get:
+      tags:
+        - Publish API
+      summary: Publish message (GET alias)
+      description: Alias for publishing a message via GET request. Message parameters
+        must be passed via headers.
+      operationId: publishMessageGet
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}$
+        - $ref: '#/components/parameters/XTitle'
+        - $ref: '#/components/parameters/XPriority'
+        - $ref: '#/components/parameters/XTags'
+        - $ref: '#/components/parameters/XClick'
+        - $ref: '#/components/parameters/XIcon'
+        - $ref: '#/components/parameters/XAttach'
+        - $ref: '#/components/parameters/XFilename'
+        - $ref: '#/components/parameters/XActions'
+        - $ref: '#/components/parameters/XEmail'
+        - $ref: '#/components/parameters/XCall'
+        - $ref: '#/components/parameters/XDelay'
+        - $ref: '#/components/parameters/XCache'
+        - $ref: '#/components/parameters/XFirebase'
+        - $ref: '#/components/parameters/XMarkdown'
+        - $ref: '#/components/parameters/XTemplate'
+        - $ref: '#/components/parameters/XPollId'
+        - $ref: '#/components/parameters/XUnifiedPush'
+        - name: message
+          in: query
+          description: Message body (if not empty GET request)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /{topic}/send:
+    get:
+      tags:
+        - Publish API
+      summary: Publish message (send alias)
+      description: Alias for publishing a message via GET request
+      operationId: publishMessageSend
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}$
+        - $ref: '#/components/parameters/XTitle'
+        - $ref: '#/components/parameters/XPriority'
+        - $ref: '#/components/parameters/XTags'
+        - $ref: '#/components/parameters/XClick'
+        - $ref: '#/components/parameters/XIcon'
+        - $ref: '#/components/parameters/XAttach'
+        - $ref: '#/components/parameters/XFilename'
+        - $ref: '#/components/parameters/XActions'
+        - $ref: '#/components/parameters/XEmail'
+        - $ref: '#/components/parameters/XCall'
+        - $ref: '#/components/parameters/XDelay'
+        - $ref: '#/components/parameters/XCache'
+        - $ref: '#/components/parameters/XFirebase'
+        - $ref: '#/components/parameters/XMarkdown'
+        - $ref: '#/components/parameters/XTemplate'
+        - $ref: '#/components/parameters/XPollId'
+        - $ref: '#/components/parameters/XUnifiedPush'
+        - name: message
+          in: query
+          description: Message body
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /{topic}/trigger:
+    get:
+      tags:
+        - Publish API
+      summary: Publish message (trigger alias)
+      description: Alias for publishing a message via GET request
+      operationId: publishMessageTrigger
+      security:
+        - { }
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}$
+        - $ref: '#/components/parameters/XTitle'
+        - $ref: '#/components/parameters/XPriority'
+        - $ref: '#/components/parameters/XTags'
+        - $ref: '#/components/parameters/XClick'
+        - $ref: '#/components/parameters/XIcon'
+        - $ref: '#/components/parameters/XAttach'
+        - $ref: '#/components/parameters/XFilename'
+        - $ref: '#/components/parameters/XActions'
+        - $ref: '#/components/parameters/XEmail'
+        - $ref: '#/components/parameters/XCall'
+        - $ref: '#/components/parameters/XDelay'
+        - $ref: '#/components/parameters/XCache'
+        - $ref: '#/components/parameters/XFirebase'
+        - $ref: '#/components/parameters/XMarkdown'
+        - $ref: '#/components/parameters/XTemplate'
+        - $ref: '#/components/parameters/XPollId'
+        - $ref: '#/components/parameters/XUnifiedPush'
+        - name: message
+          in: query
+          description: Message body
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Message published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /{topic}/auth:
+    get:
+      tags:
+        - Subscribe API
+      summary: Check topic authentication
+      description: Check if the client is authenticated to access the topic
+      operationId: checkTopicAuth
+      security:
+        - BasicAuth: [ ]
+        - BearerAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name or comma-separated list of topics
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}(,[-_A-Za-z0-9]{1,64})*$
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/health:
+    get:
+      tags:
+        - Admin API (Internal)
+      summary: Health check
+      description: Returns server health status
+      operationId: healthCheck
+      security: [ ]
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  healthy:
+                    type: boolean
+  /v1/stats:
+    get:
+      tags:
+        - Admin API (Internal)
+      summary: Server statistics
+      description: Returns public server statistics
+      operationId: getStats
+      security: [ ]
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: integer
+                    description: Total number of messages
+                  messages_rate:
+                    type: number
+                    format: float
+                    description: Average messages per second
+  /v1/tiers:
+    get:
+      tags:
+        - Account API (Internal)
+      summary: List available tiers
+      description: Returns list of available subscription tiers with pricing
+      operationId: getTiers
+      security:
+        - { }
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Tiers retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    code:
+                      type: string
+                    name:
+                      type: string
+                    prices:
+                      type: object
+                      properties:
+                        month:
+                          type: integer
+                          description: Price in cents per month
+                        year:
+                          type: integer
+                          description: Price in cents per year
+                    limits:
+                      $ref: '#/components/schemas/AccountLimits'
+  /v1/users:
+    get:
+      tags:
+        - Admin API (Internal)
+      summary: List users
+      description: Returns list of all users (admin only)
+      operationId: listUsers
+      security:
+        - AdminAuth: [ ]
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+        - Admin API (Internal)
+      summary: Create user
+      description: Creates a new user (admin only)
+      operationId: createUser
+      security:
+        - AdminAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+                tier:
+                  type: string
+                role:
+                  type: string
+                  enum:
+                    - user
+                    - admin
+                  default: user
+      responses:
+        '200':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    put:
+      tags:
+        - Admin API (Internal)
+      summary: Update user
+      description: Updates an existing user (admin only)
+      operationId: updateUser
+      security:
+        - AdminAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+                tier:
+                  type: string
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Admin API (Internal)
+      summary: Delete user
+      description: Deletes a user (admin only)
+      operationId: deleteUser
+      security:
+        - AdminAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+      responses:
+        '200':
+          description: User deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/users/access:
+    put:
+      tags:
+        - Admin API (Internal)
+      summary: Grant user access to topic
+      description: Grants a user access to a topic or topic pattern (admin only)
+      operationId: grantAccess
+      security:
+        - AdminAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - topic
+                - permission
+              properties:
+                username:
+                  type: string
+                topic:
+                  type: string
+                  description: Topic name or pattern (supports wildcards)
+                permission:
+                  type: string
+                  enum:
+                    - read
+                    - write
+                    - readwrite
+      responses:
+        '200':
+          description: Access granted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags:
+        - Admin API (Internal)
+      summary: Reset user access to topic
+      description: Resets user access to a topic (admin only)
+      operationId: resetAccess
+      security:
+        - AdminAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - topic
+              properties:
+                username:
+                  type: string
+                topic:
+                  type: string
+      responses:
+        '200':
+          description: Access reset successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/account:
+    post:
+      tags:
+        - Account API (Internal)
+      summary: Create account
+      description: Creates a new user account
+      operationId: createAccount
+      security: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Username already exists
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    get:
+      tags:
+        - Account API (Internal)
+      summary: Get account info
+      description: Returns information about the authenticated user's account
+      operationId: getAccount
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      responses:
+        '200':
+          description: Account info retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags:
+        - Account API (Internal)
+      summary: Delete account
+      description: Deletes the authenticated user's account
+      operationId: deleteAccount
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Account deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/account/password:
+    post:
+      tags:
+        - Account API (Internal)
+      summary: Change password
+      description: Changes the authenticated user's password
+      operationId: changePassword
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+                - new_password
+              properties:
+                password:
+                  type: string
+                  format: password
+                  description: Current password
+                new_password:
+                  type: string
+                  format: password
+                  description: New password
+      responses:
+        '200':
+          description: Password changed successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/account/token:
+    post:
+      tags:
+        - Account API (Internal)
+      summary: Create access token
+      description: Creates a new API access token for the authenticated user
+      operationId: createToken
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                  description: Label for the token
+                expires:
+                  type: integer
+                  description: Unix timestamp when token expires
+      responses:
+        '200':
+          description: Token created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    patch:
+      tags:
+        - Account API (Internal)
+      summary: Update access token
+      description: Updates an existing access token
+      operationId: updateToken
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  description: Token to update
+                label:
+                  type: string
+                expires:
+                  type: integer
+                  format: int64
+      responses:
+        '200':
+          description: Token updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Account API (Internal)
+      summary: Delete access token
+      description: Deletes an access token
+      operationId: deleteToken
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Token deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/account/settings:
+    patch:
+      tags:
+        - Account API (Internal)
+      summary: Update account settings
+      description: Updates the authenticated user's account settings
+      operationId: updateSettings
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language:
+                  type: string
+                  description: Preferred language code
+                notification:
+                  type: object
+                  properties:
+                    sound:
+                      type: string
+                    min_priority:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                    delete_after:
+                      type: integer
+      responses:
+        '200':
+          description: Settings updated successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/account/subscription:
+    post:
+      tags:
+        - Account API (Internal)
+      summary: Add topic subscription
+      description: Subscribes to a topic
+      operationId: addSubscription
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic
+              properties:
+                topic:
+                  type: string
+                display_name:
+                  type: string
+      responses:
+        '200':
+          description: Subscription added successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    patch:
+      tags:
+        - Account API (Internal)
+      summary: Update topic subscription
+      description: Updates a topic subscription
+      operationId: updateSubscription
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic
+              properties:
+                topic:
+                  type: string
+                display_name:
+                  type: string
+      responses:
+        '200':
+          description: Subscription updated successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - Account API (Internal)
+      summary: Delete topic subscription
+      description: Unsubscribes from a topic
+      operationId: deleteSubscription
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic
+              properties:
+                topic:
+                  type: string
+      responses:
+        '200':
+          description: Subscription deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/account/reservation:
+    post:
+      tags:
+        - Account API (Internal)
+      summary: Reserve topic
+      description: Reserves a topic for exclusive use
+      operationId: reserveTopic
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic
+              properties:
+                topic:
+                  type: string
+                  pattern: ^[-_A-Za-z0-9]{1,64}$
+                everyone:
+                  type: string
+                  enum:
+                    - read-write
+                    - read-only
+                    - deny
+                  default: deny
+                  description: Access level for other users
+      responses:
+        '200':
+          description: Topic reserved successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Topic already reserved
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /v1/account/reservation/{topic}:
+    delete:
+      tags:
+        - Account API (Internal)
+      summary: Delete topic reservation
+      description: Removes a topic reservation
+      operationId: deleteReservation
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          description: Topic name
+          schema:
+            type: string
+            pattern: ^[-_A-Za-z0-9]{1,64}$
+      responses:
+        '200':
+          description: Reservation deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/account/phone:
+    put:
+      tags:
+        - Account API (Internal)
+      summary: Add phone number
+      description: Adds and verifies a phone number for voice call notifications
+      operationId: addPhoneNumber
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - number
+                - code
+              properties:
+                number:
+                  type: string
+                  pattern: ^\+\d{1,100}$
+                code:
+                  type: string
+                  description: Verification code received via SMS
+      responses:
+        '200':
+          description: Phone number added successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      tags:
+        - Account API (Internal)
+      summary: Delete phone number
+      description: Removes a phone number
+      operationId: deletePhoneNumber
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - number
+              properties:
+                number:
+                  type: string
+                  pattern: ^\+\d{1,100}$
+      responses:
+        '200':
+          description: Phone number removed successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/account/phone/verify:
+    put:
+      tags:
+        - Account API (Internal)
+      summary: Request phone verification code
+      description: Requests a verification code via SMS
+      operationId: verifyPhoneNumber
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - number
+                - channel
+              properties:
+                number:
+                  type: string
+                  pattern: ^\+\d{1,100}$
+                channel:
+                  type: string
+                  enum:
+                    - sms
+                    - call
+      responses:
+        '200':
+          description: Verification code sent successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /v1/account/billing/subscription:
+    post:
+      tags:
+        - Account API (Internal)
+      summary: Create subscription
+      description: Creates a paid subscription via Stripe checkout
+      operationId: createSubscription
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier:
+                  type: string
+                interval:
+                  type: string
+                  enum:
+                    - month
+                    - year
+      responses:
+        '200':
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect_url:
+                    type: string
+                    format: uri
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags:
+        - Account API (Internal)
+      summary: Update subscription
+      description: Modifies an existing subscription
+      operationId: updateSubscription
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier:
+                  type: string
+                interval:
+                  type: string
+                  enum:
+                    - month
+                    - year
+      responses:
+        '200':
+          description: Subscription updated successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags:
+        - Account API (Internal)
+      summary: Cancel subscription
+      description: Cancels the paid subscription
+      operationId: cancelSubscription
+      security:
+        - BearerAuth: [ ]
+        - BasicAuth: [ ]
+      responses:
+        '200':
+          description: Subscription cancelled successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /_matrix/push/v1/notify:
+    get:
+      tags:
+        - Matrix
+      summary: Matrix push gateway discovery
+      description: Returns Matrix push gateway information
+      operationId: matrixDiscovery
+      security: [ ]
+      responses:
+        '200':
+          description: Gateway info
+          content:
+            application/json:
+              schema:
+                type: object
+    post:
+      tags:
+        - Matrix
+      summary: Matrix push notification
+      description: Receives push notifications from Matrix homeserver
+      operationId: matrixPush
+      security: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notification:
+                  type: object
+                  properties:
+                    devices:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          pushkey:
+                            type: string
+                          pushkey_ts:
+                            type: integer
+                          data:
+                            type: object
+      responses:
+        '200':
+          description: Notification processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rejected:
+                    type: array
+                    items:
+                      type: string
+                    description: List of rejected pushkeys
+  /metrics:
+    get:
+      tags:
+        - Admin API (Internal)
+      summary: Prometheus metrics
+      description: Returns Prometheus-compatible metrics
+      operationId: getMetrics
+      security: [ ]
+      responses:
+        '200':
+          description: Metrics in Prometheus format
+          content:
+            text/plain:
+              schema:
+                type: string
+  /v1/config:
+    get:
+      tags:
+        - Admin API (Internal)
+      summary: Server configuration
+      description: Returns the server configuration as JSON. Used by the web app to determine enabled features.
+      operationId: getServerConfig
+      security: [ ]
+      responses:
+        '200':
+          description: Server configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerConfig'
+components:
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+      description: HTTP Basic Authentication using username and password
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    AdminAuth:
+      type: http
+      scheme: basic
+      description: Admin-level authentication (requires admin role)
+  parameters:
+    XTitle:
+      name: X-Title
+      in: header
+      description: 'Message title. See [ntfy docs](https://docs.ntfy.sh/publish/#message-title) for details.'
+      schema:
+        type: string
+        simple:
+          value: Alert!
+        with_url:
+          value: Unauthorized access detected
+    XPriority:
+      name: X-Priority
+      in: header
+      description: 'Message priority level. See [ntfy docs](https://docs.ntfy.sh/publish/#message-priority) for details.
+
+        - 1 (min): Low priority, may be hidden
+
+        - 2: Low priority
+
+        - 3: Default priority
+
+        - 4: High priority
+
+        - 5 (urgent/max): Urgent priority, bypasses quiet hours
+
+        '
+      schema:
+        type: integer
+        enum:
+          - 3
+          - 2
+          - 1
+          - 4
+          - 5
+        min:
+          value: 1
+        urgent:
+          value: 5
+    XTags:
+      name: X-Tags
+      in: header
+      description: 'Comma-separated list of tags (may map to emojis). See [ntfy docs](https://docs.ntfy.sh/publish/#tags-emojis) for details.'
+      schema:
+        type: string
+    XClick:
+      name: X-Click
+      in: header
+      description: 'URL to open when notification is clicked. See [ntfy docs](https://docs.ntfy.sh/publish/#click-action) for details.'
+      schema:
+        type: string
+        format: uri
+    XIcon:
+      name: X-Icon
+      in: header
+      description: 'URL to an image to use as notification icon. See [ntfy docs](https://docs.ntfy.sh/publish/#icons) for details.'
+      schema:
+        type: string
+        format: uri
+    XAttach:
+      name: X-Attach
+      in: header
+      description: 'URL of a file to attach to the notification. See [ntfy docs](https://docs.ntfy.sh/publish/#attachments) for details.'
+      schema:
+        type: string
+        format: uri
+    XFilename:
+      name: X-Filename
+      in: header
+      description: 'Filename for the attachment. See [ntfy docs](https://docs.ntfy.sh/publish/#attachments) for details.'
+      schema:
+        type: string
+    XActions:
+      name: X-Actions
+      in: header
+      description: 'Action buttons for the notification. See [ntfy docs](https://docs.ntfy.sh/publish/#action-buttons) for details.
+      
+        Format: action,label,url[,clear=true]
+
+
+        Actions:
+
+        - view: Open URL
+
+        - http: HTTP request
+
+        - broadcast: Android broadcast intent
+
+
+        Multiple actions separated by semicolon (;)
+
+        '
+      schema:
+        type: string
+    XEmail:
+      name: X-Email
+      in: header
+      description: 'Forward notification to email address. See [ntfy docs](https://docs.ntfy.sh/publish/#e-mail-notifications) for details.'
+      schema:
+        type: string
+        format: email
+    XCall:
+      name: X-Call
+      in: header
+      description: 'Make phone call when notification is received. See [ntfy docs](https://docs.ntfy.sh/publish/#phone-calls) for details.
+
+
+        Set to "1" or "yes" to call verified phone number, or specify phone number
+        in E.164 format (+1234567890)
+
+        '
+      schema:
+        type: string
+    XDelay:
+      name: X-Delay
+      in: header
+      description: 'Delay delivery of message. See [ntfy docs](https://docs.ntfy.sh/publish/#scheduled-delivery) for details.
+
+        Supports:
+
+        - Absolute timestamp: 2023-12-25 08:00:00 EST
+
+        - Relative duration: 30m, 2h, 1d
+
+        - Unix timestamp: 1703500800
+
+        '
+      schema:
+        type: string
+    XCache:
+      name: X-Cache
+      in: header
+      description: 'Cache message for delayed subscribers (default: yes). See [ntfy docs](https://docs.ntfy.sh/publish/#message-caching) for details.'
+      schema:
+        type: string
+        enum:
+          - true
+          - false
+          - 1
+          - 0
+    XFirebase:
+      name: X-Firebase
+      in: header
+      description: 'Forward to Firebase Cloud Messaging (default: yes). See [ntfy docs](https://docs.ntfy.sh/publish/#disable-firebase) for details.'
+      schema:
+        type: string
+        enum:
+          - true
+          - false
+          - 1
+          - 0
+    XMarkdown:
+      name: X-Markdown
+      in: header
+      description: 'Render message as Markdown. See [ntfy docs](https://docs.ntfy.sh/publish/#markdown-formatting) for details.'
+      schema:
+        type: string
+        enum:
+          - true
+          - false
+          - 1
+          - 0
+    XTemplate:
+      name: X-Template
+      in: header
+      description: 'Template name from server templates directory, or "yes"/"true"
+        for inline templating. See [ntfy docs](https://docs.ntfy.sh/publish/#message-templating) for details.
+
+        When "yes", the message/title should be a Go template.
+
+        '
+      schema:
+        type: string
+    XPollId:
+      name: X-Poll-Id
+      in: header
+      description: 'Poll request ID. When set, this becomes a poll request message
+        for UnifiedPush. See [ntfy docs](https://docs.ntfy.sh/publish/#unifiedpush) for details.
+
+        The message body is ignored when this is set.
+
+        '
+      schema:
+        type: string
+    XUnifiedPush:
+      name: X-UnifiedPush
+      in: header
+      description: 'Enable UnifiedPush mode. See [ntfy docs](https://docs.ntfy.sh/publish/#unifiedpush) for details.'
+      schema:
+        type: string
+        enum:
+          - false
+          - true
+          - 1
+          - 0
+          - up
+    Poll:
+      name: poll
+      in: query
+      description: 'Return cached messages and close connection. See [ntfy docs](https://docs.ntfy.sh/subscribe/api/#poll-for-messages) for details.'
+      schema:
+        type: boolean
+        default: false
+    Since:
+      name: since
+      in: query
+      description: 'Return cached messages since. See [ntfy docs](https://docs.ntfy.sh/subscribe/api/#fetch-cached-messages) for details.
+
+        - Unix timestamp: 1635528757
+
+        - Duration: 10m, 30s, 1h
+
+        - Message ID: nFS3knfcQ1xe
+
+        - "all": All cached messages
+
+        - "latest": Most recent message only
+
+        - "none": No cached messages (default)
+
+        '
+      schema:
+        type: string
+        enum:
+          - all
+          - latest
+          - none
+        default: none
+    Scheduled:
+      name: scheduled
+      in: query
+      description: 'Include scheduled/delayed messages in response. See [ntfy docs](https://docs.ntfy.sh/subscribe/api/#fetch-scheduled-messages) for details.'
+      schema:
+        type: boolean
+        default: false
+    FilterId:
+      name: id
+      in: query
+      description: 'Only return messages matching this exact message ID. See [ntfy docs](https://docs.ntfy.sh/subscribe/api/#filter-messages) for details.'
+      schema:
+        type: string
+    FilterMessage:
+      name: message
+      in: query
+      description: 'Only return messages matching this exact message string. See [ntfy docs](https://docs.ntfy.sh/subscribe/api/#filter-messages) for details.'
+      schema:
+        type: string
+    FilterTitle:
+      name: title
+      in: query
+      description: 'Only return messages matching this exact title string. See [ntfy docs](https://docs.ntfy.sh/subscribe/api/#filter-messages) for details.'
+      schema:
+        type: string
+    FilterPriority:
+      name: priority
+      in: query
+      description: 'Only return messages matching any of these priorities (comma-separated). See [ntfy docs](https://docs.ntfy.sh/subscribe/api/#filter-messages) for details.'
+      schema:
+        type: string
+    FilterTags:
+      name: tags
+      in: query
+      description: 'Only return messages containing all these tags (comma-separated). See [ntfy docs](https://docs.ntfy.sh/subscribe/api/#filter-messages) for details.'
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            error: invalid_request
+            error_code: 40001
+            message: Invalid topic name
+    Unauthorized:
+      description: Authentication required or failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            error: unauthorized
+            error_code: 40101
+            message: Invalid credentials
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            error: forbidden
+            error_code: 40301
+            message: You do not have access to this topic
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            error: not_found
+            error_code: 40401
+            message: User not found
+    TooManyRequests:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+            error: rate_limited
+            error_code: 42901
+            message: Rate limit exceeded. Please try again later.
+  schemas:
+    ServerConfig:
+      type: object
+      description: Server configuration
+      properties:
+        base_url:
+          type: string
+          description: Base URL of the server (empty means use window.location.origin)
+        app_root:
+          type: string
+          description: Web app root path
+        enable_login:
+          type: boolean
+          description: Whether login is enabled
+        require_login:
+          type: boolean
+          description: Whether login is required to use the server
+        enable_signup:
+          type: boolean
+          description: Whether user signup is enabled
+        enable_payments:
+          type: boolean
+          description: Whether Stripe payments are enabled
+        enable_calls:
+          type: boolean
+          description: Whether phone calls are enabled (Twilio)
+        enable_emails:
+          type: boolean
+          description: Whether email forwarding is enabled
+        enable_reservations:
+          type: boolean
+          description: Whether topic reservations are enabled
+        enable_web_push:
+          type: boolean
+          description: Whether Web Push notifications are enabled
+        billing_contact:
+          type: string
+          description: Billing contact email
+        web_push_public_key:
+          type: string
+          description: VAPID public key for Web Push
+        disallowed_topics:
+          type: array
+          items:
+            type: string
+          description: List of disallowed topic names
+        config_hash:
+          type: string
+          description: Hash of the current configuration (for change detection)
+    Message:
+      type: object
+      description: A notification message
+      required:
+        - id
+        - time
+        - event
+        - topic
+      properties:
+        id:
+          type: string
+          description: Random message identifier
+        time:
+          type: integer
+          format: int64
+          description: Unix timestamp
+        expires:
+          type: integer
+          format: int64
+          description: Unix timestamp when message expires (if cached)
+        event:
+          type: string
+          enum:
+            - open
+            - keepalive
+            - message
+            - poll_request
+          description: Message event type
+        topic:
+          type: string
+          description: Topic name (or comma-separated list for open events)
+        title:
+          type: string
+          description: Message title
+        message:
+          type: string
+          description: Message body
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Message priority (1=min, 5=max)
+        tags:
+          type: array
+          items:
+            type: string
+          description: List of tags
+        click:
+          type: string
+          format: uri
+          description: URL to open on click
+        icon:
+          type: string
+          format: uri
+          description: Notification icon URL
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Action'
+          description: Action buttons
+        attachment:
+          $ref: '#/components/schemas/Attachment'
+        content_type:
+          type: string
+          description: Content type (text/plain or text/markdown)
+        encoding:
+          type: string
+          description: Message encoding (empty for UTF-8, or "base64")
+        poll_id:
+          type: string
+          description: Poll request ID for UnifiedPush
+    Action:
+      type: object
+      description: An action button
+      required:
+        - id
+        - action
+        - label
+      properties:
+        id:
+          type: string
+          description: Action identifier
+        action:
+          type: string
+          enum:
+            - view
+            - http
+            - broadcast
+          description: Action type
+        label:
+          type: string
+          description: Button label
+        clear:
+          type: boolean
+          description: Clear notification after action
+        url:
+          type: string
+          format: uri
+          description: URL for view/http actions
+        method:
+          type: string
+          description: HTTP method for http action
+          default: POST
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: HTTP headers for http action
+        body:
+          type: string
+          description: HTTP body for http action
+        intent:
+          type: string
+          description: Android intent for broadcast action
+        extras:
+          type: object
+          additionalProperties:
+            type: string
+          description: Extra values for broadcast action
+    Attachment:
+      type: object
+      description: A file attachment
+      required:
+        - name
+        - url
+      properties:
+        name:
+          type: string
+          description: Filename
+        type:
+          type: string
+          description: MIME type (if known)
+        size:
+          type: integer
+          format: int64
+          description: File size in bytes
+        expires:
+          type: integer
+          format: int64
+          description: Unix timestamp when attachment expires
+        url:
+          type: string
+          format: uri
+          description: Download URL
+    PublishMessage:
+      type: object
+      description: Message for JSON publishing
+      required:
+        - topic
+      properties:
+        topic:
+          type: string
+          description: Topic name
+        message:
+          type: string
+          description: Message body
+        title:
+          type: string
+          description: Message title
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Message priority
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags
+        click:
+          type: string
+          format: uri
+          description: Click URL
+        icon:
+          type: string
+          format: uri
+          description: Icon URL
+        attach:
+          type: string
+          format: uri
+          description: Attachment URL
+        filename:
+          type: string
+          description: Attachment filename
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Action'
+          description: Action buttons
+        email:
+          type: string
+          format: email
+          description: Forward to email
+        call:
+          type: string
+          description: Phone call
+        delay:
+          type: string
+          description: Delay delivery
+        cache:
+          type: string
+          description: Cache message
+        firebase:
+          type: string
+          description: Forward to Firebase
+        markdown:
+          type: boolean
+          description: Render as Markdown
+    Error:
+      type: object
+      description: Error response
+      required:
+        - error
+        - error_code
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+        error_code:
+          type: integer
+          description: ntfy error code
+        message:
+          type: string
+          description: Human-readable error message
+    Account:
+      type: object
+      description: User account information
+      required:
+        - username
+      properties:
+        username:
+          type: string
+          description: Username
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+          description: User role
+        sync_topic:
+          type: string
+          description: Account sync topic
+        language:
+          type: string
+          description: Preferred language
+        tier:
+          $ref: '#/components/schemas/Tier'
+        limits:
+          $ref: '#/components/schemas/AccountLimits'
+        stats:
+          $ref: '#/components/schemas/AccountStats'
+        subscriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subscription'
+        reservations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reservation'
+        tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Token'
+        phone_numbers:
+          type: array
+          items:
+            type: string
+            pattern: ^\+\d{1,100}$
+          description: Verified phone numbers
+        billing:
+          $ref: '#/components/schemas/Billing'
+    Tier:
+      type: object
+      description: Account tier
+      properties:
+        code:
+          type: string
+          description: Tier code
+        name:
+          type: string
+          description: Tier name
+    AccountLimits:
+      type: object
+      description: Account tier limits
+      properties:
+        basis:
+          type: string
+          enum:
+            - ip
+            - tier
+          description: Limit basis
+        messages:
+          type: integer
+          format: int64
+          description: Daily message limit
+        messages_expiry_duration:
+          type: integer
+          format: int64
+          description: Message cache duration in seconds
+        emails:
+          type: integer
+          format: int64
+          description: Daily email limit
+        calls:
+          type: integer
+          format: int64
+          description: Daily call limit
+        reservations:
+          type: integer
+          format: int64
+          description: Number of reserved topics allowed
+        attachment_total_size:
+          type: integer
+          format: int64
+          description: Total attachment storage in bytes
+        attachment_file_size:
+          type: integer
+          format: int64
+          description: Max attachment size in bytes
+        attachment_expiry_duration:
+          type: integer
+          format: int64
+          description: Attachment retention duration in seconds
+        attachment_bandwidth:
+          type: integer
+          format: int64
+          description: Daily attachment bandwidth limit in bytes
+    AccountStats:
+      type: object
+      description: Account usage statistics
+      properties:
+        messages:
+          type: integer
+          format: int64
+          description: Messages sent today
+        messages_remaining:
+          type: integer
+          format: int64
+          description: Messages remaining today
+        emails:
+          type: integer
+          format: int64
+          description: Emails sent today
+        emails_remaining:
+          type: integer
+          format: int64
+          description: Emails remaining today
+        calls:
+          type: integer
+          format: int64
+          description: Calls made today
+        calls_remaining:
+          type: integer
+          format: int64
+          description: Calls remaining today
+        reservations:
+          type: integer
+          format: int64
+          description: Active reservations
+        reservations_remaining:
+          type: integer
+          format: int64
+          description: Reservations remaining
+        attachment_total_size:
+          type: integer
+          format: int64
+          description: Attachment storage used
+        attachment_total_size_remaining:
+          type: integer
+          format: int64
+          description: Attachment storage remaining
+    Subscription:
+      type: object
+      description: Topic subscription
+      properties:
+        topic:
+          type: string
+          description: Topic name
+        display_name:
+          type: string
+          description: Display name
+    Reservation:
+      type: object
+      description: Topic reservation
+      properties:
+        topic:
+          type: string
+          description: Reserved topic name
+        everyone:
+          type: string
+          enum:
+            - read-write
+            - read-only
+            - deny
+          description: Access for other users
+    Token:
+      type: object
+      description: API access token
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: Token value
+        label:
+          type: string
+          description: Token label
+        last_access:
+          type: integer
+          format: int64
+          description: Last access timestamp
+        last_origin:
+          type: string
+          description: Last access IP address
+        expires:
+          type: integer
+          format: int64
+          description: Expiration timestamp
+        provisioned:
+          type: boolean
+          description: Whether token was provisioned by server config
+    Billing:
+      type: object
+      description: Billing information
+      properties:
+        customer:
+          type: boolean
+          description: Whether user is a Stripe customer
+        subscription:
+          type: boolean
+          description: Whether user has active subscription
+        status:
+          type: string
+          description: Subscription status
+        interval:
+          type: string
+          enum:
+            - month
+            - year
+          description: Billing interval
+        paid_until:
+          type: integer
+          format: int64
+          description: Unix timestamp until paid
+        cancel_at:
+          type: integer
+          format: int64
+          description: Unix timestamp when subscription cancels
+    UserInfo:
+      type: object
+      description: User information (admin view)
+      required:
+        - username
+        - role
+      properties:
+        username:
+          type: string
+          description: Username
+        role:
+          type: string
+          enum:
+            - user
+            - admin
+          description: User role
+        tier:
+          type: string
+          description: Tier code
+        grants:
+          type: array
+          items:
+            type: object
+            properties:
+              topic:
+                type: string
+                description: Topic or pattern
+              permission:
+                type: string
+                enum:
+                  - read
+                  - write
+                  - readwrite
+                description: Permission level

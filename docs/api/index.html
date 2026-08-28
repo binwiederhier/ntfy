@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ntfy API Reference</title>
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #ffffff;
+        }
+
+        /* Header matching docs.ntfy.sh */
+        .header {
+            background: linear-gradient(to right, #317f6f, #14b8a6);
+            padding: 16px 20px;
+            color: white;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            justify-content: space-between;
+        }
+
+        .header-text {
+            flex: 1;
+        }
+
+        .header-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+            color: white;
+            line-height: 1.2;
+        }
+
+        .header-text p {
+            font-size: 13px;
+            margin: 2px 0 0 0;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .header-links {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .header-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0.9;
+            transition: opacity 0.2s;
+        }
+
+        .header-links a:hover {
+            opacity: 1;
+        }
+
+        /* Scalar container */
+        #scalar-api-reference {
+            width: 100%;
+            min-height: calc(100vh - 100px);
+        }
+
+        /* Hide Share and Generate SDKs menu items */
+        [data-scalar-menu-item="share"],
+        [data-scalar-menu-item="sdk"],
+        .scalar-card-header-actions button[title="Share"],
+        .scalar-card-header-actions button[title="Generate SDK"],
+        button:has(> span:contains("Share")),
+        button:has(> span:contains("SDK")) {
+            display: none !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            .header-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <a href="/" style="display: flex; align-items: center; text-decoration: none;">
+                <img src="/static/img/ntfy.png" width="35" height="35" alt="ntfy logo" style="margin-right: 10px;">
+            </a>
+            <div class="header-text">
+                <h1>ntfy</h1>
+                <p>API Reference</p>
+            </div>
+            <div class="header-links">
+                <a href="/">Documentation Home</a>
+                <a href="https://ntfy.sh">ntfy.sh</a>
+                <a href="https://github.com/binwiederhier/ntfy">GitHub</a>
+            </div>
+        </div>
+    </div>
+    <!-- Scalar API Reference -->
+    <div id="scalar-api-reference"></div>
+
+    <link rel="stylesheet" type="text/css" href="./scalar-style.css" />
+    <script src="./scalar-standalone.js"></script>
+
+    <script>
+        function initScalar() {
+            const targetElement = document.getElementById('scalar-api-reference');
+            
+            if (!targetElement) {
+                setTimeout(initScalar, 50);
+                return;
+            }
+            
+            if (typeof Scalar === 'undefined' || typeof Scalar.createApiReference !== 'function') {
+                setTimeout(initScalar, 50);
+                return;
+            }
+            
+            const config = {
+                url: './openapi.yaml',
+                layout: 'modern',
+                theme: 'default',
+                customCss: `
+                    /* Hide Share and Generate SDKs menu items in dropdowns */
+                    [data-testid="share-button"],
+                    [data-testid="sdk-button"],
+                    .context-menu-item:has(svg[data-icon="share"]),
+                    .context-menu-item:has(svg[data-icon="sdk"]),
+                    .dropdown-item:has(span:contains("Share")),
+                    .dropdown-item:has(span:contains("SDK")),
+                    .scalar-dropdown-item[data-action="share"],
+                    .scalar-dropdown-item[data-action="generate-sdk"],
+                    button[aria-label="Share"],
+                    button[aria-label="Generate SDK"] {
+                        display: none !important;
+                    }
+                `,
+                configuration: {
+                    hideSidebar: false,
+                    hideSearch: false,
+                    hideModels: false,
+                    hideDownloadButton: false,
+                    hideTabs: false,
+                    hideServerUrl: false,
+                    hideInfo: false,
+                    darkMode: false,
+                    withDefaultFonts: false,
+                },
+            };
+            
+            try {
+                Scalar.createApiReference('#scalar-api-reference', config);
+            } catch (error) {
+                console.error('Error initializing Scalar:', error);
+                targetElement.innerHTML = '<div style="padding: 20px; color: red;">Error loading API reference: ' + error.message + '</div>';
+            }
+        }
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initScalar);
+        } else {
+            setTimeout(initScalar, 100);
+        }
+        
+        window.addEventListener('load', function() {
+            setTimeout(initScalar, 200);
+        });
+    </script>
+</body>
+</html>

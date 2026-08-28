@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
@@ -1913,7 +1914,23 @@ func (s *Server) runSMTPServer() error {
 	s.smtpServer.MaxMessageBytes = 1024 * 1024 // Must be much larger than message size (headers, multipart, etc.)
 	s.smtpServer.MaxRecipients = 1
 	s.smtpServer.AllowInsecureAuth = true
-	return s.smtpServer.ListenAndServe()
+
+	if s.config.SMTPServerCertFile != "" && s.config.SMTPServerKeyFile != "" {
+		cert, err := tls.LoadX509KeyPair(s.config.SMTPServerCertFile, s.config.SMTPServerKeyFile)
+		if err != nil {
+			return err
+		}
+		s.smtpServer.AllowInsecureAuth = false
+		s.smtpServer.TLSConfig = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}
+	}
+
+	if s.config.SMTPServerImplicitTLS {
+		return s.smtpServer.ListenAndServeTLS()
+	} else {
+		return s.smtpServer.ListenAndServe()
+	}
 }
 
 func (s *Server) runManager() {

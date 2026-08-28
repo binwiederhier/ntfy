@@ -204,3 +204,26 @@ docker_manifests:
       - *arm64v8_image
       - *armv7_image
       - *armv6_image
+
+chocolateys:
+  - name: ntfy
+    ids:
+      - ntfy_windows
+    title: ntfy
+    authors: Philipp C. Heckel
+    owners: Philipp C. Heckel
+    project_url: https://ntfy.sh
+    package_source_url: https://github.com/binwiederhier/ntfy
+    icon_url: https://ntfy.sh/static/images/ntfy.png
+    license_url: https://github.com/binwiederhier/ntfy/blob/main/LICENSE
+    docs_url: https://ntfy.sh/docs
+    bug_tracker_url: https://github.com/binwiederhier/ntfy/issues
+    release_notes: "https://github.com/binwiederhier/ntfy/releases/tag/v{{ .Version }}"
+    summary: Simple HTTP-based pub-sub notification service
+    description: |
+      ntfy (pronounced notify) is a simple HTTP-based pub-sub notification service. 
+      It allows you to send notifications to your phone or desktop via scripts from any computer, 
+      and receive them via a mobile app, or a simple GET request.
+    tags: "ntfy notification push cli windows"
+    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
+    source_repo: "https://push.chocolatey.org/"

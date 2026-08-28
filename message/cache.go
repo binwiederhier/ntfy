@@ -39,6 +39,7 @@ type queries struct {
 	selectMessagesSinceIDScheduled   string
 	selectMessagesLatest             string
 	selectMessagesDue                string
+	selectMessagesDueForUpdate       string // Postgres-only: claims due rows via FOR UPDATE SKIP LOCKED; empty for SQLite/mem
 	deleteExpiredMessages            string
 	updateMessagePublished           string
 	selectMessagesCount              string
@@ -252,11 +253,46 @@ func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
 
 // MessagesDue returns all messages that are due for publishing
 func (c *Cache) MessagesDue() ([]*model.Message, error) {
+	// On Postgres (cluster mode), claim due rows atomically so that concurrent delayed senders
+	// on other nodes cannot pick up the same message. We SELECT ... FOR UPDATE SKIP LOCKED and
+	// mark the claimed rows published in the same transaction; each row is thus handed to exactly
+	// one node. We deliberately mark published at claim time (not after delivery) to keep the row
+	// lock short: holding a transaction open across Firebase/WebPush/email delivery would be far
+	// worse than the small at-most-once window if a node crashes between claim and delivery.
+	if c.queries.selectMessagesDueForUpdate != "" {
+		return c.claimMessagesDue()
+	}
 	rows, err := c.db.Query(c.queries.selectMessagesDue, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}
 	return readMessages(rows)
+}
+
+// claimMessagesDue is the Postgres claiming path for MessagesDue (see its comment).
+func (c *Cache) claimMessagesDue() ([]*model.Message, error) {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	rows, err := tx.Query(c.queries.selectMessagesDueForUpdate, time.Now().Unix())
+	if err != nil {
+		return nil, err
+	}
+	messages, err := readMessages(rows) // reads all rows and closes them
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range messages {
+		if _, err := tx.Exec(c.queries.updateMessagePublished, m.ID); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return messages, nil
 }
 
 // DeleteExpiredMessages deletes up to `limit` expired messages in a single query

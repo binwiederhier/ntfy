@@ -30,7 +30,7 @@ type publishMessage struct {
 }
 
 // dispatchOpts selects which delivery targets fire for a published message, beyond delivery
-// to local subscribers (see Server.dispatch)
+// to local subscribers and the cross-node forward, which always happen (see Server.dispatch)
 type dispatchOpts struct {
 	firebase bool   // Send to Firebase (if configured)
 	email    string // Send an email to this address (if a mailer is configured)

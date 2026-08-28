@@ -45,13 +45,20 @@ func TestTopic_CancelSubscribersUser(t *testing.T) {
 	cancelFn2 := func() {
 		canceled2.Store(true)
 	}
+	// u_phil holds two subscriptions (e.g. two tabs/devices); both must be canceled.
+	canceled3 := atomic.Bool{}
+	cancelFn3 := func() {
+		canceled3.Store(true)
+	}
 	to := newTopic("mytopic")
 	to.Subscribe(subFn, "u_another", cancelFn1)
 	to.Subscribe(subFn, "u_phil", cancelFn2)
+	to.Subscribe(subFn, "u_phil", cancelFn3)
 
 	to.CancelSubscriberUser("u_phil")
 	require.False(t, canceled1.Load())
 	require.True(t, canceled2.Load())
+	require.True(t, canceled3.Load())
 }
 
 func TestTopic_Keepalive(t *testing.T) {

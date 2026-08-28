@@ -383,6 +383,12 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 			return
 		}
 	}
+	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
+		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)
+		for _, cancel := range state.Cancels {
+			c.conf.CancelFunc(cancel)
+		}
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -443,18 +449,22 @@ func (c *meshCluster) pushState(peers []*registry.Peer) {
 // subscriber, shrinking the window in which a publisher could wrongly skip this node from a
 // full state interval down to about one round trip.
 func (c *meshCluster) BroadcastState(state *State) {
-	if len(state.AddedTopics) == 0 {
+	if len(state.AddedTopics) == 0 && len(state.SubscriberCancels) == 0 {
 		return
 	}
 	peers, err := c.registry.Peers()
 	if err != nil || len(peers) == 0 {
 		return
 	}
-	body, err := json.Marshal(&apiState{Topics: &apiStateTopics{Added: state.AddedTopics}})
+	envelope := &apiState{Cancels: state.SubscriberCancels}
+	if len(state.AddedTopics) > 0 {
+		envelope.Topics = &apiStateTopics{Added: state.AddedTopics}
+	}
+	body, err := json.Marshal(envelope)
 	if err != nil {
 		return
 	}
-	log.Tag(tag).Debug("Broadcasting state (%d new topics) to %d peer(s)", len(state.AddedTopics), len(peers))
+	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), len(peers))
 	for _, p := range peers {
 		go c.postToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), contentTypeJSON, body)
 	}

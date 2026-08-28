@@ -346,6 +346,7 @@ func New(conf *Config) (*Server, error) {
 		AdvertiseURL:    advertiseURL,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
+		CancelFunc:      s.applySubscriberCancel,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus, s.liveTopics)
 	if err != nil {

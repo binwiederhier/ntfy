@@ -16,6 +16,7 @@ import (
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 )
 
 // fakeCluster records relayed messages and topic announcements so tests can assert that every
@@ -451,4 +452,55 @@ func TestServer_Cluster_UnifiedPushRateVisitorAcrossNodes(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(1), sA.quota.Totals("ip:9.9.9.9").Messages)
 	require.Equal(t, int64(0), sA.quota.Totals("ip:8.8.8.8").Messages)
+}
+
+func TestServer_Cluster_ReservationTakeoverCancelsAcrossNodes(t *testing.T) {
+	// Reserving a topic kicks everyone else's live subscribers. That must reach subscribers
+	// connected to OTHER nodes, or they keep receiving messages they just lost access to.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	// Node B with a real cluster listener (receives the cancel broadcast)
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestConfig(t, schemaDSN)
+	confB.ClusterNodeID = "node-b"
+	confB.ClusterListen = listenerB.Addr().String()
+	confB.ClusterSecret = "s3cret"
+	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
+	confB.AuthDefault = user.PermissionReadWrite
+	sB := newTestServer(t, confB)
+	srvB := &http.Server{Handler: sB.clusterHandler()}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+	// Node A takes the reservation
+	confA := newTestConfig(t, schemaDSN)
+	confA.ClusterNodeID = "node-a"
+	confA.ClusterListen = "127.0.0.1:1"
+	confA.ClusterSecret = "s3cret"
+	confA.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	confA.AuthDefault = user.PermissionReadWrite
+	confA.EnableReservations = true
+	sA := newTestServer(t, confA)
+
+	require.Nil(t, sA.userManager.AddTier(&user.Tier{Code: "pro", MessageLimit: 100, ReservationLimit: 2}))
+	require.Nil(t, sA.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, sA.userManager.ChangeTier("phil", "pro"))
+
+	// Anonymous subscriber on node B
+	topics, err := sB.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	canceled := make(chan bool, 1)
+	topics[0].Subscribe(func(_ *visitor, _ *model.Message) error { return nil }, "", func() {
+		canceled <- true
+	})
+
+	// phil reserves the topic on node A: node B's anonymous subscriber must be canceled
+	response := request(t, sA, "POST", "/v1/account/reservation", `{"topic":"mytopic","everyone":"deny-all"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, response.Code)
+	select {
+	case <-canceled:
+	case <-time.After(5 * time.Second):
+		t.Fatal("subscriber on node B was not canceled after reservation takeover on node A")
+	}
 }

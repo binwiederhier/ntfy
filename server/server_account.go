@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"heckel.io/ntfy/v2/cluster"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -548,6 +549,8 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 		return err
 	}
 	t.CancelSubscribersExceptUser(u.ID)
+	// The topic/subscriber registry is per-node; peer nodes must kick their subscribers too
+	s.cluster.BroadcastState(&cluster.State{SubscriberCancels: []*cluster.SubscriberCancel{{Topic: t.ID, ExceptUserID: u.ID}}})
 	return s.writeJSON(w, newSuccessResponse())
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -587,4 +588,56 @@ func TestMesh_HealthyReflectsRegistration(t *testing.T) {
 	// A successful heartbeat restores health
 	require.Nil(t, mesh.heartbeat())
 	require.True(t, mesh.Healthy())
+}
+
+func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
+	// A subscriber-cancel broadcast from node A must invoke node B's CancelFunc; node A's own
+	// callback must not fire (no loop).
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	var receivedB []*SubscriberCancel
+	canceledA := 0
+
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
+	confB.CancelFunc = func(cancel *SubscriberCancel) {
+		mu.Lock()
+		defer mu.Unlock()
+		receivedB = append(receivedB, cancel)
+	}
+	meshB, err := newMeshCluster(confB, poolB, nil, nil)
+	require.Nil(t, err)
+	defer meshB.Close()
+	srvB := &http.Server{Handler: meshB}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+
+	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	confA.CancelFunc = func(_ *SubscriberCancel) {
+		mu.Lock()
+		defer mu.Unlock()
+		canceledA++
+	}
+	meshA, err := newMeshCluster(confA, poolA, nil, nil)
+	require.Nil(t, err)
+	defer meshA.Close()
+
+	meshA.BroadcastState(&State{SubscriberCancels: []*SubscriberCancel{
+		{Topic: "mytopic", ExceptUserID: "u_owner"},
+		{Topic: "up*", UserID: "u_revoked"},
+	}})
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(receivedB) == 2
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, "mytopic", receivedB[0].Topic)
+	require.Equal(t, "u_owner", receivedB[0].ExceptUserID)
+	require.Equal(t, "up*", receivedB[1].Topic)
+	require.Equal(t, "u_revoked", receivedB[1].UserID)
+	require.Equal(t, 0, canceledA)
 }

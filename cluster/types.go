@@ -20,6 +20,7 @@ type Config struct {
 	StateInterval       time.Duration // How often the full subscription state is pushed to peers
 	MaxMessageBytes     int64         // Upper bound for a single message on the wire (batch limits derive from this)
 	LeaderRenewInterval time.Duration // Overrides the leader lease renewal cadence; tests only, 0 = default
+	CancelFunc          CancelFunc    // Applies a peer's subscriber-cancel request to local connections; may be nil
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The
@@ -28,8 +29,25 @@ type DeliverFunc func(m *model.Message)
 
 // State is a subscription-state delta for Cluster.BroadcastState.
 type State struct {
-	AddedTopics []string // Topics that just gained their first local subscriber on this node
+	AddedTopics       []string            // Topics that just gained their first local subscriber on this node
+	SubscriberCancels []*SubscriberCancel // Requests to cancel matching live subscriber connections on peer nodes
 }
+
+// SubscriberCancel asks peer nodes to cancel matching live subscriber connections, mirroring
+// the two local operations that reach into open connections: reservation takeover (Topic +
+// ExceptUserID: cancel everyone else on that one topic) and access revocation (Topic pattern +
+// UserID: cancel that user wherever the pattern matches). Without relaying these, they only
+// affect the node they ran on and revoked subscribers keep receiving on other nodes.
+type SubscriberCancel struct {
+	Topic        string `json:"topic"`                    // Topic ID, or a "*" pattern when UserID is set
+	UserID       string `json:"user_id,omitempty"`        // Cancel this user's subscribers (access revocation)
+	ExceptUserID string `json:"except_user_id,omitempty"` // Cancel everyone BUT this user (reservation takeover)
+}
+
+// CancelFunc applies a peer's subscriber-cancel request to this node's local connections. The
+// server supplies it (same inversion as DeliverFunc); it must only cancel locally, never
+// re-broadcast (loop prevention).
+type CancelFunc func(cancel *SubscriberCancel)
 
 // TopicsFunc returns the topics that currently have at least one live subscriber, computed
 // fresh on every call: membership is never tracked as a list, so topics "leave" simply by not
@@ -49,7 +67,8 @@ type apiMessage struct {
 // apiState is the peer state-exchange envelope. Each concern is an optional section; future
 // concerns (rate limit counters, stats) become siblings of Topics.
 type apiState struct {
-	Topics *apiStateTopics `json:"topics,omitempty"`
+	Topics  *apiStateTopics     `json:"topics,omitempty"`
+	Cancels []*SubscriberCancel `json:"cancels,omitempty"`
 }
 
 // apiStateTopics carries a peer's subscription knowledge: either a full snapshot (Filter, a

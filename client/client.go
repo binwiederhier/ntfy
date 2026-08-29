@@ -24,6 +24,9 @@ const (
 
 const (
 	maxResponseBytes = 4096
+
+	subscribeRetryInitialDelay = 2 * time.Second
+	subscribeRetryMaxDelay     = 2 * time.Minute
 )
 
 var (
@@ -152,7 +155,7 @@ func (c *Client) Poll(topic string, options ...SubscribeOption) ([]*Message, err
 	log.Debug("%s Polling from topic", util.ShortTopicURL(topicURL))
 	options = append(options, WithPoll())
 	go func() {
-		err := performSubscribeRequest(ctx, msgChan, topicURL, "", options...)
+		_, err := performSubscribeRequest(ctx, msgChan, topicURL, "", options...)
 		close(msgChan)
 		errChan <- err
 	}()
@@ -226,58 +229,74 @@ func (c *Client) expandTopicURL(topic string) (string, error) {
 }
 
 func handleSubscribeConnLoop(ctx context.Context, msgChan chan *Message, topicURL, subcriptionID string, options ...SubscribeOption) {
+	var lastMessageID string
+	delay := subscribeRetryInitialDelay
 	for {
-		// TODO The retry logic is crude and may lose messages. It should record the last message like the
-		//      Android client, use since=, and do incremental backoff too
-		if err := performSubscribeRequest(ctx, msgChan, topicURL, subcriptionID, options...); err != nil {
+		attemptOptions := options
+		if lastMessageID != "" {
+			attemptOptions = append(append([]SubscribeOption{}, options...), WithSince(lastMessageID))
+		}
+		messageID, err := performSubscribeRequest(ctx, msgChan, topicURL, subcriptionID, attemptOptions...)
+		if messageID != "" {
+			lastMessageID = messageID
+		}
+		if err != nil {
 			log.Warn("%s Connection failed: %s", util.ShortTopicURL(topicURL), err.Error())
+		}
+		if err == nil || messageID != "" {
+			delay = subscribeRetryInitialDelay
 		}
 		select {
 		case <-ctx.Done():
 			log.Info("%s Connection exited", util.ShortTopicURL(topicURL))
 			return
-		case <-time.After(10 * time.Second): // TODO Add incremental backoff
+		case <-time.After(delay):
 		}
+		delay = min(2*delay, subscribeRetryMaxDelay)
 	}
 }
 
-func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicURL string, subscriptionID string, options ...SubscribeOption) error {
+// performSubscribeRequest returns the ID of the last message it handed to msgChan, so the caller can
+// resume from there rather than lose whatever arrived while the connection was down.
+func performSubscribeRequest(ctx context.Context, msgChan chan *Message, topicURL string, subscriptionID string, options ...SubscribeOption) (string, error) {
 	streamURL := fmt.Sprintf("%s/json", topicURL)
 	log.Debug("%s Listening to %s", util.ShortTopicURL(topicURL), streamURL)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, streamURL, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	for _, option := range options {
 		if err := option(req); err != nil {
-			return err
+			return "", err
 		}
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		b, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 		if err != nil {
-			return err
+			return "", err
 		}
-		return errors.New(strings.TrimSpace(string(b)))
+		return "", errors.New(strings.TrimSpace(string(b)))
 	}
+	var lastMessageID string
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		messageJSON := scanner.Text()
 		m, err := toMessage(messageJSON, topicURL, subscriptionID)
 		if err != nil {
-			return err
+			return lastMessageID, err
 		}
 		log.Trace("%s Message received: %s", util.ShortTopicURL(topicURL), messageJSON)
 		if m.Event == MessageEvent {
 			msgChan <- m
+			lastMessageID = m.ID
 		}
 	}
-	return nil
+	return lastMessageID, nil
 }
 
 func toMessage(s, topicURL, subscriptionID string) (*Message, error) {

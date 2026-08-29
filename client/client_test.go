@@ -6,7 +6,10 @@ import (
 	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/test"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -114,4 +117,47 @@ func nextMessage(c *client.Client) *client.Message {
 	default:
 		return nil
 	}
+}
+
+func TestClient_Subscribe_ResumeAfterConnectionLoss(t *testing.T) {
+	var mu sync.Mutex
+	since := make([]string, 0)
+	reconnected := make(chan struct{}, 1)
+	stop := make(chan struct{})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		attempt := len(since)
+		since = append(since, r.URL.Query().Get("since"))
+		mu.Unlock()
+		if attempt == 0 {
+			fmt.Fprintln(w, `{"id":"nT4qA1zGvJ","time":1,"event":"message","topic":"mytopic","message":"delivered before the drop"}`)
+			return // ending the handler drops the stream, as a flaky connection would
+		}
+		select {
+		case reconnected <- struct{}{}:
+		default:
+		}
+		select {
+		case <-stop:
+		case <-r.Context().Done():
+		}
+	}))
+	defer server.Close()
+	defer close(stop)
+
+	c := client.New(client.NewConfig())
+	subscriptionID, _ := c.Subscribe(server.URL + "/mytopic")
+	defer c.Unsubscribe(subscriptionID)
+
+	select {
+	case <-reconnected:
+	case <-time.After(30 * time.Second):
+		t.Fatal("client did not reconnect")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, "", since[0], "the first connection must not ask for old messages")
+	require.Equal(t, "nT4qA1zGvJ", since[1], "the reconnect must resume after the last delivered message")
 }

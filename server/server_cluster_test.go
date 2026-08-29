@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster"
+	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
@@ -503,4 +505,105 @@ func TestServer_Cluster_ReservationTakeoverCancelsAcrossNodes(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("subscriber on node B was not canceled after reservation takeover on node A")
 	}
+}
+
+func TestServer_Cluster_AccountStatsShowClusterTotals(t *testing.T) {
+	// The account usage display must show cluster-wide usage, not the node-local limiter
+	// view: behind a load balancer, two page loads would otherwise show different numbers
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = "127.0.0.1:1"
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		conf.VisitorUsageFlushInterval = 150 * time.Millisecond
+		return newTestServer(t, conf)
+	}
+	sA, sB := newNode("node-a"), newNode("node-b")
+
+	require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "one", nil).Code)
+	require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "two", nil).Code)
+	time.Sleep(600 * time.Millisecond) // Push on A, pull on B
+
+	response := request(t, sB, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, response.Code)
+	var account apiAccountResponse
+	require.Nil(t, json.Unmarshal(response.Body.Bytes(), &account))
+	require.Equal(t, int64(2), account.Stats.Messages)
+}
+
+func TestServer_Cluster_MatrixRejectDecisionFromSharedState(t *testing.T) {
+	// The Matrix pushkey rejection must be decided from the shared topic table when
+	// clustered: the per-node topic object is often freshly created (so its in-memory age
+	// says "too early"), while the shared record proves nobody has subscribed for days
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1"
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	conf.BaseURL = "http://127.0.0.1:12345"
+	conf.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, conf)
+
+	// A topic that existed for days with no subscriber activity (written by "another node")
+	old := time.Now().Add(-80 * time.Hour).Unix()
+	host, err := pg.Open(schemaDSN)
+	require.Nil(t, err)
+	defer host.DB.Close()
+	_, err = host.DB.Exec(`INSERT INTO topic (id, created_at, last_subscribed_at, last_published_at) VALUES ('up123456789012', $1, $1, $1)`, old)
+	require.Nil(t, err)
+
+	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/up123456789012?up=1"}]}}`
+	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 200, response.Code, response.Body.String())
+	require.Equal(t, `{"rejected":["http://127.0.0.1:12345/up123456789012?up=1"]}`+"\n", response.Body.String())
+
+	// A topic with RECENT subscriber activity (per the shared record) must NOT be rejected,
+	// even though there is no rate visitor right now
+	recent := time.Now().Add(-1 * time.Hour).Unix()
+	_, err = host.DB.Exec(`INSERT INTO topic (id, created_at, last_subscribed_at) VALUES ('up999456789012', $1, $1)`, recent)
+	require.Nil(t, err)
+	notification2 := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/up999456789012?up=1"}]}}`
+	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification2, nil)
+	require.Equal(t, 507, response.Code, response.Body.String())
+}
+
+func TestServer_Cluster_TopicLivenessRecorded(t *testing.T) {
+	// Subscribes (and their keepalives) and successful publishes must be recorded in the
+	// shared topic table, so any node can make liveness decisions about a topic
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1"
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	conf.KeepaliveInterval = 200 * time.Millisecond
+	conf.TopicStoreUpdateInterval = 100 * time.Millisecond
+	s := newTestServer(t, conf)
+
+	// Publish: recorded with the publisher's visitor key
+	require.Equal(t, 200, request(t, s, "PUT", "/livetopic", "hi", nil).Code)
+	waitFor(t, func() bool {
+		info, err := s.topicStore.Get("livetopic")
+		return err == nil && info.LastPublisherKey == "ip:9.9.9.9" && !info.LastPublishedAt.IsZero()
+	})
+
+	// Subscribe: initial record plus keepalive refreshes
+	subscribeRR := httptest.NewRecorder()
+	subscribeCancel := subscribe(t, s, "/livetopic/json", subscribeRR)
+	waitFor(t, func() bool {
+		info, err := s.topicStore.Get("livetopic")
+		return err == nil && !info.LastSubscribedAt.IsZero()
+	})
+	info1, err := s.topicStore.Get("livetopic")
+	require.Nil(t, err)
+	// Keepalives must refresh the subscriber record; timestamps have second granularity, so
+	// wait until the recorded time visibly advances
+	waitForWithMaxWait(t, 10*time.Second, func() bool {
+		info2, err := s.topicStore.Get("livetopic")
+		return err == nil && info2.LastSubscribedAt.After(info1.LastSubscribedAt)
+	})
+	subscribeCancel()
 }

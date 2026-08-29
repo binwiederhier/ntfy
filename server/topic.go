@@ -24,6 +24,8 @@ type topic struct {
 	subscribers       map[int]*topicSubscriber
 	rateVisitor       *visitor
 	rateVisitorMissAt time.Time // Last failed shared-store lookup; throttles per-publish lookups for topics without a rate visitor
+	subscriberStoredAt time.Time // Last shared subscriber-liveness record (see TakeSubscriberRecordSlot)
+	publishStoredAt   time.Time // Last shared publish-liveness record (see TakePublishRecordSlot)
 	lastAccess        time.Time
 	onFirstSubscriber func() // Fired (async) when the subscriber count goes 0 -> 1; may be nil
 	mu                sync.RWMutex
@@ -100,6 +102,30 @@ func (t *topic) RateVisitor() *visitor {
 		t.rateVisitor = nil
 	}
 	return t.rateVisitor
+}
+
+// TakeSubscriberRecordSlot reports whether a shared subscriber-liveness record is due for
+// this topic (at most one per interval) and, if so, claims the slot. The caller then writes
+// the record; a failed write is simply retried at the next slot.
+func (t *topic) TakeSubscriberRecordSlot(interval time.Duration) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if time.Since(t.subscriberStoredAt) < interval {
+		return false
+	}
+	t.subscriberStoredAt = time.Now()
+	return true
+}
+
+// TakePublishRecordSlot is TakeSubscriberRecordSlot for publish-liveness records
+func (t *topic) TakePublishRecordSlot(interval time.Duration) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if time.Since(t.publishStoredAt) < interval {
+		return false
+	}
+	t.publishStoredAt = time.Now()
+	return true
 }
 
 // SetRateVisitorMiss records that a shared-store rate-visitor lookup found nothing, so the

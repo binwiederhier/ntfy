@@ -480,3 +480,14 @@ func SanitizeUTF8(s string) string {
 	}
 	return s
 }
+
+// MaxTime returns the latest of the given times
+func MaxTime(times ...time.Time) time.Time {
+	var max time.Time
+	for _, t := range times {
+		if t.After(max) {
+			max = t
+		}
+	}
+	return max
+}

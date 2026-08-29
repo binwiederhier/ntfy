@@ -34,7 +34,7 @@ import (
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/cluster/quota"
-	"heckel.io/ntfy/v2/cluster/ratevisitor"
+	topicstore "heckel.io/ntfy/v2/cluster/topics"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -78,7 +78,7 @@ type Server struct {
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	cluster           cluster.Cluster                     // Fans messages out to peer cluster nodes (nop when not clustered)
 	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
-	rateVisitors      *ratevisitor.Store                  // Shared topic -> rate-visitor assignments (UnifiedPush); nil when not clustered
+	topicStore        *topicstore.Store                   // Shared per-topic state (rate visitors, liveness); nil when not clustered
 	pendingPeerUsage  map[string]*pendingPeerUsage        // Peer usage for visitors this node has not seen yet, burned when the visitor first appears
 	stopOnce          sync.Once                           // Makes Stop idempotent (double close panics otherwise)
 	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
@@ -365,7 +365,7 @@ func New(conf *Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
-		s.rateVisitors, err = ratevisitor.New(pool)
+		s.topicStore, err = topicstore.New(pool)
 		if err != nil {
 			return nil, err
 		}
@@ -1123,6 +1123,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	s.mu.Lock()
 	s.messages++
 	s.mu.Unlock()
+	s.recordTopicPublish(v, t)
 	if unifiedpush {
 		metrics.UnifiedPushPublishedSuccess.Inc()
 	}
@@ -1140,6 +1141,54 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	return s.writeJSON(w, m.ForJSON())
 }
 
+// matrixPushkeyRejectable decides whether a UnifiedPush publish without a rate visitor should
+// reject the Matrix pushkey (the homeserver then permanently removes the pusher) or stay a
+// transient 507. Clustered, the decision comes from the shared topic table: the local topic
+// object is often freshly created on this node while the subscriber history lives elsewhere.
+// Without a shared record (or when not clustered), the node-local topic age decides, as before.
+// recordTopicSubscriber writes the shared subscriber-liveness record for the topic, at most
+// once per TopicStoreUpdateInterval per topic (asynchronously; failures are logged only and
+// retried at the next slot). Keepalive ticks call this, so a long-held connection keeps the
+// topic -- and its rate-visitor assignment -- alive in the shared record.
+func (s *Server) recordTopicSubscriber(v *visitor, t *topic) {
+	if s.topicStore == nil || !t.TakeSubscriberRecordSlot(s.config.TopicStoreUpdateInterval) {
+		return
+	}
+	visitorKey := string(v.QuotaKey())
+	go func() {
+		if err := s.topicStore.RecordSubscriber(t.ID, visitorKey); err != nil {
+			log.Tag(tagSubscribe).Err(err).Warn("Cannot record subscriber liveness for topic %s", t.ID)
+		}
+	}()
+}
+
+// recordTopicPublish is recordTopicSubscriber for successful publishes (the "last sender")
+func (s *Server) recordTopicPublish(v *visitor, t *topic) {
+	if s.topicStore == nil || t == nil || !t.TakePublishRecordSlot(s.config.TopicStoreUpdateInterval) {
+		return
+	}
+	visitorKey := string(v.QuotaKey())
+	go func() {
+		if err := s.topicStore.RecordPublish(t.ID, visitorKey); err != nil {
+			log.Tag(tagPublish).Err(err).Warn("Cannot record publish liveness for topic %s", t.ID)
+		}
+	}()
+}
+
+func (s *Server) matrixPushkeyRejectable(t *topic) bool {
+	if s.topicStore != nil {
+		info, err := s.topicStore.Get(t.ID)
+		if err == nil {
+			lastActivity := util.MaxTime(info.CreatedAt, info.LastSubscribedAt, info.LastPublishedAt, info.RateVisitorSeenAt)
+			return time.Since(lastActivity) > matrixRejectClusterAfter
+		} else if !errors.Is(err, topicstore.ErrNotFound) {
+			return false // Database trouble: never reject on missing information (fail safe)
+		}
+		// No shared record: fall through to the node-local rule
+	}
+	return time.Since(t.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter
+}
+
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	_, err := s.handlePublishInternal(r, v)
 	if err != nil {
@@ -1154,7 +1203,7 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 			if err != nil {
 				return err
 			}
-			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
+			if s.matrixPushkeyRejectable(topic) {
 				return writeMatrixResponse(w, pushKey)
 			}
 		}
@@ -1646,6 +1695,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
+		s.recordTopicSubscriber(v, t)
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1674,6 +1724,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			v.Keepalive()
 			for _, t := range topics {
 				t.Keepalive()
+				s.recordTopicSubscriber(v, t)
 			}
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
@@ -1764,6 +1815,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				v.Keepalive()
 				for _, t := range topics {
 					t.Keepalive()
+					s.recordTopicSubscriber(v, t)
 				}
 				if err := ping(); err != nil {
 					return err
@@ -1795,6 +1847,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
+		s.recordTopicSubscriber(v, t)
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1894,10 +1947,11 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
 		t.SetRateVisitor(v)
 		// Cluster: persist the assignment so publishes on other nodes bill this subscriber too.
-		// Same lifetime as the in-memory assignment (the visitor goes stale after a day);
-		// failures are logged only, the local assignment still works (fail open).
-		if s.rateVisitors != nil {
-			if err := s.rateVisitors.Set(t.ID, string(v.QuotaKey()), v.MaybeUserID(), time.Now().Add(visitorExpungeAfter)); err != nil {
+		// Liveness is refreshed by the subscriber's (throttled) keepalives, so the assignment
+		// stays valid for as long as the subscriber is connected anywhere; failures are logged
+		// only, the local assignment still works (fail open).
+		if s.topicStore != nil {
+			if err := s.topicStore.SetRateVisitor(t.ID, string(v.QuotaKey()), v.MaybeUserID()); err != nil {
 				logvr(v, r).Tag(tagSubscribe).Err(err).With(t).Warn("Cannot persist rate visitor for topic %s", t.ID)
 			}
 		}
@@ -2311,12 +2365,12 @@ func (s *Server) rateVisitor(t *topic) *visitor {
 	if v := t.RateVisitor(); v != nil {
 		return v
 	}
-	if s.rateVisitors == nil || !s.config.VisitorSubscriberRateLimiting || !isUnifiedPushTopic(t.ID) || t.RateVisitorMissedRecently(rateVisitorMissTTL) {
+	if s.topicStore == nil || !s.config.VisitorSubscriberRateLimiting || !isUnifiedPushTopic(t.ID) || t.RateVisitorMissedRecently(rateVisitorMissTTL) {
 		return nil
 	}
-	visitorKey, userID, err := s.rateVisitors.Get(t.ID)
+	visitorKey, userID, err := s.topicStore.RateVisitor(t.ID)
 	if err != nil {
-		if !errors.Is(err, ratevisitor.ErrNotFound) {
+		if !errors.Is(err, topicstore.ErrNotFound) {
 			log.Tag(tagSubscribe).Err(err).With(t).Warn("Cannot resolve rate visitor for topic %s", t.ID)
 		}
 		t.SetRateVisitorMiss()

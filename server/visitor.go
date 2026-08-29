@@ -632,6 +632,13 @@ func (v *visitor) infoLightNoLock() *visitorInfo {
 	messages := v.messagesLimiter.Value()
 	emails := v.emailsLimiter.Value()
 	calls := v.callsLimiter.Value()
+	if v.quota != nil {
+		// Clustered: display the cluster-wide usage (what enforcement actually uses), not
+		// this node's local slice -- behind a load balancer, per-node numbers would differ
+		// between page loads
+		totals := v.quota.Totals(v.quotaKey)
+		messages, emails, calls = totals.Messages, totals.Emails, totals.Calls
+	}
 	limits := v.limitsNoLock()
 	stats := &visitorStats{
 		Messages:          messages,

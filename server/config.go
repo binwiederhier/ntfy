@@ -32,6 +32,7 @@ const (
 	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
+	DefaultTopicStoreUpdateInterval             = 5 * time.Minute  // Per-topic throttle for shared liveness records (cluster mode; keeps the topic table off the hot path)
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -212,6 +213,7 @@ type Config struct {
 	VisitorAuthFailureLimitReplenish     time.Duration
 	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
 	VisitorUsageFlushInterval            time.Duration  // Cadence for flushing/pulling cluster-wide visitor usage (cluster mode only; no CLI flag, tests override it)
+	TopicStoreUpdateInterval             time.Duration  // Per-topic throttle for shared liveness records (cluster mode only; no CLI flag, tests override it)
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
@@ -330,6 +332,7 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorUsageFlushInterval:            quota.DefaultFlushInterval,
+		TopicStoreUpdateInterval:             DefaultTopicStoreUpdateInterval,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address

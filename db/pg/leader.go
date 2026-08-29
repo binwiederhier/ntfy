@@ -3,6 +3,7 @@ package pg
 import (
 	"context"
 	"database/sql"
+	"hash/fnv"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ const (
 
 	tryAdvisoryLockQuery = `SELECT pg_try_advisory_lock($1)`
 	advisoryUnlockQuery  = `SELECT pg_advisory_unlock($1)`
+	currentSchemaQuery   = `SELECT current_schema()`
 
 	defaultRenewInterval = 5 * time.Second
 	leaderMissedRenewals = 3
@@ -32,7 +34,8 @@ const (
 // renew every 5s, lease duration 15s, hold-off 30s -> up to ~35s without a leader.
 type Leader struct {
 	db            *sql.DB
-	key           int64
+	key           int64 // Base key; scoped to the schema on the first acquire attempt (see scopeKeyToSchema)
+	keyScoped     bool
 	renewInterval time.Duration
 	conn          *sql.Conn          // holds the advisory lock while this process is leader
 	acquiredAt    time.Time          // When the lock was won (this tenure), for the hold-off
@@ -111,6 +114,25 @@ func (l *Leader) runAcquireOrRenewLoop(ctx context.Context) {
 
 // tryAcquireOrRenew renews the lock on a healthy leader (a cheap ping) or retries acquiring
 // it on a follower, on a pinned connection.
+// scopeKeyToSchema folds the connection's current schema into the lock key, once. Advisory
+// locks are database-global, but a cluster is defined by its schema: every real node runs with
+// the same search_path (public), while test runs and multi-tenant setups use distinct schemas
+// and must elect independently instead of stealing each other's leadership.
+func (l *Leader) scopeKeyToSchema(ctx context.Context, conn *sql.Conn) error {
+	if l.keyScoped {
+		return nil
+	}
+	var schema string
+	if err := conn.QueryRowContext(ctx, currentSchemaQuery).Scan(&schema); err != nil {
+		return err
+	}
+	h := fnv.New64a()
+	h.Write([]byte(schema))
+	l.key ^= int64(h.Sum64())
+	l.keyScoped = true
+	return nil
+}
+
 func (l *Leader) tryAcquireOrRenew(ctx context.Context) {
 	l.mu.Lock()
 	conn := l.conn
@@ -130,6 +152,11 @@ func (l *Leader) tryAcquireOrRenew(ctx context.Context) {
 	newConn, err := l.db.Conn(ctx)
 	if err != nil {
 		log.Tag(tagLeader).Debug("Cannot get connection to compete for leader lock (lock key %d): %s", l.key, err.Error())
+		return
+	}
+	if err := l.scopeKeyToSchema(ctx, newConn); err != nil {
+		newConn.Close()
+		log.Tag(tagLeader).Debug("Cannot scope leader lock key to schema: %s", err.Error())
 		return
 	}
 	var acquired bool

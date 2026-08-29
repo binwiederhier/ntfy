@@ -88,3 +88,25 @@ func waitForLeader(t *testing.T, l *pg.Leader) {
 	}
 	t.Fatal("node never became effective leader")
 }
+
+func TestLeader_SchemaScopedKeys(t *testing.T) {
+	// Advisory locks are database-global, but a "cluster" is defined by its schema (all real
+	// nodes share search_path=public; test schemas and multi-tenant databases do not). Two
+	// leaders with the same base key on DIFFERENT schemas must both win, or concurrently
+	// running test binaries steal each other's leadership.
+	dsnA := dbtest.CreateTestPostgresSchema(t)
+	dsnB := dbtest.CreateTestPostgresSchema(t)
+	hostA, err := pg.Open(dsnA)
+	require.Nil(t, err)
+	defer hostA.DB.Close()
+	hostB, err := pg.Open(dsnB)
+	require.Nil(t, err)
+	defer hostB.DB.Close()
+
+	leaderA := pg.NewLeader(hostA.DB, pg.LeaderLockKey, 50*time.Millisecond)
+	defer leaderA.Close()
+	waitForLeader(t, leaderA)
+	leaderB := pg.NewLeader(hostB.DB, pg.LeaderLockKey, 50*time.Millisecond)
+	defer leaderB.Close()
+	waitForLeader(t, leaderB) // Must win too: different schema, independent leadership
+}

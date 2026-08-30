@@ -445,7 +445,7 @@ The following priorities exist:
 
 | Priority             | Icon                                       | ID  | Name           | Description                                                                                            |
 |----------------------|--------------------------------------------|-----|----------------|--------------------------------------------------------------------------------------------------------|
-| Max priority         | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification.                 |
+| Max priority         | ![min priority](static/img/priority-5.svg) | `5` | `max`/`urgent` | Really long vibration bursts, default notification sound with a pop-over notification. On iOS, delivered as a [critical alert](#ios-critical-alerts) by default. |
 | High priority        | ![min priority](static/img/priority-4.svg) | `4` | `high`         | Long vibration burst, default notification sound with a pop-over notification.                         |
 | **Default priority** | *(none)*                                   | `3` | `default`      | Short default vibration and sound. Default notification behavior.                                      |
 | Low priority         | ![min priority](static/img/priority-2.svg) | `2` | `low`          | No vibration or sound. Notification will not visibly show up until notification drawer is pulled down. |
@@ -529,6 +529,73 @@ You can set the priority with the header `X-Priority` (or any of its aliases: `P
   ![priority notification](static/img/priority-detail-overview.png){ width=500 }
   <figcaption>Detail view of priority notifications</figcaption>
 </figure>
+
+## iOS critical alerts
+_Supported on:_ :material-apple:
+
+Critical alerts are Apple's mechanism for notifications that **must** be heard: they play a sound even if the phone
+is muted, the volume is turned down, or Focus/Do Not Disturb is enabled. They are meant for alarm-style use cases
+(on-call alerts, health alerts, home security), not for everyday notifications.
+
+You can control critical alert delivery with the `X-Apple-Critical` header (alias: `Apple-Critical`; unlike other
+parameters, these headers deliberately have no short aliases — a flag that breaks through Do Not Disturb should be
+explicit). If the header is not set, messages with [max priority](#message-priority) (`5`) are delivered as critical
+alerts, so existing publishers get critical alerts without any changes. An explicit header always wins:
+
+| `X-Apple-Critical` | Priority | Delivered as critical alert |
+|--------------------|----------|-----------------------------|
+| `1`/`yes`/`true`   | *any*    | Yes                         |
+| `0`/`no`/`false`   | *any*    | No, even at max priority    |
+| *(not set)*        | `5`      | Yes (backwards compatible)  |
+| *(not set)*        | `1`-`4`  | No                          |
+
+For critical alerts, you can optionally set the sound name with `X-Apple-Sound` (a sound file from the app bundle,
+defaults to `default`), and the volume with `X-Apple-Volume` (a number greater than `0.0` and at most `1.0`,
+defaults to `1.0`; zero is rejected, since a silent critical alert defeats its purpose). The volume is enforced
+by iOS regardless of the phone's volume setting.
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -H "X-Apple-Critical: 1" \
+        -H "X-Apple-Volume: 0.8" \
+        -d "Backup failed, wake up" \
+        ntfy.sh/phil_alerts
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /phil_alerts HTTP/1.1
+    Host: ntfy.sh
+    X-Apple-Critical: 1
+    X-Apple-Volume: 0.8
+
+    Backup failed, wake up
+    ```
+
+=== "JSON publishing"
+    ``` json
+    {
+        "topic": "phil_alerts",
+        "message": "Backup failed, wake up",
+        "apple": {
+            "critical": true,
+            "volume": 0.8
+        }
+    }
+    ```
+
+!!! info
+    Critical alerts only work if the user has allowed them for the ntfy app (iOS asks for this permission separately,
+    and it can be changed under **Settings → Notifications → ntfy → Critical Alerts**). The decision to deliver a
+    message as critical is made by the publisher and the server, so it works consistently across all subscribed
+    devices — there is no per-topic toggle in the app, since iOS does not support suppressing critical alerts
+    per topic on the receiving side.
+
+For [self-hosted servers with an upstream server](config.md#ios-instant-notifications), the critical flag (and volume)
+is forwarded along with the poll request, so the notification that wakes up the iOS app is also delivered as a
+critical alert. The message JSON additionally carries the options in an `apple` field, so the iOS app can apply them
+when it fetches the real message from your server.
 
 ## Tags & emojis 🥳 🎉
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -3722,6 +3789,7 @@ all the supported fields:
 | `email`       | -        | *e-mail address or 'yes'*        | `phil@example.com` or `yes`               | E-mail address for e-mail notifications, or `yes` to use your primary verified address    |
 | `call`        | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                                        |
 | `sequence_id` | -        | *string*                         | `my-sequence-123`                         | Sequence ID for [updating/deleting notifications](#updating-deleting-notifications)   |
+| `apple`       | -        | *JSON object*                    | `{"critical":true,"volume":0.8}`          | [iOS critical alert](#ios-critical-alerts) options                                        |
 
 ## Webhooks (publish via GET) 
 _Supported on:_ :material-android: :material-apple: :material-firefox:
@@ -4955,6 +5023,9 @@ table in their canonical form.
 | `X-Title`       | `Title`, `t`                               | [Message title](#message-title)                                                               |
 | `X-Sequence-ID` | `Sequence-ID`, `SID`                       | [Sequence ID](#updating-deleting-notifications) for updating/clearing/deleting notifications  |
 | `X-Priority`    | `Priority`, `prio`, `p`                    | [Message priority](#message-priority)                                                         |
+| `X-Apple-Critical` | `Apple-Critical`                        | [iOS critical alert](#ios-critical-alerts) override (boolean)                                 |
+| `X-Apple-Sound` | `Apple-Sound`                              | Sound name for [iOS critical alerts](#ios-critical-alerts)                                    |
+| `X-Apple-Volume` | `Apple-Volume`                            | Sound volume (greater than `0.0`, at most `1.0`) for [iOS critical alerts](#ios-critical-alerts) |
 | `X-Tags`        | `Tags`, `Tag`, `ta`                        | [Tags and emojis](#tags-emojis)                                                               |
 | `X-Delay`       | `Delay`, `X-At`, `At`, `X-In`, `In`        | Timestamp or duration for [delayed delivery](#scheduled-delivery)                             |
 | `X-Actions`     | `Actions`, `Action`                        | JSON array or short format of [user actions](#action-buttons)                                 |

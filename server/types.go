@@ -10,23 +10,33 @@ import (
 
 // publishMessage is used as input when publishing as JSON
 type publishMessage struct {
-	Topic      string         `json:"topic"`
-	SequenceID string         `json:"sequence_id"`
-	Title      string         `json:"title"`
-	Message    string         `json:"message"`
-	Priority   int            `json:"priority"`
-	Tags       []string       `json:"tags"`
-	Click      string         `json:"click"`
-	Icon       string         `json:"icon"`
-	Actions    []model.Action `json:"actions"`
-	Attach     string         `json:"attach"`
-	Markdown   bool           `json:"markdown"`
-	Filename   string         `json:"filename"`
-	Email      string         `json:"email"`
-	Call       string         `json:"call"`
-	Cache      string         `json:"cache"`    // use string as it defaults to true (or use &bool instead)
-	Firebase   string         `json:"firebase"` // use string as it defaults to true (or use &bool instead)
-	Delay      string         `json:"delay"`
+	Topic      string               `json:"topic"`
+	SequenceID string               `json:"sequence_id"`
+	Title      string               `json:"title"`
+	Message    string               `json:"message"`
+	Priority   int                  `json:"priority"`
+	Tags       []string             `json:"tags"`
+	Click      string               `json:"click"`
+	Icon       string               `json:"icon"`
+	Actions    []model.Action       `json:"actions"`
+	Attach     string               `json:"attach"`
+	Markdown   bool                 `json:"markdown"`
+	Filename   string               `json:"filename"`
+	Email      string               `json:"email"`
+	Call       string               `json:"call"`
+	Cache      string               `json:"cache"`    // use string as it defaults to true (or use &bool instead)
+	Firebase   string               `json:"firebase"` // use string as it defaults to true (or use &bool instead)
+	Delay      string               `json:"delay"`
+	Apple      *publishMessageApple `json:"apple"` // iOS-specific delivery options (critical alerts)
+}
+
+// publishMessageApple mirrors model.AppleOptions for JSON publishing. Critical and Volume are
+// pointers, so that absent values stay absent: an empty "apple" object must neither act as an
+// explicit critical opt-out (see appleCritical), nor silently bypass the volume validation.
+type publishMessageApple struct {
+	Critical *bool    `json:"critical"`
+	Sound    string   `json:"sound"`
+	Volume   *float64 `json:"volume"`
 }
 
 // dispatchOpts selects which delivery targets fire for a published message, beyond delivery

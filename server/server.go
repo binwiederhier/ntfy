@@ -2435,14 +2435,11 @@ func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	id := visitorID(ip, user, s.config)
 	v, exists := s.visitors[id]
 	if !exists {
+		// newVisitor reseeds the buckets from the tracker's cluster totals, which already
+		// include anything parked in pendingPeerUsage -- burning both would double-punish
 		v = newVisitor(s.config, s.messageCache, s.userManager, s.quota, ip, user)
 		s.visitors[id] = v
-		if pending, ok := s.pendingPeerUsage[id]; ok {
-			delete(s.pendingPeerUsage, id)
-			if pending.expires.After(time.Now()) {
-				v.BurnPeerUsage(pending.counters)
-			}
-		}
+		delete(s.pendingPeerUsage, id)
 		return v
 	}
 	v.Keepalive()

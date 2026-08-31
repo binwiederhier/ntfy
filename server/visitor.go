@@ -283,6 +283,31 @@ func (v *visitor) CallAllowed() bool {
 	return true
 }
 
+// reseedBucketsNoLock burns today's already-consumed usage (from the cluster usage tracker)
+// into the freshly built request and bandwidth buckets, so a restart or visitor eviction does
+// not hand back a full burst (restart amnesty). The burn is capped at the burst -- a reseeded
+// bucket starts at worst EMPTY, never in debt: a day total says nothing about how much the
+// bucket would have replenished since, so debt would over-punish long-lived visitors. Nop when
+// not clustered. (Rehydration piece 1, plans/260829-topic-visitor-tables.md.)
+func (v *visitor) reseedBucketsNoLock(limits *visitorLimits) {
+	if v.quota == nil {
+		return
+	}
+	totals := v.quota.Totals(v.quotaKey)
+	if n := totals.Requests; n > 0 {
+		if burst := int64(limits.RequestLimitBurst); n > burst {
+			n = burst
+		}
+		util.BurnTokens(v.requestLimiter, n)
+	}
+	if n := totals.BandwidthBytes; n > 0 {
+		if limit := limits.AttachmentBandwidthLimit; n > limit {
+			n = limit
+		}
+		v.bandwidthLimiter.Burn(n)
+	}
+}
+
 // quotaAllowedNoLock reports whether the cluster-wide usage for this visitor is still below the
 // given daily limit. Always true when not clustered, or when the limit is zero (zero limits are
 // enforced by the local limiters, which know whether zero means "none allowed" or "unlimited").
@@ -532,7 +557,8 @@ func (v *visitor) resetLimitersNoLock(messages, emails, calls int64, enqueueUpda
 		v.authLimiter = nil    // Users are already logged in, no need to limit requests
 	}
 	v.statsPersisted = user.Stats{Messages: messages, Emails: emails, Calls: calls} // Seeds come from the persisted user stats, so nothing is owed to the queue
-	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor")          // Must be after function, because contextNoLock() describes rate limiters
+	v.reseedBucketsNoLock(limits)
+	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor") // Must be after function, because contextNoLock() describes rate limiters
 }
 
 func (v *visitor) Limits() *visitorLimits {

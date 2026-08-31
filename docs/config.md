@@ -2197,6 +2197,50 @@ applies the prefix):
     bantime = 1h
     ```
 
+## Clustering (experimental)
+ntfy can run as a **cluster of stateless nodes** behind a load balancer or DNS round-robin, so you can scale
+horizontally and survive single-node failures. Clustering is **experimental** and requires:
+
+* **PostgreSQL** as the database backend (`database-url`, see [database options](#database-options)); the shared
+  database carries all durable state (messages, users, web push) plus the cluster coordination tables.
+* **Shared attachment storage** if you use [attachments](#attachments): per-node cache directories cannot serve
+  files uploaded via another node.
+
+Clustering is enabled by setting `cluster-listen`. Nodes discover each other through the shared database and
+deliver published messages to subscribers on any node directly over a private HTTP listener. Messages, delayed
+messages, [rate limits and daily quotas](#rate-limiting), UnifiedPush subscriber-based rate limiting, and access
+control all behave as if the cluster were one server: a visitor spreading requests across N nodes does not get
+N times the limits, scheduled messages are delivered exactly once, and revoking access disconnects subscribers
+on every node.
+
+Example config for a node (all nodes are identical except `cluster-node-id`, `cluster-listen` and
+`cluster-advertise-url`):
+
+``` yaml
+base-url: "https://ntfy.example.com"
+database-url: "postgres://user:pass@dbhost:5432/ntfy"
+
+cluster-node-id: "node-1"                       # stable identity, e.g. the hostname
+cluster-listen: "10.0.0.5:2587"                 # private network interface!
+cluster-advertise-url: "http://10.0.0.5:2587"   # how the other nodes reach this one
+cluster-secret: "long-random-shared-secret"     # must match on all nodes
+```
+
+A few important notes:
+
+* **The cluster listener must not be publicly reachable.** It accepts message injections from anyone with the
+  shared secret, so bind it to a private network interface and firewall it to the peer nodes.
+* `cluster-node-id` must be **stable across restarts** (use the hostname). A node restarting under the same ID
+  reuses its registry entry.
+* **Health checks:** `/v1/health` returns non-200 when a node has lost contact with the database, so your load
+  balancer can take it out of rotation. Your health checker should fail open (never remove all nodes at once):
+  during a full database outage, all nodes report unhealthy while message delivery keeps working.
+* Cross-node delivery is fire-and-forget. If a node briefly cannot reach a peer, live subscribers on that peer
+  catch up automatically via [`since=`](subscribe/api.md#fetch-cached-messages) when they reconnect, as they
+  would after any connection loss.
+* Some limiters deliberately remain per-node: active subscription counts (connections are per-node by nature),
+  and the topic-creation, signup and login-failure limiters (they protect node-local resources).
+
 ## IPv6 support
 ntfy fully supports IPv6, though there are a few things to keep in mind.
 
@@ -2348,6 +2392,11 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
 | `database-url`                             | `NTFY_DATABASE_URL`                             | *string (connection URL)*                           | -                 | PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/ntfy`). If set, uses PostgreSQL for all database-backed stores (message cache, user manager, web push) instead of SQLite. See [database options](#database-options). |
+| `cluster-node-id`                          | `NTFY_CLUSTER_NODE_ID`                          | *string*                                            | -                 | Stable per-node identifier (e.g. the hostname); required for [clustering](#clustering-experimental)                                                                                                                                     |
+| `cluster-listen`                           | `NTFY_CLUSTER_LISTEN`                           | `[host]:port`                                       | -                 | Private listen address for node-to-node traffic; setting it enables [clustering](#clustering-experimental)                                                                                                                              |
+| `cluster-advertise-url`                    | `NTFY_CLUSTER_ADVERTISE_URL`                    | *URL*                                               | `http://<cluster-listen>` | URL under which the other cluster nodes reach this node's cluster listener                                                                                                                                                      |
+| `cluster-secret`                           | `NTFY_CLUSTER_SECRET`                           | *string*                                            | -                 | Shared secret authenticating node-to-node traffic; required for [clustering](#clustering-experimental), must match on all nodes                                                                                                          |
+| `cluster-batch-linger`                     | `NTFY_CLUSTER_BATCH_LINGER`                     | *duration*                                          | `500ms`           | How long messages wait to form a node-to-node delivery batch; `0` sends immediately                                                                                                                                                     |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |

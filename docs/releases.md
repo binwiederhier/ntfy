@@ -2101,6 +2101,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
+* Fix a recurring panic in the account token-update endpoint when a concurrent anonymous request from the same IP raced the authenticated request on the shared visitor (nil-user dereference); the request now fails with HTTP 401
 * Fix `since=<id>` replays resolving the message ID with an unscoped subquery: an ID that resolved to a message in another topic could silently skip messages, two messages sharing an ID made the lookup fail, and (with read replicas) an ID the replica had not seen yet replayed the topic's entire retained history
 * Fix the global message counter and per-user stats being overwritten by concurrent writers; both are now written as increments
 

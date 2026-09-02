@@ -116,3 +116,33 @@ func TestFormatDuration(t *testing.T) {
 func TestFormatDuration_Rounded(t *testing.T) {
 	require.Equal(t, "1d", FormatDuration(47*time.Hour))
 }
+
+func TestParseFutureTimeRFC3339(t *testing.T) {
+	now := time.Date(
+		2026, 9, 2,
+		7, 0, 0, 0,
+		time.UTC,
+	)
+
+	tests := []struct {
+		input    string
+		expected time.Time
+	}{
+		{
+			"2026-09-02T10:00:00Z",
+			time.Date(2026, 9, 2, 10, 0, 0, 0, time.UTC),
+		},
+		{
+			"2026-09-02T10:00:00+02:00",
+			time.Date(2026, 9, 2, 10, 0, 0, 0,
+				time.FixedZone("", 2*60*60)),
+		},
+	}
+
+	for _, tt := range tests {
+		actual, err := ParseFutureTime(tt.input, now)
+		require.NoError(t, err)
+		require.True(t, tt.expected.Equal(actual),
+			"expected %v, got %v", tt.expected, actual)
+	}
+}

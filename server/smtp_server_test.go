@@ -515,8 +515,9 @@ L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
-func TestSmtpBackend_NestedMultipartTooDeep(t *testing.T) {
-	email := `EHLO example.com
+// nestedMultipartEmail nests multipart/mixed > multipart/alternative > multipart/alternative,
+// putting the text parts at depth 2. It is rejected at a max depth of 2 and accepted at 3.
+const nestedMultipartEmail = `EHLO example.com
 MAIL FROM: test@mydomain.me
 RCPT TO: ntfy-mytopic@ntfy.sh
 DATA
@@ -560,12 +561,26 @@ L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
 .
 `
 
-	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+func TestSmtpBackend_NestedMultipartTooDeep(t *testing.T) {
+	s, c, conf, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("This should not be called")
 	})
+	conf.SMTPServerMaxMultipartDepth = 2
 	defer s.Close()
 	defer c.Close()
-	writeAndReadUntilLine(t, email, c, scanner, "554 5.0.0 Error: transaction failed, blame it on the weather: multipart message nested too deep")
+	writeAndReadUntilLine(t, nestedMultipartEmail, c, scanner, "554 5.0.0 Error: transaction failed, blame it on the weather: multipart message nested too deep")
+}
+
+func TestSmtpBackend_NestedMultipartWithinConfiguredDepth(t *testing.T) {
+	s, c, conf, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/mytopic", r.URL.Path)
+		require.Equal(t, "TrueNAS truenas.local: TrueNAS Test Message hostname: truenas.local", r.Header.Get("Title"))
+		require.Equal(t, "This is a test message from TrueNAS CORE.", readAll(t, r.Body))
+	})
+	conf.SMTPServerMaxMultipartDepth = 3
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, nestedMultipartEmail, c, scanner, "250 2.0.0 OK: queued")
 }
 
 func TestSmtpBackend_HTMLEmail(t *testing.T) {

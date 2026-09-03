@@ -38,10 +38,6 @@ var (
 	htmlLineBreakRegex       = regexp.MustCompile(`(?i)<br\s*/?>`)
 )
 
-const (
-	maxMultipartDepth = 2
-)
-
 // smtpBackend implements SMTP server methods.
 type smtpBackend struct {
 	config  *Config
@@ -153,7 +149,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if err != nil {
 			return err
 		}
-		body, err := readMailBody(msg.Body, msg.Header)
+		body, err := readMailBody(conf, msg.Body, msg.Header)
 		if err != nil {
 			return err
 		}
@@ -244,7 +240,7 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 	return err
 }
 
-func readMailBody(body io.Reader, header mail.Header) (string, error) {
+func readMailBody(conf *Config, body io.Reader, header mail.Header) (string, error) {
 	if header.Get("Content-Type") == "" {
 		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
 	}
@@ -256,14 +252,14 @@ func readMailBody(body io.Reader, header mail.Header) (string, error) {
 	if canonicalContentType == "text/plain" || canonicalContentType == "text/html" {
 		return readTextMailBody(body, canonicalContentType, header.Get("Content-Transfer-Encoding"))
 	} else if strings.HasPrefix(canonicalContentType, "multipart/") {
-		return readMultipartMailBody(body, params)
+		return readMultipartMailBody(conf, body, params)
 	}
 	return "", errUnsupportedContentType
 }
 
-func readMultipartMailBody(body io.Reader, params map[string]string) (string, error) {
+func readMultipartMailBody(conf *Config, body io.Reader, params map[string]string) (string, error) {
 	parts := make(map[string]string)
-	if err := readMultipartMailBodyParts(body, params, 0, parts); err != nil && err != io.EOF {
+	if err := readMultipartMailBodyParts(conf, body, params, 0, parts); err != nil && err != io.EOF {
 		return "", err
 	} else if s, ok := parts["text/plain"]; ok {
 		return s, nil
@@ -273,8 +269,8 @@ func readMultipartMailBody(body io.Reader, params map[string]string) (string, er
 	return "", io.EOF
 }
 
-func readMultipartMailBodyParts(body io.Reader, params map[string]string, depth int, parts map[string]string) error {
-	if depth >= maxMultipartDepth {
+func readMultipartMailBodyParts(conf *Config, body io.Reader, params map[string]string, depth int, parts map[string]string) error {
+	if depth >= conf.SMTPServerMaxMultipartDepth {
 		return errMultipartNestedTooDeep
 	}
 	mr := multipart.NewReader(body, params["boundary"])
@@ -295,7 +291,7 @@ func readMultipartMailBodyParts(body io.Reader, params map[string]string, depth 
 			}
 			parts[canonicalPartContentType] = s
 		} else if strings.HasPrefix(strings.ToLower(partContentType), "multipart/") {
-			if err := readMultipartMailBodyParts(part, partParams, depth+1, parts); err != nil {
+			if err := readMultipartMailBodyParts(conf, part, partParams, depth+1, parts); err != nil {
 				return err
 			}
 		}

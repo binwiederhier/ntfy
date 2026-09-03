@@ -71,6 +71,11 @@ ntfy subscribe TOPIC COMMAND
     ntfy sub mytopic 'notify-send "$m"'    # Execute command for incoming messages
     ntfy sub topic1 myscript.sh            # Execute script for incoming messages
 
+  On Windows, %VARIABLE% references to the variables above are rewritten to
+  delayed-expansion references (!VARIABLE!) before the command is run, so that
+  message content cannot be interpreted as batch commands. A literal ! in a
+  command must be escaped as ^^!.
+
 ntfy subscribe --from-config
   Service mode (used in ntfy-client.service). This reads the config file and sets up 
   subscriptions for every topic in the "subscribe:" block (see config file).
@@ -259,7 +264,7 @@ func runCommand(c *cli.Context, command string, m *client.Message) {
 func runCommandInternal(c *cli.Context, script string, m *client.Message) error {
 	scriptFile := fmt.Sprintf("%s/ntfy-subscribe-%s.%s", os.TempDir(), util.RandomString(10), scriptExt)
 	log.Debug("%s Running command '%s' via temporary script %s", logMessagePrefix(m), script, scriptFile)
-	script = scriptHeader + script
+	script = scriptHeader + scriptVarRewriter(script)
 	if err := os.WriteFile(scriptFile, []byte(script), 0700); err != nil {
 		return err
 	}

@@ -7,6 +7,7 @@ import pop from "../sounds/pop.mp3";
 import popSwoosh from "../sounds/pop-swoosh.mp3";
 import config from "./config";
 import emojisMapped from "./emojisMapped";
+import { fetchOrThrow } from "./errors";
 import { THEME, DATE_FORMAT, TIME_FORMAT } from "./Prefs";
 
 export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
@@ -311,7 +312,7 @@ export const playSound = async (id) => {
 // eslint-disable-next-line func-style
 export async function* fetchLinesIterator(fileURL, headers) {
   const utf8Decoder = new TextDecoder("utf-8");
-  const response = await fetch(fileURL, {
+  const response = await fetchOrThrow(fileURL, {
     headers,
   });
   const reader = response.body.getReader();

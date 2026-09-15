@@ -52,6 +52,11 @@ describe("throwAppError", () => {
     await expect(throwAppError(fakeResponse(403))).rejects.toBeInstanceOf(UnauthorizedError);
   });
 
+  it("keeps the HTTP status on the error, so callers can tell bad credentials (401) from a topic ACL denial (403)", async () => {
+    await expect(throwAppError(fakeResponse(401))).rejects.toHaveProperty("status", 401);
+    await expect(throwAppError(fakeResponse(403))).rejects.toHaveProperty("status", 403);
+  });
+
   it("maps known ntfy error codes to their specific error classes", async () => {
     await expect(throwAppError(fakeResponse(409, { code: UserExistsError.CODE }))).rejects.toBeInstanceOf(UserExistsError);
     await expect(throwAppError(fakeResponse(409, { code: TopicReservedError.CODE }))).rejects.toBeInstanceOf(TopicReservedError);

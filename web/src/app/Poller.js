@@ -1,7 +1,11 @@
 import api from "./Api";
+import config from "./config";
 import prefs from "./Prefs";
 import subscriptionManager from "./SubscriptionManager";
+import session from "./Session";
+import routes from "../components/routes";
 import { EVENT_MESSAGE, EVENT_MESSAGE_DELETE } from "./events";
+import { UnauthorizedError } from "./errors";
 
 const delayMillis = 2000; // 2 seconds
 const intervalMillis = 300000; // 5 minutes
@@ -34,6 +38,14 @@ class Poller {
           await this.poll(s);
         } catch (e) {
           console.log(`[Poller] Error polling ${s.id}`, e);
+          // 401 means the credentials we sent were rejected; 403 means they were fine but this
+          // particular topic isn't authorized for them (server/server_middleware.go
+          // authorizeTopic), which says nothing about the account session. Only the home
+          // server's poll is authenticated with the account session token in the first place
+          // (see UserManager.get), so only end the session on a 401 from there.
+          if (e instanceof UnauthorizedError && e.status === 401 && s.baseUrl === config.base_url && session.exists()) {
+            await session.resetAndRedirect(routes.login);
+          }
         }
       }),
     );

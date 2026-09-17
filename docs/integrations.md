@@ -88,7 +88,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-logging](https://github.com/Pimak/ntfy-logging) - Turns JVM error logs into ntfy notifications, with zero-code adapters for java.util.logging, Logback, Log4j2, Spring Boot, Micronaut and Quarkus (Java)
 
 ## CLIs + GUIs
-
+- [ntfy-wear](https://github.com/cloudsliberty/ntfy-wear) - Lightweight ntfy client for Wear OS round-screen smartwatches.
 - [ntfy.sh.sh](https://github.com/mininmobile/ntfy.sh.sh) - Run scripts on ntfy.sh events
 - [ntfy-desktop](https://codeberg.org/zvava/ntfy-desktop) - Cross-platform desktop application for ntfy
 - [ntfy-desktop](https://github.com/Aetherinox/ntfy-desktop) - Desktop client for Windows, Linux, and MacOS with push notifications

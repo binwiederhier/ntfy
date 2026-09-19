@@ -330,6 +330,7 @@ func New(conf *Config) (*Server, error) {
 		topics:           topics,
 		userManager:      userManager,
 		messages:         messages,
+		messagesFlushed:  messages, // The loaded total is already persisted; only new publishes are deltas
 		messagesHistory:  []int64{messages},
 		visitors:         make(map[string]*visitor),
 		pendingPeerUsage: make(map[string]*pendingPeerUsage),

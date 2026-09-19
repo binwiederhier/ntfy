@@ -736,3 +736,30 @@ func TestServer_Cluster_MessageStatsDoNotCompound(t *testing.T) {
 	defer sA.mu.RUnlock()
 	require.Equal(t, int64(5), sA.messages)
 }
+
+func TestServer_Cluster_MessageStatsNotReaddedAfterRestart(t *testing.T) {
+	// A (re)started node loads the shared total; its first flush must not write that total
+	// back as a "delta" (the flush marker has to start at the loaded value)
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func() *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = "node-a"
+		conf.ClusterListen = "127.0.0.1:1"
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		return newTestServer(t, conf)
+	}
+	s1 := newNode()
+	for i := 0; i < 3; i++ {
+		require.Equal(t, 200, request(t, s1, "PUT", "/mytopic", "hi", nil).Code)
+	}
+	s1.updateAndWriteStats(0)
+	s1.Stop()
+
+	s2 := newNode()
+	s2.updateAndWriteStats(0)
+	s2.updateAndWriteStats(0)
+	total, err := s2.messageCache.Stats()
+	require.Nil(t, err)
+	require.Equal(t, int64(3), total)
+}

@@ -19,6 +19,7 @@ import (
 
 	"github.com/emersion/go-smtp"
 	"github.com/microcosm-cc/bluemonday"
+	"golang.org/x/text/encoding/ianaindex"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
@@ -164,7 +165,15 @@ func (s *smtpSession) Data(r io.Reader) error {
 		m := model.NewDefaultMessage(s.topic, body)
 		subject := strings.TrimSpace(msg.Header.Get("Subject"))
 		if subject != "" {
-			dec := mime.WordDecoder{}
+			dec := mime.WordDecoder{
+				CharsetReader: func(charset string, input io.Reader) (io.Reader, error) {
+					enc, err := ianaindex.MIME.Encoding(charset)
+					if err != nil || enc == nil {
+						return nil, fmt.Errorf("mime: unhandled charset %q", charset)
+					}
+					return enc.NewDecoder().Reader(input), nil
+				},
+			}
 			subject, err := dec.DecodeHeader(subject)
 			if err != nil {
 				return err

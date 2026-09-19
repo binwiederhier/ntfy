@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/textproto"
 	"strings"
 	"testing"
 	"time"
@@ -132,25 +133,94 @@ what's up
 }
 
 func TestSmtpBackend_Plaintext_EncodedSubject(t *testing.T) {
-	email := `EHLO example.com
-MAIL FROM: phil@example.com
-RCPT TO: ntfy-mytopic@ntfy.sh
-DATA
-Date: Tue, 28 Dec 2021 00:30:10 +0100
-Subject: =?UTF-8?B?VGhyZWUgc2FudGFzIPCfjoXwn46F8J+OhQ==?=
-From: Phil <phil@example.com>
-To: ntfy-mytopic@ntfy.sh
-Content-Type: text/plain; charset="UTF-8"
+	const polishQ = "=?ISO-8859-2?Q?Za=BF=F3=B3=E6_g=EA=B6l=B1_ja=BC=F1?="
+	const polishB = "=?ISO-8859-2?B?WmG/87PmIGfqtmyxIGphvPE=?="
+	const polishTitle = "Zażółć gęślą jaźń"
+	const utf8Subject = "=?UTF-8?B?VGhyZWUgc2FudGFzIPCfjoXwn46F8J+OhQ==?="
 
-what's up
-.
-`
-	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "Three santas 🎅🎅🎅", r.Header.Get("Title"))
-	})
-	defer s.Close()
-	defer c.Close()
-	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+	tests := []struct {
+		name        string
+		subject     string
+		wantSubject string
+		subjectOnly bool
+		wantError   string
+	}{
+		{"ascii", "Printer ready", "Printer ready", false, ""},
+		{"us_ascii", "=?US-ASCII?Q?Printer_ready?=", "Printer ready", false, ""},
+		{"utf8", utf8Subject, "Three santas 🎅🎅🎅", false, ""},
+		{"iso8859_1", "=?ISO-8859-1?Q?Gr=FC=DFe?=", "Grüße", false, ""},
+		{"iso8859_2_q", polishQ, polishTitle, false, ""},
+		{"iso8859_2_b", polishB, polishTitle, false, ""},
+		{"mixed_case", "=?iSo-8859-2?q?Za=BF=F3=B3=E6_g=EA=B6l=B1_ja=BC=F1?=", polishTitle, false, ""},
+		{"folded_words", "=?ISO-8859-2?Q?Za=BF=F3=B3=E6?=\r\n\t=?UTF-8?Q?_g=C4=99=C5=9Bl=C4=85_ja=C5=BA=C5=84?=", polishTitle, false, ""},
+		{"subject_only_legacy", polishQ, polishTitle, true, ""},
+		{"subject_only_utf8", utf8Subject, "Three santas 🎅🎅🎅", true, ""},
+		{"unknown_charset", "=?x-unknown?Q?Printer_ready?=", "", false, `mime: unhandled charset "x-unknown"`},
+		{"unsupported_charset", "=?utf-7?Q?Printer_ready?=", "", false, `mime: unhandled charset "utf-7"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			published := make(chan *http.Request, 1)
+			s, c, _, _ := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+				published <- r
+				w.WriteHeader(http.StatusOK)
+			})
+			defer s.Close()
+			defer c.Close()
+			require.NoError(t, c.SetDeadline(time.Now().Add(3*time.Second)))
+
+			client := textproto.NewConn(c)
+			_, _, err := client.ReadResponse(220)
+			require.NoError(t, err)
+			for _, step := range []struct {
+				command string
+				code    int
+			}{
+				{"EHLO example.com", 250},
+				{"MAIL FROM:<phil@example.com>", 250},
+				{"RCPT TO:<ntfy-mytopic@ntfy.sh>", 250},
+				{"DATA", 354},
+			} {
+				require.NoError(t, client.PrintfLine("%s", step.command))
+				_, _, err := client.ReadResponse(step.code)
+				require.NoError(t, err)
+			}
+
+			body := "what's up"
+			if tt.subjectOnly {
+				body = ""
+			}
+			data := client.DotWriter()
+			_, err = io.WriteString(data, "Subject: "+tt.subject+"\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n"+body+"\r\n")
+			require.NoError(t, err)
+			require.NoError(t, data.Close())
+
+			// Read the DATA response directly so a baseline 554 fails immediately.
+			wantCode := 250
+			if tt.wantError != "" {
+				wantCode = 554
+			}
+			_, response, err := client.ReadResponse(wantCode)
+			require.NoError(t, err)
+			if tt.wantError != "" {
+				require.Contains(t, response, tt.wantError)
+				require.Empty(t, published)
+				return
+			}
+			require.Equal(t, "2.0.0 OK: queued", response)
+			require.Len(t, published, 1)
+			r := <-published
+			defer r.Body.Close()
+			require.Equal(t, "/mytopic", r.URL.Path)
+			if tt.subjectOnly {
+				require.Empty(t, r.Header.Get("Title"))
+				require.Equal(t, tt.wantSubject, readAll(t, r.Body))
+			} else {
+				require.Equal(t, tt.wantSubject, r.Header.Get("Title"))
+				require.Equal(t, body, readAll(t, r.Body))
+			}
+		})
+	}
 }
 
 func TestSmtpBackend_Plaintext_TooLongTruncate(t *testing.T) {

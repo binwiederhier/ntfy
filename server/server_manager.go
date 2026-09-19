@@ -30,7 +30,8 @@ func (s *Server) execManager() {
 		log.Tag(tagManager).Err(err).Warn("Cannot get messages count")
 	}
 
-	// Remove subscriptions without subscribers
+	// Remove subscriptions without subscribers (unless active on another node)
+	s.keepSharedActiveTopics()
 	var emptyTopics, subscribers int
 	log.
 		Tag(tagManager).

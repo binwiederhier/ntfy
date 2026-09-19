@@ -20,15 +20,15 @@ const (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID                string
-	subscribers       map[int]*topicSubscriber
-	rateVisitor       *visitor
-	rateVisitorMissAt time.Time // Last failed shared-store lookup; throttles per-publish lookups for topics without a rate visitor
+	ID                 string
+	subscribers        map[int]*topicSubscriber
+	rateVisitor        *visitor
+	rateVisitorMissAt  time.Time // Last failed shared-store lookup; throttles per-publish lookups for topics without a rate visitor
 	subscriberStoredAt time.Time // Last shared subscriber-liveness record (see TakeSubscriberRecordSlot)
-	publishStoredAt   time.Time // Last shared publish-liveness record (see TakePublishRecordSlot)
-	lastAccess        time.Time
-	onFirstSubscriber func() // Fired (async) when the subscriber count goes 0 -> 1; may be nil
-	mu                sync.RWMutex
+	publishStoredAt    time.Time // Last shared publish-liveness record (see TakePublishRecordSlot)
+	lastAccess         time.Time
+	onFirstSubscriber  func() // Fired (async) when the subscriber count goes 0 -> 1; may be nil
+	mu                 sync.RWMutex
 }
 
 type topicSubscriber struct {
@@ -187,6 +187,24 @@ func (t *topic) Keepalive() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.lastAccess = time.Now()
+}
+
+// KeepaliveAt moves the last access time forward to the given time (never backwards), e.g.
+// to adopt activity another node recorded for this topic
+func (t *topic) KeepaliveAt(at time.Time) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if at.After(t.lastAccess) {
+		t.lastAccess = at
+	}
+}
+
+// SeedLastAccess overwrites the last access time; used at boot, when topics restored from the
+// message cache would otherwise all look freshly accessed
+func (t *topic) SeedLastAccess(at time.Time) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.lastAccess = at
 }
 
 // CancelSubscribersExceptUser calls the cancel function for all subscribers, forcing

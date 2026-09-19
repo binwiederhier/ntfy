@@ -1,6 +1,7 @@
 package topics
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -94,4 +95,29 @@ func TestStore_Prune(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound)
 	_, err = s.Get("newtopic")
 	require.Nil(t, err)
+}
+
+func TestStore_LastActivity(t *testing.T) {
+	s := newTestStore(t)
+	now := time.Now()
+	s.now = func() time.Time { return now }
+	require.Nil(t, s.RecordPublish("published", "ip:1.2.3.4"))
+	now = now.Add(time.Hour)
+	require.Nil(t, s.RecordSubscriber("subscribed", "ip:1.2.3.4"))
+	now = now.Add(time.Hour)
+	require.Nil(t, s.RecordPublish("both", "ip:1.2.3.4"))
+	now = now.Add(time.Hour)
+	require.Nil(t, s.RecordSubscriber("both", "ip:1.2.3.4"))
+
+	// Unknown topics are absent from the result; lookups span multiple query chunks
+	ids := []string{"published", "subscribed", "both"}
+	for i := 0; i < 2*lastActivityChunkSize; i++ {
+		ids = append(ids, fmt.Sprintf("unknown%d", i))
+	}
+	activity, err := s.LastActivity(ids)
+	require.Nil(t, err)
+	require.Equal(t, 3, len(activity))
+	require.Equal(t, now.Add(-3*time.Hour).Unix(), activity["published"].Unix())
+	require.Equal(t, now.Add(-2*time.Hour).Unix(), activity["subscribed"].Unix())
+	require.Equal(t, now.Unix(), activity["both"].Unix())
 }

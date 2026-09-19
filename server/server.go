@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -18,6 +19,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -369,6 +371,7 @@ func New(conf *Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
+		s.seedTopicsLastAccess()
 	}
 	// The cluster routes messages by subscription knowledge: peers learn this node's live topics
 	// via periodic state pushes (liveTopics) and immediate announcements on a topic's first
@@ -1173,6 +1176,55 @@ func (s *Server) recordTopicPublish(v *visitor, t *topic) {
 			log.Tag(tagPublish).Err(err).Warn("Cannot record publish liveness for topic %s", t.ID)
 		}
 	}()
+}
+
+// seedTopicsLastAccess sets the last access of the topics restored at boot to the activity
+// recorded in the shared topic table, so topics idle cluster-wide are expunged at the next
+// manager run instead of lingering for topicExpungeAfter. Topics without a record keep "now".
+func (s *Server) seedTopicsLastAccess() {
+	ids := make([]string, 0, len(s.topics))
+	for id := range s.topics {
+		ids = append(ids, id)
+	}
+	activity, err := s.topicStore.LastActivity(ids)
+	if err != nil {
+		log.Tag(tagManager).Err(err).Warn("Cannot seed topic last access from shared topic state")
+		return
+	}
+	for id, lastActivity := range activity {
+		s.topics[id].SeedLastAccess(lastActivity)
+	}
+	log.Tag(tagManager).Debug("Seeded last access of %d/%d topic(s) from shared topic state", len(activity), len(ids))
+}
+
+// keepSharedActiveTopics keeps topics that are stale on this node but recently active on
+// another one (per the shared topic table) from being expunged, by adopting the shared last
+// activity. Database errors leave the node-local rule in charge.
+func (s *Server) keepSharedActiveTopics() {
+	if s.topicStore == nil {
+		return
+	}
+	s.mu.RLock()
+	stale := make(map[string]*topic)
+	for id, t := range s.topics {
+		if t.Stale() {
+			stale[id] = t
+		}
+	}
+	s.mu.RUnlock()
+	if len(stale) == 0 {
+		return
+	}
+	activity, err := s.topicStore.LastActivity(slices.Collect(maps.Keys(stale)))
+	if err != nil {
+		log.Tag(tagManager).Err(err).Warn("Cannot check shared topic activity, expunging by local rule")
+		return
+	}
+	for id, lastActivity := range activity {
+		if time.Since(lastActivity) <= topicExpungeAfter {
+			stale[id].KeepaliveAt(lastActivity)
+		}
+	}
 }
 
 func (s *Server) matrixPushkeyRejectable(t *topic) bool {

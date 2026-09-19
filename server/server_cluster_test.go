@@ -607,3 +607,100 @@ func TestServer_Cluster_TopicLivenessRecorded(t *testing.T) {
 	})
 	subscribeCancel()
 }
+
+func TestServer_Cluster_TopicLastAccessSeededAtBoot(t *testing.T) {
+	// A restart restores every cached topic into memory. Without seeding, all of them look
+	// freshly accessed and linger for topicExpungeAfter; seeded from the shared record, topics
+	// idle cluster-wide are expunged at the first manager run, active ones are kept.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(id string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = id
+		conf.ClusterListen = "127.0.0.1:1"
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		return newTestServer(t, conf)
+	}
+	s1 := newNode("node-a")
+	require.Equal(t, 200, request(t, s1, "PUT", "/idletopic", "hi", nil).Code)
+	require.Equal(t, 200, request(t, s1, "PUT", "/hottopic", "hi", nil).Code)
+	require.Equal(t, 200, request(t, s1, "PUT", "/unrecordedtopic", "hi", nil).Code)
+	waitFor(t, func() bool {
+		for _, id := range []string{"idletopic", "hottopic", "unrecordedtopic"} {
+			if _, err := s1.topicStore.Get(id); err != nil {
+				return false
+			}
+		}
+		return true
+	})
+
+	// Rewrite history: idletopic was last touched 20h ago, hottopic 1h ago, and
+	// unrecordedtopic has no shared record at all
+	host, err := pg.Open(schemaDSN)
+	require.Nil(t, err)
+	defer host.DB.Close()
+	set := func(topic string, at time.Time) {
+		_, err := host.DB.Exec(`UPDATE topic SET created_at = $2, last_published_at = $2 WHERE id = $1`, topic, at.Unix())
+		require.Nil(t, err)
+	}
+	set("idletopic", time.Now().Add(-20*time.Hour))
+	set("hottopic", time.Now().Add(-time.Hour))
+	_, err = host.DB.Exec(`DELETE FROM topic WHERE id = 'unrecordedtopic'`)
+	require.Nil(t, err)
+
+	// "Restart": a fresh node boots with all three topics from the message cache
+	s2 := newNode("node-b")
+	s2.execManager()
+	topics := topicsSnapshot(s2)
+	require.NotContains(t, topics, "idletopic")
+	require.Contains(t, topics, "hottopic")
+	require.Contains(t, topics, "unrecordedtopic") // No shared record: local rule (just booted)
+}
+
+func TestServer_Cluster_TopicExpungeGatedBySharedActivity(t *testing.T) {
+	// A topic idle on this node must survive expunge while another node records activity
+	// for it in the shared table; its local last access adopts the shared one
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1"
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	s := newTestServer(t, conf)
+
+	host, err := pg.Open(schemaDSN)
+	require.Nil(t, err)
+	defer host.DB.Close()
+	sharedRecent := time.Now().Add(-time.Hour).Truncate(time.Second)
+	_, err = host.DB.Exec(`INSERT INTO topic (id, created_at, last_published_at) VALUES ('elsewhere', $1, $1), ('deadtopic', $2, $2)`,
+		sharedRecent.Unix(), time.Now().Add(-20*time.Hour).Unix())
+	require.Nil(t, err)
+
+	locallyIdle := time.Now().Add(-20 * time.Hour)
+	for _, id := range []string{"elsewhere", "deadtopic", "unrecordedtopic"} {
+		topic, err := s.topicFromID(nil, id)
+		require.Nil(t, err)
+		topic.mu.Lock()
+		topic.lastAccess = locallyIdle
+		topic.mu.Unlock()
+	}
+
+	s.execManager()
+	topics := topicsSnapshot(s)
+	require.Contains(t, topics, "elsewhere")
+	require.NotContains(t, topics, "deadtopic")
+	require.NotContains(t, topics, "unrecordedtopic")
+	require.Equal(t, sharedRecent.Unix(), topics["elsewhere"].LastAccess().Unix())
+}
+
+// topicsSnapshot copies the server's topic map, so assertions never run under s.mu (a failing
+// require under the lock would deadlock the server's cleanup)
+func topicsSnapshot(s *Server) map[string]*topic {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	topics := make(map[string]*topic, len(s.topics))
+	for id, t := range s.topics {
+		topics[id] = t
+	}
+	return topics
+}

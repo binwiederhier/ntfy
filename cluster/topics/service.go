@@ -12,6 +12,7 @@ package topics
 import (
 	"database/sql"
 	"errors"
+	"slices"
 	"time"
 
 	"heckel.io/ntfy/v2/db"
@@ -27,6 +28,9 @@ const (
 	// subscriber keeps the assignment alive indefinitely; only truly departed subscribers
 	// expire, matching the in-memory visitor staleness rule.
 	RateVisitorTTL = 24 * time.Hour
+
+	// lastActivityChunkSize caps the number of topic IDs per LastActivity query
+	lastActivityChunkSize = 1000
 
 	// retention is how long rows without any recorded activity are kept before the leader
 	// prunes them. Far longer than any decision window that reads the table.
@@ -75,6 +79,10 @@ const (
 		SELECT id, created_at, last_subscribed_at, last_subscriber_key, last_published_at, last_publisher_key,
 		       rate_visitor_key, rate_visitor_uid, rate_visitor_seen_at
 		FROM topic WHERE id = $1
+	`
+	selectLastActivityQuery = `
+		SELECT id, GREATEST(created_at, last_subscribed_at, last_published_at, rate_visitor_seen_at)
+		FROM topic WHERE id = ANY($1)
 	`
 	pruneQuery = `DELETE FROM topic WHERE GREATEST(created_at, last_subscribed_at, last_published_at, rate_visitor_seen_at) < $1`
 )
@@ -168,4 +176,33 @@ func (s *Store) Get(topic string) (*Info, error) {
 func (s *Store) Prune() error {
 	_, err := s.pool.Exec(pruneQuery, s.now().Add(-retention).Unix())
 	return err
+}
+
+// LastActivity returns the most recent recorded activity for each of the given topics. Topics
+// without a row are absent from the result.
+func (s *Store) LastActivity(ids []string) (map[string]time.Time, error) {
+	activity := make(map[string]time.Time)
+	for chunk := range slices.Chunk(ids, lastActivityChunkSize) {
+		if err := s.lastActivityChunk(chunk, activity); err != nil {
+			return nil, err
+		}
+	}
+	return activity, nil
+}
+
+func (s *Store) lastActivityChunk(ids []string, activity map[string]time.Time) error {
+	rows, err := s.pool.Query(selectLastActivityQuery, ids)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var lastActivity int64
+		if err := rows.Scan(&id, &lastActivity); err != nil {
+			return err
+		}
+		activity[id] = time.Unix(lastActivity, 0)
+	}
+	return rows.Err()
 }

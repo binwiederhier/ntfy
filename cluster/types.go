@@ -10,17 +10,18 @@ import (
 // Config configures the cluster. It is assembled by the server from its own config, which keeps
 // this package free of server types.
 type Config struct {
-	Enabled             bool          // Master switch; when false, New returns the nop cluster
-	NodeID              NodeID        // Stable per-node identifier; required
-	AdvertiseURL        string        // Base URL peers use to reach this node's fan-out endpoint
-	Secret              string        // Shared secret authenticating node-to-node fan-out requests
-	HeartbeatInterval   time.Duration // How often the node registry heartbeat is refreshed
-	NodeTTL             time.Duration // Registry rows older than this do not count as live peers
-	BatchLinger         time.Duration // How long messages wait in a peer queue to form a batch; 0 = send immediately
-	StateInterval       time.Duration // How often the full subscription state is pushed to peers
-	MaxMessageBytes     int64         // Upper bound for a single message on the wire (batch limits derive from this)
-	LeaderRenewInterval time.Duration // Overrides the leader lease renewal cadence; tests only, 0 = default
-	CancelFunc          CancelFunc    // Applies a peer's subscriber-cancel request to local connections; may be nil
+	Enabled             bool            // Master switch; when false, New returns the nop cluster
+	NodeID              NodeID          // Stable per-node identifier; required
+	AdvertiseURL        string          // Base URL peers use to reach this node's fan-out endpoint
+	Secret              string          // Shared secret authenticating node-to-node fan-out requests
+	HeartbeatInterval   time.Duration   // How often the node registry heartbeat is refreshed
+	NodeTTL             time.Duration   // Registry rows older than this do not count as live peers
+	BatchLinger         time.Duration   // How long messages wait in a peer queue to form a batch; 0 = send immediately
+	StateInterval       time.Duration   // How often the full subscription state is pushed to peers
+	MaxMessageBytes     int64           // Upper bound for a single message on the wire (batch limits derive from this)
+	LeaderRenewInterval time.Duration   // Overrides the leader lease renewal cadence; tests only, 0 = default
+	CancelFunc          CancelFunc      // Applies a peer's subscriber-cancel request to local connections; may be nil
+	TopicsAddedFunc     TopicsAddedFunc // Told about topics that just gained their first subscriber on a peer; may be nil
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The
@@ -48,6 +49,11 @@ type SubscriberCancel struct {
 // server supplies it (same inversion as DeliverFunc); it must only cancel locally, never
 // re-broadcast (loop prevention).
 type CancelFunc func(cancel *SubscriberCancel)
+
+// TopicsAddedFunc is called with topics a peer announced as having just gained their first
+// subscriber there (not for full state snapshots). The server supplies it, e.g. to drop cached
+// negative lookups for those topics; it must not re-broadcast (loop prevention).
+type TopicsAddedFunc func(topics []string)
 
 // TopicsFunc returns the topics that currently have at least one live subscriber, computed
 // fresh on every call: membership is never tracked as a list, so topics "leave" simply by not

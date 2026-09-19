@@ -350,6 +350,7 @@ func New(conf *Config) (*Server, error) {
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
 		CancelFunc:      s.applySubscriberCancel,
+		TopicsAddedFunc: s.clearRateVisitorMisses,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus, s.liveTopics)
 	if err != nil {
@@ -421,6 +422,19 @@ func (s *Server) liveTopics() []string {
 func (s *Server) topicAnnouncer(id string) func() {
 	return func() {
 		s.cluster.BroadcastState(&cluster.State{AddedTopics: []string{id}})
+	}
+}
+
+// clearRateVisitorMisses drops cached rate-visitor misses for topics that just gained a subscriber
+// on a peer. The peer persists the rate visitor before announcing the topic, so the next publish
+// here finds it instead of answering 507 from the stale miss for up to rateVisitorMissTTL.
+func (s *Server) clearRateVisitorMisses(topics []string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, id := range topics {
+		if t, ok := s.topics[id]; ok {
+			t.ClearRateVisitorMiss()
+		}
 	}
 }
 

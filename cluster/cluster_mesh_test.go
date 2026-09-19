@@ -641,3 +641,45 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	require.Equal(t, "u_revoked", receivedB[1].UserID)
 	require.Equal(t, 0, canceledA)
 }
+
+func TestMesh_TopicAnnouncementInvokesTopicsAddedFunc(t *testing.T) {
+	// A first-subscriber announcement from node A must reach node B's TopicsAddedFunc (the
+	// server uses it to drop stale UnifiedPush rate-visitor misses); full snapshots must not
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	var addedB []string
+
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
+	confB.TopicsAddedFunc = func(topics []string) {
+		mu.Lock()
+		defer mu.Unlock()
+		addedB = append(addedB, topics...)
+	}
+	meshB, err := newMeshCluster(confB, poolB, nil, nil)
+	require.Nil(t, err)
+	defer meshB.Close()
+	srvB := &http.Server{Handler: meshB}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+
+	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil, func() []string { return []string{"snapshot-topic"} })
+	require.Nil(t, err)
+	defer meshA.Close()
+
+	meshA.BroadcastState(&State{AddedTopics: []string{"up123456789012"}})
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(addedB) > 0
+	})
+	peers, err := meshA.registry.Refresh()
+	require.Nil(t, err)
+	meshA.pushState(peers)
+	time.Sleep(300 * time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, []string{"up123456789012"}, addedB)
+}

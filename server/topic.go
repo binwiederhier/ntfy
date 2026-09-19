@@ -136,6 +136,14 @@ func (t *topic) SetRateVisitorMiss() {
 	t.rateVisitorMissAt = time.Now()
 }
 
+// ClearRateVisitorMiss forgets a cached failed lookup, so the next publish asks the shared store
+// again (e.g. because a peer just announced a new subscriber for this topic)
+func (t *topic) ClearRateVisitorMiss() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rateVisitorMissAt = time.Time{}
+}
+
 // RateVisitorMissedRecently reports whether a shared-store lookup failed within the TTL
 func (t *topic) RateVisitorMissedRecently(ttl time.Duration) bool {
 	t.mu.Lock()

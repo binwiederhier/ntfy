@@ -658,3 +658,25 @@ func TestServer_ClusterVariant_StopCompletesWithBlockedUsageFlush(t *testing.T) 
 	close(stopPublishing)
 	<-publishingDone
 }
+
+func TestServer_ClusterVariant_UnifiedPush_MissCacheClearedBySubscriberElsewhere(t *testing.T) {
+	// A UP publish without a subscriber caches the miss on its node (507). When the device then
+	// subscribes on ANOTHER node, the first node must not keep answering 507 from its stale miss
+	// cache: found on the cluster3 harness (1/3 of pushes 507'd for up to 30s after a reconnect).
+	cluster := newTestCluster(t, 2, func(_ int, conf *Config) {
+		conf.VisitorSubscriberRateLimiting = true
+	})
+	sA, sB := cluster[0], cluster[1]
+	topic := "up123456789012"
+
+	response := request(t, sB, "POST", "/"+topic+"?up=1", "before subscribe", nil)
+	require.Equal(t, 507, response.Code)
+
+	subscribeRR := httptest.NewRecorder()
+	subscribeCancel := subscribe(t, sA, "/"+topic+"/json", subscribeRR)
+	defer subscribeCancel()
+
+	waitForWithMaxWait(t, 5*time.Second, func() bool {
+		return request(t, sB, "POST", "/"+topic+"?up=1", "after subscribe", nil).Code == 200
+	})
+}

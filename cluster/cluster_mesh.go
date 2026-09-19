@@ -384,6 +384,9 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		if len(state.Topics.Added) > 0 && c.conf.TopicsAddedFunc != nil {
+			c.conf.TopicsAddedFunc(state.Topics.Added)
+		}
 	}
 	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
 		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)

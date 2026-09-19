@@ -615,8 +615,19 @@ func execServe(c *cli.Context) error {
 	s, err := server.New(conf)
 	if err != nil {
 		log.Fatal("%s", err.Error())
-	} else if err := s.Run(); err != nil {
-		log.Fatal("%s", err.Error())
+	}
+	stopping := make(chan struct{})
+	go sigHandlerShutdown(s, stopping)
+	err = s.Run()
+	select {
+	case <-stopping:
+		// Run returns as soon as the listeners close; Stop blocks until the signal-triggered
+		// shutdown (incl. flushing the message cache) has completed
+		s.Stop()
+	default:
+		if err != nil {
+			log.Fatal("%s", err.Error())
+		}
 	}
 	log.Info("Exiting.")
 	return nil

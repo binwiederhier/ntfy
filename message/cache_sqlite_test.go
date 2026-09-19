@@ -264,3 +264,19 @@ func checkSqliteSchemaVersion(t *testing.T, filename string) {
 	require.Equal(t, 15, schemaVersion)
 	require.Nil(t, rows.Close())
 }
+
+func TestSqliteStore_CloseFlushesQueuedMessages(t *testing.T) {
+	// Messages accepted into the write batch must reach the database on a graceful Close;
+	// before, a restart dropped up to one batch timeout's worth of accepted messages
+	filename := newSqliteTestStoreFile(t)
+	s, err := message.NewSQLiteStore(filename, "", time.Hour, 100, time.Hour, false)
+	require.Nil(t, err)
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "queued 1")))
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "queued 2")))
+	require.Nil(t, s.Close())
+
+	reopened := newSqliteTestStoreFromFile(t, filename, "")
+	messages, err := reopened.Messages("mytopic", model.SinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(messages))
+}

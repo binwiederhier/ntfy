@@ -56,3 +56,28 @@ func TestBatchingQueue_WithTimeout(t *testing.T) {
 	require.True(t, len(batches) < 21)
 	mu.Unlock()
 }
+
+func TestBatchingQueue_CloseFlushesRemaining(t *testing.T) {
+	// Elements still waiting for their batch must be emitted on Close (not dropped), and the
+	// output channel must close so consumers can drain and exit
+	q := util.NewBatchingQueue[int](100, time.Hour)
+	done := make(chan []int)
+	go func() {
+		var all []int
+		for batch := range q.Dequeue() {
+			all = append(all, batch...)
+		}
+		done <- all
+	}()
+	q.Enqueue(1)
+	q.Enqueue(2)
+	q.Enqueue(3)
+	q.Close()
+	select {
+	case all := <-done:
+		require.Equal(t, []int{1, 2, 3}, all)
+	case <-time.After(2 * time.Second):
+		t.Fatal("output channel not closed after Close")
+	}
+	q.Enqueue(4) // Must not panic after Close
+}

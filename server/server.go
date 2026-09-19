@@ -2545,7 +2545,9 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 		total = snapshot // Keep the local view; only the flush marker moves
 	}
 	s.mu.Lock()
-	s.messagesFlushed = snapshot
+	// The marker is the folded total (everything the database already has, incl. peer counts),
+	// so the next delta is only this node's new publishes; peer counts must never be re-added
+	s.messagesFlushed = total
 	s.messages = total + (s.messages - snapshot) // Publishes that arrived while flushing stay counted
 	s.mu.Unlock()
 }

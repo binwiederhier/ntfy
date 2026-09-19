@@ -704,3 +704,35 @@ func topicsSnapshot(s *Server) map[string]*topic {
 	}
 	return topics
 }
+
+func TestServer_Cluster_MessageStatsDoNotCompound(t *testing.T) {
+	// Each node writes only its own new publishes as a delta. A node must never write back the
+	// peer counts it folded in: on the harness the shared counter compounded every manager tick
+	// until it overflowed bigint.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(id string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = id
+		conf.ClusterListen = "127.0.0.1:1"
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		return newTestServer(t, conf)
+	}
+	sA, sB := newNode("node-a"), newNode("node-b")
+	for i := 0; i < 3; i++ {
+		require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "a", nil).Code)
+	}
+	for i := 0; i < 2; i++ {
+		require.Equal(t, 200, request(t, sB, "PUT", "/mytopic", "b", nil).Code)
+	}
+	for tick := 0; tick < 4; tick++ {
+		sA.updateAndWriteStats(0)
+		sB.updateAndWriteStats(0)
+	}
+	total, err := sA.messageCache.Stats()
+	require.Nil(t, err)
+	require.Equal(t, int64(5), total)
+	sA.mu.RLock()
+	defer sA.mu.RUnlock()
+	require.Equal(t, int64(5), sA.messages)
+}

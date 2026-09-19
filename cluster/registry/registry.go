@@ -5,6 +5,7 @@
 package registry
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -27,6 +28,8 @@ const (
 // Schema version and queries
 
 const (
+	maxOpTimeout = 5 * time.Second // Upper bound for one registry database call (ttl/2 below that)
+
 	schemaVersion  = 1
 	schemaStoreKey = "node_registry"
 )
@@ -80,7 +83,9 @@ func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry
 // Register upserts this node into the registry with a fresh heartbeat. It is a pure write: it
 // does not touch the peer cache, because our own row is excluded from Peers() anyway.
 func (r *Registry) Register() error {
-	_, err := r.pool.Exec(upsertNodeQuery, r.nodeID, r.advertiseURL, time.Now().Unix())
+	ctx, cancel := r.opContext()
+	defer cancel()
+	_, err := r.pool.ExecContext(ctx, upsertNodeQuery, r.nodeID, r.advertiseURL, time.Now().Unix())
 	return err
 }
 
@@ -116,13 +121,17 @@ func (r *Registry) Peers() ([]*Peer, error) {
 // Prune deletes registry rows whose heartbeat is long expired. Only the leader calls this; the
 // grace period of 3x the TTL avoids deleting rows of nodes that are merely slow to heartbeat.
 func (r *Registry) Prune() error {
-	_, err := r.pool.Exec(pruneStaleNodesQuery, time.Now().Add(-3*r.ttl).Unix())
+	ctx, cancel := r.opContext()
+	defer cancel()
+	_, err := r.pool.ExecContext(ctx, pruneStaleNodesQuery, time.Now().Add(-3*r.ttl).Unix())
 	return err
 }
 
 // Deregister deletes this node's registry row; called on shutdown.
 func (r *Registry) Deregister() error {
-	_, err := r.pool.Exec(deleteNodeQuery, r.nodeID)
+	ctx, cancel := r.opContext()
+	defer cancel()
+	_, err := r.pool.ExecContext(ctx, deleteNodeQuery, r.nodeID)
 	return err
 }
 
@@ -144,8 +153,10 @@ func (r *Registry) Refresh() ([]*Peer, error) {
 
 // queryPeers reads the current live peer set from the registry table.
 func (r *Registry) queryPeers() ([]*Peer, error) {
+	ctx, cancel := r.opContext()
+	defer cancel()
 	cutoff := time.Now().Add(-r.ttl).Unix()
-	rows, err := r.pool.Query(selectPeersQuery, cutoff, r.nodeID)
+	rows, err := r.pool.QueryContext(ctx, selectPeersQuery, cutoff, r.nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,4 +173,10 @@ func (r *Registry) queryPeers() ([]*Peer, error) {
 		return nil, err
 	}
 	return peers, nil
+}
+
+// opContext bounds a registry database call, so a partition (dropped packets) makes it fail
+// instead of hanging the heartbeat loop and shutdown
+func (r *Registry) opContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), min(r.ttl/2, maxOpTimeout))
 }

@@ -57,6 +57,16 @@ func (d *DB) Exec(query string, args ...any) (sql.Result, error) {
 	return d.primary.DB.Exec(query, args...)
 }
 
+// ExecContext delegates to the primary database.
+func (d *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return d.primary.DB.ExecContext(ctx, query, args...)
+}
+
+// QueryContext delegates to the primary database.
+func (d *DB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return d.primary.DB.QueryContext(ctx, query, args...)
+}
+
 // Begin delegates to the primary database.
 func (d *DB) Begin() (*sql.Tx, error) {
 	return d.primary.DB.Begin()

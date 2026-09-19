@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -729,4 +730,85 @@ func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
 	time.Sleep(time.Second)
 	require.False(t, mesh.Healthy())
 	require.Equal(t, wantIsolated, isolated.Load() > 0)
+}
+
+func TestMesh_IsolatedFuncWhenDatabaseHangs(t *testing.T) {
+	// A network partition makes database calls hang (dropped packets) instead of failing, which
+	// blocks the heartbeat loop. Isolation must still be detected (Healthy is time-based).
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer peer.Close()
+	registerFakePeer(t, openTestPool(t, schemaDSN), "node-peer", peer.URL)
+
+	proxy := newFreezableProxy(t, schemaDSN)
+	var isolated atomic.Int32
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.NodeTTL = 300 * time.Millisecond
+	conf.IsolatedFunc = func() { isolated.Add(1) }
+	mesh, err := newMeshCluster(conf, openTestPool(t, proxy.dsn), nil, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, func() bool {
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.knownPeers) == 1
+	})
+
+	proxy.freeze()
+	waitFor(t, func() bool { return isolated.Load() > 0 })
+}
+
+// freezableProxy forwards TCP to the test database until frozen; then it stops moving bytes
+// (and new connections hang), like a partition that drops packets
+type freezableProxy struct {
+	dsn    string
+	frozen atomic.Bool
+}
+
+func newFreezableProxy(t *testing.T, dsn string) *freezableProxy {
+	u, err := url.Parse(dsn)
+	require.Nil(t, err)
+	target := u.Host
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	t.Cleanup(func() { listener.Close() })
+	p := &freezableProxy{}
+	u.Host = listener.Addr().String()
+	p.dsn = u.String()
+	pipe := func(dst, src net.Conn) {
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := src.Read(buf)
+			for p.frozen.Load() {
+				time.Sleep(50 * time.Millisecond) // Hold everything, never close: a black hole
+			}
+			if err != nil {
+				dst.Close()
+				return
+			}
+			if _, err := dst.Write(buf[:n]); err != nil {
+				return
+			}
+		}
+	}
+	go func() {
+		for {
+			client, err := listener.Accept()
+			if err != nil {
+				return
+			}
+			server, err := net.Dial("tcp", target)
+			if err != nil {
+				client.Close()
+				continue
+			}
+			go pipe(server, client)
+			go pipe(client, server)
+		}
+	}()
+	return p
+}
+
+func (p *freezableProxy) freeze() {
+	p.frozen.Store(true)
 }

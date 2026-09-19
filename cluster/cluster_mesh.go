@@ -93,8 +93,9 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc, topics Topic
 	c.mux = http.NewServeMux()
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
 	c.mux.HandleFunc("POST "+StatePath, c.authenticated(c.handleState))
-	c.wg.Add(1)
+	c.wg.Add(2)
 	go c.heartbeatLoop()
+	go c.isolationLoop()
 	return c, nil
 }
 
@@ -144,6 +145,21 @@ func (c *meshCluster) heartbeatLoop() {
 			if err := c.heartbeat(); err != nil {
 				log.Tag(tag).Err(err).Warn("Cluster heartbeat failed")
 			}
+		}
+	}
+}
+
+// isolationLoop runs the isolation check on its own ticker: a partitioned database can make
+// heartbeat calls hang for a while, and Healthy is time-based, so this still notices
+func (c *meshCluster) isolationLoop() {
+	defer c.wg.Done()
+	ticker := time.NewTicker(c.conf.HeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
 			c.maybeIsolated()
 		}
 	}

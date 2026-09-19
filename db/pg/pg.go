@@ -40,7 +40,8 @@ func OpenReplica(dsn string) (*db.Host, error) {
 }
 
 // open opens a PostgreSQL database connection pool from a DSN string. It supports custom
-// query parameters for pool configuration: pool_max_conns (default 10), pool_max_idle_conns,
+// query parameters for pool configuration: pool_max_conns (default 10), pool_max_idle_conns
+// (default: pool_max_conns),
 // pool_conn_max_lifetime, and pool_conn_max_idle_time. These parameters are stripped from
 // the DSN before passing it to the driver.
 func open(dsn string) (*db.Host, error) {
@@ -77,9 +78,12 @@ func open(dsn string) (*db.Host, error) {
 		return nil, err
 	}
 	d.SetMaxOpenConns(maxOpenConns)
-	if maxIdleConns > 0 {
-		d.SetMaxIdleConns(maxIdleConns)
+	if maxIdleConns == 0 {
+		// database/sql keeps only 2 idle connections by default, so every burst above that
+		// would close and re-open connections (DNS + TCP + TLS + auth per query)
+		maxIdleConns = maxOpenConns
 	}
+	d.SetMaxIdleConns(maxIdleConns)
 	if connMaxLifetime > 0 {
 		d.SetConnMaxLifetime(connMaxLifetime)
 	}

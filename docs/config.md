@@ -473,7 +473,7 @@ the primary and replica URLs):
 | Parameter                 | Default | Description                                                                      |
 |---------------------------|---------|----------------------------------------------------------------------------------|
 | `pool_max_conns`          | 10      | Maximum number of open connections to the database                               |
-| `pool_max_idle_conns`     | -       | Maximum number of idle connections in the pool                                   |
+| `pool_max_idle_conns`     | = `pool_max_conns` | Maximum number of idle connections in the pool                          |
 | `pool_conn_max_lifetime`  | -       | Maximum amount of time a connection may be reused (Go duration, e.g. `5m`, `1h`) |
 | `pool_conn_max_idle_time` | -       | Maximum amount of time a connection may be idle (Go duration, e.g. `30s`, `5m`)  |
 

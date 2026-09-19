@@ -21,6 +21,7 @@ import (
 
 const (
 	meshHTTPTimeout   = 5 * time.Second
+	peerHealthTimeout = 2 * time.Second // Per-peer health probe while this node is unhealthy
 	peerQueueSize     = 1024            // Bounded per-peer fan-out queue (drop on overflow)
 	batchMaxMessages  = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes     = 256 * 1024      // Flush a batch early when it reaches this size
@@ -143,8 +144,46 @@ func (c *meshCluster) heartbeatLoop() {
 			if err := c.heartbeat(); err != nil {
 				log.Tag(tag).Err(err).Warn("Cluster heartbeat failed")
 			}
+			c.maybeIsolated()
 		}
 	}
+}
+
+// maybeIsolated calls IsolatedFunc while this node's registration is stale (peers no longer
+// forward to it) but at least one known peer is healthy. With no healthy peer (e.g. a full
+// database outage) nothing happens: the mesh keeps delivering on its cached peer view.
+func (c *meshCluster) maybeIsolated() {
+	if c.conf.IsolatedFunc == nil || c.Healthy() {
+		return
+	}
+	c.mu.Lock()
+	urls := make([]string, 0, len(c.knownPeers))
+	for _, url := range c.knownPeers {
+		urls = append(urls, url)
+	}
+	c.mu.Unlock()
+	for _, url := range urls {
+		if c.peerHealthy(url) {
+			log.Tag(tag).Warn("This node lost its cluster registration while peer %s is healthy; closing local subscribers so they reconnect elsewhere", url)
+			c.conf.IsolatedFunc()
+			return
+		}
+	}
+}
+
+func (c *meshCluster) peerHealthy(url string) bool {
+	ctx, cancel := context.WithTimeout(c.ctx, peerHealthTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+HealthPath, nil)
+	if err != nil {
+		return false
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
 
 // heartbeat is one control-plane tick: refresh this node's registry row, retry/confirm the

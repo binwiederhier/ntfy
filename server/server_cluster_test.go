@@ -763,3 +763,27 @@ func TestServer_Cluster_MessageStatsNotReaddedAfterRestart(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, int64(3), total)
 }
+
+func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
+	// Called by the cluster when this node lost its registration while peers are healthy:
+	// every local subscriber connection must end, so clients reconnect to a healthy node
+	s := newTestServer(t, newTestConfig(t, ""))
+	done := make(chan struct{})
+	go func() {
+		rr := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/mytopic/json", nil)
+		s.handle(rr, req)
+		close(done)
+	}()
+	waitFor(t, func() bool {
+		topics := topicsSnapshot(s)
+		t, ok := topics["mytopic"]
+		return ok && t.SubscribersCount() == 1
+	})
+	s.closeLocalSubscribers()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("subscriber connection still open")
+	}
+}

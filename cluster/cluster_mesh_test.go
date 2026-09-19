@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -682,4 +683,50 @@ func TestMesh_TopicAnnouncementInvokesTopicsAddedFunc(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, []string{"up123456789012"}, addedB)
+}
+
+func TestMesh_IsolatedFuncWhenPeersHealthy(t *testing.T) {
+	// A node that lost its database (registration goes stale) while a peer is still healthy
+	// is isolated: peers stop forwarding to it, so its subscribers would silently receive
+	// nothing. IsolatedFunc tells the server to close them so clients reconnect elsewhere.
+	isolatedTest(t, http.StatusOK, true)
+}
+
+func TestMesh_NoIsolatedFuncWhenNoPeerHealthy(t *testing.T) {
+	// Full database outage: every node is unhealthy, the mesh keeps delivering on its cached
+	// peer view, so subscribers must be kept (fail open)
+	isolatedTest(t, http.StatusServiceUnavailable, false)
+}
+
+func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/health" {
+			w.WriteHeader(peerHealthStatus)
+		}
+	}))
+	defer peer.Close()
+	registerFakePeer(t, openTestPool(t, schemaDSN), "node-peer", peer.URL)
+
+	host, err := pg.Open(schemaDSN)
+	require.Nil(t, err)
+	pool := db.New(host, nil)
+	var isolated atomic.Int32
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.NodeTTL = 300 * time.Millisecond
+	conf.IsolatedFunc = func() { isolated.Add(1) }
+	mesh, err := newMeshCluster(conf, pool, nil, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, func() bool {
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.knownPeers) == 1
+	})
+	require.Equal(t, int32(0), isolated.Load()) // Healthy node: never isolated
+
+	pool.Close() // Database lost: registration fails from now on
+	time.Sleep(time.Second)
+	require.False(t, mesh.Healthy())
+	require.Equal(t, wantIsolated, isolated.Load() > 0)
 }

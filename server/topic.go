@@ -183,6 +183,13 @@ func (t *topic) Publish(v *visitor, m *model.Message) error {
 	return nil
 }
 
+// SubscribersCount returns the number of local subscribers
+func (t *topic) SubscribersCount() int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return len(t.subscribers)
+}
+
 // Stats returns the number of subscribers and last access to this topic
 func (t *topic) Stats() (int, time.Time) {
 	t.mu.RLock()
@@ -223,6 +230,15 @@ func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
 		if s.userID != exceptUserID {
 			t.cancelUserSubscriber(s)
 		}
+	}
+}
+
+// CancelAllSubscribers calls the cancel function of every subscriber, closing their connections
+func (t *topic) CancelAllSubscribers() {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	for _, s := range t.subscribers {
+		s.cancel()
 	}
 }
 

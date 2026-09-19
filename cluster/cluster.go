@@ -22,6 +22,9 @@ const (
 	// StatePath receives peer state (JSON apiState): full subscription snapshots and
 	// incremental updates.
 	StatePath = "/v1/internal/state"
+	// HealthPath reports a node's cluster health (200 healthy, 503 not); served on the cluster
+	// listener too, where isolated nodes probe their peers.
+	HealthPath = "/v1/health"
 )
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer

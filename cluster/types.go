@@ -22,6 +22,7 @@ type Config struct {
 	LeaderRenewInterval time.Duration   // Overrides the leader lease renewal cadence; tests only, 0 = default
 	CancelFunc          CancelFunc      // Applies a peer's subscriber-cancel request to local connections; may be nil
 	TopicsAddedFunc     TopicsAddedFunc // Told about topics that just gained their first subscriber on a peer; may be nil
+	IsolatedFunc        func()          // Called while this node lost its registration but a peer is healthy; may be nil
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The

@@ -81,6 +81,7 @@ type Server struct {
 	cluster           cluster.Cluster                     // Fans messages out to peer cluster nodes (nop when not clustered)
 	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
 	topicStore        *topicstore.Store                   // Shared per-topic state (rate visitors, liveness); nil when not clustered
+	catchUpDelay      time.Duration                       // When the catch-up replay runs after a since= subscribe (see server_catchup.go)
 	pendingPeerUsage  map[string]*pendingPeerUsage        // Peer usage for visitors this node has not seen yet, burned when the visitor first appears
 	stopOnce          sync.Once                           // Makes Stop idempotent (double close panics otherwise)
 	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
@@ -331,6 +332,7 @@ func New(conf *Config) (*Server, error) {
 		userManager:      userManager,
 		messages:         messages,
 		messagesFlushed:  messages, // The loaded total is already persisted; only new publishes are deltas
+		catchUpDelay:     conf.CacheBatchTimeout + conf.ClusterBatchLinger + catchUpMargin,
 		messagesHistory:  []int64{messages},
 		visitors:         make(map[string]*visitor),
 		pendingPeerUsage: make(map[string]*pendingPeerUsage),
@@ -352,6 +354,7 @@ func New(conf *Config) (*Server, error) {
 		BatchLinger:     conf.ClusterBatchLinger,
 		CancelFunc:      s.applySubscriberCancel,
 		TopicsAddedFunc: s.clearRateVisitorMisses,
+		IsolatedFunc:    s.closeLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus, s.liveTopics)
 	if err != nil {
@@ -390,7 +393,7 @@ func New(conf *Config) (*Server, error) {
 // be reached from the outside even before any firewalling.
 func (s *Server) clusterHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc(apiHealthPath, func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc(cluster.HealthPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if s.cluster.Healthy() {
 			io.WriteString(w, `{"healthy":true}`+"\n")
@@ -423,6 +426,17 @@ func (s *Server) liveTopics() []string {
 func (s *Server) topicAnnouncer(id string) func() {
 	return func() {
 		s.cluster.BroadcastState(&cluster.State{AddedTopics: []string{id}})
+	}
+}
+
+// closeLocalSubscribers closes every subscriber connection on this node. The cluster calls it
+// while this node is isolated (lost its registration, peers healthy): peers no longer forward
+// to it, so its subscribers would silently receive nothing; they reconnect to a healthy node.
+func (s *Server) closeLocalSubscribers() {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, t := range s.topics {
+		t.CancelAllSubscribers()
 	}
 }
 
@@ -1761,6 +1775,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	deduper := newReplayDeduper(since.ID())
+	sub = deduper.wrap(sub) // Before subscribing, so live messages are remembered too
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
@@ -1777,12 +1793,25 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
+	var catchUp <-chan time.Time
+	if needsCatchUp(since) {
+		catchUp = time.After(s.catchUpDelay)
+	} else {
+		deduper.stop()
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-r.Context().Done():
 			return nil
+		case <-catchUp:
+			catchUp = nil
+			err := s.sendOldMessages(w, topics, s.catchUpSince(since), scheduled, v, sub)
+			deduper.stop()
+			if err != nil {
+				return err
+			}
 		case <-time.After(s.config.KeepaliveInterval):
 			ev := logvr(v, r).Tag(tagSubscribe)
 			if len(topics) == 1 {
@@ -1913,6 +1942,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
+	deduper := newReplayDeduper(since.ID())
+	sub = deduper.wrap(sub) // Before subscribing, so live messages are remembered too
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
@@ -1928,6 +1959,19 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
+	}
+	if needsCatchUp(since) {
+		g.Go(func() error {
+			defer deduper.stop()
+			select {
+			case <-gctx.Done():
+				return nil
+			case <-time.After(s.catchUpDelay):
+				return s.sendOldMessages(w, topics, s.catchUpSince(since), scheduled, v, sub)
+			}
+		})
+	} else {
+		deduper.stop()
 	}
 	err = g.Wait()
 	if err != nil && websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNoStatusReceived) {

@@ -1,6 +1,8 @@
 package quota
 
 import (
+	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -158,4 +160,34 @@ func TestDayFor_ResetTimeBoundary(t *testing.T) {
 	require.Equal(t, "2026-08-28", dayFor(time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC), midnight))
 	require.Equal(t, "2026-08-28", dayFor(time.Date(2026, 8, 29, 1, 59, 0, 0, time.UTC), twoAM))
 	require.Equal(t, "2026-08-29", dayFor(time.Date(2026, 8, 29, 2, 1, 0, 0, time.UTC), twoAM))
+}
+
+func TestTracker_MemoryPerKeyBounded(t *testing.T) {
+	// Every node's tracker holds state for every key with usage anywhere in the cluster that
+	// day (~0.6-1M keys at ntfy.sh volume), so the per-key footprint is a scaling property:
+	// the heap profile of the cluster3 harness showed the tracker dominating app memory.
+	const keys = 50000
+	tracker := newTracker(&Config{FlushInterval: time.Hour}, nil)
+	sums := make(map[Key]*Counters, keys)
+	for i := 0; i < keys; i++ {
+		sums[Key(fmt.Sprintf("ip:10.%d.%d.%d", i>>16&255, i>>8&255, i&255))] = &Counters{Requests: 5, BandwidthBytes: 1500}
+	}
+
+	// Measure what the tracker itself retains for a day's worth of keys: local increments
+	// plus the pulled cluster sums (the key strings are shared with sums, so they are not
+	// counted; this compares the per-key state, which is what grew)
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	for key := range sums {
+		tracker.Inc(key, Counters{Requests: 3, BandwidthBytes: 900})
+	}
+	tracker.apply(tracker.day, sums, time.Now().Unix())
+	sums = nil
+	runtime.GC()
+	runtime.ReadMemStats(&after)
+	perKey := (int64(after.HeapAlloc) - int64(before.HeapAlloc)) / keys
+	require.Less(t, perKey, int64(120), "tracker retains %d bytes per key", perKey)
+	t.Logf("tracker retains %d bytes per key", perKey)
+	require.Equal(t, keys, len(tracker.entries))
 }

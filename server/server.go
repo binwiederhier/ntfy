@@ -82,7 +82,6 @@ type Server struct {
 	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
 	topicStore        *topicstore.Store                   // Shared per-topic state (rate visitors, liveness); nil when not clustered
 	catchUpDelay      time.Duration                       // When the catch-up replay runs after a since= subscribe (see server_catchup.go)
-	pendingPeerUsage  map[string]*pendingPeerUsage        // Peer usage for visitors this node has not seen yet, burned when the visitor first appears
 	stopOnce          sync.Once                           // Makes Stop idempotent (double close panics otherwise)
 	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
 	closeChan         chan bool
@@ -176,7 +175,6 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
-	pendingPeerUsageTTL      = 5 * time.Minute           // How long peer usage for unseen visitors is remembered; burns are debt-capped, so late burns cost at most one burst
 	rateVisitorMissTTL       = 30 * time.Second          // How long a failed shared-store rate-visitor lookup is cached on the topic
 )
 
@@ -319,24 +317,23 @@ func New(conf *Config) (*Server, error) {
 		})
 	}
 	s := &Server{
-		config:           conf,
-		db:               pool,
-		messageCache:     messageCache,
-		webPush:          wp,
-		attachment:       attachmentStore,
-		firebaseClient:   firebaseClient,
-		twilio:           twilioClient,
-		mailer:           sender,
-		ban:              banner,
-		topics:           topics,
-		userManager:      userManager,
-		messages:         messages,
-		messagesFlushed:  messages, // The loaded total is already persisted; only new publishes are deltas
-		catchUpDelay:     conf.CacheBatchTimeout + conf.ClusterBatchLinger + catchUpMargin,
-		messagesHistory:  []int64{messages},
-		visitors:         make(map[string]*visitor),
-		pendingPeerUsage: make(map[string]*pendingPeerUsage),
-		stripe:           stripe,
+		config:          conf,
+		db:              pool,
+		messageCache:    messageCache,
+		webPush:         wp,
+		attachment:      attachmentStore,
+		firebaseClient:  firebaseClient,
+		twilio:          twilioClient,
+		mailer:          sender,
+		ban:             banner,
+		topics:          topics,
+		userManager:     userManager,
+		messages:        messages,
+		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
+		catchUpDelay:    conf.CacheBatchTimeout + conf.ClusterBatchLinger + catchUpMargin,
+		messagesHistory: []int64{messages},
+		visitors:        make(map[string]*visitor),
+		stripe:          stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	// Cross-node cluster; delivery of peer messages to local subscribers is injected
@@ -2526,20 +2523,16 @@ func (s *Server) visitorFromKey(visitorKey, userID string) (*visitor, error) {
 // briefly and burned when the visitor first appears, so a client rotating across nodes
 // cannot collect a fresh burst on every node; entries expire because old consumption would
 // have been replenished by now anyway (token buckets, not daily quotas).
+// applyPeerUsage burns usage that peer nodes consumed for a visitor this node knows. Usage for
+// a visitor that does not exist here is dropped: newVisitor seeds its buckets from the
+// tracker's cluster totals, which already include what peers consumed that day.
 func (s *Server) applyPeerUsage(key quota.Key, delta quota.Counters) {
 	s.mu.Lock()
 	v, ok := s.visitors[string(key)]
-	if !ok {
-		if pending, exists := s.pendingPeerUsage[string(key)]; exists && pending.expires.After(time.Now()) {
-			pending.counters.Add(delta)
-		} else {
-			s.pendingPeerUsage[string(key)] = newPendingPeerUsage(delta)
-		}
-		s.mu.Unlock()
-		return
-	}
 	s.mu.Unlock()
-	v.BurnPeerUsage(delta)
+	if ok {
+		v.BurnPeerUsage(delta)
+	}
 }
 
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
@@ -2549,10 +2542,9 @@ func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	v, exists := s.visitors[id]
 	if !exists {
 		// newVisitor reseeds the buckets from the tracker's cluster totals, which already
-		// include anything parked in pendingPeerUsage -- burning both would double-punish
+		// include what peers consumed for this visitor today
 		v = newVisitor(s.config, s.messageCache, s.userManager, s.quota, ip, user)
 		s.visitors[id] = v
-		delete(s.pendingPeerUsage, id)
 		return v
 	}
 	v.Keepalive()
@@ -2595,18 +2587,4 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 	s.messagesFlushed = total
 	s.messages = total + (s.messages - snapshot) // Publishes that arrived while flushing stay counted
 	s.mu.Unlock()
-}
-
-// pendingPeerUsage holds peer-node usage reported for a visitor before this node has seen it;
-// burned from the visitor's buckets on first contact, dropped when it expires unclaimed
-type pendingPeerUsage struct {
-	counters quota.Counters
-	expires  time.Time
-}
-
-func newPendingPeerUsage(delta quota.Counters) *pendingPeerUsage {
-	return &pendingPeerUsage{
-		counters: delta,
-		expires:  time.Now().Add(pendingPeerUsageTTL),
-	}
 }

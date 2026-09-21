@@ -76,18 +76,15 @@ type Config struct {
 type Tracker struct {
 	conf      *Config
 	pool      *db.DB
-	now       func() time.Time  // Injectable clock, for tests
-	day       string            // Usage day the maps below refer to
-	deltas    map[Key]*Counters // Local increments not yet flushed to the database
-	totals    map[Key]*Counters // Last known cluster totals, including unflushed local increments
-	flushed   map[Key]*Counters // Local increments already flushed to the database this day (peer-delta bookkeeping)
-	peerSeen  map[Key]*Counters // Peer consumption already reported via PeerUsageFunc this day
-	pulledAt  int64             // updated_at watermark for pulling changed usage rows
-	closing   bool              // Set in Close; the final pull skips PeerUsageFunc (the server is shutting down and may hold its own locks)
+	now       func() time.Time // Injectable clock, for tests
+	day       string           // Usage day the entries below refer to
+	entries   map[Key]*entry   // Per-key state; one entry per key seen anywhere in the cluster today
+	pulledAt  int64            // updated_at watermark for pulling changed usage rows
+	closing   bool             // Set in Close; the final pull skips PeerUsageFunc (the server is shutting down and may hold its own locks)
 	closeChan chan struct{}
 	closeOnce sync.Once
 	wg        sync.WaitGroup
-	mu        sync.Mutex // Protects day, deltas, totals, flushed, peerSeen, pulledAt, closing
+	mu        sync.Mutex // Protects day, entries, pulledAt, closing
 }
 
 // New creates a tracker on the given (shared) database pool and starts its flush loop
@@ -95,17 +92,7 @@ func New(conf *Config, pool *db.DB) (*Tracker, error) {
 	if conf.FlushInterval <= 0 {
 		conf.FlushInterval = DefaultFlushInterval
 	}
-	t := &Tracker{
-		conf:      conf,
-		pool:      pool,
-		now:       time.Now,
-		deltas:    make(map[Key]*Counters),
-		totals:    make(map[Key]*Counters),
-		flushed:   make(map[Key]*Counters),
-		peerSeen:  make(map[Key]*Counters),
-		closeChan: make(chan struct{}),
-	}
-	t.day = t.currentDay()
+	t := newTracker(conf, pool)
 	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, schema.AsMigrateFunc(createTable), nil); err != nil {
 		return nil, err
 	}
@@ -118,13 +105,47 @@ func New(conf *Config, pool *db.DB) (*Tracker, error) {
 	return t, nil
 }
 
+// entry is the per-key state. One entry per key replaces the four parallel maps this used to
+// keep (deltas, totals, flushed, peerSeen): every node holds state for every key with usage
+// anywhere in the cluster that day, so the per-key footprint is a scaling property.
+//
+// baseline is the database sum as of the last pull, so the cluster total is baseline plus the
+// local increments not yet written, and usage consumed by peers since the last pull is
+// whatever the database grew beyond the baseline.
+type entry struct {
+	unflushed Counters
+	baseline  Counters
+}
+
+// newTracker builds a tracker with its in-memory state initialized (no database work)
+func newTracker(conf *Config, pool *db.DB) *Tracker {
+	t := &Tracker{
+		conf:      conf,
+		pool:      pool,
+		now:       time.Now,
+		entries:   make(map[Key]*entry),
+		closeChan: make(chan struct{}),
+	}
+	t.day = t.currentDay()
+	return t
+}
+
 // Inc records local usage for the given visitor key. In-memory only, safe for the hot path;
 // the flush loop persists it as an increment.
 func (t *Tracker) Inc(key Key, delta Counters) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	addTo(t.deltas, key, delta)
-	addTo(t.totals, key, delta)
+	t.entryFor(key).unflushed.Add(delta)
+}
+
+// entryFor returns the key's entry, creating it if needed. The caller must hold t.mu.
+func (t *Tracker) entryFor(key Key) *entry {
+	e, ok := t.entries[key]
+	if !ok {
+		e = &entry{}
+		t.entries[key] = e
+	}
+	return e
 }
 
 // Totals returns the visitor's cluster-wide usage for the current day, including local
@@ -132,10 +153,13 @@ func (t *Tracker) Inc(key Key, delta Counters) {
 func (t *Tracker) Totals(key Key) Counters {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if c, ok := t.totals[key]; ok {
-		return *c
+	e, ok := t.entries[key]
+	if !ok {
+		return Counters{}
 	}
-	return Counters{}
+	total := e.baseline
+	total.Add(e.unflushed)
+	return total
 }
 
 // Prune deletes usage rows older than the retention. Only the cluster leader calls this
@@ -185,13 +209,16 @@ func (t *Tracker) flushAndPull() error {
 	// flushed under the day they were counted in; the fast-moving maps restart empty.
 	t.mu.Lock()
 	day := t.day
-	pending := t.deltas
-	t.deltas = make(map[Key]*Counters)
+	pending := make(map[Key]Counters, len(t.entries))
+	for key, e := range t.entries {
+		if !e.unflushed.zero() {
+			pending[key] = e.unflushed
+			e.unflushed = Counters{}
+		}
+	}
 	if newDay := t.currentDay(); newDay != day {
 		t.day = newDay
-		t.totals = make(map[Key]*Counters)
-		t.flushed = make(map[Key]*Counters)
-		t.peerSeen = make(map[Key]*Counters)
+		t.entries = make(map[Key]*entry)
 		t.pulledAt = 0
 	}
 	t.mu.Unlock()
@@ -199,25 +226,24 @@ func (t *Tracker) flushAndPull() error {
 	// Push deltas as increments
 	now := t.now().Unix()
 	for key, c := range pending {
-		if c.zero() {
-			continue
-		}
 		if _, err := t.pool.Exec(upsertUsageQuery, string(key), day, c.Requests, c.Messages, c.Emails, c.Calls, c.BandwidthBytes, now); err != nil {
 			// Put the deltas back for retry; counts must not be lost on a database hiccup
 			t.mu.Lock()
 			if t.day == day {
 				for k, cc := range pending {
-					addTo(t.deltas, k, *cc)
+					t.entryFor(k).unflushed.Add(cc)
 				}
 			}
 			t.mu.Unlock()
 			return err
 		}
 	}
+	// Written rows are part of the baseline now, so the next pull does not read them back as
+	// peer consumption
 	t.mu.Lock()
 	if t.day == day {
 		for k, cc := range pending {
-			addTo(t.flushed, k, *cc)
+			t.entryFor(k).baseline.Add(cc)
 		}
 	}
 	t.mu.Unlock()
@@ -249,6 +275,16 @@ func (t *Tracker) pull() error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
+	peerDeltas := t.apply(day, sums, pullTime)
+	for key, delta := range peerDeltas {
+		t.conf.PeerUsageFunc(key, delta)
+	}
+	return nil
+}
+
+// apply folds the database sums read by pull into the in-memory state and returns the usage
+// peers consumed since the last pull. Split out so it can be exercised without a database.
+func (t *Tracker) apply(day string, sums map[Key]*Counters, pullTime int64) map[Key]Counters {
 	var peerDeltas map[Key]Counters
 	t.mu.Lock()
 	if t.day != day {
@@ -256,50 +292,23 @@ func (t *Tracker) pull() error {
 		return nil // Rolled over while reading; discard
 	}
 	for key, sum := range sums {
-		// Cluster totals: database sums plus local increments that are not in them yet
-		total := *sum
-		if d, ok := t.deltas[key]; ok {
-			total.Add(*d)
-		}
-		t.totals[key] = &total
-		// Peer consumption: everything in the database that this node did not flush itself,
-		// reported as a delta against what was already reported
+		e := t.entryFor(key)
 		peer := *sum
-		if f, ok := t.flushed[key]; ok {
-			peer.sub(*f)
-		}
-		if seen, ok := t.peerSeen[key]; ok {
-			peer.sub(*seen)
-		}
-		if !peer.zero() {
-			addTo(t.peerSeen, key, peer)
-			if t.conf.PeerUsageFunc != nil && !t.closing {
-				if peerDeltas == nil {
-					peerDeltas = make(map[Key]Counters)
-				}
-				peerDeltas[key] = peer
+		peer.sub(e.baseline) // Everything the database grew beyond our baseline came from peers
+		e.baseline = *sum
+		if !peer.zero() && t.conf.PeerUsageFunc != nil && !t.closing {
+			if peerDeltas == nil {
+				peerDeltas = make(map[Key]Counters)
 			}
+			peerDeltas[key] = peer
 		}
 	}
 	t.pulledAt = pullTime - 1 // Overlap one second to never miss same-second writers; re-reads are idempotent
 	t.mu.Unlock()
-	for key, delta := range peerDeltas {
-		t.conf.PeerUsageFunc(key, delta)
-	}
-	return nil
+	return peerDeltas
 }
 
 // currentDay returns the usage day for the current time
 func (t *Tracker) currentDay() string {
 	return dayFor(t.now(), t.conf.StatsResetTime)
-}
-
-// addTo adds delta to the counters map entry for key, creating it if needed
-func addTo(m map[Key]*Counters, key Key, delta Counters) {
-	if c, ok := m[key]; ok {
-		c.Add(delta)
-	} else {
-		c := delta
-		m[key] = &c
-	}
 }

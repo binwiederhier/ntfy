@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster"
+	"heckel.io/ntfy/v2/cluster/quota"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/model"
@@ -786,4 +787,27 @@ func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("subscriber connection still open")
 	}
+}
+
+func TestServer_Cluster_PeerUsageForUnknownVisitorSeededOnceOnCreation(t *testing.T) {
+	// Peer usage for a visitor this node has never seen is dropped, not parked: the visitor's
+	// buckets are seeded from the cluster totals when it is created, so it is burned exactly
+	// once (parking it as well used to risk double-punishing, and cost a map of every
+	// cluster-wide visitor).
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1"
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	s := newTestServer(t, conf)
+
+	// A peer consumed 10 requests for a visitor this node has not seen
+	key := quota.Key("ip:9.9.9.9")
+	s.quota.Inc(key, quota.Counters{Requests: 10})
+	s.applyPeerUsage(key, quota.Counters{Requests: 10})
+
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	burned := float64(s.config.VisitorRequestLimitBurst) - v.requestLimiter.Tokens()
+	require.InDelta(t, 10, burned, 1, "expected one burn of 10 requests, burned %.1f", burned)
 }

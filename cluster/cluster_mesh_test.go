@@ -285,6 +285,8 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	defer mesh.Close()
 	// The fake peer registers once and then "dies": its heartbeat is never refreshed
 	registerFakePeer(t, pool, "node-dead", srv.URL)
+	_, err = mesh.registry.Refresh() // See the peer now; the short TTL would otherwise expire it first
+	require.Nil(t, err)
 	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("mytopic", "while alive")))
 	waitFor(t, func() bool {
 		mu.Lock()

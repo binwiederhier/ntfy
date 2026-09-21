@@ -812,3 +812,41 @@ func newFreezableProxy(t *testing.T, dsn string) *freezableProxy {
 func (p *freezableProxy) freeze() {
 	p.frozen.Store(true)
 }
+
+func TestMesh_MembersEndpoint(t *testing.T) {
+	// The LB agents ask a node which nodes are live, so each LB can maintain its own upstream
+	// list instead of a central monitor pushing it. Secret-authenticated, read-only.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	registerFakePeer(t, pool, "node-peer", "http://192.168.1.50:2587")
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, func() bool {
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.knownPeers) == 1
+	})
+
+	// Without the shared secret: rejected
+	rr := httptest.NewRecorder()
+	mesh.ServeHTTP(rr, httptest.NewRequest("GET", MembersPath, nil))
+	require.Equal(t, http.StatusUnauthorized, rr.Code)
+
+	// With it: this node plus its live peers, with the addresses an agent needs
+	rr = httptest.NewRecorder()
+	req := httptest.NewRequest("GET", MembersPath, nil)
+	req.Header.Set(secretHeader, testSecret)
+	mesh.ServeHTTP(rr, req)
+	require.Equal(t, http.StatusOK, rr.Code)
+	var members []Member
+	require.Nil(t, json.Unmarshal(rr.Body.Bytes(), &members))
+	byID := make(map[NodeID]Member)
+	for _, m := range members {
+		byID[m.NodeID] = m
+	}
+	require.Equal(t, 2, len(byID))
+	require.Equal(t, "http://192.168.1.10:2587", byID["node-a"].AdvertiseURL)
+	require.True(t, byID["node-a"].Healthy)
+	require.Equal(t, "http://192.168.1.50:2587", byID["node-peer"].AdvertiseURL)
+}

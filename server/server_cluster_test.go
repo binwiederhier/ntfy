@@ -71,6 +71,8 @@ func (b *fakeCluster) setLeader(leader bool) {
 	b.notLeader = !leader
 }
 
+func (b *fakeCluster) Members() []cluster.Member { return nil }
+
 func (b *fakeCluster) Close() error { return nil }
 
 func (b *fakeCluster) Messages() []*model.Message {

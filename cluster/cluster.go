@@ -22,6 +22,9 @@ const (
 	// StatePath receives peer state (JSON apiState): full subscription snapshots and
 	// incremental updates.
 	StatePath = "/v1/internal/state"
+	// MembersPath lists the live cluster members (this node plus its live peers), for the
+	// load balancers' agents: each LB maintains its own upstream list from it.
+	MembersPath = "/v1/internal/members"
 	// HealthPath reports a node's cluster health (200 healthy, 503 not); served on the cluster
 	// listener too, where isolated nodes probe their peers.
 	HealthPath = "/v1/health"
@@ -64,6 +67,13 @@ const (
 	DefaultBatchLinger = 500 * time.Millisecond
 )
 
+// Member is one live cluster node as reported by MembersPath
+type Member struct {
+	NodeID       NodeID `json:"node_id"`
+	AdvertiseURL string `json:"advertise_url"`
+	Healthy      bool   `json:"healthy"`
+}
+
 // Cluster fans published messages out to peer cluster nodes and receives their fan-out requests.
 // Local delivery to a node's own subscribers still happens inline in the server; the cluster
 // only covers the cross-node hop.
@@ -79,6 +89,9 @@ type Cluster interface {
 	// IsLeader reports whether this node holds the cluster leader lock. Singleton background
 	// jobs (e.g. the Firebase keepaliver) are gated on the leader.
 	IsLeader() bool
+	// Members lists the live cluster members (this node plus its live peers); served on
+	// MembersPath for the load balancers' agents.
+	Members() []Member
 	// Healthy reports whether this node is fit to serve: its registry heartbeat is fresh
 	// enough (within NodeTTL) that peers still forward messages to it. Health checkers must
 	// fail open (never pull ALL nodes): during a full database outage every node reports

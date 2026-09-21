@@ -21,6 +21,8 @@ func (c *nopCluster) BroadcastState(_ *State) {}
 
 func (c *nopCluster) IsLeader() bool { return true }
 
+func (c *nopCluster) Members() []Member { return nil }
+
 func (c *nopCluster) Healthy() bool { return true }
 
 func (c *nopCluster) Close() error { return nil }

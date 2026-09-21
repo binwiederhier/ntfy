@@ -93,6 +93,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc, topics Topic
 	c.mux = http.NewServeMux()
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
 	c.mux.HandleFunc("POST "+StatePath, c.authenticated(c.handleState))
+	c.mux.HandleFunc("GET "+MembersPath, c.secretAuthenticated(c.handleMembers))
 	c.wg.Add(2)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
@@ -125,6 +126,41 @@ func (c *meshCluster) authenticated(h func(origin NodeID, w http.ResponseWriter,
 		}
 		h(origin, w, r)
 	}
+}
+
+// secretAuthenticated wraps a handler with the shared-secret check only. Unlike authenticated
+// it expects no origin node, because the callers are the load balancers' agents, not peers.
+func (c *meshCluster) secretAuthenticated(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if c.conf.Secret == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get(secretHeader)), []byte(c.conf.Secret)) != 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		h(w, r)
+	}
+}
+
+// handleMembers lists the live cluster members for the load balancers' agents
+func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", contentTypeJSON)
+	if err := json.NewEncoder(w).Encode(c.Members()); err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot write member list")
+	}
+}
+
+// Members returns this node plus the peers the registry currently considers live. The peer
+// list is the cached registry view, so it is at most one heartbeat stale.
+func (c *meshCluster) Members() []Member {
+	members := []Member{{NodeID: c.conf.NodeID, AdvertiseURL: c.conf.AdvertiseURL, Healthy: c.Healthy()}}
+	peers, err := c.registry.Peers()
+	if err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot read peers for the member list")
+		return members
+	}
+	for _, p := range peers {
+		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Healthy: true})
+	}
+	return members
 }
 
 // heartbeatLoop runs one heartbeat immediately (the ticker first fires a full interval after

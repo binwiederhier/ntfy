@@ -348,15 +348,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
-	} else if baseURL != "" {
-		u, err := url.Parse(baseURL)
-		if err != nil {
-			return fmt.Errorf("if set, base-url must be a valid URL, e.g. https://ntfy.mydomain.com: %v", err)
-		} else if u.Scheme != "http" && u.Scheme != "https" {
-			return errors.New("if set, base-url must be a valid URL starting with http:// or https://, e.g. https://ntfy.mydomain.com")
-		} else if u.Path != "" {
-			return fmt.Errorf("if set, base-url must not have a path (%s), as hosting ntfy on a sub-path is not supported, e.g. https://ntfy.mydomain.com", u.Path)
-		}
+	} else if err := validateBaseURL(baseURL); err != nil {
+		return err
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
 	} else if upstreamBaseURL != "" && strings.HasSuffix(upstreamBaseURL, "/") {
@@ -377,11 +370,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if stripe-secret-key is set, stripe-webhook-key and base-url must also be set")
 	} else if twilioAccount != "" && (twilioAuthToken == "" || twilioPhoneNumber == "" || twilioVerifyService == "" || baseURL == "" || (authFile == "" && databaseURL == "")) {
 		return errors.New("if twilio-account is set, twilio-auth-token, twilio-phone-number, twilio-verify-service, base-url, and auth-file (or database-url) must also be set")
-	} else if messageSizeLimit > server.DefaultMessageSizeLimit {
-		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
-		if messageSizeLimit > 5*1024*1024 {
-			return errors.New("message-size-limit cannot be higher than 5M")
-		}
+	} else if messageSizeLimit > 5*1024*1024 {
+		return errors.New("message-size-limit cannot be higher than 5M")
 	} else if !server.WebPushAvailable && (webPushPrivateKey != "" || webPushPublicKey != "" || webPushFile != "") {
 		return errors.New("cannot enable WebPush, support is not available in this build (nowebpush)")
 	} else if webPushExpiryWarningDuration > 0 && webPushExpiryWarningDuration > webPushExpiryDuration {
@@ -402,6 +392,9 @@ func execServe(c *cli.Context) error {
 		return fmt.Errorf("if ban-file is set, its directory (%s) must exist", filepath.Dir(banFile))
 	} else if runtime.GOOS == "windows" && listenUnix != "" {
 		return errors.New("listen-unix is not supported on Windows")
+	}
+	if messageSizeLimit > server.DefaultMessageSizeLimit {
+		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
 	}
 
 	// Backwards compatibility
@@ -589,6 +582,21 @@ func execServe(c *cli.Context) error {
 		log.Fatal("%s", err.Error())
 	}
 	log.Info("Exiting.")
+	return nil
+}
+
+func validateBaseURL(baseURL string) error {
+	if baseURL == "" {
+		return nil
+	}
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return fmt.Errorf("if set, base-url must be a valid URL, e.g. https://ntfy.mydomain.com: %v", err)
+	} else if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("if set, base-url must be a valid URL starting with http:// or https://, e.g. https://ntfy.mydomain.com")
+	} else if u.Path != "" {
+		return fmt.Errorf("if set, base-url must not have a path (%s), as hosting ntfy on a sub-path is not supported, e.g. https://ntfy.mydomain.com", u.Path)
+	}
 	return nil
 }
 

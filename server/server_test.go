@@ -1034,6 +1034,7 @@ func TestServer_Auth_Success_HeaderUser(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.AuthDefault = user.PermissionDenyAll
+		c.BehindProxy = true
 		c.AuthHeaderUser = "X-Forwarded-User"
 		s := newTestServer(t, c)
 
@@ -1050,6 +1051,7 @@ func TestServer_Auth_Success_HeaderRoleMapping_Admin(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.AuthDefault = user.PermissionDenyAll
+		c.BehindProxy = true
 		c.AuthHeaderUser = "X-Forwarded-User"
 		c.AuthHeaderRole = "X-Forwarded-Groups"
 		c.AuthHeaderMappings = map[string]user.Role{
@@ -1066,10 +1068,31 @@ func TestServer_Auth_Success_HeaderRoleMapping_Admin(t *testing.T) {
 	})
 }
 
+func TestServer_Auth_HeaderRoleMapping_UserIsNotAdmin(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.AuthDefault = user.PermissionDenyAll
+		c.BehindProxy = true
+		c.AuthHeaderUser = "X-Forwarded-User"
+		c.AuthHeaderRole = "X-Forwarded-Groups"
+		c.AuthHeaderMappings = map[string]user.Role{
+			"ntfy-users": user.RoleUser,
+		}
+		s := newTestServer(t, c)
+
+		response := request(t, s, "GET", "/mytopic/auth", "", map[string]string{
+			"X-Forwarded-User":   "ben",
+			"X-Forwarded-Groups": "ntfy-users",
+		})
+		require.Equal(t, 403, response.Code)
+	})
+}
+
 func TestServer_Auth_HeaderAuth_FallsBackToAuthorization(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.AuthDefault = user.PermissionDenyAll
+		c.BehindProxy = true
 		c.AuthHeaderUser = "X-Forwarded-User"
 		s := newTestServer(t, c)
 
@@ -1085,6 +1108,7 @@ func TestServer_Auth_HeaderAuth_FallsBackToAuthorization(t *testing.T) {
 func TestServer_Auth_HeaderAuth_InvalidUsername(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.BehindProxy = true
 		c.AuthHeaderUser = "X-Forwarded-User"
 		s := newTestServer(t, c)
 
@@ -1098,6 +1122,7 @@ func TestServer_Auth_HeaderAuth_InvalidUsername(t *testing.T) {
 func TestServer_Auth_HeaderAuth_DoesNotOverrideAuthorization(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.BehindProxy = true
 		c.AuthHeaderUser = "X-Forwarded-User"
 		s := newTestServer(t, c)
 

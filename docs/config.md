@@ -647,6 +647,7 @@ as OAuth2 Proxy, Authelia, or Traefik ForwardAuth.
 
 The relevant options are:
 
+* `behind-proxy`: Must be enabled so ntfy only accepts these auth headers in reverse-proxy mode
 * `auth-header-user`: Header name containing the authenticated username, e.g. `X-Forwarded-User`
 * `auth-header-role`: Optional header name containing one or more upstream roles/groups
 * `auth-header-mappings`: Optional list of role/group mappings in the format `<value>:<role>`, where `<role>` is
@@ -666,6 +667,7 @@ Example:
 ``` yaml
 auth-file: "/var/lib/ntfy/user.db"
 auth-default-access: "deny-all"
+behind-proxy: true
 auth-header-user: "X-Forwarded-User"
 auth-header-role: "X-Forwarded-Groups"
 auth-header-mappings:
@@ -2397,7 +2399,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cache-batch-timeout`                      | `NTFY_CACHE_BATCH_TIMEOUT`                      | *duration*                                          | 0s                | Timeout for batched async writes to the message cache (if zero, writes are synchronous)                                                                                                                                                 |
 | `auth-file`                                | `NTFY_AUTH_FILE`                                | *filename*                                          | -                 | Auth database file used for access control (SQLite). If set, enables authentication and access control. Not required if `database-url` is set. See [access control](#access-control).                                                   |
 | `auth-default-access`                      | `NTFY_AUTH_DEFAULT_ACCESS`                      | `read-write`, `read-only`, `write-only`, `deny-all` | `read-write`      | Default permissions if no matching entries in the auth database are found. Default is `read-write`.                                                                                                                                     |
-| `auth-header-user`                         | `NTFY_AUTH_HEADER_USER`                         | *string*                                            | -                 | Trusted reverse-proxy header containing the authenticated username. Only use in trusted reverse-proxy deployments.                                                                                                                      |
+| `auth-header-user`                         | `NTFY_AUTH_HEADER_USER`                         | *string*                                            | -                 | Trusted reverse-proxy header containing the authenticated username. Requires `behind-proxy`. Only use in trusted reverse-proxy deployments.                                                                                             |
 | `auth-header-role`                         | `NTFY_AUTH_HEADER_ROLE`                         | *string*                                            | -                 | Trusted reverse-proxy header containing roles/groups. Supports repeated headers and comma-separated values. Requires `auth-header-user`.                                                                                                |
 | `auth-header-mappings`                     | `NTFY_AUTH_HEADER_MAPPINGS`                     | *list of `value:role` mappings*                     | -                 | Reverse-proxy role/group to ntfy role mappings. If any mapped value resolves to `admin`, the request is authorized as an ntfy admin. Requires `auth-header-role`.                                                                       |
 | `auth-access-cache`                        | `NTFY_AUTH_ACCESS_CACHE`                        | *bool*                                              | false             | Enables an in-memory ACL cache so authorization checks no longer hit the database. Only worth enabling on high-volume servers.                                                                                                          |

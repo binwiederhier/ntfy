@@ -117,7 +117,7 @@ func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.Us
 }
 
 func (s *Server) authenticateHeaderUser(r *http.Request) (*user.User, bool, error) {
-	if s.config.AuthHeaderUser == "" {
+	if s.config.AuthHeaderUser == "" || !s.config.BehindProxy {
 		return nil, false, nil
 	}
 	username := strings.TrimSpace(r.Header.Get(s.config.AuthHeaderUser))

@@ -377,6 +377,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if auth-header-role is set, auth-header-user must also be set")
 	} else if len(authHeaderMappingsRaw) > 0 && authHeaderRole == "" {
 		return errors.New("if auth-header-mappings is set, auth-header-role must also be set")
+	} else if (authHeaderUser != "" || authHeaderRole != "" || len(authHeaderMappingsRaw) > 0) && !behindProxy {
+		return errors.New("if auth-header-user is set, behind-proxy must also be set")
 	} else if (authHeaderUser != "" || authHeaderRole != "" || len(authHeaderMappingsRaw) > 0) && authFile == "" && databaseURL == "" {
 		return errors.New("cannot set auth-header-user, auth-header-role, or auth-header-mappings if auth-file or database-url is not set")
 	} else if enableSignup && !enableLogin {

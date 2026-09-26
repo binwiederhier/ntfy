@@ -116,6 +116,15 @@
 # - auth-tokens is a list of access tokens that are automatically created when the server starts.
 #   Each entry is in the format "<username>:<token>[:<label>]", e.g. "phil:tk_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef:My token".
 #   Use 'ntfy token generate' to generate a new access token.
+# - auth-header-user is the name of a trusted reverse-proxy header containing the authenticated username,
+#   e.g. "X-Forwarded-User" or "Remote-User". When set, ntfy accepts proxied users without requiring a
+#   local ntfy password or token. Only use this behind a trusted reverse proxy such as OAuth2 Proxy,
+#   Authelia, or Traefik ForwardAuth.
+# - auth-header-role is the name of a trusted reverse-proxy header containing one or more roles/groups.
+#   Multiple values may be supplied either by repeating the header or by using a comma-separated list.
+# - auth-header-mappings maps reverse-proxy role/group values to ntfy roles in the format "<value>:<role>",
+#   where <role> is either "admin" or "user". If any mapped value resolves to "admin", the proxied user
+#   is treated as an ntfy admin. Unmapped values are ignored.
 # - auth-access-cache enables an in-memory snapshot of the access control table that authorizes every
 #   request without a database round-trip.
 #
@@ -133,6 +142,9 @@
 # auth-users:
 # auth-access:
 # auth-tokens:
+# auth-header-user:
+# auth-header-role:
+# auth-header-mappings:
 # auth-access-cache: false
 
 # If set, the X-Forwarded-For header (or whatever is configured in proxy-forwarded-header) is used to determine

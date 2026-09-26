@@ -436,7 +436,7 @@ func execServe(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	authAccess, err := parseAccess(authUsers, authAccessRaw)
+	authAccess, err := parseAccess(authUsers, authAccessRaw, authHeaderUser != "")
 	if err != nil {
 		return err
 	}
@@ -663,7 +663,7 @@ func parseUsers(usersRaw []string) ([]*user.User, error) {
 	return users, nil
 }
 
-func parseAccess(users []*user.User, accessRaw []string) (map[string][]*user.Grant, error) {
+func parseAccess(users []*user.User, accessRaw []string, allowUnknownUsers bool) (map[string][]*user.Grant, error) {
 	access := make(map[string][]*user.Grant)
 	for _, accessLine := range accessRaw {
 		parts := strings.Split(accessLine, ":")
@@ -678,11 +678,11 @@ func parseAccess(users []*user.User, accessRaw []string) (map[string][]*user.Gra
 			return u.Name == username
 		})
 		if username != user.Everyone {
-			if !exists {
+			if !exists && !allowUnknownUsers {
 				return nil, fmt.Errorf("invalid auth-access: %s, user %s is not provisioned", accessLine, username)
 			} else if !user.AllowedUsername(username) {
 				return nil, fmt.Errorf("invalid auth-access: %s, username %s invalid", accessLine, username)
-			} else if u.Role != user.RoleUser {
+			} else if exists && u.Role != user.RoleUser {
 				return nil, fmt.Errorf("invalid auth-access: %s, user %s is not a regular user, only regular users can have ACL entries", accessLine, username)
 			}
 		}

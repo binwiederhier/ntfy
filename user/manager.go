@@ -745,8 +745,31 @@ func (a *Manager) allowAccessTx(tx *sql.Tx, username string, topicPattern string
 	} else if !AllowedTopicPattern(topicPattern) {
 		return ErrInvalidArgument
 	}
+	if username != Everyone {
+		if err := a.ensureAccessUserTx(tx, username, provisioned); err != nil {
+			return err
+		}
+	}
 	_, err := tx.Exec(a.queries.upsertUserAccess, username, toSQLWildcard(topicPattern), permission.IsRead(), permission.IsWrite(), "", "", provisioned)
 	return err
+}
+
+func (a *Manager) ensureAccessUserTx(tx *sql.Tx, username string, provisioned bool) error {
+	u, err := a.userTx(tx, username)
+	if err == nil {
+		if u.Role != RoleUser {
+			return ErrInvalidArgument
+		}
+		if provisioned && !u.Provisioned {
+			return a.changeProvisionedTx(tx, username, true)
+		}
+		return nil
+	} else if !errors.Is(err, ErrUserNotFound) {
+		return err
+	} else if !a.config.AccessAllowUnknownUsers {
+		return ErrInvalidArgument
+	}
+	return a.addUserTx(tx, username, "", RoleUser, provisioned)
 }
 
 // ResetAccess removes an access control list entry for a specific username/topic, or (if topic is
@@ -1918,7 +1941,7 @@ func (a *Manager) maybeProvisionGrants(tx *sql.Tx) error {
 		user, exists := util.Find(a.config.Users, func(u *User) bool {
 			return u.Name == username
 		})
-		if !exists && username != Everyone {
+		if !exists && username != Everyone && !a.config.AccessAllowUnknownUsers {
 			return fmt.Errorf("user %s is not a provisioned user, refusing to add ACL entry", username)
 		} else if user != nil && user.Role == RoleAdmin {
 			return fmt.Errorf("adding access control entries is not allowed for admin roles for user %s", username)

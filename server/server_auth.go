@@ -32,30 +32,30 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*http.Request, *visitor, er
 	if s.userManager == nil {
 		return r, vip, nil
 	}
+	header, err := readAuthHeader(r)
+	if err != nil {
+		return r, vip, err
+	} else if supportedAuthHeader(header) {
+		// If we're trying to auth, check the rate limiter first
+		if !vip.AuthAllowed() {
+			return r, vip, errHTTPTooManyRequestsLimitAuthFailure // Always return visitor, even when error occurs!
+		}
+		u, err := s.authenticate(r, header)
+		if err != nil {
+			vip.AuthFailed()
+			logr(r).Err(err).Debug("Authentication failed")
+			return r, vip, errHTTPUnauthorized // Always return visitor, even when error occurs!
+		}
+		// Authentication with user was successful
+		return r, s.visitor(ip, u), nil
+	}
 	if u, ok, err := s.authenticateHeaderUser(r); err != nil {
 		logr(r).Err(err).Debug("Header-based authentication failed")
 		return r, vip, errHTTPUnauthorized
 	} else if ok {
 		return r, s.visitor(ip, u), nil
 	}
-	header, err := readAuthHeader(r)
-	if err != nil {
-		return r, vip, err
-	} else if !supportedAuthHeader(header) {
-		return r, vip, nil
-	}
-	// If we're trying to auth, check the rate limiter first
-	if !vip.AuthAllowed() {
-		return r, vip, errHTTPTooManyRequestsLimitAuthFailure // Always return visitor, even when error occurs!
-	}
-	u, err := s.authenticate(r, header)
-	if err != nil {
-		vip.AuthFailed()
-		logr(r).Err(err).Debug("Authentication failed")
-		return r, vip, errHTTPUnauthorized // Always return visitor, even when error occurs!
-	}
-	// Authentication with user was successful
-	return r, s.visitor(ip, u), nil
+	return r, vip, nil
 }
 
 // authenticate a user based on basic auth username/password (Authorization: Basic ...), or token auth (Authorization: Bearer ...).

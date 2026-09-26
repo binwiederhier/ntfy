@@ -652,9 +652,11 @@ The relevant options are:
 * `auth-header-mappings`: Optional list of role/group mappings in the format `<value>:<role>`, where `<role>` is
   `admin` or `user`
 
-When `auth-header-user` is set and the header is present, ntfy authenticates the request as that username even if no
-local ntfy user exists. Topic ACLs still use the username from the header, so you can keep managing permissions via
-`ntfy access` or `auth-access`. If `auth-header-role` is also configured, ntfy reads comma-separated role/group values
+When `auth-header-user` is set and the header is present, ntfy authenticates the request as that username without
+requiring a local ntfy password or access token. Topic ACLs still use the username from the header, so you can keep
+managing permissions via `ntfy access` or `auth-access`. If you create per-user ACLs for a proxied username, ntfy
+stores an internal placeholder auth record for that username so the ACL can be persisted, but that record is not used
+for password or token authentication. If `auth-header-role` is also configured, ntfy reads comma-separated role/group values
 from that header (or repeated header values), applies `auth-header-mappings`, and uses the mapped ntfy role for
 authorization decisions. If any mapped value resolves to `admin`, the proxied user is treated as an ntfy admin;
 otherwise the user is treated as a regular ntfy `user`.

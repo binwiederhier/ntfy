@@ -119,7 +119,8 @@
 # - auth-header-user is the name of a trusted reverse-proxy header containing the authenticated username,
 #   e.g. "X-Forwarded-User" or "Remote-User". When set, ntfy accepts proxied users without requiring a
 #   local ntfy password or token. Only use this behind a trusted reverse proxy such as OAuth2 Proxy,
-#   Authelia, or Traefik ForwardAuth.
+#   Authelia, or Traefik ForwardAuth. If you add per-user ACLs for proxied usernames, ntfy stores
+#   internal placeholder auth records so those ACLs can be persisted.
 # - auth-header-role is the name of a trusted reverse-proxy header containing one or more roles/groups.
 #   Multiple values may be supplied either by repeating the header or by using a comma-separated list.
 # - auth-header-mappings maps reverse-proxy role/group values to ntfy roles in the format "<value>:<role>",

@@ -28,6 +28,7 @@ const (
 	userIDPrefix                    = "u_"
 	userIDLength                    = 12
 	userAuthIntentionalSlowDownHash = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match DefaultUserPasswordBcryptCost
+	userAuthDisabledHash            = "!"                                                            // Intentionally invalid bcrypt hash for proxy-ACL placeholder users
 	userHardDeleteAfterDuration     = 7 * 24 * time.Hour
 	tokenPrefix                     = "tk_"
 	tokenLength                     = 32
@@ -769,7 +770,7 @@ func (a *Manager) ensureAccessUserTx(tx *sql.Tx, username string, provisioned bo
 	} else if !a.config.AccessAllowUnknownUsers {
 		return ErrInvalidArgument
 	}
-	return a.addUserTx(tx, username, "", RoleUser, provisioned)
+	return a.addUserTx(tx, username, userAuthDisabledHash, RoleUser, provisioned)
 }
 
 // ResetAccess removes an access control list entry for a specific username/topic, or (if topic is

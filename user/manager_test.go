@@ -1953,6 +1953,37 @@ func checkSchemaVersion(t *testing.T, d *db.DB) {
 	require.Nil(t, rows.Close())
 }
 
+func TestManager_AllowAccess_UnknownUser_PersistsAcrossReopen(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		conf := &Config{
+			DefaultAccess:           PermissionDenyAll,
+			BcryptCost:              bcrypt.MinCost,
+			QueueWriterInterval:     DefaultUserStatsQueueWriterInterval,
+			AccessAllowUnknownUsers: true,
+		}
+		a := newManager(conf)
+		require.Nil(t, a.AllowAccess("proxyuser", "mytopic", PermissionReadWrite))
+
+		u, err := a.User("proxyuser")
+		require.Nil(t, err)
+		require.Equal(t, RoleUser, u.Role)
+
+		authUser, err := a.Authenticate("proxyuser", "")
+		require.Nil(t, authUser)
+		require.Equal(t, ErrUnauthenticated, err)
+
+		require.Nil(t, a.Close())
+
+		reopened := newManager(conf)
+		t.Cleanup(func() { reopened.Close() })
+
+		grants, err := reopened.Grants("proxyuser")
+		require.Nil(t, err)
+		require.Equal(t, []Grant{{TopicPattern: "mytopic", Permission: PermissionReadWrite, Provisioned: false}}, grants)
+		require.Nil(t, reopened.Authorize(&User{Name: "proxyuser", Role: RoleUser}, "mytopic", PermissionRead))
+	})
+}
+
 func newTestManager(t *testing.T, newManager newManagerFunc, defaultAccess Permission) *Manager {
 	a := newManager(&Config{
 		DefaultAccess:       defaultAccess,

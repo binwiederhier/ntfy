@@ -1,0 +1,53 @@
+{
+  "name": "__CLIENT__ - Leads Meta vers ntfy",
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1, "maxErrors": 3, "autoCommit": true, "autoCommitTriggerLast": true,
+      "sequential": false, "confidential": false, "dataloss": false, "dlq": false, "freshVariables": false
+    },
+    "designer": { "orphans": [] }
+  },
+  "flow": [
+    {
+      "id": 1,
+      "module": "facebook-lead-ads:NewLeadMultiple",
+      "version": 2,
+      "parameters": { "__IMTHOOK__": "__HOOK_ID__", "v": "2", "fields": [] },
+      "mapper": {},
+      "metadata": { "designer": { "x": 0, "y": 0 } }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": { "handleErrors": true, "useNewZLibDeCompress": true },
+      "mapper": {
+        "url": "https://ntfy.sh/__TOPIC__",
+        "method": "post",
+        "headers": [
+          { "name": "Title", "value": "Nouveau lead - __CLIENT__" },
+          { "name": "Priority", "value": "__PRIORITY__" },
+          { "name": "Tags", "value": "rotating_light" },
+          { "name": "Actions", "value": "__ACTIONS__" }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "contentType": "text/plain",
+        "data": "__BODY__",
+        "parseResponse": true,
+        "timeout": 30,
+        "serializeUrl": false,
+        "shareCookies": false,
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "followAllRedirects": false,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false
+      },
+      "metadata": { "designer": { "x": 300, "y": 0 } }
+    }
+  ]
+}

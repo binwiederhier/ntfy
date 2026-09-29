@@ -135,7 +135,7 @@
     "prefs_notifications_delete_after_one_day_description": "一天后自动删除通知",
     "prefs_notifications_delete_after_one_week_description": "一周后自动删除通知",
     "prefs_notifications_delete_after_one_month_description": "一月后后自动删除通知",
-    "prefs_notifications_web_push_disabled": "已暂用",
+    "prefs_notifications_web_push_disabled": "已停用",
     "prefs_notifications_web_push_disabled_description": "当网页程序在运行时将会收到通知 (透过 WebSocket)",
     "prefs_notifications_web_push_enabled": "已为 {{server}} 启用",
     "prefs_notifications_web_push_enabled_description": "即使网页程序未有运行亦会收到通知 (via Web Push)",

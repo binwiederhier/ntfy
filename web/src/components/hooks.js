@@ -244,6 +244,55 @@ export const useWebPushTopics = () => {
 const matchMedia = window.matchMedia("(display-mode: standalone)");
 const isIOSStandalone = window.navigator.standalone === true;
 
+/**
+ * iOS may not propagate service-worker IndexedDB mutations to an already-running PWA. Poll a
+ * compact native IndexedDB snapshot while the PWA is visible and return a revision that can be
+ * used to re-run Dexie live queries when the snapshot changes.
+ */
+export const useIOSNotificationDatabaseRevision = () => {
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    if (!isIOSStandalone) {
+      return undefined;
+    }
+
+    let stopped = false;
+    let timeout;
+    let previousState;
+
+    const poll = async () => {
+      if (document.visibilityState === "visible") {
+        try {
+          const state = JSON.stringify(await subscriptionManager.notificationStateFromBackend());
+          if (stopped) {
+            return;
+          }
+          if (previousState !== undefined && state !== previousState) {
+            setRevision((current) => current + 1);
+          }
+          previousState = state;
+        } catch (e) {
+          console.error(`[useIOSNotificationDatabaseRevision] Error polling IndexedDB`, e);
+        }
+      }
+
+      if (!stopped) {
+        timeout = setTimeout(poll, 1000);
+      }
+    };
+
+    poll();
+
+    return () => {
+      stopped = true;
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  return revision;
+};
+
 /*
  * Watches the "display-mode" to detect if the app is running as a standalone app (PWA).
  */

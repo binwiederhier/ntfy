@@ -17,6 +17,7 @@ import (
 // ntfy key is defined here, following the "ntfy"+2586+letter scheme
 const (
 	SchemaLockKey = int64(0x6e7466792586a) // Schema setup serialization (transaction-scoped, see db/schema)
+	LeaderLockKey = int64(0x6e7466792586b) // Cluster singleton-job leader (session-scoped, held for process lifetime)
 )
 
 // Open opens a PostgreSQL connection pool for a primary database. It pings the database

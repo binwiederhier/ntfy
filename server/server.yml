@@ -61,6 +61,34 @@
 #
 # database-url: <connection-string>
 
+# If "cluster-listen" is set, clustering is implicitly enabled: this node registers itself in
+# the PostgreSQL node registry and fans published messages out to the other cluster nodes over
+# HTTP, so subscribers connected to any node receive messages published to any other node.
+# Requires "database-url" and "cluster-secret".
+#
+# - cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes talk to.
+#   Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners never
+#   serve the fan-out endpoint.
+# - cluster-node-id is a stable per-node identifier (e.g. the hostname); required.
+# - cluster-advertise-url is the base URL peer nodes use to reach this node's fan-out listener;
+#   it defaults to "http://<cluster-listen>". It must be set explicitly if cluster-listen binds
+#   a wildcard address (e.g. ":2587").
+# - cluster-secret authenticates node-to-node fan-out requests; it must be identical on all
+#   nodes.
+# - cluster-batch-linger is how long fan-out messages may wait to form a batch per peer node,
+#   trading up to that much cross-node delivery latency for a bounded request rate between
+#   nodes. Set to 0 to send each message immediately.
+#
+# SECURITY: The fan-out endpoint injects messages into arbitrary topics. The shared secret
+# protects it, and it is only served on the dedicated cluster listener -- but you should still
+# make sure that listener is reachable only from the private network (firewall/VPC rules).
+#
+# cluster-listen: <ip:port>
+# cluster-node-id: <hostname>
+# cluster-advertise-url: "http://<cluster-listen>"
+# cluster-secret: <secret>
+# cluster-batch-linger: 500ms
+
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.
 # Not required if "database-url" is set (messages are stored in PostgreSQL instead).

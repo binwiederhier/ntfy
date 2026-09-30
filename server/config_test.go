@@ -25,6 +25,7 @@ func TestConfig_HashExcludesSecrets(t *testing.T) {
 	conf2.UpstreamAccessToken = "tk_upstream"
 	conf2.WebPushPrivateKey = "web-push-private-key"
 	conf2.SMTPSenderPass = "hunter2"
+	conf2.ClusterSecret = "cluster-secret"
 	conf2.AuthUsers = []*user.User{{Name: "phil", Hash: "$2a$10$somebcrypthash"}}
 	conf2.AuthTokens = map[string][]*user.Token{"phil": {{Value: "tk_secrettoken"}}}
 	assert.Equal(t, conf1.Hash(), conf2.Hash())

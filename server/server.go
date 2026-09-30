@@ -32,6 +32,7 @@ import (
 	"heckel.io/ntfy/v2/action"
 	"heckel.io/ntfy/v2/attachment"
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -72,6 +73,8 @@ type Server struct {
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
+	cluster           cluster.Cluster                     // Fans messages out to peer cluster nodes (nop when not clustered)
+	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
 	closeChan         chan bool
 	mu                sync.RWMutex
 }
@@ -321,7 +324,91 @@ func New(conf *Config) (*Server, error) {
 		stripe:          stripe,
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
+	// Cross-node cluster; delivery of peer messages to local subscribers is injected
+	// as a callback, so the cluster package never depends on the server. Peers talk to each
+	// other only via the dedicated cluster listener, never via the public listeners.
+	advertiseURL := conf.ClusterAdvertiseURL
+	if advertiseURL == "" && conf.ClusterListen != "" {
+		advertiseURL = "http://" + conf.ClusterListen
+	}
+	s.cluster, err = cluster.New(&cluster.Config{
+		Enabled:         conf.ClusterListen != "", // Setting cluster-listen implicitly enables clustering
+		NodeID:          cluster.NodeID(conf.ClusterNodeID),
+		AdvertiseURL:    advertiseURL,
+		Secret:          conf.ClusterSecret,
+		BatchLinger:     conf.ClusterBatchLinger,
+		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
+	}, pool, s.deliverFromBus, s.liveTopics)
+	if err != nil {
+		return nil, err
+	}
+	// The cluster routes messages by subscription knowledge: peers learn this node's live topics
+	// via periodic state pushes (liveTopics) and immediate announcements on a topic's first
+	// subscriber (the hook below; also set in topicsFromIDs for topics created later)
+	for _, t := range s.topics {
+		t.onFirstSubscriber = s.topicAnnouncer(t.ID)
+	}
 	return s, nil
+}
+
+// clusterHandler returns the handler served on the dedicated cluster listener (cluster-listen).
+// It serves the internal peer API (owned and routed by the cluster itself, including auth) plus
+// a health endpoint; the public listeners never expose these paths, so internal traffic cannot
+// be reached from the outside even before any firewalling.
+func (s *Server) clusterHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc(apiHealthPath, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if s.cluster.Healthy() {
+			io.WriteString(w, `{"healthy":true}`+"\n")
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			io.WriteString(w, `{"healthy":false}`+"\n")
+		}
+	})
+	mux.Handle("/", s.cluster)
+	return mux
+}
+
+// liveTopics returns the topics that currently have at least one subscriber, computed fresh on
+// every call. Deliberately NOT the whole topics map: it also holds subscriber-less topics
+// rebuilt from the message cache, which would gut the routing filter's selectivity.
+func (s *Server) liveTopics() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	topics := make([]string, 0, len(s.topics))
+	for _, t := range s.topics {
+		if subscribers, _ := t.Stats(); subscribers > 0 {
+			topics = append(topics, t.ID)
+		}
+	}
+	return topics
+}
+
+// topicAnnouncer returns the first-subscriber hook for a topic: it tells peer nodes right away
+// that this node now wants messages for it (see Cluster.BroadcastState).
+func (s *Server) topicAnnouncer(id string) func() {
+	return func() {
+		s.cluster.BroadcastState(&cluster.State{AddedTopics: []string{id}})
+	}
+}
+
+// deliverFromBus delivers a message received from a peer node (via the cluster) to this
+// node's local subscribers. It is the receive-side counterpart to Cluster.ForwardMessage: local
+// delivery and all global side effects (Firebase, email, web push, upstream) already ran on the
+// origin node, so this only publishes to the local topic, and never re-relays.
+func (s *Server) deliverFromBus(m *model.Message) {
+	s.mu.RLock()
+	t, ok := s.topics[m.Topic]
+	s.mu.RUnlock()
+	if !ok {
+		metrics.ClusterMessagesWasted.Inc() // Relayed here needlessly: this node had no use for the message
+		return
+	}
+	v := s.visitor(m.Sender, nil)
+	if err := t.Publish(v, m); err != nil {
+		logvm(v, m).Err(err).Warn("Cluster: unable to deliver fan-out message to local subscribers")
+	}
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -365,6 +452,9 @@ func (s *Server) Run() error {
 	}
 	if s.config.ProfileListenHTTP != "" {
 		listenStr += fmt.Sprintf(" %s[http/profile]", s.config.ProfileListenHTTP)
+	}
+	if s.config.ClusterListen != "" {
+		listenStr += fmt.Sprintf(" %s[http/cluster]", s.config.ClusterListen)
 	}
 	log.Tag(tagStartup).Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.BuildVersion, log.CurrentLevel().String())
 	if log.IsFile() {
@@ -420,6 +510,12 @@ func (s *Server) Run() error {
 	} else if s.config.EnableMetrics {
 		s.metricsHandler = promhttp.Handler()
 	}
+	if s.config.ClusterListen != "" {
+		s.httpClusterServer = &http.Server{Addr: s.config.ClusterListen, Handler: s.clusterHandler()}
+		go func() {
+			errChan <- s.httpClusterServer.ListenAndServe()
+		}()
+	}
 	if s.config.ProfileListenHTTP != "" {
 		profileMux := http.NewServeMux()
 		profileMux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -464,6 +560,12 @@ func (s *Server) Stop() {
 	}
 	if s.attachment != nil {
 		s.attachment.Close()
+	}
+	if s.httpClusterServer != nil {
+		s.httpClusterServer.Close()
+	}
+	if s.cluster != nil {
+		s.cluster.Close()
 	}
 	s.closeDatabases()
 	if s.ban != nil {
@@ -717,10 +819,13 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	response := &apiHealthResponse{
-		Healthy: true,
+	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this
+	// node; 503 lets status-code LB checks pull it (checkers must fail open, see cluster.Cluster)
+	healthy := s.cluster.Healthy()
+	if !healthy {
+		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, response)
+	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -820,9 +925,13 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
-// dispatch delivers m to local subscribers and fires the requested side-effect targets. It is
-// the single choke point through which every published message must pass; t may be nil when
-// the topic has no local subscribers (delayed sender).
+// dispatch delivers m to local subscribers, forwards it to peer cluster nodes, and fires the
+// requested side-effect targets. It is the single choke point through which every published
+// message must pass; t may be nil when the topic has no local subscribers (delayed sender).
+//
+// The side-effect targets (Firebase, email, calls, upstream, web push) are global, not per-node:
+// they fire only here on the origin node, and never again when a peer node receives the message
+// via the cluster (see deliverFromBus).
 func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchOpts) error {
 	// Deliver to local subscribers
 	if t != nil {
@@ -835,6 +944,10 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 		} else if err := t.Publish(v, m); err != nil {
 			return err
 		}
+	}
+	// Forward to peer cluster nodes, whose subscribers do not show up in this node's topics map
+	if err := s.cluster.ForwardMessage(m); err != nil {
+		logvm(v, m).Err(err).Warn("Cluster: unable to forward message to peer nodes")
 	}
 	// Fire the requested side-effect targets
 	if s.firebaseClient != nil && opts.firebase {
@@ -1041,7 +1154,7 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 	m.Sender = v.IP()
 	m.User = v.MaybeUserID()
 	m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
-	// Publish to subscribers, Firebase (for Android clients), and web push endpoints
+	// Publish to subscribers, peer nodes, Firebase (for Android clients), and web push endpoints
 	if err := s.dispatch(v, t, m, dispatchOpts{firebase: true, webPush: true}); err != nil {
 		return err
 	}
@@ -1869,7 +1982,9 @@ func (s *Server) topicsFromIDs(v *visitor, ids ...string) ([]*topic, error) {
 			if v != nil && !v.TopicCreationAllowed() {
 				return nil, errHTTPTooManyRequestsLimitTopicCreation
 			}
-			s.topics[id] = newTopic(id)
+			t := newTopic(id)
+			t.onFirstSubscriber = s.topicAnnouncer(id)
+			s.topics[id] = t
 		}
 		topics = append(topics, s.topics[id])
 	}
@@ -1956,7 +2071,8 @@ func (s *Server) resetStats() {
 	for _, v := range s.visitors {
 		v.ResetStats()
 	}
-	if s.userManager != nil {
+	// The user database is shared; only the cluster leader resets it (always true single-node)
+	if s.userManager != nil && s.cluster.IsLeader() {
 		if err := s.userManager.ResetStats(); err != nil {
 			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
 		}
@@ -1971,7 +2087,11 @@ func (s *Server) runFirebaseKeepaliver() {
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
-			s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
+			// Leader only: every FCM keepalive wakes all subscribed phones, so a cluster must
+			// send it exactly once, not once per node (checked per tick to survive failover)
+			if s.cluster.IsLeader() {
+				s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
+			}
 		/*
 			FIXME: Disable iOS polling entirely for now due to thundering herd problem (see #677)
 			       To solve this, we'd have to shard the iOS poll topics to spread out the polling evenly.

@@ -153,14 +153,16 @@ func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
 	}
 }
 
-// CancelSubscriberUser kills the subscriber with the given user ID
+// CancelSubscriberUser kills all subscribers with the given user ID. A single user may hold
+// multiple subscriptions on a topic (e.g. several tabs/devices), so we must cancel every match:
+// this is called from the access-reset and user-delete paths, where leaving any of the user's
+// subscriptions connected would keep delivering messages the user is no longer allowed to see.
 func (t *topic) CancelSubscriberUser(userID string) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	for _, s := range t.subscribers {
 		if s.userID == userID {
 			t.cancelUserSubscriber(s)
-			return
 		}
 	}
 }

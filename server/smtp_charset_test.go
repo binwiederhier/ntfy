@@ -135,7 +135,7 @@ func TestSmtpBackend_BodyCharsetPublish(t *testing.T) {
 					conf.AttachmentCacheDir = t.TempDir()
 				}
 				publisher := newTestServer(t, conf)
-				s, conn, _, _ := newTestSMTPServer(t, publisher.ServeHTTP)
+				s, conn, _, _ := newTestSMTPServer(t, publisher.handle)
 				defer s.Close()
 				defer conn.Close()
 				require.NoError(t, conn.SetDeadline(time.Now().Add(5*time.Second)))
@@ -169,7 +169,7 @@ func TestSmtpBackend_BodyCharsetTruncate(t *testing.T) {
 				conf := newTestConfig(t, "")
 				conf.AttachmentCacheDir = ""
 				publisher := newTestServer(t, conf)
-				s, conn, smtpConf, _ := newTestSMTPServer(t, publisher.ServeHTTP)
+				s, conn, smtpConf, _ := newTestSMTPServer(t, publisher.handle)
 				defer s.Close()
 				defer conn.Close()
 				prefix := strings.Repeat("a", smtpConf.MessageSizeLimit-room)
@@ -203,7 +203,7 @@ func TestSmtpBackend_BodyCharsetReject(t *testing.T) {
 			conf := newTestConfig(t, "")
 			conf.AttachmentCacheDir = t.TempDir()
 			publisher := newTestServer(t, conf)
-			s, conn, _, _ := newTestSMTPServer(t, publisher.ServeHTTP)
+			s, conn, _, _ := newTestSMTPServer(t, publisher.handle)
 			defer s.Close()
 			defer conn.Close()
 			require.NoError(t, conn.SetDeadline(time.Now().Add(5*time.Second)))

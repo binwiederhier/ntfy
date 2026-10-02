@@ -2098,6 +2098,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Support [iOS critical alerts](publish.md#ios-critical-alerts) via the `X-Apple-(Critical|Sound|Volume)` headers: the publisher decides whether a message breaks through Focus, Do Not Disturb and the mute switch; without the header, max priority (5) messages are delivered as critical alerts ([#1235](https://github.com/binwiederhier/ntfy/issues/1235))
+### ntfy server v2.28.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

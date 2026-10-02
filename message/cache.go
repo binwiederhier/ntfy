@@ -309,7 +309,8 @@ func (c *Cache) MarkPublished(m *model.Message) error {
 	return err
 }
 
-// MessagesCount returns the total number of messages in the cache
+// MessagesCount returns the total number of messages in the cache. On Postgres, this is the
+// planner's estimate once the table has been analyzed, not an exact count.
 func (c *Cache) MessagesCount() (int, error) {
 	rows, err := c.db.ReadOnly().Query(c.queries.selectMessagesCount)
 	if err != nil {

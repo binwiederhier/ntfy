@@ -74,3 +74,28 @@ func TestPostgresStore_Migration_From14(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, dbtest.PostgresSchema(t, freshDB), dbtest.PostgresSchema(t, testDB))
 }
+
+func TestPostgresStore_MessagesCount_UsesPlannerEstimate(t *testing.T) {
+	// The manager calls MessagesCount every minute for a metric; a COUNT(*) scans the whole
+	// table on every call, so once the table has been analyzed, the planner's estimate is used
+	testDB := dbtest.CreateTestPostgres(t)
+	store, err := message.NewPostgresStore(testDB, 0, 0)
+	require.Nil(t, err)
+	for i := 0; i < 10; i++ {
+		require.Nil(t, store.AddMessage(model.NewDefaultMessage("mytopic", "some message")))
+	}
+
+	// Never analyzed: falls back to an exact count
+	count, err := store.MessagesCount()
+	require.Nil(t, err)
+	require.Equal(t, 10, count)
+
+	// Analyzed, then rows deleted: the estimate lags until the next (auto)analyze
+	_, err = testDB.Exec(`ANALYZE message`)
+	require.Nil(t, err)
+	_, err = testDB.Exec(`DELETE FROM message WHERE id IN (SELECT id FROM message LIMIT 4)`)
+	require.Nil(t, err)
+	count, err = store.MessagesCount()
+	require.Nil(t, err)
+	require.Equal(t, 10, count)
+}

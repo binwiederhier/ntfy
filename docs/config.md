@@ -16,6 +16,27 @@ You can immediately start [publishing messages](publish.md), or subscribe via th
 the server further, check out the [config options table](#config-options) or simply type `ntfy serve --help` to
 get a list of [command line options](#command-line-options).
 
+## Including configuration files
+
+Use `include` to keep local overrides in separate YAML files:
+
+```yaml
+include:
+  - server.local.yml
+  - conf/auth.yml
+```
+
+A single path (`include: server.local.yml`) is also accepted. Relative paths are
+resolved relative to the file containing the include. Included settings override
+the parent file, and later files override earlier files. List values are replaced,
+not appended. Command-line arguments and environment variables retain their
+existing precedence over file settings. Includes also work for administrative
+commands that read the server configuration.
+
+Missing files, invalid YAML, and circular includes fail configuration loading.
+Keep secrets in files readable only by the ntfy service user. This feature does
+not reload files automatically; restart the server after changing them.
+
 ## Example config
 !!! info
     Definitely check out the **[server.yml](https://github.com/binwiederhier/ntfy/blob/main/server/server.yml)** file. It contains examples and detailed descriptions of all the settings.

@@ -43,7 +43,7 @@ func TestReadMailBody_Charset(t *testing.T) {
 		{"html_base64", "text/html; charset=ISO-8859-2", "base64", base64.StdEncoding.EncodeToString([]byte("<p>" + latin2 + "</p>")), polish, ""},
 		{"unknown", "text/plain; charset=x-unknown", "8bit", "Printer ready", "", `mime: unhandled charset "x-unknown"`},
 		{"unsupported", "text/plain; charset=utf-7", "8bit", "Printer ready", "", `mime: unhandled charset "utf-7"`},
-		{"invalid_base64", "text/plain; charset=ISO-8859-2", "base64", "%%%", "", "illegal base64 data"},
+		{"invalid_base64", "text/plain; charset=ISO-8859-2", "base64", "%%%%", "", "illegal base64 data"},
 		{"truncated_base64", "text/plain; charset=ISO-8859-2", "base64", "WmE", "", "unexpected EOF"},
 	}
 	for _, tt := range tests {

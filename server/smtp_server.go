@@ -20,6 +20,8 @@ import (
 
 	"github.com/emersion/go-smtp"
 	"github.com/microcosm-cc/bluemonday"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/htmlindex"
 	"golang.org/x/text/encoding/ianaindex"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
@@ -254,6 +256,9 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 func readMailCharset(charset string, input io.Reader) (io.Reader, error) {
 	enc, err := ianaindex.MIME.Encoding(charset)
 	if err != nil || enc == nil {
+		enc, err = htmlindex.Get(charset)
+	}
+	if err != nil || enc == nil || enc == encoding.Replacement {
 		return nil, fmt.Errorf("mime: unhandled charset %q", charset)
 	}
 	return enc.NewDecoder().Reader(input), nil

@@ -148,6 +148,9 @@ func TestSmtpBackend_Plaintext_EncodedSubject(t *testing.T) {
 		{"ascii", "Printer ready", "Printer ready", false, ""},
 		{"us_ascii", "=?US-ASCII?Q?Printer_ready?=", "Printer ready", false, ""},
 		{"utf8", utf8Subject, "Three santas 🎅🎅🎅", false, ""},
+		{"utf8_alias", "=?utf8?Q?Za=C5=BC=C3=B3=C5=82=C4=87?=", "Zażółć", false, ""},
+		{"ascii_alias", "=?ascii?Q?Printer_ready?=", "Printer ready", false, ""},
+		{"cp1252_alias", "=?cp1252?Q?Price_=80?=", "Price €", false, ""},
 		{"iso8859_1", "=?ISO-8859-1?Q?Gr=FC=DFe?=", "Grüße", false, ""},
 		{"iso8859_2_q", polishQ, polishTitle, false, ""},
 		{"iso8859_2_b", polishB, polishTitle, false, ""},
@@ -157,6 +160,8 @@ func TestSmtpBackend_Plaintext_EncodedSubject(t *testing.T) {
 		{"subject_only_utf8", utf8Subject, "Three santas 🎅🎅🎅", true, ""},
 		{"unknown_charset", "=?x-unknown?Q?Printer_ready?=", "", false, `mime: unhandled charset "x-unknown"`},
 		{"unsupported_charset", "=?utf-7?Q?Printer_ready?=", "", false, `mime: unhandled charset "utf-7"`},
+		{"unknown8_charset", "=?unknown-8bit?Q?Printer_ready?=", "", false, `mime: unhandled charset "unknown-8bit"`},
+		{"replacement_charset", "=?iso-2022-kr?Q?Printer_ready?=", "", false, `mime: unhandled charset "iso-2022-kr"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

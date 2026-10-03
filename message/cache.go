@@ -56,6 +56,7 @@ type queries struct {
 type Cache struct {
 	db      *db.DB
 	queue   *util.BatchingQueue[*model.Message]
+	written chan struct{} // Closed once the batch writer has drained the queue (after queue.Close)
 	nop     bool
 	mu      *sync.Mutex // nil for PostgreSQL (concurrent writes supported), set for SQLite (single writer)
 	queries queries
@@ -69,6 +70,7 @@ func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTi
 	c := &Cache{
 		db:      db,
 		queue:   queue,
+		written: make(chan struct{}),
 		nop:     nop,
 		mu:      mu,
 		queries: queries,
@@ -458,11 +460,17 @@ func (c *Cache) Stats() (messages int64, err error) {
 }
 
 // Close closes the underlying database connection
+// Close writes the messages still waiting in the batch queue, then closes the database
 func (c *Cache) Close() error {
+	if c.queue != nil {
+		c.queue.Close()
+		<-c.written
+	}
 	return c.db.Close()
 }
 
 func (c *Cache) processMessageBatches() {
+	defer close(c.written)
 	if c.queue == nil {
 		return
 	}

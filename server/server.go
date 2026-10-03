@@ -73,6 +73,7 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
+	stopOnce          sync.Once
 	mu                sync.RWMutex
 }
 
@@ -446,8 +447,13 @@ func (s *Server) Run() error {
 	return <-errChan
 }
 
-// Stop stops HTTP (+HTTPS) server and all managers
+// Stop stops the HTTP (+HTTPS) server and all managers. It is idempotent: a signal handler and
+// the serve command both call it, and the second call waits for the first to finish.
 func (s *Server) Stop() {
+	s.stopOnce.Do(s.stop)
+}
+
+func (s *Server) stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.httpServer != nil {

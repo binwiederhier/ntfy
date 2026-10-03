@@ -5457,3 +5457,22 @@ func TestServer_BanFeed_SuccessfulRequestsNotBanned(t *testing.T) {
 	s.ban.Close() // Flush any buffered bans (there should be none) before asserting no file
 	require.NoFileExists(t, banFile)
 }
+
+func TestServer_StopFlushesBatchedMessages(t *testing.T) {
+	// Published messages that are still in the cache's write batch must be persisted when the
+	// server stops gracefully (SIGTERM on every deploy), not dropped
+	conf := newTestConfig(t, "")
+	conf.CacheBatchSize = 100
+	conf.CacheBatchTimeout = time.Hour
+	s := newTestServer(t, conf)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "batched 1", nil).Code)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "batched 2", nil).Code)
+	s.Stop()
+
+	cache, err := message.NewSQLiteStore(conf.CacheFile, "", time.Hour, 0, 0, false)
+	require.Nil(t, err)
+	defer cache.Close()
+	messages, err := cache.Messages("mytopic", model.SinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(messages))
+}

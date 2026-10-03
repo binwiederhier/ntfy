@@ -78,11 +78,11 @@ const (
 	// would fire on 2 of ~98k cached topics. See docs/subscribe/api.md#replay-limits.
 	DefaultMessagePollSizeLimit = 10 * 1024 * 1024
 
-	// messageTitleSizeLimit and messageTagsSizeLimit cap two publisher-controlled fields that
+	// DefaultMessageTitleSizeLimit and DefaultMessageTagsSizeLimit cap two publisher-controlled fields that
 	// otherwise have no limit of their own. Sized off ntfy.sh's own cache: title p999 is 212 bytes
 	// (16 of ~3M messages exceed 1 KB), tags p999 is 244 (197 exceed 512).
-	messageTitleSizeLimit = 1024
-	messageTagsSizeLimit  = 512
+	DefaultMessageTitleSizeLimit = 1024
+	DefaultMessageTagsSizeLimit  = 512
 )
 
 // Defines all per-visitor limits
@@ -183,6 +183,8 @@ type Config struct {
 	ProfileListenHTTP                    string
 	MessageDelayMin                      time.Duration
 	MessageDelayMax                      time.Duration
+	MessageTitleSizeLimit                int
+	MessageTagsSizeLimit                 int
 	MessageSizeLimit                     int
 	MessagePollSizeLimit                 int64
 	TotalTopicLimit                      int
@@ -292,6 +294,8 @@ func NewConfig() *Config {
 		TwilioVerifyBaseURL:                  "https://verify.twilio.com", // Override for tests
 		TwilioVerifyService:                  "",
 		TwilioCallFormat:                     nil,
+		MessageTitleSizeLimit:                DefaultMessageTitleSizeLimit,
+		MessageTagsSizeLimit:                 DefaultMessageTagsSizeLimit,
 		MessageSizeLimit:                     DefaultMessageSizeLimit,
 		MessagePollSizeLimit:                 DefaultMessagePollSizeLimit,
 		MessageDelayMin:                      DefaultMessageDelayMin,

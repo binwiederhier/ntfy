@@ -1147,7 +1147,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 	cache = readBoolParam(r, true, "x-cache", "cache")
 	firebase = readBoolParam(r, true, "x-firebase", "firebase")
 	m.Title = readParam(r, "x-title", "title", "t")
-	if len(m.Title) > messageTitleSizeLimit {
+	if len(m.Title) > s.config.MessageTitleSizeLimit {
 		return false, false, "", "", "", false, "", errHTTPBadRequestTitleTooLarge
 	}
 	m.Click = readParam(r, "x-click", "click")
@@ -1221,7 +1221,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 	for _, tag := range m.Tags {
 		tagsSize += len(tag)
 	}
-	if tagsSize > messageTagsSizeLimit {
+	if tagsSize > s.config.MessageTagsSizeLimit {
 		return false, false, "", "", "", false, "", errHTTPBadRequestTagsTooLarge
 	}
 	delayStr := readParam(r, "x-delay", "delay", "x-at", "at", "x-in", "in")

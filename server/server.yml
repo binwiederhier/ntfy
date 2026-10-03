@@ -327,6 +327,11 @@
 # - message-delay-limit defines the max delay of a message when using the "Delay" header.
 #
 # message-size-limit: "4k"
+#
+# Maximum title size and combined tag size in bytes (positive values only).
+# Raising these limits may exceed mobile push payload limits.
+# message-title-size-limit: "1k"
+# message-tags-size-limit: "512"
 # message-delay-limit: "3d"
 
 # Rate limiting: Total number of topics before the server rejects new topics.

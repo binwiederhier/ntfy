@@ -84,6 +84,8 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-verify-service", Aliases: []string{"twilio_verify_service"}, EnvVars: []string{"NTFY_TWILIO_VERIFY_SERVICE"}, Usage: "Twilio Verify service ID, used for phone number verification"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-call-format", Aliases: []string{"twilio_call_format"}, EnvVars: []string{"NTFY_TWILIO_CALL_FORMAT"}, Usage: "Twilio/TwiML format string for phone calls"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-size-limit", Aliases: []string{"message_size_limit"}, EnvVars: []string{"NTFY_MESSAGE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultMessageSizeLimit), Usage: "size limit for the message (see docs for limitations)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-title-size-limit", EnvVars: []string{"NTFY_MESSAGE_TITLE_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultMessageTitleSizeLimit), Usage: "size limit for the message title (see docs for limitations)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-tags-size-limit", EnvVars: []string{"NTFY_MESSAGE_TAGS_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultMessageTagsSizeLimit), Usage: "size limit for all message tags combined (see docs for limitations)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "message-delay-limit", Aliases: []string{"message_delay_limit"}, EnvVars: []string{"NTFY_MESSAGE_DELAY_LIMIT"}, Value: util.FormatDuration(server.DefaultMessageDelayMax), Usage: "max duration a message can be scheduled into the future"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "global-topic-limit", Aliases: []string{"global_topic_limit", "T"}, EnvVars: []string{"NTFY_GLOBAL_TOPIC_LIMIT"}, Value: server.DefaultTotalTopicLimit, Usage: "total number of topics allowed"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "visitor-subscription-limit", Aliases: []string{"visitor_subscription_limit"}, EnvVars: []string{"NTFY_VISITOR_SUBSCRIPTION_LIMIT"}, Value: server.DefaultVisitorSubscriptionLimit, Usage: "number of subscriptions per visitor"}),
@@ -295,6 +297,14 @@ func execServe(c *cli.Context) error {
 	messageSizeLimit, err := util.ParseSize(messageSizeLimitStr)
 	if err != nil {
 		return fmt.Errorf("invalid message size limit: %s", messageSizeLimitStr)
+	}
+	messageTitleSizeLimit, err := util.ParseSize(c.String("message-title-size-limit"))
+	if err != nil || messageTitleSizeLimit <= 0 || messageTitleSizeLimit > math.MaxInt {
+		return fmt.Errorf("invalid message title size limit: %s (must be a positive size no greater than %d)", c.String("message-title-size-limit"), math.MaxInt)
+	}
+	messageTagsSizeLimit, err := util.ParseSize(c.String("message-tags-size-limit"))
+	if err != nil || messageTagsSizeLimit <= 0 || messageTagsSizeLimit > math.MaxInt {
+		return fmt.Errorf("invalid message tags size limit: %s (must be a positive size no greater than %d)", c.String("message-tags-size-limit"), math.MaxInt)
 	}
 	attachmentTotalSizeLimit, err := util.ParseSize(attachmentTotalSizeLimitStr)
 	if err != nil {
@@ -523,6 +533,8 @@ func execServe(c *cli.Context) error {
 	conf.TwilioPhoneNumber = twilioPhoneNumber
 	conf.TwilioVerifyService = twilioVerifyService
 	conf.TwilioCallFormat = twilioCallFormatTemplate
+	conf.MessageTitleSizeLimit = int(messageTitleSizeLimit)
+	conf.MessageTagsSizeLimit = int(messageTagsSizeLimit)
 	conf.MessageSizeLimit = int(messageSizeLimit)
 	conf.MessageDelayMax = messageDelayLimit
 	conf.TotalTopicLimit = totalTopicLimit

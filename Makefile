@@ -145,6 +145,7 @@ web-build:
 	cd web \
 		&& $(NPM) run build \
 		&& mv build/index.html build/app.html \
+		&& mkdir -p ../server \
 		&& rm -rf ../server/site \
 		&& mv build ../server/site \
 		&& rm \

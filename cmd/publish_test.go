@@ -123,10 +123,10 @@ func TestCLI_Publish_Wait_PID_And_Cmd(t *testing.T) {
 
 	// Test: Failing command (exit 1)
 	app, _, stdout, _ = newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "publish", "--wait-cmd", topic, "/bin/false", "false doesn't care about its args"}))
+	require.Nil(t, app.Run([]string{"ntfy", "publish", "--wait-cmd", topic, "false", "false doesn't care about its args"}))
 	m = toMessage(t, stdout.String())
 	require.Contains(t, m.Message, `Command failed after `)
-	require.Contains(t, m.Message, `(exit code 1): /bin/false "false doesn't care about its args"`, m.Message)
+	require.Contains(t, m.Message, `(exit code 1): false "false doesn't care about its args"`, m.Message)
 
 	// Test: Non-existing command (hard fail!)
 	app, _, _, _ = newTestApp()

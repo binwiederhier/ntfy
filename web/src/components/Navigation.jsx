@@ -32,6 +32,7 @@ import MoreVert from "@mui/icons-material/MoreVert";
 import NotificationsOffOutlined from "@mui/icons-material/NotificationsOffOutlined";
 import Send from "@mui/icons-material/Send";
 import ArticleIcon from "@mui/icons-material/Article";
+import ExploreIcon from "@mui/icons-material/Explore";
 import { Trans, useTranslation } from "react-i18next";
 import CelebrationIcon from "@mui/icons-material/Celebration";
 import SubscribeDialog from "./SubscribeDialog";
@@ -175,6 +176,14 @@ const NavList = (props) => {
               <Person />
             </ListItemIcon>
             <ListItemText primary={t("nav_button_account")} />
+          </ListItemButton>
+        )}
+        {session.exists() && (
+          <ListItemButton onClick={() => navigate(routes.discover)} selected={location.pathname === routes.discover}>
+            <ListItemIcon>
+              <ExploreIcon />
+            </ListItemIcon>
+            <ListItemText primary={t("nav_button_discover")} />
           </ListItemButton>
         )}
         <ListItemButton onClick={() => navigate(routes.settings)} selected={location.pathname === routes.settings}>

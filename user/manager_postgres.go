@@ -107,9 +107,10 @@ const (
 		ORDER BY LENGTH(topic) DESC, CASE WHEN write THEN 1 ELSE 0 END DESC, CASE WHEN read THEN 1 ELSE 0 END DESC, topic
 	`
 	postgresSelectUserReservationsQuery = `
-		SELECT a_user.topic, a_user.read, a_user.write, a_everyone.read AS everyone_read, a_everyone.write AS everyone_write
+		SELECT a_user.topic, a_user.read, a_user.write, a_everyone.read AS everyone_read, a_everyone.write AS everyone_write, COALESCE(t.visibility, 'private')
 		FROM user_access a_user
 		LEFT JOIN  user_access a_everyone ON a_user.topic = a_everyone.topic AND a_everyone.user_id = (SELECT id FROM "user" WHERE user_name = $1)
+		LEFT JOIN  topics t ON t.topic = a_user.topic
 		WHERE a_user.user_id = a_user.owner_user_id
 		  AND a_user.owner_user_id = (SELECT id FROM "user" WHERE user_name = $2)
 		ORDER BY a_user.topic
@@ -139,6 +140,63 @@ const (
 		WHERE (topic = $1 OR $2 LIKE topic ESCAPE '\')
 		  AND (owner_user_id IS NULL OR owner_user_id != (SELECT id FROM "user" WHERE user_name = $3))
 	`
+	postgresSelectSharedTopicsQuery = `
+		SELECT t.topic, u.user_name
+		FROM topics t
+		JOIN "user" u ON u.id = t.owner_user_id
+		WHERE t.visibility = $1
+		ORDER BY t.topic
+	`
+	postgresSelectTopicVisibilityQuery = `
+		SELECT visibility, owner_user_id
+		FROM topics
+		WHERE topic = $1
+	`
+	postgresUpdateTopicVisibilityQuery = `
+		UPDATE topics
+		SET visibility = $1
+		WHERE topic = $2
+		  AND owner_user_id = $3
+	`
+	// Makes a shared topic actually usable: a deny-all Everyone grant means subscribers can discover
+	// and subscribe but receive nothing, so it is upgraded to read-only. Broader grants are untouched
+	// (the NOT read AND NOT write predicate matches deny-all only).
+	postgresUpgradeEveryoneToReadOnlyQuery = `
+		UPDATE user_access
+		SET read = TRUE, write = FALSE
+		WHERE user_id = (SELECT id FROM "user" WHERE user_name = $1)
+		  AND topic = $2
+		  AND owner_user_id = $3
+		  AND read = FALSE
+		  AND write = FALSE
+	`
+	postgresSelectSharedTopicsDenyAllQuery = `
+		SELECT t.topic, u.user_name, t.owner_user_id
+		FROM topics t
+		JOIN "user" u ON u.id = t.owner_user_id
+		JOIN user_access a ON a.topic = t.topic
+		  AND a.user_id = (SELECT id FROM "user" WHERE user_name = $1)
+		  AND a.owner_user_id = t.owner_user_id
+		WHERE t.visibility = $2
+		  AND a.read = FALSE
+		  AND a.write = FALSE
+		ORDER BY t.topic
+	`
+	postgresInsertTopicQuery = `
+		INSERT INTO topics (topic, owner_user_id, visibility)
+		VALUES ($1, (SELECT id FROM "user" WHERE user_name = $2), 'private')
+		ON CONFLICT (topic) DO NOTHING
+	`
+	postgresDeleteTopicQuery = `
+		DELETE FROM topics
+		WHERE topic = $1
+		  AND owner_user_id = (SELECT id FROM "user" WHERE user_name = $2)
+	`
+	postgresDeleteUserTopicsQuery = `
+		DELETE FROM topics
+		WHERE owner_user_id = (SELECT id FROM "user" WHERE user_name = $1)
+	`
+	postgresDeleteAllTopicsQuery  = `DELETE FROM topics`
 	postgresUpsertUserAccessQuery = `
 		INSERT INTO user_access (user_id, topic, read, write, owner_user_id, provisioned)
 		VALUES (
@@ -302,6 +360,15 @@ var postgresQueries = queries{
 	selectUserReservationsOwner:    postgresSelectUserReservationsOwnerQuery,
 	selectUserHasReservation:       postgresSelectUserHasReservationQuery,
 	selectOtherAccessCount:         postgresSelectOtherAccessCountQuery,
+	selectSharedTopics:             postgresSelectSharedTopicsQuery,
+	selectTopicVisibility:          postgresSelectTopicVisibilityQuery,
+	updateTopicVisibility:          postgresUpdateTopicVisibilityQuery,
+	upgradeEveryoneToReadOnly:      postgresUpgradeEveryoneToReadOnlyQuery,
+	selectSharedTopicsDenyAll:      postgresSelectSharedTopicsDenyAllQuery,
+	insertTopic:                    postgresInsertTopicQuery,
+	deleteTopic:                    postgresDeleteTopicQuery,
+	deleteUserTopics:               postgresDeleteUserTopicsQuery,
+	deleteAllTopics:                postgresDeleteAllTopicsQuery,
 	upsertUserAccess:               postgresUpsertUserAccessQuery,
 	deleteUserAccess:               postgresDeleteUserAccessQuery,
 	deleteUserAccessProvisioned:    postgresDeleteUserAccessProvisionedQuery,

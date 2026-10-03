@@ -20,6 +20,8 @@ import {
   accountUrl,
   maybeWithBearerAuth,
   tiersUrl,
+  topicVisibilityUrl,
+  topicsSharedUrl,
   withBasicAuth,
   withBearerAuth,
 } from "./utils";
@@ -246,6 +248,31 @@ class AccountApi {
         everyone,
       }),
     });
+  }
+
+  // sharedTopics returns the topics other users have marked as shared (GET /v1/topics?visibility=shared).
+  // Requires authentication; the server returns { topics: [{ topic, owner }] }.
+  async sharedTopics() {
+    const url = topicsSharedUrl(config.base_url);
+    console.log(`[AccountApi] Fetching shared topics ${url}`);
+    const response = await fetchOrThrow(url, {
+      headers: withBearerAuth({}, session.token()),
+    });
+    const json = await response.json(); // May throw SyntaxError
+    return json.topics || [];
+  }
+
+  // changeTopicVisibility toggles a topic the current user owns between private and shared
+  // (PATCH /v1/topics/<topic>). The server enforces owner/admin-only access.
+  async changeTopicVisibility(topic, visibility) {
+    const url = topicVisibilityUrl(config.base_url, topic);
+    console.log(`[AccountApi] Changing visibility of ${topic} to ${visibility}`);
+    const response = await fetchOrThrow(url, {
+      method: "PATCH",
+      headers: withBearerAuth({}, session.token()),
+      body: JSON.stringify({ visibility }),
+    });
+    return response.json(); // May throw SyntaxError
   }
 
   async deleteReservation(topic, deleteMessages) {

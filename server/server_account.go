@@ -146,8 +146,9 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 				response.Reservations = make([]*apiAccountReservation, 0)
 				for _, r := range reservations {
 					response.Reservations = append(response.Reservations, &apiAccountReservation{
-						Topic:    r.Topic,
-						Everyone: r.Everyone.String(),
+						Topic:      r.Topic,
+						Everyone:   r.Everyone.String(),
+						Visibility: string(r.Visibility),
 					})
 				}
 			}
@@ -524,6 +525,10 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return errHTTPBadRequestPermissionInvalid
 	}
+	visibility, err := user.ParseVisibility(req.Visibility)
+	if err != nil {
+		return errHTTPBadRequest
+	}
 	// Check if we are allowed to reserve this topic
 	if u.IsUser() && u.Tier == nil {
 		return errHTTPUnauthorized
@@ -547,6 +552,15 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 			return errHTTPTooManyRequestsLimitReservations
 		}
 		return err
+	}
+	// A reservation is private by default; if the request asked for shared, flip it and announce.
+	if visibility == user.VisibilityShared {
+		if err := s.userManager.SetTopicVisibility(u.ID, req.Topic, visibility); err != nil {
+			return err
+		}
+		if err := s.publishSharedTopicEvent(v, req.Topic, u.Name); err != nil {
+			logvr(v, r).Tag(tagAccount).Err(err).Warn("Failed to announce shared topic")
+		}
 	}
 	// Kill existing subscribers
 	t, err := s.topicFromID(v, req.Topic)

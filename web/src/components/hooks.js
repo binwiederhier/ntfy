@@ -2,7 +2,8 @@ import { useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import subscriptionManager from "../app/SubscriptionManager";
-import { disallowedTopic, expandSecureUrl, topicUrl } from "../app/utils";
+import { directoryTopic, disallowedTopic, expandSecureUrl, topicUrl } from "../app/utils";
+import toast from "../app/Toast";
 import routes from "./routes";
 import connectionManager from "../app/ConnectionManager";
 import poller from "../app/Poller";
@@ -36,7 +37,13 @@ export const useConnectionListeners = (account, subscriptions, users, webPushTop
   // Register listeners for incoming messages, and connection state changes
   useEffect(
     () => {
-      const handleInternalMessage = async (message) => {
+      const handleInternalMessage = async (subscription, message) => {
+        // The directory feed announces newly shared topics as plain text, not JSON sync events.
+        if (subscription.directory) {
+          console.log(`[ConnectionListener] Received directory message`, message.message);
+          toast.show(message.message);
+          return;
+        }
         console.log(`[ConnectionListener] Received message on sync topic`, message.message);
         try {
           const data = JSON.parse(message.message);
@@ -87,7 +94,7 @@ export const useConnectionListeners = (account, subscriptions, users, webPushTop
         }
 
         if (subscription.internal) {
-          await handleInternalMessage(message);
+          await handleInternalMessage(subscription, message);
         } else {
           await handleNotification(subscription, message);
         }
@@ -112,6 +119,17 @@ export const useConnectionListeners = (account, subscriptions, users, webPushTop
       return;
     }
     subscriptionManager.upsert(config.base_url, account.sync_topic, { internal: true }); // Dangle!
+  }, [account]);
+
+  // Directory listener: For logged-in accounts (sync_topic is only set for those), subscribe to the
+  // reserved ~directory feed so newly shared topics are surfaced live. The server grants read access
+  // to authenticated users only. Marked with `directory` so incoming plain-text messages are routed
+  // to a toast rather than parsed as sync JSON.
+  useEffect(() => {
+    if (!account || !account.sync_topic) {
+      return;
+    }
+    subscriptionManager.upsert(config.base_url, directoryTopic, { internal: true, directory: true }); // Dangle!
   }, [account]);
 
   // When subscriptions or users change, refresh the connections

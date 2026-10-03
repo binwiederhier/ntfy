@@ -96,6 +96,7 @@ nav:
   - "Other things":
       - "FAQs": faq.md
       - "Examples": examples.md
+      - "Topic visibility": topic-visibility.md
       - "Integrations + projects": integrations.md
       - "Release notes": releases.md
       - "Emojis 🥳 🎉": emojis.md

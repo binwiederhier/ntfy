@@ -303,8 +303,9 @@ type apiAccountStats struct {
 }
 
 type apiAccountReservation struct {
-	Topic    string `json:"topic"`
-	Everyone string `json:"everyone"`
+	Topic      string `json:"topic"`
+	Everyone   string `json:"everyone"`
+	Visibility string `json:"visibility"`
 }
 
 // apiAccountEmailInfo describes one email address on the account, as returned by GET /v1/account.
@@ -346,8 +347,29 @@ type apiAccountResponse struct {
 }
 
 type apiAccountReservationRequest struct {
-	Topic    string `json:"topic"`
-	Everyone string `json:"everyone"`
+	Topic      string `json:"topic"`
+	Everyone   string `json:"everyone"`
+	Visibility string `json:"visibility"` // Optional; "private" (default) or "shared"
+}
+
+// apiTopicEntry is one discoverable topic in the directory listing (GET /v1/topics).
+type apiTopicEntry struct {
+	Topic string `json:"topic"`
+	Owner string `json:"owner"`
+}
+
+type apiTopicsResponse struct {
+	Topics []*apiTopicEntry `json:"topics"`
+}
+
+// apiTopicVisibilityPatchRequest is the body of PATCH /v1/topics/<topic>.
+type apiTopicVisibilityPatchRequest struct {
+	Visibility string `json:"visibility"`
+}
+
+type apiTopicVisibilityResponse struct {
+	Topic      string `json:"topic"`
+	Visibility string `json:"visibility"`
 }
 
 type apiConfigResponse struct {

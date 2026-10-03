@@ -87,6 +87,7 @@ const SubscribePage = (props) => {
   const { account } = useContext(AccountContext);
   const [error, setError] = useState("");
   const [reserveTopicVisible, setReserveTopicVisible] = useState(false);
+  const [discoverable, setDiscoverable] = useState(false);
   const [anotherServerVisible, setAnotherServerVisible] = useState(false);
   const [everyone, setEveryone] = useState(Permission.DENY_ALL);
   const baseUrl = anotherServerVisible ? props.baseUrl : config.base_url;
@@ -133,6 +134,23 @@ const SubscribePage = (props) => {
         } else if (e instanceof TopicReservedError) {
           setError(t("subscribe_dialog_error_topic_already_reserved"));
           return;
+        }
+      }
+      // Access level and discoverability are independent: reserving shared is an explicit opt-in,
+      // reusing the same call as the per-topic "Share topic (discoverable)" menu item.
+      if (discoverable) {
+        console.log(`[SubscribeDialog] Marking topic ${topic} as discoverable (shared)`);
+        try {
+          await accountApi.changeTopicVisibility(topic, "shared");
+          await accountApi.sync(); // Refresh the reservation (incl. visibility) from the server
+        } catch (e) {
+          console.log(`[SubscribeDialog] Error marking topic discoverable`, e);
+          if (e instanceof UnauthorizedError) {
+            await session.resetAndRedirect(routes.login);
+          } else {
+            setError(e.message);
+            return;
+          }
         }
       }
     }
@@ -219,6 +237,24 @@ const SubscribePage = (props) => {
               }
             />
             {reserveTopicVisible && <ReserveTopicSelect value={everyone} onChange={setEveryone} />}
+            {reserveTopicVisible && (
+              <FormControlLabel
+                variant="standard"
+                sx={{ mt: 1 }}
+                control={
+                  <Switch
+                    checked={discoverable}
+                    onChange={(ev) => setDiscoverable(ev.target.checked)}
+                    slotProps={{
+                      input: {
+                        "aria-label": t("subscribe_dialog_discoverable_label"),
+                      },
+                    }}
+                  />
+                }
+                label={t("subscribe_dialog_discoverable_label")}
+              />
+            )}
           </FormGroup>
         )}
         {!reserveTopicVisible && (

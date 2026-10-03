@@ -775,6 +775,10 @@ func (a *Manager) resetAccessTx(tx *sql.Tx, username string, topicPattern string
 		return ErrInvalidArgument
 	}
 	if username == "" && topicPattern == "" {
+		// Full reset: all ACL rows go, so all reservations (and their topics rows) go too.
+		if _, err := tx.Exec(a.queries.deleteAllTopics); err != nil {
+			return err
+		}
 		_, err := tx.Exec(a.queries.deleteAllAccess)
 		return err
 	} else if topicPattern == "" {
@@ -890,10 +894,12 @@ func (a *Manager) Grants(username string) ([]Grant, error) {
 	return grants, nil
 }
 
-// AddReservation creates two access control entries for the given topic: one with full read/write
-// access for the given user, and one for Everyone with the given permission. Both entries are
-// created atomically in a single transaction. If limit is > 0, the reservation count is checked
-// inside the transaction and ErrTooManyReservations is returned if the limit would be exceeded.
+// AddReservation creates a owned topic plus two access control entries for it: one with full
+// read/write access for the given user, and one for Everyone with the given permission. The
+// topics row is the reservation entity (owner + visibility); the user_access rows stay pure ACL
+// grants. Everything is created atomically in a single transaction. If limit is > 0, the
+// reservation count is checked inside the transaction and ErrTooManyReservations is returned if
+// the limit would be exceeded.
 func (a *Manager) AddReservation(username string, topic string, everyone Permission, limit int64) error {
 	if !AllowedUsername(username) || username == Everyone || !AllowedTopic(topic) {
 		return ErrInvalidArgument
@@ -913,6 +919,10 @@ func (a *Manager) AddReservation(username string, topic string, everyone Permiss
 					return ErrTooManyReservations
 				}
 			}
+		}
+		// Idempotent: re-adding an existing reservation must not reset a shared topic to private.
+		if _, err := tx.Exec(a.queries.insertTopic, toSQLWildcard(topic), username); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(a.queries.upsertUserAccess, username, toSQLWildcard(topic), true, true, username, username, false); err != nil {
 			return err
@@ -972,21 +982,174 @@ func (a *Manager) reservationsTx(tx db.Querier, username string) ([]Reservation,
 	defer rows.Close()
 	reservations := make([]Reservation, 0)
 	for rows.Next() {
-		var topic string
+		var topic, visibility string
 		var ownerRead, ownerWrite bool
 		var everyoneRead, everyoneWrite sql.NullBool
-		if err := rows.Scan(&topic, &ownerRead, &ownerWrite, &everyoneRead, &everyoneWrite); err != nil {
+		if err := rows.Scan(&topic, &ownerRead, &ownerWrite, &everyoneRead, &everyoneWrite, &visibility); err != nil {
 			return nil, err
 		} else if err := rows.Err(); err != nil {
 			return nil, err
 		}
 		reservations = append(reservations, Reservation{
-			Topic:    fromSQLWildcard(topic),
-			Owner:    NewPermission(ownerRead, ownerWrite),
-			Everyone: NewPermission(everyoneRead.Bool, everyoneWrite.Bool),
+			Topic:      fromSQLWildcard(topic),
+			Owner:      NewPermission(ownerRead, ownerWrite),
+			Everyone:   NewPermission(everyoneRead.Bool, everyoneWrite.Bool),
+			Visibility: Visibility(visibility),
 		})
 	}
 	return reservations, nil
+}
+
+// TopicVisibility returns the visibility and owner user ID of the reservation for the given
+// topic, read from the topics table. It returns an empty owner ID if the topic is not reserved
+// by anyone.
+func (a *Manager) TopicVisibility(topic string) (Visibility, string, error) {
+	rows, err := a.db.Query(a.queries.selectTopicVisibility, escapeUnderscore(topic))
+	if err != nil {
+		return "", "", err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return "", "", nil
+	}
+	var visibility, ownerUserID string
+	if err := rows.Scan(&visibility, &ownerUserID); err != nil {
+		return "", "", err
+	}
+	return Visibility(visibility), ownerUserID, nil
+}
+
+// SetTopicVisibility changes the visibility of a topic reservation. It updates the topics row
+// for the given owner user ID; ErrUnauthorized is returned if that user does not own the topic.
+// Callers are responsible for the authorization decision (owner or admin).
+//
+// Sharing a topic whose Everyone ACL is still deny-all would otherwise be a silent no-op for
+// subscribers (they can discover and subscribe, but receive nothing), so the Everyone grant is
+// upgraded to read-only in the same transaction. Broader grants (read-only/read-write) are left
+// untouched. Setting a topic back to private deliberately does NOT revert the Everyone grant:
+// visibility and ACL are related but distinct, and reverting could surprise an owner who widened
+// access for other reasons.
+func (a *Manager) SetTopicVisibility(ownerUserID, topic string, visibility Visibility) error {
+	if ownerUserID == "" || !AllowedTopic(topic) {
+		return ErrInvalidArgument
+	}
+	if visibility != VisibilityPrivate && visibility != VisibilityShared {
+		return ErrInvalidArgument
+	}
+	upgraded := false
+	err := db.ExecTx(a.db, func(tx *sql.Tx) error {
+		res, err := tx.Exec(a.queries.updateTopicVisibility, string(visibility), escapeUnderscore(topic), ownerUserID)
+		if err != nil {
+			return err
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return err
+		} else if affected == 0 {
+			return ErrUnauthorized
+		}
+		if visibility == VisibilityShared {
+			upgraded, err = a.upgradeEveryoneToReadOnlyTx(tx, ownerUserID, topic)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if upgraded {
+		log.Tag(tag).Field("topic", topic).Field("owner_user_id", ownerUserID).
+			Info("Upgraded Everyone ACL from deny-all to read-only for shared topic %s", topic)
+		return a.maybeReloadAccessCache(Everyone)
+	}
+	return nil
+}
+
+// upgradeEveryoneToReadOnlyTx upgrades the Everyone ACL of a reserved topic from deny-all to
+// read-only, within the given transaction. It returns whether a row was changed; broader grants
+// (read-only/read-write) are left untouched because the query only matches deny-all.
+func (a *Manager) upgradeEveryoneToReadOnlyTx(tx *sql.Tx, ownerUserID, topic string) (bool, error) {
+	res, err := tx.Exec(a.queries.upgradeEveryoneToReadOnly, Everyone, escapeUnderscore(topic), ownerUserID)
+	if err != nil {
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
+}
+
+// BackfillSharedTopicReadAccess repairs pre-existing data: every shared topic whose Everyone ACL is
+// still deny-all is upgraded to read-only, matching what SetTopicVisibility now does for new shares.
+// It returns the changes it made so callers can log them (topic, owner, before/after). This is a
+// one-off data repair, not a schema migration; it is idempotent and a no-op once the data is fixed.
+func (a *Manager) BackfillSharedTopicReadAccess() ([]*SharedTopicACLChange, error) {
+	changes, err := db.QueryTx(a.db, func(tx *sql.Tx) ([]*SharedTopicACLChange, error) {
+		rows, err := tx.Query(a.queries.selectSharedTopicsDenyAll, Everyone, string(VisibilityShared))
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		changes := make([]*SharedTopicACLChange, 0)
+		for rows.Next() {
+			var topic, owner, ownerUserID string
+			if err := rows.Scan(&topic, &owner, &ownerUserID); err != nil {
+				return nil, err
+			} else if err := rows.Err(); err != nil {
+				return nil, err
+			}
+			rawTopic := fromSQLWildcard(topic)
+			upgraded, err := a.upgradeEveryoneToReadOnlyTx(tx, ownerUserID, rawTopic)
+			if err != nil {
+				return nil, err
+			}
+			if upgraded {
+				changes = append(changes, &SharedTopicACLChange{
+					Topic:  rawTopic,
+					Owner:  owner,
+					Before: PermissionDenyAll,
+					After:  PermissionRead,
+				})
+			}
+		}
+		return changes, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(changes) > 0 {
+		if err := a.maybeReloadAccessCache(Everyone); err != nil {
+			return nil, err
+		}
+	}
+	return changes, nil
+}
+
+// SharedTopics returns all reservations whose owner has marked them as shared, including the
+// owner's username. It is the discovery listing behind GET /v1/topics?visibility=shared.
+func (a *Manager) SharedTopics() ([]*SharedTopic, error) {
+	rows, err := a.db.Query(a.queries.selectSharedTopics, string(VisibilityShared))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	topics := make([]*SharedTopic, 0)
+	for rows.Next() {
+		var topic, owner string
+		if err := rows.Scan(&topic, &owner); err != nil {
+			return nil, err
+		} else if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		topics = append(topics, &SharedTopic{
+			Topic: fromSQLWildcard(topic),
+			Owner: owner,
+		})
+	}
+	return topics, nil
 }
 
 // HasReservation returns true if the given topic access is owned by the user
@@ -1104,12 +1267,20 @@ func (a *Manager) removeReservationAccessTx(tx *sql.Tx, username, topic string) 
 	if err := a.resetTopicAccessTx(tx, username, topic); err != nil {
 		return err
 	}
+	// Drop the reservation entity along with its ACL rows.
+	if _, err := tx.Exec(a.queries.deleteTopic, toSQLWildcard(topic), username); err != nil {
+		return err
+	}
 	return a.resetTopicAccessTx(tx, Everyone, topic)
 }
 
 func (a *Manager) resetUserAccessTx(tx *sql.Tx, username string) error {
 	if !AllowedUsername(username) && username != Everyone {
 		return ErrInvalidArgument
+	}
+	// All of this user's reservations lose their ACL rows below, so drop their topics rows too.
+	if _, err := tx.Exec(a.queries.deleteUserTopics, username); err != nil {
+		return err
 	}
 	_, err := tx.Exec(a.queries.deleteUserAccess, username, username)
 	return err

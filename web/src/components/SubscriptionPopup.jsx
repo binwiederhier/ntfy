@@ -29,6 +29,8 @@ import Notifications from "@mui/icons-material/Notifications";
 import NotificationsOff from "@mui/icons-material/NotificationsOff";
 import RemoveCircle from "@mui/icons-material/RemoveCircle";
 import Send from "@mui/icons-material/Send";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import subscriptionManager from "../app/SubscriptionManager";
 import DialogFooter from "./DialogFooter";
 import accountApi, { Role } from "../app/AccountApi";
@@ -52,6 +54,7 @@ export const SubscriptionPopup = (props) => {
   const [reserveEditDialogOpen, setReserveEditDialogOpen] = useState(false);
   const [reserveDeleteDialogOpen, setReserveDeleteDialogOpen] = useState(false);
   const [showPublishError, setShowPublishError] = useState(false);
+  const [showVisibilityError, setShowVisibilityError] = useState(false);
   const { subscription } = props;
   const placement = props.placement ?? "left";
   const reservations = account?.reservations || [];
@@ -64,6 +67,9 @@ export const SubscriptionPopup = (props) => {
     (config.enable_payments || account?.stats.reservations_remaining === 0);
   const showReservationEdit = config.enable_reservations && !!subscription?.reservation;
   const showReservationDelete = config.enable_reservations && !!subscription?.reservation;
+  // Only the owner of a reservation can change its visibility (the server enforces this too)
+  const showVisibilityToggle = config.enable_reservations && !!subscription?.reservation;
+  const isShared = subscription?.reservation?.visibility === "shared";
 
   const handleChangeDisplayName = async () => {
     setDisplayNameDialogOpen(true);
@@ -79,6 +85,23 @@ export const SubscriptionPopup = (props) => {
 
   const handleReserveDelete = async () => {
     setReserveDeleteDialogOpen(true);
+  };
+
+  const handleToggleVisibility = async () => {
+    const nextVisibility = isShared ? "private" : "shared";
+    console.log(`[SubscriptionPopup] Setting visibility of ${subscription.topic} to ${nextVisibility}`);
+    try {
+      await accountApi.changeTopicVisibility(subscription.topic, nextVisibility);
+      await accountApi.sync(); // Refresh the reservation (incl. visibility) from the server
+      props.onClose();
+    } catch (e) {
+      console.log(`[SubscriptionPopup] Error changing topic visibility`, e);
+      if (e instanceof UnauthorizedError) {
+        await session.resetAndRedirect(routes.login);
+      } else {
+        setShowVisibilityError(true);
+      }
+    }
   };
 
   const handleSendTestMessage = async () => {
@@ -209,6 +232,12 @@ export const SubscriptionPopup = (props) => {
             {t("action_bar_reservation_edit")}
           </MenuItem>
         )}
+        {showVisibilityToggle && (
+          <MenuItem onClick={handleToggleVisibility}>
+            <ListItemIcon>{isShared ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}</ListItemIcon>
+            {isShared ? t("action_bar_visibility_make_private") : t("action_bar_visibility_share")}
+          </MenuItem>
+        )}
         {showReservationDelete && (
           <MenuItem onClick={handleReserveDelete}>
             <ListItemIcon>
@@ -258,6 +287,12 @@ export const SubscriptionPopup = (props) => {
           autoHideDuration={3000}
           onClose={() => setShowPublishError(false)}
           message={t("message_bar_error_publishing")}
+        />
+        <Snackbar
+          open={showVisibilityError}
+          autoHideDuration={3000}
+          onClose={() => setShowVisibilityError(false)}
+          message={t("action_bar_visibility_error")}
         />
         <DisplayNameDialog open={displayNameDialogOpen} subscription={subscription} onClose={() => setDisplayNameDialogOpen(false)} />
         {showReservationAdd && (

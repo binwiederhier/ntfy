@@ -456,14 +456,16 @@ func TestManager_Reservations(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, 2, len(reservations))
 		require.Equal(t, Reservation{
-			Topic:    "readme",
-			Owner:    PermissionReadWrite,
-			Everyone: PermissionRead,
+			Topic:      "readme",
+			Owner:      PermissionReadWrite,
+			Everyone:   PermissionRead,
+			Visibility: VisibilityPrivate,
 		}, reservations[0])
 		require.Equal(t, Reservation{
-			Topic:    "ztopic_",
-			Owner:    PermissionReadWrite,
-			Everyone: PermissionDenyAll,
+			Topic:      "ztopic_",
+			Owner:      PermissionReadWrite,
+			Everyone:   PermissionDenyAll,
+			Visibility: VisibilityPrivate,
 		}, reservations[1])
 
 		b, err := a.HasReservation("ben", "readme")

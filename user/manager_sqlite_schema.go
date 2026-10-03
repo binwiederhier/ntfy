@@ -65,6 +65,12 @@ const (
 			FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
 		    FOREIGN KEY (owner_user_id) REFERENCES user (id) ON DELETE CASCADE
 		);
+		CREATE TABLE IF NOT EXISTS topics (
+			topic TEXT PRIMARY KEY,
+			owner_user_id TEXT NOT NULL,
+			visibility TEXT NOT NULL DEFAULT 'private',
+			FOREIGN KEY (owner_user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
 		CREATE TABLE IF NOT EXISTS user_token (
 			user_id TEXT NOT NULL,
 			token TEXT NOT NULL,
@@ -114,7 +120,7 @@ const (
 )
 
 const (
-	sqliteCurrentSchemaVersion = 9
+	sqliteCurrentSchemaVersion = 10
 )
 
 // Schema migrations for SQLite
@@ -366,6 +372,29 @@ const (
 		WHERE user_id IN (SELECT id FROM user); -- Drop orphaned rows that the broken foreign key failed to cascade-delete
 		DROP TABLE user_phone_old;
 	`
+
+	// 9 -> 10: Topic visibility for discovery. A reservation is a topic owned by a user; it gets
+	// its own row in `topics`, keyed independently of the ACL rows in `user_access` (which stays
+	// exactly as upstream: grants only). Existing reservations are backfilled as 'private', so
+	// no behavior changes for topics that predate this table.
+	//
+	// NOTE: this rewrites the 9 -> 10 step that briefly put `visibility` on user_access in an
+	// earlier prototype commit. That version was never deployed and never proposed upstream, so
+	// squashing it is cleaner than layering a 10 -> 11 that would only undo it. Only throwaway
+	// local test databases ever ran the old step.
+	sqliteMigrate9To10UpdateQueries = `
+		CREATE TABLE IF NOT EXISTS topics (
+			topic TEXT PRIMARY KEY,
+			owner_user_id TEXT NOT NULL,
+			visibility TEXT NOT NULL DEFAULT 'private',
+			FOREIGN KEY (owner_user_id) REFERENCES user (id) ON DELETE CASCADE
+		);
+		INSERT INTO topics (topic, owner_user_id, visibility)
+		SELECT topic, owner_user_id, 'private'
+		FROM user_access
+		WHERE user_id = owner_user_id
+		  AND owner_user_id IS NOT NULL;
+	`
 )
 
 var (
@@ -382,6 +411,7 @@ var (
 		6: schema.AsMigrateFunc(sqliteMigrate6To7UpdateQueries),
 		7: schema.AsMigrateFunc(sqliteMigrate7To8UpdateQueries),
 		8: schema.AsMigrateFunc(sqliteMigrate8To9UpdateQueries),
+		9: schema.AsMigrateFunc(sqliteMigrate9To10UpdateQueries),
 	}
 )
 

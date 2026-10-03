@@ -111,9 +111,10 @@ const (
 		ORDER BY LENGTH(topic) DESC, write DESC, read DESC, topic
 	`
 	sqliteSelectUserReservationsQuery = `
-		SELECT a_user.topic, a_user.read, a_user.write, a_everyone.read AS everyone_read, a_everyone.write AS everyone_write
+		SELECT a_user.topic, a_user.read, a_user.write, a_everyone.read AS everyone_read, a_everyone.write AS everyone_write, IFNULL(t.visibility, 'private')
 		FROM user_access a_user
 		LEFT JOIN  user_access a_everyone ON a_user.topic = a_everyone.topic AND a_everyone.user_id = (SELECT id FROM user WHERE user = ?)
+		LEFT JOIN  topics t ON t.topic = a_user.topic
 		WHERE a_user.user_id = a_user.owner_user_id
 		  AND a_user.owner_user_id = (SELECT id FROM user WHERE user = ?)
 		ORDER BY a_user.topic
@@ -143,6 +144,63 @@ const (
 		WHERE (topic = ? OR ? LIKE topic ESCAPE '\')
 		  AND (owner_user_id IS NULL OR owner_user_id != (SELECT id FROM user WHERE user = ?))
 	`
+	sqliteSelectSharedTopicsQuery = `
+		SELECT t.topic, u.user
+		FROM topics t
+		JOIN user u ON u.id = t.owner_user_id
+		WHERE t.visibility = ?
+		ORDER BY t.topic
+	`
+	sqliteSelectTopicVisibilityQuery = `
+		SELECT visibility, owner_user_id
+		FROM topics
+		WHERE topic = ?
+	`
+	sqliteUpdateTopicVisibilityQuery = `
+		UPDATE topics
+		SET visibility = ?
+		WHERE topic = ?
+		  AND owner_user_id = ?
+	`
+	// Makes a shared topic actually usable: a deny-all Everyone grant means subscribers can discover
+	// and subscribe but receive nothing, so it is upgraded to read-only. Broader grants are untouched
+	// (the read=0/write=0 predicate matches deny-all only).
+	sqliteUpgradeEveryoneToReadOnlyQuery = `
+		UPDATE user_access
+		SET read = 1, write = 0
+		WHERE user_id = (SELECT id FROM user WHERE user = ?)
+		  AND topic = ?
+		  AND owner_user_id = ?
+		  AND read = 0
+		  AND write = 0
+	`
+	sqliteSelectSharedTopicsDenyAllQuery = `
+		SELECT t.topic, u.user, t.owner_user_id
+		FROM topics t
+		JOIN user u ON u.id = t.owner_user_id
+		JOIN user_access a ON a.topic = t.topic
+		  AND a.user_id = (SELECT id FROM user WHERE user = ?)
+		  AND a.owner_user_id = t.owner_user_id
+		WHERE t.visibility = ?
+		  AND a.read = 0
+		  AND a.write = 0
+		ORDER BY t.topic
+	`
+	sqliteInsertTopicQuery = `
+		INSERT INTO topics (topic, owner_user_id, visibility)
+		VALUES (?, (SELECT id FROM user WHERE user = ?), 'private')
+		ON CONFLICT (topic) DO NOTHING
+	`
+	sqliteDeleteTopicQuery = `
+		DELETE FROM topics
+		WHERE topic = ?
+		  AND owner_user_id = (SELECT id FROM user WHERE user = ?)
+	`
+	sqliteDeleteUserTopicsQuery = `
+		DELETE FROM topics
+		WHERE owner_user_id = (SELECT id FROM user WHERE user = ?)
+	`
+	sqliteDeleteAllTopicsQuery  = `DELETE FROM topics`
 	sqliteUpsertUserAccessQuery = `
 		INSERT INTO user_access (user_id, topic, read, write, owner_user_id, provisioned)
 		VALUES ((SELECT id FROM user WHERE user = ?), ?, ?, ?, (SELECT IIF(?='',NULL,(SELECT id FROM user WHERE user=?))), ?)
@@ -298,6 +356,15 @@ var sqliteQueries = queries{
 	selectUserReservationsOwner:    sqliteSelectUserReservationsOwnerQuery,
 	selectUserHasReservation:       sqliteSelectUserHasReservationQuery,
 	selectOtherAccessCount:         sqliteSelectOtherAccessCountQuery,
+	selectSharedTopics:             sqliteSelectSharedTopicsQuery,
+	selectTopicVisibility:          sqliteSelectTopicVisibilityQuery,
+	updateTopicVisibility:          sqliteUpdateTopicVisibilityQuery,
+	upgradeEveryoneToReadOnly:      sqliteUpgradeEveryoneToReadOnlyQuery,
+	selectSharedTopicsDenyAll:      sqliteSelectSharedTopicsDenyAllQuery,
+	insertTopic:                    sqliteInsertTopicQuery,
+	deleteTopic:                    sqliteDeleteTopicQuery,
+	deleteUserTopics:               sqliteDeleteUserTopicsQuery,
+	deleteAllTopics:                sqliteDeleteAllTopicsQuery,
 	upsertUserAccess:               sqliteUpsertUserAccessQuery,
 	deleteUserAccess:               sqliteDeleteUserAccessQuery,
 	deleteUserAccessProvisioned:    sqliteDeleteUserAccessProvisionedQuery,

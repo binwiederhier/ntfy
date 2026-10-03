@@ -12,6 +12,7 @@ import {
   validUrl,
   validTopic,
   disallowedTopic,
+  unsubscribedSharedTopics,
   encodeBase64,
   encodeBase64Url,
   bearerAuth,
@@ -79,6 +80,37 @@ describe("topic validation", () => {
     expect(validTopic("bad/slash")).toBeFalsy();
     expect(validTopic("with space")).toBeFalsy();
     expect(validTopic("")).toBeFalsy();
+  });
+});
+
+describe("discover filtering", () => {
+  const baseUrl = "https://ntfy.sh";
+  const shared = [
+    { topic: "announcements", owner: "phil" },
+    { topic: "home-automation", owner: "ben" },
+  ];
+
+  it("keeps only topics the user is not subscribed to", () => {
+    const subscriptions = [{ baseUrl, topic: "announcements" }];
+    expect(unsubscribedSharedTopics(shared, subscriptions, baseUrl)).toEqual([{ topic: "home-automation", owner: "ben" }]);
+  });
+
+  it("ignores subscriptions on other servers", () => {
+    const subscriptions = [{ baseUrl: "https://other.example", topic: "announcements" }];
+    expect(unsubscribedSharedTopics(shared, subscriptions, baseUrl)).toEqual(shared);
+  });
+
+  it("returns an empty list when everything is subscribed (empty-state case)", () => {
+    const subscriptions = [
+      { baseUrl, topic: "announcements" },
+      { baseUrl, topic: "home-automation" },
+    ];
+    expect(unsubscribedSharedTopics(shared, subscriptions, baseUrl)).toEqual([]);
+  });
+
+  it("handles missing topics/subscriptions gracefully", () => {
+    expect(unsubscribedSharedTopics(undefined, undefined, baseUrl)).toEqual([]);
+    expect(unsubscribedSharedTopics(shared, undefined, baseUrl)).toEqual(shared);
   });
 });
 

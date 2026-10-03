@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -161,6 +162,16 @@ func (s *Server) authorizeTopic(next handleFunc, perm user.Permission) handleFun
 		}
 		u := v.User()
 		for _, t := range topics {
+			// Reserved system topics (e.g. ~control, ~poll, ~directory) are never user topics.
+			// Only the directory feed is exposed over HTTP, readable by authenticated users;
+			// everything else under the reserved prefix stays internal.
+			if strings.HasPrefix(t.ID, reservedTopicPrefix) {
+				if u != nil && t.ID == directoryTopicID && perm == user.PermissionRead {
+					continue
+				}
+				logvr(v, r).With(t).Debug("Access to system topic %s not authorized", t.ID)
+				return errHTTPForbidden.With(t)
+			}
 			if err := s.userManager.Authorize(u, t.ID, perm); err != nil {
 				logvr(v, r).With(t).Err(err).Debug("Access to topic %s not authorized", t.ID)
 				return errHTTPForbidden.With(t)

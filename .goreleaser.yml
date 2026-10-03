@@ -156,6 +156,7 @@ dockers:
     goarch: amd64
     build_flag_templates:
       - "--platform=linux/amd64"
+      - "--build-arg=VERSION={{ .Version }}"
   - image_templates:
       - &arm64v8_image "binwiederhier/ntfy:{{ .Tag }}-arm64v8"
     use: buildx
@@ -163,6 +164,7 @@ dockers:
     goarch: arm64
     build_flag_templates:
       - "--platform=linux/arm64/v8"
+      - "--build-arg=VERSION={{ .Version }}"
   - image_templates:
       - &armv7_image "binwiederhier/ntfy:{{ .Tag }}-armv7"
     use: buildx
@@ -171,6 +173,7 @@ dockers:
     goarm: 7
     build_flag_templates:
       - "--platform=linux/arm/v7"
+      - "--build-arg=VERSION={{ .Version }}"
   - image_templates:
       - &armv6_image "binwiederhier/ntfy:{{ .Tag }}-armv6"
     use: buildx
@@ -179,6 +182,7 @@ dockers:
     goarm: 6
     build_flag_templates:
       - "--platform=linux/arm/v6"
+      - "--build-arg=VERSION={{ .Version }}"
 docker_manifests:
   - name_template: "binwiederhier/ntfy:latest"
     image_templates:

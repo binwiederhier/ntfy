@@ -1855,6 +1855,11 @@ Here's an example:
 ## Message limits
 There are a few message limits that you can configure:
 
+* `message-title-size-limit` limits the title to 1K by default.
+* `message-tags-size-limit` limits all tags combined to 512 bytes by default (excluding separators).
+  Both settings accept positive sizes such as `2K`. Increasing these limits can exceed FCM/APNS
+  payload limits, so large notifications may not be delivered to mobile clients.
+  HTTP header limits and the JSON publish request limit (twice `message-size-limit`) still apply.
 * `message-size-limit` defines the max size of a message body. Please note message sizes >4K are **not recommended,
    and largely untested**. The Android/iOS and other clients may not work, or work properly. If FCM and/or APNS is used,
    the limit should stay 4K, because their limits are around that size. If you increase this size limit regardless, 
@@ -2379,6 +2384,8 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `keepalive-interval`                       | `NTFY_KEEPALIVE_INTERVAL`                       | *duration*                                          | 45s               | Interval in which keepalive messages are sent to the client. This is to prevent intermediaries closing the connection for inactivity. Note that the Android app has a hardcoded timeout at 77s, so it should be less than that.         |
 | `manager-interval`                         | `NTFY_MANAGER_INTERVAL`                         | *duration*                                          | 1m                | Interval in which the manager prunes old messages, deletes topics and prints the stats.                                                                                                                                                 |
 | `message-size-limit`                       | `NTFY_MESSAGE_SIZE_LIMIT`                       | *size*                                              | 4K                | The size limit for the message body. Please note that this is largely untested, and that FCM/APNS have limits around 4KB. If you increase this size limit, FCM and APNS will NOT work for large messages.                               |
+| `message-title-size-limit` | `NTFY_MESSAGE_TITLE_SIZE_LIMIT` | *size* | 1K | Maximum title size in bytes. Must be positive. |
+| `message-tags-size-limit` | `NTFY_MESSAGE_TAGS_SIZE_LIMIT` | *size* | 512 | Maximum combined tag size in bytes, excluding separators. Must be positive. |
 | `message-delay-limit`                      | `NTFY_MESSAGE_DELAY_LIMIT`                      | *duration*                                          | 3d                | Amount of time a message can be [scheduled](publish.md#scheduled-delivery) into the future when using the `Delay` header                                                                                                                |
 | `global-topic-limit`                       | `NTFY_GLOBAL_TOPIC_LIMIT`                       | *number*                                            | 15,000            | Rate limiting: Total number of topics before the server rejects new topics.                                                                                                                                                             |
 | `upstream-base-url`                        | `NTFY_UPSTREAM_BASE_URL`                        | *URL*                                               | `https://ntfy.sh` | Forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers                                                                                                                           |

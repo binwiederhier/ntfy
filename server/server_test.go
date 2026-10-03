@@ -2859,11 +2859,11 @@ func TestServer_PublishTitleTooLarge(t *testing.T) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))
 
 		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "x", map[string]string{
-			"Title": strings.Repeat("t", messageTitleSizeLimit),
+			"Title": strings.Repeat("t", DefaultMessageTitleSizeLimit),
 		}).Code)
 
 		response := request(t, s, "PUT", "/mytopic", "x", map[string]string{
-			"Title": strings.Repeat("t", messageTitleSizeLimit+1),
+			"Title": strings.Repeat("t", DefaultMessageTitleSizeLimit+1),
 		})
 		require.Equal(t, 400, response.Code)
 		require.Equal(t, 40057, toHTTPError(t, response.Body.String()).Code)
@@ -2877,11 +2877,11 @@ func TestServer_PublishTagsTooLarge(t *testing.T) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))
 
 		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "x", map[string]string{
-			"Tags": strings.Repeat("g", messageTagsSizeLimit),
+			"Tags": strings.Repeat("g", DefaultMessageTagsSizeLimit),
 		}).Code)
 
 		response := request(t, s, "PUT", "/mytopic", "x", map[string]string{
-			"Tags": strings.Repeat("g", messageTagsSizeLimit+1),
+			"Tags": strings.Repeat("g", DefaultMessageTagsSizeLimit+1),
 		})
 		require.Equal(t, 400, response.Code)
 		require.Equal(t, 40058, toHTTPError(t, response.Body.String()).Code)

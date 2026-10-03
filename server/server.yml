@@ -212,11 +212,17 @@
 # - smtp-server-domain is the e-mail domain, e.g. ntfy.sh
 # - smtp-server-addr-prefix is an optional prefix for the e-mail addresses to prevent spam. If set to "ntfy-",
 #   for instance, only e-mails to ntfy-$topic@ntfy.sh will be accepted. If this is not set, all emails to
-#   $topic@ntfy.sh will be accepted (which may be a spam problem).
+#   $topic@ntfy.sh will be accepted (which may be a spam problem)
+# - smtp-server-cert-file is the path of the public key to be used for TLS encryption
+# - smtp-server-key-file is the path of the private key to be used for TLS encryption
+# - smtp-server-implicit-tls specifies if TLS should be enforced by the server (if false, STARTTLS will be used instead).
 #
 # smtp-server-listen:
 # smtp-server-domain:
 # smtp-server-addr-prefix:
+# smtp-server-cert-file:
+# smtp-server-key-file:
+# smtp-server-implicit-tls: false
 
 # Web Push support (background notifications for browsers)
 #

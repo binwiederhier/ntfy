@@ -47,11 +47,27 @@ func ParseFutureTime(s string, now time.Time) (time.Time, error) {
 	if err == nil {
 		return t, nil
 	}
+	t, err = parseRFC3339Time(s, now)
+	if err == nil {
+		return t, nil
+	}
 	t, err = parseNaturalTime(s, now)
 	if err == nil {
 		return t, nil
 	}
 	return time.Time{}, errInvalidDuration
+}
+
+// parseRFC3339Time is a parser for time formated following RFC 3339
+func parseRFC3339Time(s string, now time.Time) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, errInvalidDuration
+	}
+	if !t.After(now) {
+		return time.Time{}, errInvalidDuration
+	}
+	return t, nil
 }
 
 // ParseDuration is like time.ParseDuration, except that it also understands days (d), which

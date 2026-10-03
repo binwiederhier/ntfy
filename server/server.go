@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -74,6 +75,7 @@ type Server struct {
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
 	stopOnce          sync.Once
+	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex
 }
 
@@ -164,6 +166,11 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+
+	// stopTimeout bounds the entire shutdown. The stores wait for their own background work
+	// (the attachment sync loop queries the database), and none of those waits has a deadline,
+	// so this is the backstop that keeps a wedged database from stalling us until SIGKILL.
+	stopTimeout = 10 * time.Second
 )
 
 // WebSocket constants
@@ -375,7 +382,14 @@ func (s *Server) Run() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)
 	errChan := make(chan error)
+	if s.stopped.Load() {
+		return nil // Stopped before we got here; a stuck shutdown must not block us on the lock
+	}
 	s.mu.Lock()
+	if s.stopped.Load() {
+		s.mu.Unlock()
+		return nil // Stopped while we waited for the lock, i.e. the stores are closed by now
+	}
 	s.closeChan = make(chan bool)
 	if s.config.ListenHTTP != "" {
 		s.httpServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
@@ -393,6 +407,10 @@ func (s *Server) Run() error {
 		go func() {
 			var err error
 			s.mu.Lock()
+			if s.stopped.Load() {
+				s.mu.Unlock()
+				return // Nobody would close this listener anymore
+			}
 			os.Remove(s.config.ListenUnix)
 			s.unixListener, err = net.Listen("unix", s.config.ListenUnix)
 			if err != nil {
@@ -450,7 +468,23 @@ func (s *Server) Run() error {
 // Stop stops the HTTP (+HTTPS) server and all managers. It is idempotent: a signal handler and
 // the serve command both call it, and the second call waits for the first to finish.
 func (s *Server) Stop() {
-	s.stopOnce.Do(s.stop)
+	s.stopped.Store(true) // Before the lock: Run must see this even if stop() is stuck
+	s.stopOnce.Do(s.stopBounded)
+}
+
+// stopBounded runs the shutdown and gives up on it after stopTimeout, so that a store which
+// never finishes closing cannot keep the process alive
+func (s *Server) stopBounded() {
+	done := make(chan struct{})
+	go func() {
+		s.stop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(stopTimeout):
+		log.Tag(tagStartup).Warn("Shutdown did not finish within %v, exiting anyway", stopTimeout)
+	}
 }
 
 func (s *Server) stop() {

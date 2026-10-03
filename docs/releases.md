@@ -2102,7 +2102,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Fix a recurring panic in the account token-update endpoint when a concurrent anonymous request from the same IP raced the authenticated request on the shared visitor (nil-user dereference); the request now fails with HTTP 401
-* Fix `since=<id>` replays resolving the message ID with an unscoped subquery: an ID that resolved to a message in another topic could silently skip messages, two messages sharing an ID made the lookup fail, and (with read replicas) an ID the replica had not seen yet replayed the topic's entire retained history
+* Fix accepted messages being dropped from the cache on shutdown: the batched-write queue is now flushed, and `ntfy serve` shuts down gracefully on `SIGTERM`/`SIGINT` instead of dying mid-batch
+* Keep PostgreSQL pool connections idle instead of re-opening them: `pool_max_idle_conns` now defaults to `pool_max_conns`, so bursts no longer pay a DNS lookup, TCP/TLS handshake and authentication per query
+* Fix `since=<message-id>` replays flooding a client with a topic's entire retained history when the ID was not on the read replica yet (a client reconnecting right after receiving a message); the ID is now resolved on the primary in that case
 * Fix the global message counter and per-user stats being overwritten by concurrent writers; both are now written as increments
 * Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
 

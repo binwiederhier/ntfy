@@ -1010,23 +1010,6 @@ func TestStore_AddStats_SumsAcrossNodes(t *testing.T) {
 	require.Equal(t, int64(10), messages)
 }
 
-func TestStore_MessagesSinceID_MidCollisionPrefersOwnTopic(t *testing.T) {
-	// If the same mid exists in several topics (or is deliberately crafted), the requested
-	// topic's own row must win as the cut-off. The old un-scoped subquery was non-deterministic
-	// here (and errored on Postgres with "more than one row returned by a subquery").
-	s := newTestPostgresStore(t)
-	marker := model.NewDefaultMessage("topicb", "marker b")
-	require.Nil(t, s.AddMessage(marker))
-	require.Nil(t, s.AddMessage(model.NewDefaultMessage("topicb", "after marker")))
-	collider := model.NewDefaultMessage("topica", "collider")
-	collider.ID = marker.ID // Same mid, different topic, higher row id
-	require.Nil(t, s.AddMessage(collider))
-	messages, err := s.Messages("topicb", model.NewSinceID(marker.ID), false)
-	require.Nil(t, err)
-	require.Len(t, messages, 1) // Cut at topicb's own marker row, not at the collider
-	require.Equal(t, "after marker", messages[0].Message)
-}
-
 func TestStore_MessagesSinceID_ForeignMidActsAsPositionalMarker(t *testing.T) {
 	// Multi-topic subscriptions apply ONE since=<mid> marker to every subscribed topic, so for
 	// all but the marker's own topic the mid is foreign; it must act as a positional cut-off

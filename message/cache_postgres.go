@@ -33,9 +33,8 @@ const (
 		WHERE topic = $1 AND time >= $2
 		ORDER BY time DESC, id DESC
 	`
-	postgresSelectMessageRowIDQuery         = `SELECT id FROM message WHERE topic = $1 AND mid = $2 LIMIT 1`
-	postgresSelectMessageRowIDAnyTopicQuery = `SELECT id FROM message WHERE mid = $1 LIMIT 1`
-	postgresSelectMessagesSinceIDQuery      = `
+	postgresSelectMessageRowIDQuery    = `SELECT id FROM message WHERE mid = $1 LIMIT 1`
+	postgresSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE topic = $1
@@ -99,7 +98,6 @@ var postgresQueries = queries{
 	selectMessagesSinceTime:          postgresSelectMessagesSinceTimeQuery,
 	selectMessagesSinceTimeScheduled: postgresSelectMessagesSinceTimeIncludeScheduledQuery,
 	selectMessageRowID:               postgresSelectMessageRowIDQuery,
-	selectMessageRowIDAnyTopic:       postgresSelectMessageRowIDAnyTopicQuery,
 	selectMessagesSinceID:            postgresSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,

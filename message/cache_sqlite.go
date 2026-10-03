@@ -39,9 +39,8 @@ const (
 		WHERE topic = ? AND time >= ?
 		ORDER BY time DESC, id DESC
 	`
-	sqliteSelectMessageRowIDQuery         = `SELECT id FROM messages WHERE topic = ? AND mid = ? LIMIT 1`
-	sqliteSelectMessageRowIDAnyTopicQuery = `SELECT id FROM messages WHERE mid = ? LIMIT 1`
-	sqliteSelectMessagesSinceIDQuery      = `
+	sqliteSelectMessageRowIDQuery    = `SELECT id FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
 		WHERE topic = ? AND id > ? AND published = 1
@@ -90,7 +89,6 @@ var sqliteQueries = queries{
 	selectMessagesSinceTime:          sqliteSelectMessagesSinceTimeQuery,
 	selectMessagesSinceTimeScheduled: sqliteSelectMessagesSinceTimeIncludeScheduledQuery,
 	selectMessageRowID:               sqliteSelectMessageRowIDQuery,
-	selectMessageRowIDAnyTopic:       sqliteSelectMessageRowIDAnyTopicQuery,
 	selectMessagesSinceID:            sqliteSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   sqliteSelectMessagesSinceIDIncludeScheduledQuery,
 	selectMessagesLatest:             sqliteSelectMessagesLatestQuery,

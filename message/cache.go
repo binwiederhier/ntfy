@@ -40,6 +40,7 @@ type queries struct {
 	selectMessagesByID               string
 	selectMessagesSinceTime          string
 	selectMessagesSinceTimeScheduled string
+	selectMessageRowID               string
 	selectMessagesSinceID            string
 	selectMessagesSinceIDScheduled   string
 	selectMessagesLatest             string
@@ -235,18 +236,50 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 }
 
 func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
+	rowID, err := c.resolveMessageRowID(since.ID())
+	if err != nil {
+		return nil, false, err
+	}
 	var rows *sql.Rows
-	var err error
 	rdb := c.db.ReadOnly()
 	if scheduled {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, since.ID())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, rowID)
 	} else {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, since.ID())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, rowID)
 	}
 	if err != nil {
 		return nil, false, err
 	}
 	return readMessagesCapped(rows, maxBytes)
+}
+
+// resolveMessageRowID resolves a since=<mid> marker to the row id used as the replay cut-off.
+// It asks the replica first and, only if the mid is unknown there, the primary: a client that
+// reconnects right after receiving a message can be ahead of replication, and without the retry
+// its unknown mid resolved to 0 and replayed the topic's entire retained history. A mid unknown
+// to the primary as well (e.g. expired) returns 0, which deliberately keeps that full replay.
+func (c *Cache) resolveMessageRowID(mid string) (int64, error) {
+	rdb := c.db.ReadOnly()
+	rowID, err := c.resolveMessageRowIDOn(rdb, mid)
+	if err != nil {
+		return 0, err
+	}
+	if rowID == 0 && rdb != c.db.Primary() {
+		return c.resolveMessageRowIDOn(c.db.Primary(), mid)
+	}
+	return rowID, nil
+}
+
+// resolveMessageRowIDOn looks the mid up on one database handle; 0 means unknown
+func (c *Cache) resolveMessageRowIDOn(h *sql.DB, mid string) (int64, error) {
+	var rowID int64
+	err := h.QueryRow(c.queries.selectMessageRowID, mid).Scan(&rowID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	return rowID, nil
 }
 
 func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {

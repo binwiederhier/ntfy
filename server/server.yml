@@ -213,10 +213,14 @@
 # - smtp-server-addr-prefix is an optional prefix for the e-mail addresses to prevent spam. If set to "ntfy-",
 #   for instance, only e-mails to ntfy-$topic@ntfy.sh will be accepted. If this is not set, all emails to
 #   $topic@ntfy.sh will be accepted (which may be a spam problem).
+# - smtp-server-max-multipart-depth is how deeply nested a multipart MIME message may be before it is
+#   rejected as "nested too deep". The default of 2 covers ordinary mail; senders that bury the text
+#   part deeper (Opsgenie, for instance) need a higher value.
 #
 # smtp-server-listen:
 # smtp-server-domain:
 # smtp-server-addr-prefix:
+# smtp-server-max-multipart-depth: 2
 
 # Web Push support (background notifications for browsers)
 #

@@ -78,6 +78,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-listen", Aliases: []string{"smtp_server_listen"}, EnvVars: []string{"NTFY_SMTP_SERVER_LISTEN"}, Usage: "SMTP server address (ip:port) for incoming emails, e.g. :25"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-domain", Aliases: []string{"smtp_server_domain"}, EnvVars: []string{"NTFY_SMTP_SERVER_DOMAIN"}, Usage: "SMTP domain for incoming e-mail, e.g. ntfy.sh"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-server-addr-prefix", Aliases: []string{"smtp_server_addr_prefix"}, EnvVars: []string{"NTFY_SMTP_SERVER_ADDR_PREFIX"}, Usage: "SMTP email address prefix for topics to prevent spam (e.g. 'ntfy-')"}),
+	altsrc.NewIntFlag(&cli.IntFlag{Name: "smtp-server-max-multipart-depth", Aliases: []string{"smtp_server_max_multipart_depth"}, EnvVars: []string{"NTFY_SMTP_SERVER_MAX_MULTIPART_DEPTH"}, Value: server.DefaultSMTPServerMaxMultipartDepth, Usage: "maximum nesting depth of multipart MIME parts in incoming e-mail"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-account", Aliases: []string{"twilio_account"}, EnvVars: []string{"NTFY_TWILIO_ACCOUNT"}, Usage: "Twilio account SID, used for phone calls, e.g. AC123..."}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-auth-token", Aliases: []string{"twilio_auth_token"}, EnvVars: []string{"NTFY_TWILIO_AUTH_TOKEN"}, Usage: "Twilio auth token"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "twilio-phone-number", Aliases: []string{"twilio_phone_number"}, EnvVars: []string{"NTFY_TWILIO_PHONE_NUMBER"}, Usage: "Twilio number to use for outgoing calls"}),
@@ -199,6 +200,7 @@ func execServe(c *cli.Context) error {
 	smtpServerListen := c.String("smtp-server-listen")
 	smtpServerDomain := c.String("smtp-server-domain")
 	smtpServerAddrPrefix := c.String("smtp-server-addr-prefix")
+	smtpServerMaxMultipartDepth := c.Int("smtp-server-max-multipart-depth")
 	twilioAccount := c.String("twilio-account")
 	twilioAuthToken := c.String("twilio-auth-token")
 	twilioPhoneNumber := c.String("twilio-phone-number")
@@ -518,6 +520,7 @@ func execServe(c *cli.Context) error {
 	conf.SMTPServerListen = smtpServerListen
 	conf.SMTPServerDomain = smtpServerDomain
 	conf.SMTPServerAddrPrefix = smtpServerAddrPrefix
+	conf.SMTPServerMaxMultipartDepth = smtpServerMaxMultipartDepth
 	conf.TwilioAccount = twilioAccount
 	conf.TwilioAuthToken = twilioAuthToken
 	conf.TwilioPhoneNumber = twilioPhoneNumber

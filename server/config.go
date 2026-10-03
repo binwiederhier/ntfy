@@ -83,6 +83,11 @@ const (
 	// (16 of ~3M messages exceed 1 KB), tags p999 is 244 (197 exceed 512).
 	messageTitleSizeLimit = 1024
 	messageTagsSizeLimit  = 512
+
+	// DefaultSMTPServerMaxMultipartDepth caps how deeply nested a multipart/* tree may be when
+	// parsing incoming mail before being rejected some senders nest the text part deeper than
+	// others and may need the configurable value to be raised.  This is only the default.
+	DefaultSMTPServerMaxMultipartDepth = 2
 )
 
 // Defines all per-visitor limits
@@ -172,6 +177,7 @@ type Config struct {
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
+	SMTPServerMaxMultipartDepth          int
 	TwilioAccount                        string
 	TwilioAuthToken                      string `hash:"-"`
 	TwilioPhoneNumber                    string
@@ -285,6 +291,7 @@ func NewConfig() *Config {
 		SMTPServerListen:                     "",
 		SMTPServerDomain:                     "",
 		SMTPServerAddrPrefix:                 "",
+		SMTPServerMaxMultipartDepth:          DefaultSMTPServerMaxMultipartDepth,
 		TwilioCallsBaseURL:                   "https://api.twilio.com", // Override for tests
 		TwilioAccount:                        "",
 		TwilioAuthToken:                      "",

@@ -35,6 +35,8 @@ type queries struct {
 	selectMessagesByID               string
 	selectMessagesSinceTime          string
 	selectMessagesSinceTimeScheduled string
+	selectMessageRowID               string
+	selectMessageRowIDAnyTopic       string
 	selectMessagesSinceID            string
 	selectMessagesSinceIDScheduled   string
 	selectMessagesLatest             string
@@ -228,18 +230,62 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 }
 
 func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
+	rowID, err := c.resolveMessageRowID(topic, since.ID())
+	if err != nil {
+		return nil, false, err
+	}
 	var rows *sql.Rows
-	var err error
 	rdb := c.db.ReadOnly()
 	if scheduled {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, since.ID())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, rowID)
 	} else {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, since.ID())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, rowID)
 	}
 	if err != nil {
 		return nil, false, err
 	}
 	return readMessagesCapped(rows, maxBytes)
+}
+
+// resolveMessageRowID resolves a since=<mid> marker to the numeric row id used as the replay
+// cut-off. Resolution order, on the replica first and then (if unknown there) on the primary:
+//
+//  1. The mid within the requested topic. Preferring the topic's own row defends against mid
+//     collisions across topics (which previously made the subquery non-deterministic).
+//  2. The mid in any topic. This keeps multi-topic subscriptions working: one marker is applied
+//     to every subscribed topic, so for all but the marker's own topic the mid is foreign and
+//     acts as a positional cut-off.
+//
+// The primary retry matters in a cluster: publish on node A, reconnect to node B before
+// replication catches up -- without it, the unknown mid would replay the topic's entire
+// retained history on every such reconnect. A mid unknown even to the primary (e.g. expired)
+// returns 0, which deliberately keeps that full-replay fallback.
+func (c *Cache) resolveMessageRowID(topic, mid string) (int64, error) {
+	rdb := c.db.ReadOnly()
+	rowID, err := c.resolveMessageRowIDOn(rdb, topic, mid)
+	if err != nil {
+		return 0, err
+	}
+	if rowID == 0 && rdb != c.db.Primary() {
+		return c.resolveMessageRowIDOn(c.db.Primary(), topic, mid)
+	}
+	return rowID, nil
+}
+
+// resolveMessageRowIDOn resolves the mid on one database handle: topic-scoped first, any-topic
+// second (see resolveMessageRowID); 0 means unknown
+func (c *Cache) resolveMessageRowIDOn(h *sql.DB, topic, mid string) (int64, error) {
+	var rowID int64
+	err := h.QueryRow(c.queries.selectMessageRowID, topic, mid).Scan(&rowID)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = h.QueryRow(c.queries.selectMessageRowIDAnyTopic, mid).Scan(&rowID)
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	return rowID, nil
 }
 
 func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {

@@ -28,7 +28,7 @@
     "react-i18next": "^11.16.2",
     "react-infinite-scroll-component": "^7.2.1",
     "react-remark": "^2.1.0",
-    "react-router-dom": "^6.30.4",
+    "react-router-dom": "^7.18.2",
     "stylis": "^4.3.0",
     "stylis-plugin-rtl": "^2.1.1"
   },

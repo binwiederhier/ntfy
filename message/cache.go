@@ -22,6 +22,11 @@ const (
 
 	// NoLimit reads a topic's cached messages without a size budget.
 	NoLimit = 0
+
+	// closeFlushTimeout bounds how long Close waits for the last batch to be written. A batch
+	// write takes milliseconds, so this only ever trips when the database is wedged, and then
+	// shutdown must still finish well inside systemd's stop timeout.
+	closeFlushTimeout = 5 * time.Second
 )
 
 var errNoRows = errors.New("no rows found")
@@ -384,7 +389,8 @@ func (c *Cache) MarkPublished(m *model.Message) error {
 	return err
 }
 
-// MessagesCount returns the total number of messages in the cache
+// MessagesCount returns the total number of messages in the cache. On Postgres, this is the
+// planner's estimate once the table has been analyzed, not an exact count.
 func (c *Cache) MessagesCount() (int, error) {
 	rows, err := c.db.ReadOnly().Query(c.queries.selectMessagesCount)
 	if err != nil {
@@ -542,11 +548,21 @@ func (c *Cache) Stats() (messages int64, err error) {
 }
 
 // Close closes the underlying database connection
-// Close writes the messages still waiting in the batch queue, then closes the database
+// Close writes the messages still waiting in the batch queue, then closes the database. A
+// database that does not accept the last batch delays shutdown by at most closeFlushTimeout.
 func (c *Cache) Close() error {
 	if c.queue != nil {
-		c.queue.Close()
-		<-c.written
+		flushed := make(chan struct{})
+		go func() {
+			c.queue.Close() // Hands the pending messages to the batch writer
+			<-c.written
+			close(flushed)
+		}()
+		select {
+		case <-flushed:
+		case <-time.After(closeFlushTimeout):
+			log.Tag(tagMessageCache).Warn("Giving up on the last message batch after %v", closeFlushTimeout)
+		}
 	}
 	return c.db.Close()
 }

@@ -110,7 +110,9 @@ func (q *BatchingQueue[T]) timeoutTicker() {
 }
 
 // Close emits the elements still waiting for their batch and closes the output channel. The
-// consumer must keep reading from Dequeue until the channel is closed.
+// consumer must keep reading from Dequeue until the channel is closed. Close blocks until it has
+// handed those elements over, so a caller that cannot wait forever for a stuck consumer has to
+// bound the call itself (see message.Cache.Close).
 func (q *BatchingQueue[T]) Close() {
 	q.mu.Lock()
 	if q.closed {

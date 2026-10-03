@@ -1077,3 +1077,58 @@ func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
 	require.Nil(t, err)
 	require.Len(t, messages, 0) // Correct cut-off via primary; the lagged replica has nothing newer
 }
+
+func TestStore_CloseGivesUpOnAStuckBatchWrite(t *testing.T) {
+	// A wedged database must not make Close, and with it the entire shutdown, block forever.
+	// systemd would SIGKILL us eventually, but only after its stop timeout.
+	testDB := dbtest.CreateTestPostgres(t)
+	s, err := message.NewPostgresStore(testDB, 100, time.Hour)
+	require.Nil(t, err)
+
+	// Hold a lock on the message table, so the final batch write cannot make progress
+	tx, err := testDB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE")
+	require.Nil(t, err)
+
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "my message")))
+	done := make(chan struct{})
+	go func() {
+		s.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Close did not return while the database was stuck")
+	}
+}
+
+func TestStore_CloseGivesUpOnAnInFlightBatchWrite(t *testing.T) {
+	// Same as TestStore_CloseGivesUpOnAStuckBatchWrite, but with a batch already handed to the
+	// batch writer, so Close cannot even hand over the messages that are still pending
+	testDB := dbtest.CreateTestPostgres(t)
+	s, err := message.NewPostgresStore(testDB, 2, time.Hour)
+	require.Nil(t, err)
+
+	tx, err := testDB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE")
+	require.Nil(t, err)
+
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "stuck 1")))
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "stuck 2"))) // Batch of 2, handed over
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "pending")))
+	done := make(chan struct{})
+	go func() {
+		s.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Close did not return while the database was stuck")
+	}
+}

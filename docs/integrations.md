@@ -153,6 +153,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [nlog-ntfy](https://github.com/MichelMichels/nlog-ntfy) - Send NLog messages over ntfy (C# / .NET / NLog)
 - [helm-charts](https://github.com/sarab97/helm-charts) - Helm charts of some of the selfhosted services, incl. ntfy
 - [ntfy_ansible_role](https://github.com/stevenengland/ntfy_ansible_role) (on [Ansible Galaxy](https://galaxy.ansible.com/stevenengland/ntfy)) - Ansible role to install ntfy
+- [MASH playbook](https://github.com/mother-of-all-self-hosting/mash-playbook/blob/main/docs/services/ntfy.md) - Ansible playbook to install ntfy (and 250+ other self-hosted services) as Docker containers
 - [easy2ntfy](https://github.com/chromoxdor/easy2ntfy) - Gateway for ESPeasy to receive commands through ntfy and using easyfetch (HTML/JS)
 - [ntfy_lite](https://github.com/MPI-IS/ntfy_lite) - Minimalist python API for pushing ntfy notifications (Python)
 - [notify](https://github.com/guanguans/notify) - 推送通知 (PHP)

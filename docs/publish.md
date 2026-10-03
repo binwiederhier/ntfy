@@ -666,7 +666,7 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 _Supported on:_ :material-android: :material-firefox:
 
 You can format messages using [Markdown](https://www.markdownguide.org/basic-syntax/) 🤩. That means you can use 
-**bold text**, *italicized text*, links, images, and more. Supported Markdown features (web app only for now):
+**bold text**, *italicized text*, links, images, and more. Supported Markdown features:
 
 - [Emphasis](https://www.markdownguide.org/basic-syntax/#emphasis) such as **bold** (`**bold**`), *italics* (`*italics*`)
 - [Links](https://www.markdownguide.org/basic-syntax/#links) (`[some tool](https://ntfy.sh)`)

@@ -240,7 +240,7 @@ func TestParseAccess_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseAccess(tt.users, tt.input)
+			result, err := parseAccess(tt.users, tt.input, false)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -299,12 +299,24 @@ func TestParseAccess_Errors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseAccess(tt.users, tt.input)
+			result, err := parseAccess(tt.users, tt.input, false)
 			require.Error(t, err)
 			require.Nil(t, result)
 			assert.Contains(t, err.Error(), tt.error)
 		})
 	}
+}
+
+func TestParseAccess_Success_AllowUnknownUsers(t *testing.T) {
+	result, err := parseAccess(nil, []string{"proxy-user:alerts:read-write"}, true)
+	require.NoError(t, err)
+	assert.Equal(t, map[string][]*user.Grant{
+		"proxy-user": {{
+			TopicPattern: "alerts",
+			Permission:   user.PermissionReadWrite,
+			Provisioned:  true,
+		}},
+	}, result)
 }
 
 func TestParseTokens_Success(t *testing.T) {
@@ -462,6 +474,81 @@ func TestParseTokens_Errors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := parseTokens(tt.users, tt.input)
+			require.Error(t, err)
+			require.Nil(t, result)
+			assert.Contains(t, err.Error(), tt.error)
+		})
+	}
+}
+
+func TestParseRoleMappings_Success(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected map[string]user.Role
+	}{
+		{
+			name:     "empty input",
+			input:    []string{},
+			expected: map[string]user.Role{},
+		},
+		{
+			name:  "single mapping",
+			input: []string{"admins:admin"},
+			expected: map[string]user.Role{
+				"admins": user.RoleAdmin,
+			},
+		},
+		{
+			name:  "multiple mappings with whitespace",
+			input: []string{" admins : admin ", " users : user "},
+			expected: map[string]user.Role{
+				"admins": user.RoleAdmin,
+				"users":  user.RoleUser,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseRoleMappings(tt.input)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParseRoleMappings_Errors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		error string
+	}{
+		{
+			name:  "invalid format",
+			input: []string{"admins"},
+			error: "invalid auth-header-mappings: admins, expected format: 'value:role'",
+		},
+		{
+			name:  "empty value",
+			input: []string{":admin"},
+			error: "invalid auth-header-mappings: :admin, value cannot be empty",
+		},
+		{
+			name:  "invalid role",
+			input: []string{"admins:owner"},
+			error: "invalid auth-header-mappings: admins:owner, role owner is not allowed, allowed roles are 'admin' or 'user'",
+		},
+		{
+			name:  "duplicate value",
+			input: []string{"admins:admin", "admins:user"},
+			error: "invalid auth-header-mappings: admins:user, value admins is defined more than once",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseRoleMappings(tt.input)
 			require.Error(t, err)
 			require.Nil(t, result)
 			assert.Contains(t, err.Error(), tt.error)

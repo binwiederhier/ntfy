@@ -306,6 +306,7 @@ type Config struct {
 	Users                        []*User             // Predefined users to create on startup
 	Access                       map[string][]*Grant // Predefined access grants to create on startup (username -> []*Grant)
 	Tokens                       map[string][]*Token // Predefined users to create on startup (username -> []*Token)
+	AccessAllowUnknownUsers      bool                // Allow ACLs for usernames without a local password-based account
 	QueueWriterInterval          time.Duration       // Interval for the async queue writer to flush stats and token updates to the database
 	BcryptCost                   int                 // Cost of generated passwords; lowering makes testing faster
 	AccessCacheEnabled           bool                // Enables the in-memory ACL cache (high volume servers only)

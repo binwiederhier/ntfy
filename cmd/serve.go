@@ -54,6 +54,9 @@ var flagsServe = append(
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "auth-users", Aliases: []string{"auth_users"}, EnvVars: []string{"NTFY_AUTH_USERS"}, Usage: "pre-provisioned declarative users"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "auth-access", Aliases: []string{"auth_access"}, EnvVars: []string{"NTFY_AUTH_ACCESS"}, Usage: "pre-provisioned declarative access control entries"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "auth-tokens", Aliases: []string{"auth_tokens"}, EnvVars: []string{"NTFY_AUTH_TOKENS"}, Usage: "pre-provisioned declarative access tokens"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-header-user", Aliases: []string{"auth_header_user"}, EnvVars: []string{"NTFY_AUTH_HEADER_USER"}, Usage: "trusted reverse-proxy header containing the authenticated username"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-header-role", Aliases: []string{"auth_header_role"}, EnvVars: []string{"NTFY_AUTH_HEADER_ROLE"}, Usage: "trusted reverse-proxy header containing roles/groups"}),
+	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "auth-header-mappings", Aliases: []string{"auth_header_mappings"}, EnvVars: []string{"NTFY_AUTH_HEADER_MAPPINGS"}, Usage: "reverse-proxy role/group mappings in the format '<value>:<role>'"}),
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "auth-access-cache", Aliases: []string{"auth_access_cache"}, EnvVars: []string{"NTFY_AUTH_ACCESS_CACHE"}, Value: user.DefaultAccessCacheEnabled, Usage: "enables the in-memory ACL cache (high-volume servers only)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-cache-dir", Aliases: []string{"attachment_cache_dir"}, EnvVars: []string{"NTFY_ATTACHMENT_CACHE_DIR"}, Usage: "cache directory for attached files, or S3 URL (s3://ACCESS_KEY:SECRET_KEY@BUCKET[/PREFIX]?region=REGION[&endpoint=ENDPOINT])"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "attachment-total-size-limit", Aliases: []string{"attachment_total_size_limit", "A"}, EnvVars: []string{"NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT"}, Value: util.FormatSize(server.DefaultAttachmentTotalSizeLimit), Usage: "limit of the on-disk attachment cache"}),
@@ -175,6 +178,9 @@ func execServe(c *cli.Context) error {
 	authUsersRaw := c.StringSlice("auth-users")
 	authAccessRaw := c.StringSlice("auth-access")
 	authTokensRaw := c.StringSlice("auth-tokens")
+	authHeaderUser := c.String("auth-header-user")
+	authHeaderRole := c.String("auth-header-role")
+	authHeaderMappingsRaw := c.StringSlice("auth-header-mappings")
 	authAccessCacheEnabled := c.Bool("auth-access-cache")
 	attachmentCacheDir := c.String("attachment-cache-dir")
 	attachmentTotalSizeLimitStr := c.String("attachment-total-size-limit")
@@ -367,6 +373,14 @@ func execServe(c *cli.Context) error {
 		return errors.New("base-url and upstream-base-url cannot be identical, you'll likely want to set upstream-base-url to https://ntfy.sh, see https://ntfy.sh/docs/config/#ios-instant-notifications")
 	} else if authFile == "" && databaseURL == "" && (enableSignup || enableLogin || requireLogin || enableReservations || stripeSecretKey != "") {
 		return errors.New("cannot set enable-signup, enable-login, require-login, enable-reserve-topics, or stripe-secret-key if auth-file or database-url is not set")
+	} else if authHeaderRole != "" && authHeaderUser == "" {
+		return errors.New("if auth-header-role is set, auth-header-user must also be set")
+	} else if len(authHeaderMappingsRaw) > 0 && authHeaderRole == "" {
+		return errors.New("if auth-header-mappings is set, auth-header-role must also be set")
+	} else if (authHeaderUser != "" || authHeaderRole != "" || len(authHeaderMappingsRaw) > 0) && !behindProxy {
+		return errors.New("if auth-header-user is set, behind-proxy must also be set")
+	} else if (authHeaderUser != "" || authHeaderRole != "" || len(authHeaderMappingsRaw) > 0) && authFile == "" && databaseURL == "" {
+		return errors.New("cannot set auth-header-user, auth-header-role, or auth-header-mappings if auth-file or database-url is not set")
 	} else if enableSignup && !enableLogin {
 		return errors.New("cannot set enable-signup without also setting enable-login")
 	} else if requireLogin && !enableLogin {
@@ -424,11 +438,15 @@ func execServe(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	authAccess, err := parseAccess(authUsers, authAccessRaw)
+	authAccess, err := parseAccess(authUsers, authAccessRaw, authHeaderUser != "")
 	if err != nil {
 		return err
 	}
 	authTokens, err := parseTokens(authUsers, authTokensRaw)
+	if err != nil {
+		return err
+	}
+	authHeaderMappings, err := parseRoleMappings(authHeaderMappingsRaw)
 	if err != nil {
 		return err
 	}
@@ -498,6 +516,9 @@ func execServe(c *cli.Context) error {
 	conf.AuthUsers = authUsers
 	conf.AuthAccess = authAccess
 	conf.AuthTokens = authTokens
+	conf.AuthHeaderUser = authHeaderUser
+	conf.AuthHeaderRole = authHeaderRole
+	conf.AuthHeaderMappings = authHeaderMappings
 	conf.AuthAccessCacheEnabled = authAccessCacheEnabled
 	conf.AttachmentCacheDir = attachmentCacheDir
 	conf.AttachmentTotalSizeLimit = attachmentTotalSizeLimit
@@ -644,7 +665,7 @@ func parseUsers(usersRaw []string) ([]*user.User, error) {
 	return users, nil
 }
 
-func parseAccess(users []*user.User, accessRaw []string) (map[string][]*user.Grant, error) {
+func parseAccess(users []*user.User, accessRaw []string, allowUnknownUsers bool) (map[string][]*user.Grant, error) {
 	access := make(map[string][]*user.Grant)
 	for _, accessLine := range accessRaw {
 		parts := strings.Split(accessLine, ":")
@@ -659,11 +680,11 @@ func parseAccess(users []*user.User, accessRaw []string) (map[string][]*user.Gra
 			return u.Name == username
 		})
 		if username != user.Everyone {
-			if !exists {
+			if !exists && !allowUnknownUsers {
 				return nil, fmt.Errorf("invalid auth-access: %s, user %s is not provisioned", accessLine, username)
 			} else if !user.AllowedUsername(username) {
 				return nil, fmt.Errorf("invalid auth-access: %s, username %s invalid", accessLine, username)
-			} else if u.Role != user.RoleUser {
+			} else if exists && u.Role != user.RoleUser {
 				return nil, fmt.Errorf("invalid auth-access: %s, user %s is not a regular user, only regular users can have ACL entries", accessLine, username)
 			}
 		}
@@ -721,6 +742,27 @@ func parseTokens(users []*user.User, tokensRaw []string) (map[string][]*user.Tok
 		})
 	}
 	return tokens, nil
+}
+
+func parseRoleMappings(mappingsRaw []string) (map[string]user.Role, error) {
+	mappings := make(map[string]user.Role, len(mappingsRaw))
+	for _, mappingLine := range mappingsRaw {
+		parts := strings.SplitN(mappingLine, ":", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid auth-header-mappings: %s, expected format: 'value:role'", mappingLine)
+		}
+		value := strings.TrimSpace(parts[0])
+		role := user.Role(strings.TrimSpace(parts[1]))
+		if value == "" {
+			return nil, fmt.Errorf("invalid auth-header-mappings: %s, value cannot be empty", mappingLine)
+		} else if !user.AllowedRole(role) {
+			return nil, fmt.Errorf("invalid auth-header-mappings: %s, role %s is not allowed, allowed roles are 'admin' or 'user'", mappingLine, role)
+		} else if _, exists := mappings[value]; exists {
+			return nil, fmt.Errorf("invalid auth-header-mappings: %s, value %s is defined more than once", mappingLine, value)
+		}
+		mappings[value] = role
+	}
+	return mappings, nil
 }
 
 func maybeFromMetadata(m map[string]any, key string) string {

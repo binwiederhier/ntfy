@@ -3407,11 +3407,16 @@ If you use [access tokens](#access-tokens), that will change the format of the e
 ntfy-$topic+$token@ntfy.sh
 ```
 
-To use [username/password](https://docs.ntfy.sh/publish/#username-password), you can use SMTP PLAIN auth when authenticating
-to the ntfy server.
+You can also authenticate with SMTP AUTH PLAIN, using either a ntfy username and password, or an access token as the
+password with an empty username. See [authenticating to protected topics](config.md#authenticating-to-protected-topics)
+for details.
 
-As of today, e-mail publishing only supports adding a [message title](#message-title) (the e-mail subject). Tags, priority,
-delay and other features are not supported (yet). Here's an example that will publish a message with the 
+The e-mail subject becomes the [message title](#message-title), and the e-mail body becomes the message. The body is
+always treated as plain text, so [Markdown](#markdown-formatting) is not supported when publishing via e-mail. For
+multipart e-mails, ntfy uses the `text/plain` part. If there is none, it falls back to the `text/html` part and strips
+the tags. Tags, priority, delay and other features are not supported (yet).
+
+Here's an example that will publish a message with the 
 title `You've Got Mail` to topic `sometopic` (see [ntfy.sh/sometopic](https://ntfy.sh/sometopic)):
 
 <figure markdown>

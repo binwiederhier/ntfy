@@ -1081,8 +1081,10 @@ Here's an example config (this is how it is configured for `ntfy.sh`):
     ```
 
 In addition to configuring the ntfy server, you have to create two DNS records (an [MX record](https://en.wikipedia.org/wiki/MX_record) 
-and a corresponding A record), so incoming mail will find its way to your server. Here's an example of how `ntfy.sh` is 
-configured (in [Amazon Route 53](https://aws.amazon.com/route53/)):
+and a corresponding A record), so incoming mail will find its way to your server. This applies if other mail servers
+deliver to your domain via an MX lookup, which is the usual case. If your sender connects directly to the SMTP server's
+host and port instead, you don't need any DNS records. See [local-only email](#local-only-email) below. Here's an
+example of how `ntfy.sh` is configured (in [Amazon Route 53](https://aws.amazon.com/route53/)):
 
 <figure markdown>
   ![DNS records for incoming mail](static/img/screenshot-email-publishing-dns.png){ width=600 }
@@ -1149,6 +1151,25 @@ to include an access token in the "To" address, such as `email-alerts+tk_AbC123d
 
 If the internal service lets you use define an email "Subject", it will become the title of the notification.
 The body of the email will become the message of the notification.
+
+### Authenticating to protected topics
+If your topics are access-restricted (e.g. with `auth-default-access: deny-all`), anonymous senders cannot publish.
+One option is to put an access token into the email address, as described above (`ntfy-$topic+$token@ntfy.sh`). The
+other option is SMTP AUTH PLAIN. The SMTP server accepts it and checks the credentials against the ntfy user database.
+Most mail clients and appliances expect to log in this way.
+
+In the SMTP settings of your sending client, use either of these:
+
+* A ntfy username and password.
+* An access token as the password, and leave the username empty. This works the same way as
+  [token auth](publish.md#access-tokens) over HTTP. Note that many mail clients insist on a username, so the
+  username/password variant is usually easier.
+
+If the address contains a token and the client also uses SMTP AUTH, the token in the address wins.
+
+!!! warning
+    The ntfy SMTP server does not advertise STARTTLS, so SMTP AUTH PLAIN sends the credentials unencrypted. Only use
+    this on a trusted network, or put a TLS-terminating proxy in front of the SMTP server.
 
 ## Behind a proxy (TLS, etc.)
 !!! warning

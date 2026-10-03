@@ -1,4 +1,4 @@
-FROM golang:1.25-bookworm AS builder
+FROM golang:1.26-bookworm AS builder
 
 ARG VERSION=dev
 ARG COMMIT=unknown
@@ -50,6 +50,9 @@ ADD ./mail ./mail
 ADD ./s3 ./s3
 ADD ./action ./action
 ADD ./template/gotext ./template/gotext
+ADD ./ban ./ban
+ADD ./metrics ./metrics
+ADD ./twilio ./twilio
 
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server
 

@@ -55,10 +55,10 @@ func TestPostgresStore_Migration_From14(t *testing.T) {
 	require.Nil(t, err)
 	store, err := message.NewPostgresStore(testDB, 0, 0)
 	require.Nil(t, err)
-	// The 14 -> 15 step ran: version bumped, partial index created
+	// The 14 -> 15 and 15 -> 16 steps ran: version bumped, partial index created
 	var version int
 	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'message'`).Scan(&version))
-	require.Equal(t, 15, version)
+	require.Equal(t, 16, version)
 	var indexCount int
 	require.Nil(t, testDB.QueryRow(`SELECT COUNT(*) FROM pg_indexes WHERE indexname = 'idx_message_attachment_expires' AND schemaname = current_schema()`).Scan(&indexCount))
 	require.Equal(t, 1, indexCount)

@@ -151,6 +151,9 @@ var (
 	errHTTPBadRequestTemplateTooLarge                = &errHTTP{40056, http.StatusBadRequest, "invalid request: template too large", "https://ntfy.sh/docs/publish/#message-templating", nil}
 	errHTTPBadRequestTitleTooLarge                   = &errHTTP{40057, http.StatusBadRequest, "invalid request: title is too large", "https://ntfy.sh/docs/publish/#limitations", nil}
 	errHTTPBadRequestTagsTooLarge                    = &errHTTP{40058, http.StatusBadRequest, "invalid request: tags are too large", "https://ntfy.sh/docs/publish/#limitations", nil}
+	errHTTPBadRequestAppleCriticalInvalid            = &errHTTP{40059, http.StatusBadRequest, "invalid X-Apple-Critical parameter: must be a boolean value", "https://ntfy.sh/docs/publish/#ios-critical-alerts", nil}
+	errHTTPBadRequestAppleSoundInvalid               = &errHTTP{40060, http.StatusBadRequest, "invalid X-Apple-Sound parameter: must be a sound name without path separators or control characters", "https://ntfy.sh/docs/publish/#ios-critical-alerts", nil}
+	errHTTPBadRequestAppleVolumeInvalid              = &errHTTP{40061, http.StatusBadRequest, "invalid X-Apple-Volume parameter: must be a number greater than 0.0, at most 1.0", "https://ntfy.sh/docs/publish/#ios-critical-alerts", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

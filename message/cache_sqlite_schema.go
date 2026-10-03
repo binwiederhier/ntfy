@@ -9,7 +9,7 @@ import (
 
 // Initial SQLite schema
 const (
-	sqliteCurrentSchemaVersion = 15
+	sqliteCurrentSchemaVersion = 16
 	sqliteCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,6 +36,7 @@ const (
 			user TEXT NOT NULL,
 			content_type TEXT NOT NULL,
 			encoding TEXT NOT NULL,
+			apple TEXT NOT NULL,
 			published INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_mid ON messages (mid);
@@ -169,6 +170,11 @@ const (
 		ALTER TABLE messages ADD COLUMN event TEXT NOT NULL DEFAULT('message');
 		CREATE INDEX IF NOT EXISTS idx_sequence_id ON messages (sequence_id);
 	`
+
+	// 15 -> 16
+	sqliteMigrate15To16AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN apple TEXT NOT NULL DEFAULT('');
+	`
 )
 
 var (
@@ -200,6 +206,7 @@ func sqliteMigrations(cacheDuration time.Duration) map[int]schema.MigrateFunc {
 		12: schema.AsMigrateFunc(sqliteMigrate12To13AlterMessagesTableQuery),
 		13: schema.AsMigrateFunc(sqliteMigrate13To14AlterMessagesTableQuery),
 		14: schema.NopMigrateFunc, // Corresponds to Postgres migration
+		15: schema.AsMigrateFunc(sqliteMigrate15To16AlterMessagesTableQuery),
 	}
 }
 

@@ -1613,6 +1613,11 @@ upstream-access-token: "..." # optional, only if rate limits exceeded, or upstre
 If set, all incoming messages will publish a poll request to the configured upstream server, containing
 the message ID of the original message, instructing the iOS app to poll this server for the actual message contents.
 
+For [iOS critical alerts](publish.md#ios-critical-alerts), the critical flag (and volume) is forwarded along with
+the poll request, so the notification that wakes up the iOS app is itself delivered as a critical alert. Upstream
+servers running an older ntfy version ignore these headers, in which case the wake-up notification is delivered
+as a regular alert (the app can still apply the critical options after polling the actual message).
+
 If `upstream-base-url` is not set, notifications will still eventually get to your device, but delivery can take hours,
 depending on the state of the phone. If you are using your phone, it shouldn't take more than 20-30 minutes though.
 

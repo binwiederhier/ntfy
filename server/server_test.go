@@ -404,6 +404,106 @@ func TestServer_PublishPriority(t *testing.T) {
 	})
 }
 
+func TestServer_PublishAppleCriticalHeaders(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// Explicit critical with sound and volume
+		response := request(t, s, "POST", "/mytopic", "critical message", map[string]string{
+			"X-Apple-Critical": "1",
+			"X-Apple-Sound":    "warning",
+			"X-Apple-Volume":   "0.5",
+		})
+		msg := toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.True(t, msg.Apple.Critical)
+		require.Equal(t, "warning", msg.Apple.Sound)
+		require.Equal(t, 0.5, msg.Apple.Volume)
+
+		// Explicit opt-out, sound/volume ignored without critical
+		response = request(t, s, "POST", "/mytopic", "opt-out", map[string]string{
+			"X-Apple-Critical": "no",
+			"X-Apple-Sound":    "ignored",
+		})
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.False(t, msg.Apple.Critical)
+		require.Equal(t, "", msg.Apple.Sound)
+
+		// No header, no Apple options
+		response = request(t, s, "POST", "/mytopic", "normal message", nil)
+		msg = toMessage(t, response.Body.String())
+		require.Nil(t, msg.Apple)
+
+		// Query parameter variant
+		response = request(t, s, "GET", "/mytopic/publish?apple-critical=true", "via query", nil)
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.True(t, msg.Apple.Critical)
+
+		// JSON publish variant
+		body := `{"topic":"mytopic","message":"via json","apple":{"critical":true,"volume":0.7}}`
+		response = request(t, s, "PUT", "/", body, nil)
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.True(t, msg.Apple.Critical)
+		require.Equal(t, 0.7, msg.Apple.Volume)
+
+		// Bool values are case-insensitive, like the other bool params
+		response = request(t, s, "POST", "/mytopic", "mixed case", map[string]string{
+			"X-Apple-Critical": "True",
+		})
+		msg = toMessage(t, response.Body.String())
+		require.NotNil(t, msg.Apple)
+		require.True(t, msg.Apple.Critical)
+
+		// An empty JSON "apple" object is not an explicit opt-out, the priority-based
+		// fallback (see appleCritical) must remain intact
+		body = `{"topic":"mytopic","message":"empty apple","priority":5,"apple":{}}`
+		response = request(t, s, "PUT", "/", body, nil)
+		msg = toMessage(t, response.Body.String())
+		require.Nil(t, msg.Apple)
+		require.Equal(t, 5, msg.Priority)
+	})
+}
+
+func TestServer_PublishAppleCriticalInvalid(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+			"X-Apple-Critical": "definitely",
+		})
+		require.Equal(t, 40059, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
+func TestServer_PublishAppleVolumeInvalid(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for _, volume := range []string{"7", "-0.1", "1.01", "loud", "nan", "NaN", "0", "0.0"} {
+			response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+				"X-Apple-Critical": "1",
+				"X-Apple-Volume":   volume,
+			})
+			require.Equal(t, 40061, toHTTPError(t, response.Body.String()).Code)
+		}
+		// The JSON publish path must not bypass the volume validation
+		for _, volume := range []string{"0", "-0.5", "1.5"} {
+			body := fmt.Sprintf(`{"topic":"mytopic","message":"json volume","apple":{"critical":true,"volume":%s}}`, volume)
+			response := request(t, s, "PUT", "/", body, nil)
+			require.Equal(t, 40061, toHTTPError(t, response.Body.String()).Code)
+		}
+		// Sound with path separator or control characters is rejected
+		response := request(t, s, "POST", "/mytopic", "test", map[string]string{
+			"X-Apple-Critical": "1",
+			"X-Apple-Sound":    "../../etc/passwd",
+		})
+		require.Equal(t, 40060, toHTTPError(t, response.Body.String()).Code)
+		response = request(t, s, "GET", "/mytopic/publish?apple-critical=1&apple-sound=a%0Ab", "test", nil)
+		require.Equal(t, 40060, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
 func TestServer_PublishPriority_SpecialHTTPHeader(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))
@@ -3690,6 +3790,65 @@ func TestServer_UpstreamBaseURL_Success(t *testing.T) {
 			pID := pollID.Load()
 			return pID != nil && *pID == m.ID
 		})
+	})
+}
+
+func TestServer_UpstreamBaseURL_AppleCritical(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+		var appleCritical, appleVolume atomic.Pointer[string]
+		upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			appleCritical.Store(util.String(r.Header.Get("X-Apple-Critical")))
+			appleVolume.Store(util.String(r.Header.Get("X-Apple-Volume")))
+		}))
+		defer upstreamServer.Close()
+
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.BaseURL = "http://myserver.internal"
+		c.UpstreamBaseURL = upstreamServer.URL
+		s := newTestServer(t, c)
+
+		// Critical message: flag and volume are forwarded to the upstream server
+		response := request(t, s, "PUT", "/mytopic", "wake up", map[string]string{
+			"X-Apple-Critical": "1",
+			"X-Apple-Volume":   "0.8",
+		})
+		require.Equal(t, 200, response.Code)
+		waitFor(t, func() bool {
+			critical := appleCritical.Load()
+			return critical != nil && *critical == "1"
+		})
+		require.Equal(t, "0.8", *appleVolume.Load())
+
+		// The priority-based fallback is forwarded too (no explicit header)
+		appleCritical.Store(util.String(""))
+		appleVolume.Store(util.String(""))
+		response = request(t, s, "PUT", "/mytopic", "max priority", map[string]string{
+			"X-Priority": "5",
+		})
+		require.Equal(t, 200, response.Code)
+		waitFor(t, func() bool {
+			critical := appleCritical.Load()
+			return critical != nil && *critical == "1"
+		})
+		require.Equal(t, "", *appleVolume.Load())
+	})
+}
+
+func TestServer_PublishPollRequest_KeepsAppleOptions(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// A forwarded poll request (X-Poll-ID) replaces the message with a fresh poll request
+		// message; the iOS options must survive that replacement
+		response := request(t, s, "PUT", "/mytopic", "", map[string]string{
+			"X-Poll-ID":        "abcdefghijkl",
+			"X-Apple-Critical": "1",
+		})
+		msg := toMessage(t, response.Body.String())
+		require.Equal(t, "poll_request", msg.Event)
+		require.NotNil(t, msg.Apple)
+		require.True(t, msg.Apple.Critical)
 	})
 }
 

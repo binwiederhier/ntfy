@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/emersion/go-smtp"
@@ -902,7 +903,9 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		}
 	}
 	if m.PollID != "" {
+		apple := m.Apple
 		m = model.NewPollRequestMessage(t.ID, m.PollID)
+		m.Apple = apple // Keep iOS options, so poll requests forwarded by self-hosted servers stay critical
 	}
 	m.Sender = v.IP()
 	m.User = v.MaybeUserID()
@@ -1093,6 +1096,17 @@ func (s *Server) sendEmail(v *visitor, m *model.Message, email string) {
 	metrics.EmailsPublishedSuccess.Inc()
 }
 
+// appleCritical decides whether a message is delivered as an iOS critical alert. An explicit
+// X-Apple-Critical value always wins; without it, max priority messages are critical, so that
+// existing publishers get critical alerts without changes (see
+// https://github.com/binwiederhier/ntfy/issues/1235).
+func appleCritical(m *model.Message) bool {
+	if m.Apple != nil {
+		return m.Apple.Critical
+	}
+	return m.Priority == 5
+}
+
 func (s *Server) forwardPollRequest(v *visitor, m *model.Message) {
 	topicURL := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
 	topicHash := fmt.Sprintf("%x", sha256.Sum256([]byte(topicURL)))
@@ -1105,6 +1119,17 @@ func (s *Server) forwardPollRequest(v *visitor, m *model.Message) {
 	}
 	req.Header.Set("User-Agent", "ntfy/"+s.config.BuildVersion)
 	req.Header.Set("X-Poll-ID", m.ID)
+	if appleCritical(m) {
+		// Forward the critical flag (and volume), so the upstream server can deliver the poll
+		// request as a critical alert. This covers the priority-based fallback too. The sound
+		// name is not forwarded: the upstream alert only shows placeholder content, and the app
+		// applies the actual sound after polling the real message. Older upstream servers
+		// ignore the unknown headers.
+		req.Header.Set("X-Apple-Critical", "1")
+		if m.Apple != nil && m.Apple.Volume > 0 {
+			req.Header.Set("X-Apple-Volume", fmt.Sprintf("%g", m.Apple.Volume))
+		}
+	}
 	if s.config.UpstreamAccessToken != "" {
 		req.Header.Set("Authorization", util.BearerAuth(s.config.UpstreamAccessToken))
 	}
@@ -1214,6 +1239,33 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 			return false, false, "", "", "", false, "", errHTTPBadRequestPriorityInvalid
 		}
 		priorityStr = "" // Clear since it's already parsed
+	}
+	appleCriticalStr := strings.ToLower(readParam(r, "x-apple-critical", "apple-critical"))
+	if appleCriticalStr != "" {
+		if !isBoolValue(appleCriticalStr) {
+			return false, false, "", "", "", false, "", errHTTPBadRequestAppleCriticalInvalid
+		}
+		// The struct is only created if X-Apple-Critical was set explicitly, so that an unset header
+		// can fall back to the priority-based default (see appleCritical). Sound and volume are only
+		// read for critical messages, since they have no effect otherwise.
+		m.Apple = &model.AppleOptions{Critical: toBool(appleCriticalStr)}
+		if m.Apple.Critical {
+			appleSound := readParam(r, "x-apple-sound", "apple-sound")
+			if len(appleSound) > 128 || strings.ContainsAny(appleSound, "/\\") || strings.ContainsFunc(appleSound, unicode.IsControl) {
+				return false, false, "", "", "", false, "", errHTTPBadRequestAppleSoundInvalid
+			}
+			m.Apple.Sound = appleSound
+			if appleVolumeStr := readParam(r, "x-apple-volume", "apple-volume"); appleVolumeStr != "" {
+				appleVolume, e := strconv.ParseFloat(appleVolumeStr, 64)
+				// The negated range check also rejects NaN, which ParseFloat accepts. Zero is
+				// rejected too: it would silently be treated as "not set" (and delivered at
+				// full volume), since the FCM SDK cannot transmit a zero volume
+				if e != nil || !(appleVolume > 0 && appleVolume <= 1) {
+					return false, false, "", "", "", false, "", errHTTPBadRequestAppleVolumeInvalid
+				}
+				m.Apple.Volume = appleVolume
+			}
+		}
 	}
 	m.Tags = readCommaSeparatedParam(r, "x-tags", "tags", "tag", "ta")
 	// Measured across all tags, not each one: a publisher can add arbitrarily many
@@ -2107,6 +2159,17 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.SequenceID != "" {
 			r.Header.Set("X-Sequence-ID", m.SequenceID)
+		}
+		if m.Apple != nil {
+			if m.Apple.Critical != nil {
+				r.Header.Set("X-Apple-Critical", fmt.Sprintf("%t", *m.Apple.Critical))
+			}
+			if m.Apple.Sound != "" {
+				r.Header.Set("X-Apple-Sound", m.Apple.Sound)
+			}
+			if m.Apple.Volume != nil {
+				r.Header.Set("X-Apple-Volume", fmt.Sprintf("%g", *m.Apple.Volume))
+			}
 		}
 		return next(w, r, v)
 	}

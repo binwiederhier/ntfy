@@ -185,6 +185,35 @@ func TestStore_MessagesTagsPrioAndTitle(t *testing.T) {
 	})
 }
 
+func TestStore_AppleOptionsRoundtrip(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		m1 := model.NewDefaultMessage("mytopic", "critical message")
+		m1.Time = 100
+		m1.Apple = &model.AppleOptions{
+			Critical: true,
+			Sound:    "warning",
+			Volume:   0.5,
+		}
+		m2 := model.NewDefaultMessage("mytopic", "explicit opt-out")
+		m2.Time = 200
+		m2.Apple = &model.AppleOptions{
+			Critical: false,
+		}
+		m3 := model.NewDefaultMessage("mytopic", "no apple options")
+		m3.Time = 300
+		require.Nil(t, s.AddMessage(m1))
+		require.Nil(t, s.AddMessage(m2))
+		require.Nil(t, s.AddMessage(m3))
+
+		messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
+		require.Nil(t, err)
+		require.Equal(t, 3, len(messages))
+		require.Equal(t, &model.AppleOptions{Critical: true, Sound: "warning", Volume: 0.5}, messages[0].Apple)
+		require.Equal(t, &model.AppleOptions{Critical: false}, messages[1].Apple)
+		require.Nil(t, messages[2].Apple)
+	})
+}
+
 func TestStore_MessagesSinceID(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, s *message.Cache) {
 		m1 := model.NewDefaultMessage("mytopic", "message 1")
@@ -766,6 +795,11 @@ func TestStore_MessageFieldRoundTrip(t *testing.T) {
 		}
 		m.ContentType = "text/markdown"
 		m.Encoding = "base64"
+		m.Apple = &model.AppleOptions{
+			Critical: true,
+			Sound:    "warning",
+			Volume:   0.5,
+		}
 		m.Sender = netip.MustParseAddr("9.8.7.6")
 		m.User = "u_TestUser123"
 		require.Nil(t, s.AddMessage(m))
@@ -788,6 +822,7 @@ func TestStore_MessageFieldRoundTrip(t *testing.T) {
 		require.Equal(t, "https://example.com/icon.png", retrieved.Icon)
 		require.Equal(t, "text/markdown", retrieved.ContentType)
 		require.Equal(t, "base64", retrieved.Encoding)
+		require.Equal(t, &model.AppleOptions{Critical: true, Sound: "warning", Volume: 0.5}, retrieved.Apple)
 		require.Equal(t, netip.MustParseAddr("9.8.7.6"), retrieved.Sender)
 		require.Equal(t, "u_TestUser123", retrieved.User)
 

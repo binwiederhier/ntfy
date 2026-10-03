@@ -481,11 +481,13 @@ func (s *Server) stop() {
 }
 
 func (s *Server) closeDatabases() {
-	if s.userManager != nil {
-		s.userManager.Close()
-	}
+	// Message cache first: it may still be writing its last batch, and on Postgres all stores
+	// share one pool, so closing any other store first would close the pool under that write
 	if s.messageCache != nil {
 		s.messageCache.Close()
+	}
+	if s.userManager != nil {
+		s.userManager.Close()
 	}
 	if s.webPush != nil {
 		s.webPush.Close()

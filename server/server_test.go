@@ -26,6 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
@@ -5475,4 +5476,24 @@ func TestServer_StopFlushesBatchedMessages(t *testing.T) {
 	messages, err := cache.Messages("mytopic", model.SinceAllMessages, false)
 	require.Nil(t, err)
 	require.Equal(t, 2, len(messages))
+}
+
+func TestServer_StopFlushesBatchedMessages_Postgres(t *testing.T) {
+	// Same as TestServer_StopFlushesBatchedMessages on Postgres, where all stores share one
+	// pool: closing another store first used to close the pool under the pending batch write
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.CacheBatchSize = 100
+	conf.CacheBatchTimeout = time.Hour
+	s := newTestServer(t, conf)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "batched 1", nil).Code)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "batched 2", nil).Code)
+	s.Stop()
+
+	host, err := pg.Open(schemaDSN)
+	require.Nil(t, err)
+	defer host.DB.Close()
+	var count int
+	require.Nil(t, host.DB.QueryRow(`SELECT COUNT(*) FROM message WHERE topic = 'mytopic'`).Scan(&count))
+	require.Equal(t, 2, count)
 }

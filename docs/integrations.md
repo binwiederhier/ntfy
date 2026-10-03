@@ -193,6 +193,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [SIA-Server](https://github.com/ZebMcKayhan/SIA-Server) - A light weight, self-hosted notification Server for Honywell Galaxy Flex alarm systems (Python)
 - [zabbix-ntfy](https://github.com/torgrimt/zabbix-ntfy) - Zabbix server Mediatype to add support for ntfy.sh services
 - [Rubix Notify](https://wordpress.org/plugins/rubix-notify) - WordPress Integration with ntfy (PHP + React).
+- [NotiFerry](https://notiferry.com/) - macOS menu bar app that forwards Notification Center alerts from other Mac apps to an ntfy topic on ntfy.sh or a self-hosted server (commercial, Swift)
 
 ## Blog + forum posts
 

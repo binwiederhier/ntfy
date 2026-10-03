@@ -4696,6 +4696,13 @@ authParam  = base64_raw(authHeader) // -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM0
 // If your language does not have a function to encode raw base64, simply use normal base64
 // and REMOVE TRAILING "=" characters. 
 ```
+You can use following one liner to create `auth` parameter from ntfy token using powershell:
+``` powershell
+(Read-Host -Prompt 'Enter Ntfy token' | ForEach-Object { ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(":$_"))))) }).TrimEnd('=')
+
+# If you have base64 module installed
+(Read-Host -Prompt "Enter Ntfy token" | ForEach-Object { ":$_" } | ConvertTo-Base64 | ForEach-Object { "Basic $_" } | ConvertTo-Base64 ).TrimEnd('=')
+```
 
 The following command will generate the appropriate value for you on *nix systems:
 

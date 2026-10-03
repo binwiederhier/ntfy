@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import userManager from "./UserManager";
 import api from "./Api";
+import { UnauthorizedError } from "./errors";
 
 // Api.js talks to the server through the global fetch and looks up credentials via userManager.
 // (vi.mock is hoisted above the imports by vitest, so the import above receives the mock.)
@@ -45,6 +46,11 @@ describe("Api.poll", () => {
     fetchMock.mockResolvedValue(new Response(""));
     await api.poll("https://ntfy.sh", "mytopic", 12345);
     expect(fetchMock).toHaveBeenCalledWith("https://ntfy.sh/mytopic/json?poll=1&since=12345", expect.anything());
+  });
+
+  it("throws UnauthorizedError instead of returning silently on a 401/403", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 403 }));
+    await expect(api.poll("https://ntfy.sh", "mytopic")).rejects.toBeInstanceOf(UnauthorizedError);
   });
 });
 

@@ -10,8 +10,9 @@ const maybeToJson = async (response) => {
 };
 
 export class UnauthorizedError extends Error {
-  constructor() {
+  constructor(status) {
     super("Unauthorized");
+    this.status = status; // 401 (bad/expired credentials) or 403 (valid credentials, no topic access)
   }
 }
 
@@ -66,7 +67,7 @@ export class EmailPrimaryElsewhereError extends Error {
 export const throwAppError = async (response) => {
   if (response.status === 401 || response.status === 403) {
     console.log(`[Error] HTTP ${response.status}`, response);
-    throw new UnauthorizedError();
+    throw new UnauthorizedError(response.status);
   }
   const error = await maybeToJson(response);
   if (error?.code) {

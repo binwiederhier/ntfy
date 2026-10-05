@@ -215,8 +215,19 @@ func (s *Server) cancelSubscriberUserLocal(userID, topicPattern string) error {
 }
 
 // applySubscriberCancel applies a peer node's subscriber-cancel request to local connections
-// only; it never re-broadcasts (loop prevention, see cluster.CancelFunc)
+// only; it never re-broadcasts (loop prevention, see cluster.CancelFunc).
+//
+// A revocation also invalidates this node's ACL cache for that user: without it the cancelled
+// subscriber could reconnect immediately and be authorized from the stale cache (its periodic
+// reload is minutes away). Cancelling without the refresh would be theater.
 func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
+	if cancel.UserID != "" && s.userManager != nil {
+		if u, err := s.userManager.UserByID(cancel.UserID); err != nil {
+			log.Tag(tagSubscribe).Err(err).Warn("Cannot look up user %s for a peer's revocation", cancel.UserID)
+		} else if err := s.userManager.ReloadAccessCache(u.Name); err != nil {
+			log.Tag(tagSubscribe).Err(err).Warn("Cannot reload the access cache for user %s", u.Name)
+		}
+	}
 	if cancel.ExceptUserID != "" {
 		s.mu.RLock()
 		t, ok := s.topics[cancel.Topic]

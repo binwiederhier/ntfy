@@ -2,6 +2,7 @@ package server
 
 import (
 	"math/rand"
+	"slices"
 	"sync"
 	"time"
 
@@ -260,16 +261,29 @@ func (t *topic) CancelAllSubscribers() {
 	}
 }
 
-// CancelSubscriberUser kills the subscriber with the given user ID
+// CancelSubscriberUser kills every subscriber with the given user ID (one user can hold
+// several connections to the same topic)
 func (t *topic) CancelSubscriberUser(userID string) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	for _, s := range t.subscribers {
 		if s.userID == userID {
 			t.cancelUserSubscriber(s)
-			return
 		}
 	}
+}
+
+// SubscriberUserIDs returns the distinct non-empty user IDs of this topic's subscribers
+func (t *topic) SubscriberUserIDs() []string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	userIDs := make([]string, 0, len(t.subscribers))
+	for _, s := range t.subscribers {
+		if s.userID != "" && !slices.Contains(userIDs, s.userID) {
+			userIDs = append(userIDs, s.userID)
+		}
+	}
+	return userIDs
 }
 
 func (t *topic) cancelUserSubscriber(s *topicSubscriber) {

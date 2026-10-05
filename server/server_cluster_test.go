@@ -925,3 +925,37 @@ func TestServer_Cluster_UntieredRateVisitorPreservesIPIdentity(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "ip:1.2.3.4", string(v.QuotaKey()), "untiered accounts are IP-keyed, even with a nonempty user ID")
 }
+
+func TestServer_Cluster_ReauthorizesLiveSubscribers(t *testing.T) {
+	// Revocations travel as best-effort peer state, so one can be lost; and an ACL change made
+	// on another node only reaches this one via the cache's periodic reload. Either way a live
+	// stream must not keep receiving forever: the manager re-authorizes live subscriptions.
+	conf := newTestConfig(t, dbtest.CreateTestPostgresSchema(t))
+	conf.AuthDefault = user.PermissionDenyAll
+	s := newTestServer(t, conf)
+	require.Nil(t, s.userManager.AddUser("alice", "password", user.RoleUser, false))
+	require.Nil(t, s.userManager.AllowAccess("alice", "private", user.PermissionRead))
+	u, err := s.userManager.User("alice")
+	require.Nil(t, err)
+	topics, err := s.topicsFromIDs(nil, "private")
+	require.Nil(t, err)
+	var once sync.Once
+	canceled := make(chan struct{})
+	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, u.ID, func() {
+		once.Do(func() { close(canceled) })
+	})
+
+	s.reauthorizeSubscribers() // Still allowed to read: nothing happens
+	select {
+	case <-canceled:
+		t.Fatal("authorized subscriber was canceled")
+	default:
+	}
+	require.Nil(t, s.userManager.ResetAccess("alice", "private"))
+	s.reauthorizeSubscribers()
+	select {
+	case <-canceled:
+	case <-time.After(time.Second):
+		t.Fatal("revoked subscriber was not canceled")
+	}
+}

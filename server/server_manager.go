@@ -1,8 +1,11 @@
 package server
 
 import (
+	"errors"
+
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
+	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -27,6 +30,9 @@ func (s *Server) execManager() {
 	if err != nil {
 		log.Tag(tagManager).Err(err).Warn("Cannot get messages count")
 	}
+
+	// Re-check that live subscribers may still read what they are subscribed to
+	s.reauthorizeSubscribers()
 
 	// Remove subscriptions without subscribers (unless active on another node)
 	s.keepSharedActiveTopics()
@@ -197,5 +203,48 @@ func (s *Server) pruneVisitorUsage() {
 	}
 	if err := s.topicStore.Prune(); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Error pruning topic state")
+	}
+}
+
+// reauthorizeSubscribers cancels live subscriptions whose user may no longer read the topic.
+// Access revocation reaches open connections two ways, and neither is reliable on its own: the
+// node that ran the revocation cancels its own subscribers and asks its peers to do the same,
+// but that request is best-effort peer state and a lost one is never retried; and an ACL change
+// made elsewhere (another node, the CLI) only lands in this node's cache at its next reload.
+// Re-checking every manager tick makes revocation eventually consistent instead of permanent
+// access, and also covers a topic turning private and a deleted user.
+//
+// The check itself is in-memory (the ACL cache); only the user lookups hit the database, once
+// per distinct subscribed user per tick. A user that cannot be looked up keeps its
+// subscription: a database hiccup must not disconnect everyone.
+func (s *Server) reauthorizeSubscribers() {
+	if s.userManager == nil {
+		return
+	}
+	s.mu.RLock()
+	topics := make([]*topic, 0, len(s.topics))
+	for _, t := range s.topics {
+		topics = append(topics, t)
+	}
+	s.mu.RUnlock()
+	users := make(map[string]*user.User) // Resolved once per tick; nil means "no longer exists"
+	for _, t := range topics {
+		for _, userID := range t.SubscriberUserIDs() {
+			u, resolved := users[userID]
+			if !resolved {
+				var err error
+				if u, err = s.userManager.UserByID(userID); errors.Is(err, user.ErrUserNotFound) {
+					u = nil // Deleted; its subscriptions go below
+				} else if err != nil {
+					log.Tag(tagManager).Err(err).Warn("Cannot re-authorize subscribers of user %s", userID)
+					continue // Leave the subscription alone
+				}
+				users[userID] = u
+			}
+			if u == nil || s.userManager.Authorize(u, t.ID, user.PermissionRead) != nil {
+				log.Tag(tagManager).With(t).Debug("Canceling subscriber of user %s: no longer authorized to read", userID)
+				t.CancelSubscriberUser(userID)
+			}
+		}
 	}
 }

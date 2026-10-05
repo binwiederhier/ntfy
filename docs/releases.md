@@ -2095,6 +2095,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.28.1 (UNRELEASED)
 
+**Features:**
+
+* Support a timezone for delayed notifications via the `X-Timezone` header, `timezone` query parameter or JSON field, e.g. `At: tomorrow, 10am` with `Timezone: Asia/Tokyo`; the web app sends the browser's timezone automatically ([#1967](https://github.com/binwiederhier/ntfy/pull/1967)/[#1924](https://github.com/binwiederhier/ntfy/issues/1924), thanks to [@beemines](https://github.com/beemines) for the contribution)
+
 **Bug fixes + maintenance:**
 
 * Fix a recurring panic in the account token-update endpoint when a concurrent anonymous request from the same IP raced the authenticated request on the shared visitor (nil-user dereference); the request now fails with HTTP 401

@@ -64,7 +64,7 @@ func unmarshalMessageBody(body []byte, maxLineBytes int) ([]*model.Message, erro
 }
 
 func TestNop(t *testing.T) {
-	b, err := New(&Config{}, nil, nil, nil) // not enabled -> nop cluster, no database required
+	b, err := New(&Config{}, nil, nil) // not enabled -> nop cluster, no database required
 	require.Nil(t, err)
 	require.IsType(t, &nopCluster{}, b)
 	require.Nil(t, b.ForwardMessage(model.NewDefaultMessage("mytopic", "hi")))
@@ -78,7 +78,7 @@ func TestNop(t *testing.T) {
 }
 
 func TestNew_EnabledRequiresDatabase(t *testing.T) {
-	_, err := New(&Config{Enabled: true, Secret: "secret"}, nil, nil, nil)
+	_, err := New(&Config{Enabled: true, Secret: "secret"}, nil, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "database")
 }

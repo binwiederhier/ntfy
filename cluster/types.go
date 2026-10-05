@@ -17,7 +17,6 @@ type Config struct {
 	HeartbeatInterval   time.Duration   // How often the node registry heartbeat is refreshed
 	NodeTTL             time.Duration   // Registry rows older than this do not count as live peers
 	BatchLinger         time.Duration   // How long messages wait in a peer queue to form a batch; 0 = send immediately
-	StateInterval       time.Duration   // How often the full subscription state is pushed to peers
 	MaxMessageBytes     int64           // Upper bound for a single message on the wire (batch limits derive from this)
 	LeaderRenewInterval time.Duration   // Overrides the leader lease renewal cadence; tests only, 0 = default
 	CancelFunc          CancelFunc      // Applies a peer's subscriber-cancel request to local connections; may be nil
@@ -29,7 +28,7 @@ type Config struct {
 // server supplies it, which inverts the dependency: this package never imports the server.
 type DeliverFunc func(m *model.Message)
 
-// State is a subscription-state delta for Cluster.BroadcastState.
+// State is a state delta for Cluster.BroadcastState.
 type State struct {
 	AddedTopics       []string            // Topics that just gained their first local subscriber on this node
 	SubscriberCancels []*SubscriberCancel // Requests to cancel matching live subscriber connections on peer nodes
@@ -52,14 +51,10 @@ type SubscriberCancel struct {
 type CancelFunc func(cancel *SubscriberCancel)
 
 // TopicsAddedFunc is called with topics a peer announced as having just gained their first
-// subscriber there (not for full state snapshots). The server supplies it, e.g. to drop cached
-// negative lookups for those topics; it must not re-broadcast (loop prevention).
+// subscriber there. The server supplies it to drop cached negative rate-visitor lookups for
+// those topics; it must not re-broadcast (loop prevention). It is a cache hint only: a lost
+// announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
-
-// TopicsFunc returns the topics that currently have at least one live subscriber, computed
-// fresh on every call: membership is never tracked as a list, so topics "leave" simply by not
-// appearing in the next snapshot. The server supplies it (same inversion as DeliverFunc).
-type TopicsFunc func() []string
 
 // apiMessage is one line of a message request body (NDJSON: one message per line; a single
 // message is just a one-line body). It carries the two fields that model.Message does not
@@ -78,19 +73,9 @@ type apiState struct {
 	Cancels []*SubscriberCancel `json:"cancels,omitempty"`
 }
 
-// apiStateTopics carries a peer's subscription knowledge: either a full snapshot (Filter, a
-// marshaled Bloom filter over the topics with live subscribers) replacing all prior knowledge,
-// or an incremental update (Added) merged into it.
+// apiStateTopics carries topics that just gained their first subscriber on the sending node.
 type apiStateTopics struct {
-	Filter []byte   `json:"filter,omitempty"`
-	Added  []string `json:"added,omitempty"`
-}
-
-// peerState is what a peer last told us about itself; ForwardMessage routes around peers whose
-// fresh state provably excludes a topic.
-type peerState struct {
-	topics    *util.BloomFilter
-	updatedAt time.Time
+	Added []string `json:"added,omitempty"`
 }
 
 // peerQueue is the bounded, batching send queue for a single peer, pinned to the advertise URL

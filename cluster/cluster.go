@@ -59,7 +59,6 @@ const (
 const (
 	defaultHeartbeatInterval = 3 * time.Second  // How often a node refreshes its registry heartbeat
 	defaultNodeTTL           = 30 * time.Second // A node counts as live if its heartbeat is newer than this; generous to avoid false-dead flapping (see plans)
-	defaultStateInterval     = 15 * time.Second // How often the full subscription state is pushed to peers
 
 	// DefaultBatchLinger is how long a fan-out message may wait in a peer's queue for more
 	// messages to arrive, so they are delivered as one batch. It trades up to this much
@@ -79,12 +78,12 @@ type Member struct {
 // only covers the cross-node hop.
 type Cluster interface {
 	http.Handler
-	// ForwardMessage sends a locally published message on to the peer nodes that may have subscribers
-	// for its topic (all of them, when subscription knowledge is missing or stale). It is
-	// fire-and-forget and must not block the caller's request path.
+	// ForwardMessage sends a locally published message on to every live peer node; peers
+	// without a subscriber for the topic drop it. It is fire-and-forget and must not block the
+	// caller's request path.
 	ForwardMessage(m *model.Message) error
-	// BroadcastState pushes a subscription-state delta to ALL peers (unlike ForwardMessage,
-	// which routes), closing the routing-knowledge window to ~one round trip. Nop single-node.
+	// BroadcastState pushes a state delta (first-subscriber hints, subscriber cancels) to all
+	// peers. Nop single-node.
 	BroadcastState(state *State)
 	// IsLeader reports whether this node holds the cluster leader lock. Singleton background
 	// jobs (e.g. the Firebase keepaliver) are gated on the leader.
@@ -103,7 +102,7 @@ type Cluster interface {
 
 // New creates the cluster for the given config: the nop cluster when clustering is disabled (the
 // single-node default), or the peer-mesh cluster otherwise.
-func New(conf *Config, pool *db.DB, deliver DeliverFunc, topics TopicsFunc) (Cluster, error) {
+func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 	if !conf.Enabled {
 		return &nopCluster{}, nil
 	}
@@ -122,8 +121,5 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc, topics TopicsFunc) (Clu
 	if conf.NodeTTL == 0 {
 		conf.NodeTTL = defaultNodeTTL
 	}
-	if conf.StateInterval == 0 {
-		conf.StateInterval = defaultStateInterval
-	}
-	return newMeshCluster(conf, pool, deliver, topics)
+	return newMeshCluster(conf, pool, deliver)
 }

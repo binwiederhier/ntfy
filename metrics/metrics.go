@@ -93,12 +93,6 @@ var (
 	ClusterMessagesWasted = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_messages_wasted_total",
 	})
-	ClusterRouteSkipped = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "ntfy_cluster_route_skipped_total",
-	})
-	ClusterStatePushes = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "ntfy_cluster_state_pushes_total",
-	})
 	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_leader",
 	})
@@ -136,8 +130,6 @@ func init() {
 		ClusterQueueDropped,
 		ClusterBatchesSent,
 		ClusterMessagesWasted,
-		ClusterRouteSkipped,
-		ClusterStatePushes,
 		ClusterLeader,
 	)
 }

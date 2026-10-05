@@ -237,8 +237,8 @@ func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 }
 
 func TestServer_Cluster_FirstSubscriberAnnounces(t *testing.T) {
-	// A topic gaining its FIRST subscriber is announced to peers exactly once, so publishers on
-	// other nodes stop skipping this node for it without waiting for the next state push.
+	// A topic gaining its FIRST subscriber is announced to peers exactly once, so a peer can
+	// drop a cached rate-visitor miss for it (delivery does not depend on the announcement)
 	s := newTestServer(t, newTestConfig(t, ""))
 	b := &fakeCluster{}
 	s.cluster = b
@@ -837,42 +837,57 @@ func TestServer_Cluster_RemoteRateVisitorAssignmentRefreshes(t *testing.T) {
 }
 
 func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) {
+	// The mesh's isolation loop calls back into the server (closeLocalSubscribers, which takes
+	// s.mu). Stop must not hold s.mu while it waits for that loop, or a callback already
+	// waiting for the lock deadlocks shutdown before the message cache is drained.
 	s, err := New(newTestConfig(t, ""))
 	require.NoError(t, err)
-	// Deliberately no Stop cleanup: a failing test demonstrates the deadlock.
+	// Deliberately no Stop cleanup: a failing test demonstrates the deadlock
 	host, err := pg.Open(dbtest.CreateTestPostgresSchema(t))
 	require.NoError(t, err)
 	pool := db.New(host, nil)
+	// A peer that answers the health probe, so this node considers itself isolated rather than
+	// looking at a cluster-wide outage
+	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer peer.Close()
 	entered, release := make(chan struct{}), make(chan struct{})
 	var once sync.Once
 	c, err := cluster.New(&cluster.Config{
 		Enabled: true, NodeID: "a", AdvertiseURL: "http://127.0.0.1:1", Secret: "test",
-		HeartbeatInterval: 10 * time.Millisecond, StateInterval: 10 * time.Millisecond,
-		NodeTTL: time.Minute,
-	}, pool, func(*model.Message) {}, func() []string {
-		once.Do(func() { close(entered) })
-		<-release
-		return s.liveTopics()
-	})
+		HeartbeatInterval: 10 * time.Millisecond, NodeTTL: 50 * time.Millisecond,
+		IsolatedFunc: func() {
+			once.Do(func() { close(entered) })
+			<-release
+			s.closeLocalSubscribers()
+		},
+	}, pool, func(*model.Message) {})
 	require.NoError(t, err)
 	s.cluster = c
-	_, err = pool.Exec(`INSERT INTO node_registry VALUES ('b', 'http://127.0.0.1:2', $1)`, time.Now().Unix())
+	// The registry table exists now; the peer must be in it (and reconciled by a heartbeat)
+	// before the database goes away, or the isolation check has nobody to probe
+	_, err = pool.Exec(`INSERT INTO node_registry VALUES ('b', $1, $2)`, peer.URL, time.Now().Unix())
 	require.NoError(t, err)
+	time.Sleep(100 * time.Millisecond)
+	// Break the database: this node's registration goes stale, the peer above stays healthy,
+	// and the isolation loop calls IsolatedFunc, which parks inside the callback
+	require.NoError(t, pool.Close())
 	select {
 	case <-entered:
-	case <-time.After(time.Second):
-		t.Fatal("callback not reached")
+	case <-time.After(5 * time.Second):
+		t.Fatal("isolation callback not reached")
 	}
 	done := make(chan struct{})
 	go func() { s.Stop(); close(done) }()
 	// Give Stop time to reach cluster.Close (and, in the buggy version, to take s.mu first),
-	// then let the parked heartbeat continue: it needs s.mu to finish
+	// then let the parked callback continue: it needs s.mu to finish
 	time.Sleep(100 * time.Millisecond)
 	close(release)
 	select {
 	case <-done:
 	case <-time.After(time.Second):
-		t.Error("Stop holds s.mu while cluster.Close waits for a heartbeat callback needing s.mu")
+		t.Error("Stop holds s.mu while cluster.Close waits for an isolation callback needing s.mu")
 	}
 }
 

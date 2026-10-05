@@ -55,7 +55,7 @@ func TestMesh_Soak(t *testing.T) {
 	conf.BatchLinger = 50 * time.Millisecond
 	conf.NodeTTL = time.Minute // The fake peer never heartbeats; liveness is not under test here
 	registerFakePeer(t, pool, "node-peer", srv.URL)
-	mesh, err := newMeshCluster(conf, pool, nil, nil)
+	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	start := time.Now()
@@ -100,7 +100,7 @@ func BenchmarkForwardMessage(b *testing.B) {
 	pool := openTestPool(b, schemaDSN)
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.BatchLinger = time.Minute // Never flush; we measure enqueue only
-	mesh, err := newMeshCluster(conf, pool, nil, nil)
+	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(b, err)
 	defer mesh.Close()
 	registerFakePeer(b, pool, "node-peer", "http://127.0.0.1:1")

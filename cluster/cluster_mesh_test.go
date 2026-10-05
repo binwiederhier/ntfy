@@ -21,7 +21,6 @@ import (
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/model"
-	"heckel.io/ntfy/v2/util"
 )
 
 const (
@@ -48,7 +47,6 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 		LeaderRenewInterval: 20 * time.Millisecond, // Lease duration 60ms, hold-off 120ms; keeps leadership tests fast
 		NodeTTL:             time.Second,           // Also the peer cache bound; short so fake peers registered mid-test are seen quickly
 		MaxMessageBytes:     1 << 20,
-		StateInterval:       time.Minute, // Individual tests lower this to exercise state pushes
 	}
 }
 
@@ -87,12 +85,12 @@ func TestMesh_CrossNodeDelivery(t *testing.T) {
 		mu.Lock()
 		defer mu.Unlock()
 		received = append(received, m)
-	}, nil)
+	})
 	require.Nil(t, err)
 	defer meshB.Close()
 	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, func(m *model.Message) {
 		t.Error("node A must not receive its own relayed message")
-	}, nil)
+	})
 	require.Nil(t, err)
 	defer meshA.Close()
 	msg := model.NewDefaultMessage("mytopic", "hello cross-node")
@@ -114,7 +112,7 @@ func TestMesh_PeerAPI_Auth(t *testing.T) {
 	var delivered int
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, func(m *model.Message) {
 		delivered++
-	}, nil)
+	})
 	require.Nil(t, err)
 	defer mesh.Close()
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
@@ -159,7 +157,7 @@ func TestMesh_PeerAPI_SelfOrigin(t *testing.T) {
 	var delivered int
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, func(m *model.Message) {
 		delivered++
-	}, nil)
+	})
 	require.Nil(t, err)
 	defer mesh.Close()
 
@@ -206,7 +204,7 @@ func TestMesh_SlowPeerIsolation(t *testing.T) {
 	for i, url := range []string{srvFast.URL, srvSlow.URL} {
 		registerFakePeer(t, pool, NodeID(fmt.Sprintf("node-fake-%d", i)), url)
 	}
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	const n = 20
@@ -242,7 +240,7 @@ func TestMesh_BatchCoalescing(t *testing.T) {
 	registerFakePeer(t, pool, "node-fake", srv.URL)
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.BatchLinger = 150 * time.Millisecond
-	mesh, err := newMeshCluster(conf, pool, nil, nil)
+	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	const n = 20
@@ -280,7 +278,7 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	defer srv.Close()
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.NodeTTL = 300 * time.Millisecond // Fast expiry so the test observes TTL-based removal
-	mesh, err := newMeshCluster(conf, pool, nil, nil)
+	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	// The fake peer registers once and then "dies": its heartbeat is never refreshed
@@ -327,7 +325,7 @@ func TestMesh_ForwardAfterClose(t *testing.T) {
 	// closed) and nothing waits for it.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
 	require.Nil(t, err)
 	registerFakePeer(t, pool, "node-peer", "http://127.0.0.1:1")
 	require.Nil(t, mesh.Close())
@@ -340,10 +338,10 @@ func TestMesh_ForwardAfterClose(t *testing.T) {
 func TestMesh_LeaderFailover(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
-	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil, nil)
+	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
-	meshB, err := newMeshCluster(newTestMeshConfig("node-b", "http://127.0.0.1:1"), poolB, nil, nil)
+	meshB, err := newMeshCluster(newTestMeshConfig("node-b", "http://127.0.0.1:1"), poolB, nil)
 	require.Nil(t, err)
 	defer meshB.Close()
 	// Exactly one node becomes leader
@@ -362,7 +360,7 @@ func TestMesh_LeaderFailover(t *testing.T) {
 func TestMesh_CloseDeregisters(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
 	require.Nil(t, err)
 	var count int
 	require.Nil(t, pool.QueryRow(`SELECT COUNT(*) FROM node_registry WHERE node_id = 'node-a'`).Scan(&count))
@@ -386,201 +384,10 @@ func postState(c *meshCluster, origin NodeID, state *apiState) *httptest.Respons
 	return rr
 }
 
-// topicFilter builds a marshaled Bloom filter over the given topics.
-func topicFilter(t *testing.T, topics ...string) []byte {
-	t.Helper()
-	filter := util.NewBloomFilter(len(topics), 0.01)
-	for _, topic := range topics {
-		filter.Add(topic)
-	}
-	data, err := filter.MarshalBinary()
-	require.Nil(t, err)
-	return data
-}
-
-func TestMesh_RouteSkipsUnsubscribedPeer(t *testing.T) {
-	// A peer whose fresh state provably excludes a topic is not contacted for it; a topic in its
-	// state is delivered as usual.
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	pool := openTestPool(t, schemaDSN)
-	var mu sync.Mutex
-	received := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		require.Nil(t, err)
-		messages, err := unmarshalMessageBody(body, 1<<20)
-		require.Nil(t, err)
-		mu.Lock()
-		received += len(messages)
-		mu.Unlock()
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-	registerFakePeer(t, pool, "node-b", srv.URL)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
-	require.Nil(t, err)
-	defer mesh.Close()
-	// node-b reports subscribers only for "subscribed-topic"
-	rr := postState(mesh, "node-b", &apiState{Topics: &apiStateTopics{Filter: topicFilter(t, "subscribed-topic")}})
-	require.Equal(t, 200, rr.Code)
-	// A topic outside the peer's state is skipped
-	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("other-topic", "skipped")))
-	time.Sleep(300 * time.Millisecond) // Give a wrong implementation time to deliver anyway
-	mu.Lock()
-	require.Equal(t, 0, received)
-	mu.Unlock()
-	// A topic inside the peer's state is delivered
-	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("subscribed-topic", "delivered")))
-	waitFor(t, func() bool {
-		mu.Lock()
-		defer mu.Unlock()
-		return received == 1
-	})
-}
-
-func TestMesh_RouteBroadcastsOnStaleState(t *testing.T) {
-	// State too old to trust cannot justify skipping: the peer is broadcast to as if unknown.
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	pool := openTestPool(t, schemaDSN)
-	var mu sync.Mutex
-	received := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == MessagePath { // The mesh also pushes state here; count only messages
-			mu.Lock()
-			received++
-			mu.Unlock()
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-	registerFakePeer(t, pool, "node-b", srv.URL)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
-	require.Nil(t, err)
-	defer mesh.Close()
-	rr := postState(mesh, "node-b", &apiState{Topics: &apiStateTopics{Filter: topicFilter(t, "subscribed-topic")}})
-	require.Equal(t, 200, rr.Code)
-	// Age the state beyond the trust window
-	mesh.statesMu.Lock()
-	mesh.states["node-b"].updatedAt = time.Now().Add(-time.Hour)
-	mesh.statesMu.Unlock()
-	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("other-topic", "broadcast anyway")))
-	waitFor(t, func() bool {
-		mu.Lock()
-		defer mu.Unlock()
-		return received == 1
-	})
-}
-
-func TestMesh_StatePushReplacesAndRemoves(t *testing.T) {
-	// Node A periodically pushes a full snapshot of its live topics to node B; each snapshot
-	// REPLACES B's knowledge, so topics that lost their subscribers disappear without any
-	// explicit removal protocol.
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
-	var topicsMu sync.Mutex
-	topicsA := []string{"topic-1"}
-	source := func() []string {
-		topicsMu.Lock()
-		defer topicsMu.Unlock()
-		return append([]string{}, topicsA...)
-	}
-	var meshB *meshCluster
-	srvB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		meshB.ServeHTTP(w, r)
-	}))
-	defer srvB.Close()
-	meshB, err := newMeshCluster(newTestMeshConfig("node-b", srvB.URL), poolB, nil, nil)
-	require.Nil(t, err)
-	defer meshB.Close()
-	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	confA.StateInterval = 200 * time.Millisecond
-	meshA, err := newMeshCluster(confA, poolA, nil, source)
-	require.Nil(t, err)
-	defer meshA.Close()
-	// B learns A's topics via the periodic push
-	knows := func(topic string) func() bool {
-		return func() bool {
-			meshB.statesMu.Lock()
-			defer meshB.statesMu.Unlock()
-			state, ok := meshB.states["node-a"]
-			return ok && state.topics.Contains(topic)
-		}
-	}
-	waitFor(t, knows("topic-1"))
-	// A's subscribers change; the next snapshot replaces the old knowledge entirely
-	topicsMu.Lock()
-	topicsA = []string{"topic-2"}
-	topicsMu.Unlock()
-	waitFor(t, knows("topic-2"))
-	waitFor(t, func() bool { return !knows("topic-1")() })
-}
-
-func TestMesh_AnnounceClosesWindow(t *testing.T) {
-	// A topic gaining its first subscriber is announced immediately, so peers learn about it
-	// without waiting for the next full state push.
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
-	var meshB *meshCluster
-	srvB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		meshB.ServeHTTP(w, r)
-	}))
-	defer srvB.Close()
-	meshB, err := newMeshCluster(newTestMeshConfig("node-b", srvB.URL), poolB, nil, nil)
-	require.Nil(t, err)
-	defer meshB.Close()
-	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	confA.StateInterval = 200 * time.Millisecond // One full push establishes the baseline
-	meshA, err := newMeshCluster(confA, poolA, nil, func() []string { return []string{"existing"} })
-	require.Nil(t, err)
-	defer meshA.Close()
-	waitFor(t, func() bool {
-		meshB.statesMu.Lock()
-		defer meshB.statesMu.Unlock()
-		_, ok := meshB.states["node-a"]
-		return ok
-	})
-	// Announcements merge into the baseline right away
-	meshA.BroadcastState(&State{AddedTopics: []string{"fresh-topic"}})
-	waitFor(t, func() bool {
-		meshB.statesMu.Lock()
-		defer meshB.statesMu.Unlock()
-		state, ok := meshB.states["node-a"]
-		return ok && state.topics.Contains("fresh-topic")
-	})
-}
-
-func TestMesh_StateOfDepartedPeerPruned(t *testing.T) {
-	// peerState is push-driven and can arrive before the peer is visible in the registry, so it
-	// must survive reconcile while fresh -- but a departed peer's state must not leak forever:
-	// once it is both absent from the registry and stale past the trust window, it is pruned.
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	pool := openTestPool(t, schemaDSN)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
-	require.Nil(t, err)
-	defer mesh.Close()
-	rr := postState(mesh, "node-gone", &apiState{Topics: &apiStateTopics{Filter: topicFilter(t, "some-topic")}})
-	require.Equal(t, 200, rr.Code)
-	// Fresh state of an unknown peer survives reconcile (the new-node visibility window)
-	mesh.reconcilePeers(nil)
-	mesh.statesMu.Lock()
-	_, ok := mesh.states["node-gone"]
-	mesh.statesMu.Unlock()
-	require.True(t, ok)
-	// Stale state of an absent peer is pruned
-	mesh.statesMu.Lock()
-	mesh.states["node-gone"].updatedAt = time.Now().Add(-time.Hour)
-	mesh.statesMu.Unlock()
-	mesh.reconcilePeers(nil)
-	mesh.statesMu.Lock()
-	_, ok = mesh.states["node-gone"]
-	mesh.statesMu.Unlock()
-	require.False(t, ok)
-}
-
 func TestMesh_HealthyReflectsRegistration(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	require.True(t, mesh.Healthy()) // Registered synchronously at construction
@@ -611,7 +418,7 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 		defer mu.Unlock()
 		receivedB = append(receivedB, cancel)
 	}
-	meshB, err := newMeshCluster(confB, poolB, nil, nil)
+	meshB, err := newMeshCluster(confB, poolB, nil)
 	require.Nil(t, err)
 	defer meshB.Close()
 	srvB := &http.Server{Handler: meshB}
@@ -624,7 +431,7 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 		defer mu.Unlock()
 		canceledA++
 	}
-	meshA, err := newMeshCluster(confA, poolA, nil, nil)
+	meshA, err := newMeshCluster(confA, poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
 
@@ -646,9 +453,46 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	require.Equal(t, 0, canceledA)
 }
 
+func TestMesh_ForwardsEveryTopicToEveryPeer(t *testing.T) {
+	// Fan-out is unconditional: a peer gets every message and drops the ones it has no
+	// subscriber for. Nothing about a peer's subscriptions may gate delivery, which is what
+	// routing by subscription knowledge used to do (removed: ordering made it lose messages).
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	var topics []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		messages, err := unmarshalMessageBody(body, 1<<20)
+		require.Nil(t, err)
+		mu.Lock()
+		for _, m := range messages {
+			topics = append(topics, m.Topic)
+		}
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	registerFakePeer(t, pool, "node-b", srv.URL)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("some-topic", "one")))
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("other-topic", "two")))
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(topics) == 2
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.ElementsMatch(t, []string{"some-topic", "other-topic"}, topics)
+}
+
 func TestMesh_TopicAnnouncementInvokesTopicsAddedFunc(t *testing.T) {
-	// A first-subscriber announcement from node A must reach node B's TopicsAddedFunc (the
-	// server uses it to drop stale UnifiedPush rate-visitor misses); full snapshots must not
+	// A first-subscriber announcement from node A must reach node B's TopicsAddedFunc, which
+	// the server uses to drop a stale UnifiedPush rate-visitor miss
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	var mu sync.Mutex
@@ -662,14 +506,14 @@ func TestMesh_TopicAnnouncementInvokesTopicsAddedFunc(t *testing.T) {
 		defer mu.Unlock()
 		addedB = append(addedB, topics...)
 	}
-	meshB, err := newMeshCluster(confB, poolB, nil, nil)
+	meshB, err := newMeshCluster(confB, poolB, nil)
 	require.Nil(t, err)
 	defer meshB.Close()
 	srvB := &http.Server{Handler: meshB}
 	go srvB.Serve(listenerB)
 	defer srvB.Close()
 
-	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil, func() []string { return []string{"snapshot-topic"} })
+	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
 
@@ -679,10 +523,6 @@ func TestMesh_TopicAnnouncementInvokesTopicsAddedFunc(t *testing.T) {
 		defer mu.Unlock()
 		return len(addedB) > 0
 	})
-	peers, err := meshA.registry.Refresh()
-	require.Nil(t, err)
-	meshA.pushState(peers)
-	time.Sleep(300 * time.Millisecond)
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, []string{"up123456789012"}, addedB)
@@ -718,7 +558,7 @@ func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.NodeTTL = 300 * time.Millisecond
 	conf.IsolatedFunc = func() { isolated.Add(1) }
-	mesh, err := newMeshCluster(conf, pool, nil, nil)
+	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	waitFor(t, func() bool {
@@ -747,7 +587,7 @@ func TestMesh_IsolatedFuncWhenDatabaseHangs(t *testing.T) {
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.NodeTTL = 300 * time.Millisecond
 	conf.IsolatedFunc = func() { isolated.Add(1) }
-	mesh, err := newMeshCluster(conf, openTestPool(t, proxy.dsn), nil, nil)
+	mesh, err := newMeshCluster(conf, openTestPool(t, proxy.dsn), nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	waitFor(t, func() bool {
@@ -821,7 +661,7 @@ func TestMesh_MembersEndpoint(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	registerFakePeer(t, pool, "node-peer", "http://192.168.1.50:2587")
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	waitFor(t, func() bool {

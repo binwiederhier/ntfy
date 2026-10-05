@@ -361,7 +361,7 @@ func New(conf *Config) (*Server, error) {
 		TopicsAddedFunc: s.clearRateVisitorMisses,
 		IsolatedFunc:    s.closeLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
-	}, pool, s.deliverFromBus, s.liveTopics)
+	}, pool, s.deliverFromBus)
 	if err != nil {
 		return nil, err
 	}
@@ -383,9 +383,8 @@ func New(conf *Config) (*Server, error) {
 		}
 		s.seedTopicsLastAccess()
 	}
-	// The cluster routes messages by subscription knowledge: peers learn this node's live topics
-	// via periodic state pushes (liveTopics) and immediate announcements on a topic's first
-	// subscriber (the hook below; also set in topicsFromIDs for topics created later)
+	// Peers are told about a topic's first subscriber here (the hook below; also set in
+	// topicsFromIDs for topics created later), which lets them drop a cached rate-visitor miss
 	for _, t := range s.topics {
 		t.onFirstSubscriber = s.topicAnnouncer(t.ID)
 	}
@@ -411,23 +410,9 @@ func (s *Server) clusterHandler() http.Handler {
 	return mux
 }
 
-// liveTopics returns the topics that currently have at least one subscriber, computed fresh on
-// every call. Deliberately NOT the whole topics map: it also holds subscriber-less topics
-// rebuilt from the message cache, which would gut the routing filter's selectivity.
-func (s *Server) liveTopics() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	topics := make([]string, 0, len(s.topics))
-	for _, t := range s.topics {
-		if subscribers, _ := t.Stats(); subscribers > 0 {
-			topics = append(topics, t.ID)
-		}
-	}
-	return topics
-}
-
-// topicAnnouncer returns the first-subscriber hook for a topic: it tells peer nodes right away
-// that this node now wants messages for it (see Cluster.BroadcastState).
+// topicAnnouncer returns the first-subscriber hook for a topic: it tells peer nodes that this
+// node now has a subscriber for it, so they can drop a cached rate-visitor miss (see
+// Cluster.BroadcastState). Delivery does not depend on it; every message goes to every peer.
 func (s *Server) topicAnnouncer(id string) func() {
 	return func() {
 		s.cluster.BroadcastState(&cluster.State{AddedTopics: []string{id}})
@@ -642,8 +627,8 @@ func (s *Server) stopBounded() {
 
 func (s *Server) stop() {
 	// Close the services that call back into the server BEFORE taking the server lock: the
-	// usage tracker's flush loop calls applyPeerUsage, the mesh's heartbeat and isolation loops
-	// call liveTopics/closeLocalSubscribers, and all of those take s.mu. Closing them under the
+	// usage tracker's flush loop calls applyPeerUsage, the mesh's isolation loop calls
+	// closeLocalSubscribers, and all of those take s.mu. Closing them under the
 	// lock deadlocks with a tick that is already waiting for it (Close waits for the loop, the
 	// loop waits for s.mu, Stop holds s.mu). Usage counted during the remaining shutdown is
 	// discarded, which is fine: the final flush below the lock would race the closing databases

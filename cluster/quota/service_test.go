@@ -142,7 +142,7 @@ func TestTracker_FailOpen_RetainsDeltasAndServesStaleTotals(t *testing.T) {
 func TestTracker_Prune(t *testing.T) {
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	tracker := newTestTracker(t, pool, nil)
-	_, err := pool.Exec(upsertUsageQuery, "ip:1.2.3.4", "2020-01-01", 1, 1, 0, 0, 0, time.Now().Unix())
+	_, err := pool.Exec(upsertUsageQuery, "ip:1.2.3.4", "2020-01-01", 1, 1, 0, 0, 0)
 	require.Nil(t, err)
 	tracker.Inc("ip:1.2.3.4", Counters{Messages: 1})
 	require.Nil(t, tracker.flushAndPull())
@@ -190,4 +190,68 @@ func TestTracker_MemoryPerKeyBounded(t *testing.T) {
 	require.Less(t, perKey, int64(120), "tracker retains %d bytes per key", perKey)
 	t.Logf("tracker retains %d bytes per key", perKey)
 	require.Equal(t, keys, len(tracker.entries))
+}
+
+func TestTracker_RetainsInFlightUsage(t *testing.T) {
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	tracker := newTestTracker(t, pool, nil)
+	tracker.Inc("ip:1.2.3.4", Counters{Messages: 10})
+	tx, err := pool.Begin()
+	require.NoError(t, err)
+	defer tx.Rollback() // Also on failure, or the schema cleanup waits on the lock forever
+	_, err = tx.Exec(`LOCK TABLE visitor_usage IN ACCESS EXCLUSIVE MODE`)
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() { done <- tracker.flushAndPull() }()
+	require.Eventually(t, func() bool { // Wait for the upsert to block on the table lock
+		// Asked on the locking transaction's own connection (the test pool has two, and the
+		// blocked upsert holds the other one). Stats views are snapshotted per transaction, so
+		// the snapshot has to be dropped before every look.
+		var blocked int
+		if _, err := tx.Exec(`SELECT pg_stat_clear_snapshot()`); err != nil {
+			return false
+		}
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%INSERT INTO visitor_usage%'`).Scan(&blocked); err != nil {
+			return false
+		}
+		return blocked == 1
+	}, 3*time.Second, 5*time.Millisecond)
+	during := tracker.Totals("ip:1.2.3.4")
+	require.NoError(t, tx.Rollback())
+	require.NoError(t, <-done)
+	require.Equal(t, int64(10), during.Messages, "admitted usage disappears while SQL is blocked")
+	require.Equal(t, int64(10), tracker.Totals("ip:1.2.3.4").Messages, "usage counted twice after the flush")
+}
+
+func TestTracker_PartialFlushDoesNotDoubleCount(t *testing.T) {
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	tracker := newTestTracker(t, pool, nil)
+	_, err := pool.Exec(`CREATE SEQUENCE review_attempt;
+      CREATE FUNCTION review_fail_second() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN IF nextval('review_attempt') = 2 THEN RAISE EXCEPTION 'injected failure'; END IF; RETURN NEW; END $$;
+      CREATE TRIGGER review_fail BEFORE INSERT ON visitor_usage FOR EACH ROW EXECUTE FUNCTION review_fail_second();`)
+	require.NoError(t, err)
+	tracker.Inc("ip:1.2.3.4", Counters{Messages: 1})
+	tracker.Inc("ip:1.2.3.5", Counters{Messages: 1})
+	require.Error(t, tracker.flushAndPull())
+	require.NoError(t, tracker.flushAndPull())
+	var total int64
+	require.NoError(t, pool.QueryRow(`SELECT SUM(messages) FROM visitor_usage`).Scan(&total))
+	require.Equal(t, int64(2), total, "the successful prefix is retried after a partial failure")
+}
+
+func TestTracker_WatermarkSeesLateWriter(t *testing.T) {
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	a := newTestTracker(t, openTestPool(t, dsn), nil)
+	b := newTestTracker(t, openTestPool(t, dsn), nil)
+	// A flush stamps all writes at its start; a slow flush can commit later than B's watermark.
+	started := time.Now()
+	a.now = func() time.Time { return started }
+	b.now = func() time.Time { return started.Add(3 * time.Second) }
+	require.NoError(t, b.flushAndPull())
+	a.Inc("ip:1.2.3.4", Counters{Messages: 7})
+	require.NoError(t, a.flushAndPull())
+	require.NoError(t, b.flushAndPull())
+	require.NoError(t, b.flushAndPull())
+	require.Equal(t, int64(7), b.Totals("ip:1.2.3.4").Messages)
 }

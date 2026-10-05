@@ -8,6 +8,7 @@
 package quota
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -29,6 +30,12 @@ const (
 
 	// retention is how long old per-day usage rows are kept before the leader prunes them
 	retention = 7 * 24 * time.Hour
+
+	// flushTimeout bounds one usage upsert. Rows are stamped with the database clock at the
+	// start of their statement, so a row's updated_at lags its commit by at most this much;
+	// pullOverlap re-reads that far behind the watermark so a slow writer is never skipped.
+	flushTimeout = 5 * time.Second
+	pullOverlap  = flushTimeout + time.Second
 )
 
 const (
@@ -46,9 +53,11 @@ const (
 		);
 		CREATE INDEX IF NOT EXISTS idx_visitor_usage_updated_at ON visitor_usage (updated_at);
 	`
+	// Timestamps come from the database clock, never from a node's: the watermark below compares
+	// them, and node clocks neither agree with each other nor with the database
 	upsertUsageQuery = `
 		INSERT INTO visitor_usage (key, day, requests, messages, emails, calls, bandwidth_bytes, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, EXTRACT(EPOCH FROM now())::BIGINT)
 		ON CONFLICT (key, day) DO UPDATE SET
 			requests = visitor_usage.requests + EXCLUDED.requests,
 			messages = visitor_usage.messages + EXCLUDED.messages,
@@ -57,8 +66,9 @@ const (
 			bandwidth_bytes = visitor_usage.bandwidth_bytes + EXCLUDED.bandwidth_bytes,
 			updated_at = EXCLUDED.updated_at
 	`
-	selectChangedUsageQuery = `SELECT key, requests, messages, emails, calls, bandwidth_bytes FROM visitor_usage WHERE day = $1 AND updated_at >= $2`
-	pruneUsageQuery         = `DELETE FROM visitor_usage WHERE day < $1`
+	selectChangedUsageQuery  = `SELECT key, requests, messages, emails, calls, bandwidth_bytes FROM visitor_usage WHERE day = $1 AND updated_at >= $2`
+	selectDatabaseClockQuery = `SELECT EXTRACT(EPOCH FROM now())::BIGINT`
+	pruneUsageQuery          = `DELETE FROM visitor_usage WHERE day < $1`
 )
 
 // Config is the tracker configuration. FlushInterval defaults to DefaultFlushInterval;
@@ -202,18 +212,18 @@ func (t *Tracker) runFlushLoop() {
 }
 
 // flushAndPull pushes pending deltas, handles day rollover, pulls changed cluster totals,
-// and reports peer consumption. On error, deltas are retained and retried on the next
-// flush; totals serve stale until then (fail open).
+// and reports peer consumption. Increments stay in unflushed until their row is written, so
+// Totals never dips while a flush is in flight, and a failed write simply leaves its key's
+// increments where they are for the next flush (fail open: totals serve stale until then).
 func (t *Tracker) flushAndPull() error {
-	// Take the pending deltas and roll the day over if needed. Pending deltas are always
-	// flushed under the day they were counted in; the fast-moving maps restart empty.
+	// Snapshot the pending increments and roll the day over if needed. Increments are always
+	// flushed under the day they were counted in; a new day starts with empty entries.
 	t.mu.Lock()
 	day := t.day
 	pending := make(map[Key]Counters, len(t.entries))
 	for key, e := range t.entries {
 		if !e.unflushed.zero() {
 			pending[key] = e.unflushed
-			e.unflushed = Counters{}
 		}
 	}
 	if newDay := t.currentDay(); newDay != day {
@@ -223,30 +233,24 @@ func (t *Tracker) flushAndPull() error {
 	}
 	t.mu.Unlock()
 
-	// Push deltas as increments
-	now := t.now().Unix()
+	// Push the snapshot as increments, one row at a time. Each written row moves from unflushed
+	// to the baseline right away, so a later failure in the same flush cannot write it twice;
+	// the keys after the failure keep their increments and are retried on the next flush.
 	for key, c := range pending {
-		if _, err := t.pool.Exec(upsertUsageQuery, string(key), day, c.Requests, c.Messages, c.Emails, c.Calls, c.BandwidthBytes, now); err != nil {
-			// Put the deltas back for retry; counts must not be lost on a database hiccup
-			t.mu.Lock()
-			if t.day == day {
-				for k, cc := range pending {
-					t.entryFor(k).unflushed.Add(cc)
-				}
-			}
-			t.mu.Unlock()
+		ctx, cancel := context.WithTimeout(context.Background(), flushTimeout)
+		_, err := t.pool.ExecContext(ctx, upsertUsageQuery, string(key), day, c.Requests, c.Messages, c.Emails, c.Calls, c.BandwidthBytes)
+		cancel()
+		if err != nil {
 			return err
 		}
-	}
-	// Written rows are part of the baseline now, so the next pull does not read them back as
-	// peer consumption
-	t.mu.Lock()
-	if t.day == day {
-		for k, cc := range pending {
-			t.entryFor(k).baseline.Add(cc)
+		t.mu.Lock()
+		if t.day == day { // After a rollover the old day's entries are gone; the row is still correct
+			e := t.entryFor(key)
+			e.unflushed.sub(c) // Only the snapshot: increments counted since stay pending
+			e.baseline.Add(c)
 		}
+		t.mu.Unlock()
 	}
-	t.mu.Unlock()
 	return t.pull()
 }
 
@@ -257,7 +261,12 @@ func (t *Tracker) pull() error {
 	t.mu.Lock()
 	day, since := t.day, t.pulledAt
 	t.mu.Unlock()
-	pullTime := t.now().Unix()
+	// The watermark is the database clock, read before the rows: everything committed after
+	// this read has a later updated_at (minus at most flushTimeout, covered by pullOverlap)
+	var dbNow int64
+	if err := t.pool.QueryRow(selectDatabaseClockQuery).Scan(&dbNow); err != nil {
+		return err
+	}
 	rows, err := t.pool.Query(selectChangedUsageQuery, day, since) // Deliberately the primary: the pull must see this node's own just-flushed rows (replicas may lag)
 	if err != nil {
 		return err
@@ -275,7 +284,7 @@ func (t *Tracker) pull() error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	peerDeltas := t.apply(day, sums, pullTime)
+	peerDeltas := t.apply(day, sums, dbNow)
 	for key, delta := range peerDeltas {
 		t.conf.PeerUsageFunc(key, delta)
 	}
@@ -284,7 +293,7 @@ func (t *Tracker) pull() error {
 
 // apply folds the database sums read by pull into the in-memory state and returns the usage
 // peers consumed since the last pull. Split out so it can be exercised without a database.
-func (t *Tracker) apply(day string, sums map[Key]*Counters, pullTime int64) map[Key]Counters {
+func (t *Tracker) apply(day string, sums map[Key]*Counters, dbNow int64) map[Key]Counters {
 	var peerDeltas map[Key]Counters
 	t.mu.Lock()
 	if t.day != day {
@@ -303,7 +312,7 @@ func (t *Tracker) apply(day string, sums map[Key]*Counters, pullTime int64) map[
 			peerDeltas[key] = peer
 		}
 	}
-	t.pulledAt = pullTime - 1 // Overlap one second to never miss same-second writers; re-reads are idempotent
+	t.pulledAt = dbNow - int64(pullOverlap.Seconds()) // Re-reads are idempotent (sums, not deltas)
 	t.mu.Unlock()
 	return peerDeltas
 }

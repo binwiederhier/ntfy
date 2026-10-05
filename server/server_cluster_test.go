@@ -959,3 +959,36 @@ func TestServer_Cluster_ReauthorizesLiveSubscribers(t *testing.T) {
 		t.Fatal("revoked subscriber was not canceled")
 	}
 }
+
+func TestServer_Cluster_GapClosesSubscribersSoTheyReplay(t *testing.T) {
+	// A peer that could not deliver to this node reports the topics it lost; those subscribers
+	// must be closed, because a client sitting on an open connection has no way to notice the
+	// hole. On reconnect it asks for since=<last id> and the cache fills it in.
+	s := newTestServer(t, newTestConfig(t, ""))
+	topics, err := s.topicsFromIDs(nil, "gapped", "fine")
+	require.Nil(t, err)
+	var gappedOnce, fineOnce sync.Once
+	gappedClosed, fineClosed := make(chan struct{}), make(chan struct{})
+	noop := func(*visitor, *model.Message) error { return nil }
+	topics[0].Subscribe(noop, "", func() { gappedOnce.Do(func() { close(gappedClosed) }) })
+	topics[1].Subscribe(noop, "", func() { fineOnce.Do(func() { close(fineClosed) }) })
+
+	s.closeGappedSubscribers([]string{"gapped"})
+	select {
+	case <-gappedClosed:
+	case <-time.After(time.Second):
+		t.Fatal("subscriber of the gapped topic was not closed")
+	}
+	select {
+	case <-fineClosed:
+		t.Fatal("subscriber of an unaffected topic was closed")
+	default:
+	}
+	// Too many gaps to enumerate: everything is closed
+	s.closeGappedSubscribers([]string{cluster.GapAllTopics})
+	select {
+	case <-fineClosed:
+	case <-time.After(time.Second):
+		t.Fatal("subscriber was not closed on a cluster-wide gap")
+	}
+}

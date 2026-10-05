@@ -115,11 +115,11 @@ func BenchmarkForwardMessage(b *testing.B) {
 
 // BenchmarkDecodeFanout measures the receive-path cost of decoding a 100-message NDJSON body.
 func BenchmarkDecodeFanout(b *testing.B) {
-	frags := make([][]byte, 100)
+	frags := make([]*fragment, 100)
 	for i := range frags {
-		frag, err := marshalMessage(model.NewDefaultMessage("mytopic", fmt.Sprintf("benchmark message %d", i)))
+		data, err := marshalMessage(model.NewDefaultMessage("mytopic", fmt.Sprintf("benchmark message %d", i)))
 		require.Nil(b, err)
-		frags[i] = frag
+		frags[i] = &fragment{topic: "mytopic", data: data}
 	}
 	body := assembleMessageBody(frags)
 	b.SetBytes(int64(len(body)))

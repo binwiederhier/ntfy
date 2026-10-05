@@ -359,6 +359,7 @@ func New(conf *Config) (*Server, error) {
 		BatchLinger:     conf.ClusterBatchLinger,
 		CancelFunc:      s.applySubscriberCancel,
 		TopicsAddedFunc: s.clearRateVisitorMisses,
+		GapFunc:         s.closeGappedSubscribers,
 		IsolatedFunc:    s.closeLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
@@ -427,6 +428,25 @@ func (s *Server) closeLocalSubscribers() {
 	defer s.mu.RUnlock()
 	for _, t := range s.topics {
 		t.CancelAllSubscribers()
+	}
+}
+
+// closeGappedSubscribers closes the local subscribers of topics a peer could not deliver to
+// this node (see cluster.GapFunc). Their clients reconnect with since=<last message id> and
+// replay what they missed from the message cache, which is the only recovery path that does not
+// require the peers to agree on what was lost. Messages published with cache: no cannot be
+// replayed; cross-node delivery is best-effort for those.
+func (s *Server) closeGappedSubscribers(topics []string) {
+	if slices.Contains(topics, cluster.GapAllTopics) {
+		s.closeLocalSubscribers()
+		return
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, id := range topics {
+		if t, ok := s.topics[id]; ok {
+			t.CancelAllSubscribers()
+		}
 	}
 }
 

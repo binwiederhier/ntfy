@@ -21,6 +21,7 @@ type Config struct {
 	LeaderRenewInterval time.Duration   // Overrides the leader lease renewal cadence; tests only, 0 = default
 	CancelFunc          CancelFunc      // Applies a peer's subscriber-cancel request to local connections; may be nil
 	TopicsAddedFunc     TopicsAddedFunc // Told about topics that just gained their first subscriber on a peer; may be nil
+	GapFunc             GapFunc         // Told that a peer could not deliver messages for these topics; may be nil
 	IsolatedFunc        func()          // Called while this node lost its registration but a peer is healthy; may be nil
 }
 
@@ -50,6 +51,16 @@ type SubscriberCancel struct {
 // re-broadcast (loop prevention).
 type CancelFunc func(cancel *SubscriberCancel)
 
+// GapFunc is called with topics for which a peer could not deliver one or more messages to this
+// node (its queue overflowed, or the request failed). The server closes those topics' local
+// subscribers so their clients reconnect and replay the gap from the message cache with
+// since=. GapAllTopics means "every topic": too many topics to enumerate.
+type GapFunc func(topics []string)
+
+// GapAllTopics is the GapFunc marker for "gaps in so many topics that they are not worth
+// enumerating; treat every local subscriber as having missed something".
+const GapAllTopics = "*"
+
 // TopicsAddedFunc is called with topics a peer announced as having just gained their first
 // subscriber there. The server supplies it to drop cached negative rate-visitor lookups for
 // those topics; it must not re-broadcast (loop prevention). It is a cache hint only: a lost
@@ -71,6 +82,7 @@ type apiMessage struct {
 type apiState struct {
 	Topics  *apiStateTopics     `json:"topics,omitempty"`
 	Cancels []*SubscriberCancel `json:"cancels,omitempty"`
+	Gaps    []string            `json:"gaps,omitempty"`
 }
 
 // apiStateTopics carries topics that just gained their first subscriber on the sending node.
@@ -83,5 +95,12 @@ type apiStateTopics struct {
 // as a replacement (reconcile retires the old queue; ForwardMessage creates a fresh one on demand).
 type peerQueue struct {
 	advertiseURL string
-	queue        *util.LingerQueue[[]byte] // pre-marshaled apiMessage fragments
+	queue        *util.LingerQueue[*fragment]
+}
+
+// fragment is one pre-marshaled apiMessage line plus the topic it belongs to: a batch that is
+// dropped or rejected turns into a delivery gap, which is reported per topic (see GapFunc).
+type fragment struct {
+	topic string
+	data  []byte
 }

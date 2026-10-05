@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/netip"
+	"slices"
 	"strings"
 
 	"heckel.io/ntfy/v2/log"
@@ -35,8 +36,23 @@ func marshalMessage(m *model.Message) ([]byte, error) {
 
 // assembleMessageBody builds an NDJSON fan-out request body from pre-marshaled apiMessage
 // lines, avoiding a second JSON marshal of the messages.
-func assembleMessageBody(frags [][]byte) []byte {
-	return append(bytes.Join(frags, []byte("\n")), '\n')
+func assembleMessageBody(frags []*fragment) []byte {
+	lines := make([][]byte, len(frags))
+	for i, f := range frags {
+		lines[i] = f.data
+	}
+	return append(bytes.Join(lines, []byte("\n")), '\n')
+}
+
+// fragmentTopics returns the distinct topics of a batch, for reporting a delivery gap
+func fragmentTopics(frags []*fragment) []string {
+	topics := make([]string, 0, len(frags))
+	for _, f := range frags {
+		if !slices.Contains(topics, f.topic) {
+			topics = append(topics, f.topic)
+		}
+	}
+	return topics
 }
 
 // decodeMessageBody reads NDJSON apiMessage lines from r, reattaches the non-JSON fields
@@ -66,4 +82,15 @@ func decodeMessageBody(r io.Reader, maxLineBytes int, deliver DeliverFunc) error
 		deliver(apiMsg.Message)
 	}
 	return scanner.Err()
+}
+
+// subtractTopics returns the topics in a that are not in b
+func subtractTopics(a, b []string) []string {
+	out := make([]string, 0, len(a))
+	for _, topic := range a {
+		if !slices.Contains(b, topic) {
+			out = append(out, topic)
+		}
+	}
+	return out
 }

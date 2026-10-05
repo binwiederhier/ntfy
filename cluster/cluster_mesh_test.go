@@ -117,7 +117,7 @@ func TestMesh_PeerAPI_Auth(t *testing.T) {
 	defer mesh.Close()
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
-	payload := assembleMessageBody([][]byte{frag})
+	payload := assembleMessageBody([]*fragment{{topic: "mytopic", data: frag}})
 
 	// Wrong secret -> 401, not delivered
 	rr := httptest.NewRecorder()
@@ -164,7 +164,7 @@ func TestMesh_PeerAPI_SelfOrigin(t *testing.T) {
 	// A request that carries this node's own broadcasts must not be re-delivered (loop prevention)
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "loop"))
 	require.Nil(t, err)
-	payload := assembleMessageBody([][]byte{frag})
+	payload := assembleMessageBody([]*fragment{{topic: "mytopic", data: frag}})
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", MessagePath, strings.NewReader(string(payload)))
 	req.Header.Set(secretHeader, testSecret)
@@ -691,4 +691,87 @@ func TestMesh_MembersEndpoint(t *testing.T) {
 	require.Equal(t, "http://192.168.1.10:2587", byID["node-a"].AdvertiseURL)
 	require.True(t, byID["node-a"].Healthy)
 	require.Equal(t, "http://192.168.1.50:2587", byID["node-peer"].AdvertiseURL)
+}
+
+func TestMesh_UndeliveredBatchIsReportedAsAGap(t *testing.T) {
+	// A batch the peer rejects is lost: its subscribers there would sit on an open connection
+	// missing a message. The peer must be told which topics, so it can make those clients
+	// replay. The report is retried until it lands, since an unreachable peer is the usual
+	// reason for a gap in the first place.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	var gaps []string
+	rejectState := true
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == MessagePath {
+			w.WriteHeader(http.StatusInternalServerError) // Every batch is rejected
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if rejectState { // The first gap report fails too
+			rejectState = false
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		var state apiState
+		require.Nil(t, json.Unmarshal(body, &state))
+		gaps = append(gaps, state.Gaps...)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	registerFakePeer(t, pool, "node-b", srv.URL)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("gapped-topic", "lost")))
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(gaps) > 0
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, []string{"gapped-topic"}, gaps) // Reported once, after one failed attempt
+}
+
+func TestMesh_ReportedGapInvokesGapFunc(t *testing.T) {
+	// The receiving side hands the gapped topics to the server, which closes their subscribers
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	var received []string
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.GapFunc = func(topics []string) {
+		mu.Lock()
+		defer mu.Unlock()
+		received = append(received, topics...)
+	}
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	rr := postState(mesh, "node-b", &apiState{Gaps: []string{"topic-1", "topic-2"}})
+	require.Equal(t, 200, rr.Code)
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, []string{"topic-1", "topic-2"}, received)
+}
+
+func TestMesh_ManyGappedTopicsCollapseToAll(t *testing.T) {
+	// A peer that was unreachable for a while can have gaps in more topics than are worth
+	// enumerating; past the cap the report degenerates to "every topic"
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	for i := 0; i <= gapMaxTopics; i++ {
+		mesh.recordGap("node-b", []string{fmt.Sprintf("topic-%d", i)})
+	}
+	mesh.mu.Lock()
+	defer mesh.mu.Unlock()
+	require.Equal(t, []string{GapAllTopics}, mesh.gaps["node-b"])
 }

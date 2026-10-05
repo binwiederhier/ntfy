@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -23,6 +25,7 @@ const (
 	meshHTTPTimeout   = 5 * time.Second
 	peerHealthTimeout = 2 * time.Second // Per-peer health probe while this node is unhealthy
 	peerQueueSize     = 1024            // Bounded per-peer fan-out queue (drop on overflow)
+	gapMaxTopics      = 256             // Beyond this many gapped topics for one peer, report GapAllTopics instead
 	batchMaxMessages  = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes     = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes     = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
@@ -51,6 +54,7 @@ type meshCluster struct {
 	queues         map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
 	closed         bool                  // Guards against ForwardMessage spawning new workers after Close
 	knownPeers     map[NodeID]string     // Peers seen in the last reconcile, for join/leave logging
+	gaps           map[NodeID][]string   // Topics whose messages we could not deliver, per peer; reported and cleared by the heartbeat
 	lastRegistered time.Time             // Last successful registry heartbeat, for Healthy
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -86,6 +90,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		queues:         make(map[NodeID]*peerQueue),
 		lastRegistered: time.Now(), // The synchronous Register above just succeeded
 		knownPeers:     make(map[NodeID]string),
+		gaps:           make(map[NodeID][]string),
 		ctx:            ctx,
 		cancel:         cancel,
 	}
@@ -262,6 +267,7 @@ func (c *meshCluster) heartbeat() error {
 		return err
 	}
 	c.reconcilePeers(peers)
+	c.reportGaps(peers)
 	return nil
 }
 
@@ -309,7 +315,7 @@ func (c *meshCluster) queueFor(p *registry.Peer) *peerQueue {
 	q = &peerQueue{
 		advertiseURL: p.AdvertiseURL,
 		queue: util.NewLingerQueue(peerQueueSize, batchMaxMessages, batchMaxBytes,
-			func(frag []byte) int { return len(frag) }, c.conf.BatchLinger),
+			func(f *fragment) int { return len(f.data) }, c.conf.BatchLinger),
 	}
 	c.queues[nodeID] = q
 	c.wg.Add(1)
@@ -326,10 +332,11 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 	if len(peers) == 0 {
 		return nil // Cluster of one; skip the marshal
 	}
-	frag, err := marshalMessage(msg)
+	data, err := marshalMessage(msg)
 	if err != nil {
 		return err
 	}
+	frag := &fragment{topic: msg.Topic, data: data}
 	metrics.ClusterMessagesForwarded.Inc()
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -340,6 +347,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 		if !c.queueFor(p).queue.TryEnqueue(frag) {
 			metrics.ClusterQueueDropped.Inc()
 			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
+			c.recordGapLocked(NodeID(p.NodeID), []string{msg.Topic})
 		} else if ev := log.Tag(tag); ev.IsTrace() {
 			ev.Trace("Enqueued message %s (topic %s) for peer %s", msg.ID, msg.Topic, p.NodeID)
 		}
@@ -350,25 +358,30 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 // peerWorker delivers batches of queued fan-out messages to a single peer. Batches form in the
 // peer's LingerQueue (up to BatchLinger delay, flushed early on size/count caps); the worker
 // exits when the queue is closed (peer left the registry, or mesh shutdown) and drained.
+//
+// A batch that cannot be delivered becomes a delivery gap for its topics: the peer is told, and
+// closes those topics' subscribers so their clients replay the gap via since= (see GapFunc).
 func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	defer c.wg.Done()
 	for frags := range q.queue.Dequeue() {
 		body := assembleMessageBody(frags)
 		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(frags), len(body), nodeID)
-		c.postToPeer(nodeID, messageURL(q.advertiseURL), contentTypeNDJSON, body)
+		if err := c.postToPeer(nodeID, messageURL(q.advertiseURL), contentTypeNDJSON, body); err != nil {
+			c.recordGap(nodeID, fragmentTopics(frags))
+		}
 		metrics.ClusterBatchesSent.Inc()
 	}
 }
 
 // postToPeer POSTs a peer API payload, authenticated with the shared cluster secret. Failures
-// are logged and counted, never retried: peer traffic is best-effort by design (messages are
-// recovered via since= replay, state via the next periodic push).
-func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload []byte) {
+// are logged, counted and returned; the caller decides what a failure means (a message batch
+// becomes a delivery gap, state is retried on the next heartbeat).
+func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload []byte) error {
 	req, err := http.NewRequestWithContext(c.ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		metrics.ClusterSendErrors.Inc()
 		log.Tag(tag).Err(err).Warn("Failed to build request for peer %s", nodeID)
-		return
+		return err
 	}
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set(secretHeader, c.conf.Secret)
@@ -379,12 +392,78 @@ func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload
 			metrics.ClusterSendErrors.Inc()
 			log.Tag(tag).Err(err).Warn("Failed to send to peer %s (%s)", nodeID, url)
 		}
-		return
+		return err
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		metrics.ClusterSendErrors.Inc()
 		log.Tag(tag).Warn("Peer %s (%s) rejected request with HTTP %d", nodeID, url, resp.StatusCode)
+		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, resp.StatusCode)
+	}
+	return nil
+}
+
+// recordGap remembers that messages for these topics did not reach the peer. The heartbeat
+// reports them; until then they accumulate, and a peer with more than gapMaxTopics gapped
+// topics is reported as GapAllTopics rather than a list.
+func (c *meshCluster) recordGap(nodeID NodeID, topics []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.recordGapLocked(nodeID, topics)
+}
+
+// recordGapLocked is recordGap for callers already holding c.mu
+func (c *meshCluster) recordGapLocked(nodeID NodeID, topics []string) {
+	gapped := c.gaps[nodeID]
+	if slices.Contains(gapped, GapAllTopics) {
+		return
+	}
+	for _, topic := range topics {
+		if !slices.Contains(gapped, topic) {
+			gapped = append(gapped, topic)
+		}
+	}
+	if len(gapped) > gapMaxTopics {
+		gapped = []string{GapAllTopics}
+	}
+	c.gaps[nodeID] = gapped
+}
+
+// reportGaps tells each live peer which topics we failed to deliver to it, so it can make the
+// affected clients replay. A failed report is kept for the next heartbeat: a gap must not be
+// forgotten because the peer was briefly unreachable (which is usually why there is a gap).
+func (c *meshCluster) reportGaps(peers []*registry.Peer) {
+	c.mu.Lock()
+	pending := make(map[NodeID][]string, len(c.gaps))
+	for nodeID, topics := range c.gaps {
+		pending[nodeID] = topics
+	}
+	c.mu.Unlock()
+	if len(pending) == 0 {
+		return
+	}
+	for _, p := range peers {
+		nodeID := NodeID(p.NodeID)
+		topics, ok := pending[nodeID]
+		if !ok || len(topics) == 0 {
+			continue
+		}
+		body, err := json.Marshal(&apiState{Gaps: topics})
+		if err != nil {
+			continue
+		}
+		log.Tag(tag).Info("Reporting %d undelivered topic(s) to peer %s", len(topics), nodeID)
+		if err := c.postToPeer(nodeID, stateURL(p.AdvertiseURL), contentTypeJSON, body); err != nil {
+			continue // Keep them; the next heartbeat tries again
+		}
+		metrics.ClusterGapsReported.Inc()
+		c.mu.Lock()
+		if slices.Equal(c.gaps[nodeID], topics) { // Nothing new while we were sending
+			delete(c.gaps, nodeID)
+		} else {
+			c.gaps[nodeID] = subtractTopics(c.gaps[nodeID], topics)
+		}
+		c.mu.Unlock()
 	}
 }
 
@@ -424,6 +503,11 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 	if state.Topics != nil && len(state.Topics.Added) > 0 && c.conf.TopicsAddedFunc != nil {
 		log.Tag(tag).Debug("Received %d announced topic(s) from peer %s", len(state.Topics.Added), origin)
 		c.conf.TopicsAddedFunc(state.Topics.Added)
+	}
+	if len(state.Gaps) > 0 && c.conf.GapFunc != nil {
+		log.Tag(tag).Warn("Peer %s could not deliver messages for %d topic(s); closing their subscribers so clients replay", origin, len(state.Gaps))
+		metrics.ClusterGapsReceived.Inc()
+		c.conf.GapFunc(state.Gaps)
 	}
 	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
 		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)

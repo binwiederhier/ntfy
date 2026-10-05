@@ -536,6 +536,57 @@ func TestIP_Host_Parsing(t *testing.T) {
 	}
 }
 
+func TestCLI_Serve_ValidationNotSkippedWhenBaseURLSet(t *testing.T) {
+	authFile := filepath.Join(t.TempDir(), "user.db")
+	cases := map[string]struct {
+		args        []string
+		expectedErr string
+	}{
+		"identical upstream-base-url": {
+			args:        []string{"--base-url=https://ntfy.example.com", "--upstream-base-url=https://ntfy.example.com"},
+			expectedErr: "base-url and upstream-base-url cannot be identical",
+		},
+		"upstream-base-url with trailing slash": {
+			args:        []string{"--base-url=https://ntfy.example.com", "--upstream-base-url=https://ntfy.sh/"},
+			expectedErr: "upstream-base-url must not end with a slash",
+		},
+		"require-login without enable-login": {
+			args:        []string{"--base-url=https://ntfy.example.com", "--auth-file=" + authFile, "--require-login"},
+			expectedErr: "cannot set require-login without also setting enable-login",
+		},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorContains(t, runServeUntilError(t, c.args...), c.expectedErr)
+		})
+	}
+}
+
+func TestCLI_Serve_ValidationNotSkippedWhenMessageSizeLimitAboveDefault(t *testing.T) {
+	err := runServeUntilError(t, "--message-size-limit=8k", "--visitor-prefix-bits-ipv4=0")
+	require.ErrorContains(t, err, "visitor-prefix-bits-ipv4 must be between 1 and 32")
+}
+
+// runServeUntilError runs "ntfy serve" and returns its error. If the config passes validation,
+// the server starts and blocks, so the test fails after a timeout instead of hanging.
+func runServeUntilError(t *testing.T, args ...string) error {
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
+	port := 10000 + rand.Intn(20000)
+	errChan := make(chan error, 1)
+	go func() {
+		app, _, _, _ := newTestApp()
+		serveArgs := []string{"ntfy", "serve", "--config=" + configFile, fmt.Sprintf("--listen-http=:%d", port)}
+		errChan <- app.Run(append(serveArgs, args...))
+	}()
+	select {
+	case err := <-errChan:
+		return err
+	case <-time.After(3 * time.Second):
+		t.Fatal("server started, but config should have been rejected")
+		return nil
+	}
+}
+
 func newEmptyFile(t *testing.T) string {
 	filename := filepath.Join(t.TempDir(), "empty")
 	require.Nil(t, os.WriteFile(filename, []byte{}, 0600))

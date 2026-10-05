@@ -27,6 +27,7 @@ type publishMessage struct {
 	Cache      string         `json:"cache"`    // use string as it defaults to true (or use &bool instead)
 	Firebase   string         `json:"firebase"` // use string as it defaults to true (or use &bool instead)
 	Delay      string         `json:"delay"`
+	Timezone   string         `json:"timezone"`
 }
 
 // dispatchOpts selects which delivery targets fire for a published message, beyond delivery

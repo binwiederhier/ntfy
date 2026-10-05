@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"math"
 	"net/netip"
 	"sync"
@@ -694,17 +693,24 @@ func dailyLimitToRate(limit int64) rate.Limit {
 	return rate.Limit(limit) * rate.Every(oneDay)
 }
 
+// Visitor identity key prefixes (see visitorID); the keys are shared cluster-wide, so they are
+// parsed back by visitorFromKey
+const (
+	visitorKeyUserPrefix = "user:"
+	visitorKeyIPPrefix   = "ip:"
+)
+
 // visitorID returns a unique identifier for a visitor based on user or IP, using configurable prefix bits for IPv4/IPv6
 func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
 	if u != nil && u.Tier != nil {
-		return fmt.Sprintf("user:%s", u.ID)
+		return visitorKeyUserPrefix + u.ID
 	}
 	if ip.Is4() {
 		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv4).Masked().Addr()
 	} else if ip.Is6() {
 		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv6).Masked().Addr()
 	}
-	return fmt.Sprintf("ip:%s", ip.String())
+	return visitorKeyIPPrefix + ip.String()
 }
 
 // meteredBandwidthLimiter forwards to the visitor's bandwidth limiter and mirrors successfully

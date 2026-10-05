@@ -178,6 +178,7 @@ const (
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
 	rateVisitorMissTTL       = 30 * time.Second          // How long a failed shared-store rate-visitor lookup is cached on the topic
+	rateVisitorResolvedTTL   = 30 * time.Second          // How long a rate visitor resolved from the shared store is trusted before it is re-resolved
 
 	// stopTimeout bounds the entire shutdown. The stores wait for their own background work
 	// (the attachment sync loop queries the database), and none of those waits has a deadline,
@@ -2506,10 +2507,11 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 
 // rateVisitor returns the topic's rate visitor: the in-memory one if present, otherwise (in
 // cluster mode) resolved from the shared assignment store, so a UnifiedPush subscriber on one
-// node bills publishes arriving on any node. A successful resolution is cached on the topic
-// via SetRateVisitor; misses are cached briefly to keep the database off the publish path.
+// node bills publishes arriving on any node. A successful resolution is cached on the topic for
+// rateVisitorResolvedTTL (the subscriber may move to another node, and identity); misses are
+// cached briefly too, to keep the database off the publish path.
 func (s *Server) rateVisitor(t *topic) *visitor {
-	if v := t.RateVisitor(); v != nil {
+	if v := t.RateVisitor(rateVisitorResolvedTTL); v != nil {
 		return v
 	}
 	if s.topicStore == nil || !s.config.VisitorSubscriberRateLimiting || !isUnifiedPushTopic(t.ID) || t.RateVisitorMissedRecently(rateVisitorMissTTL) {
@@ -2529,29 +2531,41 @@ func (s *Server) rateVisitor(t *topic) *visitor {
 		t.SetRateVisitorMiss()
 		return nil
 	}
-	t.SetRateVisitor(v)
+	t.SetResolvedRateVisitor(v)
 	return v
 }
 
 // visitorFromKey rebuilds a visitor from its identity key ("ip:<addr>" or "user:<id>"), used
-// when another cluster node registered the visitor (e.g. as a rate visitor)
+// when another cluster node registered the visitor (e.g. as a rate visitor). The key decides
+// the identity, not the presence of a user: authenticated users without a tier are IP-keyed
+// (see visitorID), and the user is only attached to them.
 func (s *Server) visitorFromKey(visitorKey, userID string) (*visitor, error) {
+	var u *user.User
 	if userID != "" {
 		if s.userManager == nil {
-			return nil, errors.New("user-keyed visitor but no user manager")
+			return nil, errors.New("visitor with a user but no user manager")
 		}
-		u, err := s.userManager.UserByID(userID)
-		if err != nil {
+		var err error
+		if u, err = s.userManager.UserByID(userID); err != nil {
 			return nil, err
+		}
+	}
+	switch {
+	case strings.HasPrefix(visitorKey, visitorKeyUserPrefix):
+		if u == nil || u.ID != strings.TrimPrefix(visitorKey, visitorKeyUserPrefix) {
+			return nil, fmt.Errorf("user-keyed visitor %s without a matching user", visitorKey)
 		}
 		// The IP is not part of a user-keyed visitor's identity; it is only informational
 		return s.visitor(netip.IPv4Unspecified(), u), nil
+	case strings.HasPrefix(visitorKey, visitorKeyIPPrefix):
+		ip, err := netip.ParseAddr(strings.TrimPrefix(visitorKey, visitorKeyIPPrefix))
+		if err != nil {
+			return nil, err
+		}
+		return s.visitor(ip, u), nil
+	default:
+		return nil, fmt.Errorf("unknown visitor key format: %s", visitorKey)
 	}
-	ip, err := netip.ParseAddr(strings.TrimPrefix(visitorKey, "ip:"))
-	if err != nil {
-		return nil, err
-	}
-	return s.visitor(ip, nil), nil
 }
 
 // applyPeerUsage burns request and bandwidth tokens that a visitor consumed on other cluster

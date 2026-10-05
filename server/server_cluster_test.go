@@ -827,13 +827,12 @@ func TestServer_Cluster_RemoteRateVisitorAssignmentRefreshes(t *testing.T) {
 	topic := newTopic("up123456789012")
 	require.NoError(t, store.SetRateVisitor(topic.ID, "ip:1.2.3.4", ""))
 	require.Equal(t, "ip:1.2.3.4", string(s.rateVisitor(topic).QuotaKey()))
-	// The phone moves networks and subscribes on a different node.
+	// The phone moves networks and subscribes on a different node; nobody tells this node
 	require.NoError(t, store.SetRateVisitor(topic.ID, "ip:1.2.3.5", ""))
-	// The same peer announcement only invalidates misses, not successful assignments.
-	s.mu.Lock()
-	s.topics[topic.ID] = topic
-	s.mu.Unlock()
-	s.clearRateVisitorMisses([]string{topic.ID})
+	require.Equal(t, "ip:1.2.3.4", string(s.rateVisitor(topic).QuotaKey())) // Cached, within the TTL
+	topic.mu.Lock()
+	topic.rateVisitorResolvedAt = time.Now().Add(-rateVisitorResolvedTTL - time.Second) // TTL elapsed
+	topic.mu.Unlock()
 	require.Equal(t, "ip:1.2.3.5", string(s.rateVisitor(topic).QuotaKey()))
 }
 

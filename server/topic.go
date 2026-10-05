@@ -20,15 +20,16 @@ const (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID                 string
-	subscribers        map[int]*topicSubscriber
-	rateVisitor        *visitor
-	rateVisitorMissAt  time.Time // Last failed shared-store lookup; throttles per-publish lookups for topics without a rate visitor
-	subscriberStoredAt time.Time // Last shared subscriber-liveness record (see TakeSubscriberRecordSlot)
-	publishStoredAt    time.Time // Last shared publish-liveness record (see TakePublishRecordSlot)
-	lastAccess         time.Time
-	onFirstSubscriber  func() // Fired (async) when the subscriber count goes 0 -> 1; may be nil
-	mu                 sync.RWMutex
+	ID                    string
+	subscribers           map[int]*topicSubscriber
+	rateVisitor           *visitor
+	rateVisitorResolvedAt time.Time // When rateVisitor was resolved from the shared store; zero for a locally set one (see RateVisitor)
+	rateVisitorMissAt     time.Time // Last failed shared-store lookup; throttles per-publish lookups for topics without a rate visitor
+	subscriberStoredAt    time.Time // Last shared subscriber-liveness record (see TakeSubscriberRecordSlot)
+	publishStoredAt       time.Time // Last shared publish-liveness record (see TakePublishRecordSlot)
+	lastAccess            time.Time
+	onFirstSubscriber     func() // Fired (async) when the subscriber count goes 0 -> 1; may be nil
+	mu                    sync.RWMutex
 }
 
 type topicSubscriber struct {
@@ -88,18 +89,35 @@ func (t *topic) LastAccess() time.Time {
 	return t.lastAccess
 }
 
+// SetRateVisitor sets the rate visitor from a local subscriber; it is authoritative until the
+// visitor goes stale
 func (t *topic) SetRateVisitor(v *visitor) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.rateVisitor = v
+	t.rateVisitorResolvedAt = time.Time{}
 	t.lastAccess = time.Now()
 }
 
-func (t *topic) RateVisitor() *visitor {
+// SetResolvedRateVisitor caches a rate visitor resolved from the shared topic store. Unlike a
+// locally set one it expires after ttl (see RateVisitor), so the subscriber moving to another
+// node, and thereby to another identity, is picked up without an announcement.
+func (t *topic) SetResolvedRateVisitor(v *visitor) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && t.rateVisitor.Stale() {
+	t.rateVisitor = v
+	t.rateVisitorResolvedAt = time.Now()
+	t.lastAccess = time.Now()
+}
+
+// RateVisitor returns the rate visitor, or nil if there is none, it went stale, or it was
+// resolved from the shared store longer than ttl ago (the caller re-resolves then)
+func (t *topic) RateVisitor(ttl time.Duration) *visitor {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.rateVisitor != nil && (t.rateVisitor.Stale() || (!t.rateVisitorResolvedAt.IsZero() && time.Since(t.rateVisitorResolvedAt) > ttl)) {
 		t.rateVisitor = nil
+		t.rateVisitorResolvedAt = time.Time{}
 	}
 	return t.rateVisitor
 }

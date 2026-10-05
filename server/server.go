@@ -640,13 +640,18 @@ func (s *Server) stopBounded() {
 }
 
 func (s *Server) stop() {
-	// Close the usage tracker BEFORE taking the server lock: its flush loop calls back into
-	// applyPeerUsage, which takes s.mu -- closing it under the lock deadlocks with a flush
-	// tick that is already waiting for the lock (Close waits for the loop, the loop waits for
-	// s.mu, Stop holds s.mu). Usage counted during the remaining shutdown is discarded, which
-	// is fine: the final flush below the lock would race the closing databases anyway.
+	// Close the services that call back into the server BEFORE taking the server lock: the
+	// usage tracker's flush loop calls applyPeerUsage, the mesh's heartbeat and isolation loops
+	// call liveTopics/closeLocalSubscribers, and all of those take s.mu. Closing them under the
+	// lock deadlocks with a tick that is already waiting for it (Close waits for the loop, the
+	// loop waits for s.mu, Stop holds s.mu). Usage counted during the remaining shutdown is
+	// discarded, which is fine: the final flush below the lock would race the closing databases
+	// anyway, and fan-out stops with the listeners.
 	if s.quota != nil {
 		s.quota.Close()
+	}
+	if s.cluster != nil {
+		s.cluster.Close()
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -667,9 +672,6 @@ func (s *Server) stop() {
 	}
 	if s.httpClusterServer != nil {
 		s.httpClusterServer.Close()
-	}
-	if s.cluster != nil {
-		s.cluster.Close()
 	}
 	s.closeDatabases()
 	if s.ban != nil {

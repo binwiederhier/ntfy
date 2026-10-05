@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/cluster/quota"
+	topicstore "heckel.io/ntfy/v2/cluster/topics"
+	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/model"
@@ -812,4 +814,100 @@ func TestServer_Cluster_PeerUsageForUnknownVisitorSeededOnceOnCreation(t *testin
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	burned := float64(s.config.VisitorRequestLimitBurst) - v.requestLimiter.Tokens()
 	require.InDelta(t, 10, burned, 1, "expected one burn of 10 requests, burned %.1f", burned)
+}
+
+func TestServer_Cluster_RemoteRateVisitorAssignmentRefreshes(t *testing.T) {
+	pool := dbtest.CreateTestPostgres(t)
+	store, err := topicstore.New(pool)
+	require.NoError(t, err)
+	conf := newTestConfig(t, "")
+	conf.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, conf)
+	s.topicStore = store
+	topic := newTopic("up123456789012")
+	require.NoError(t, store.SetRateVisitor(topic.ID, "ip:1.2.3.4", ""))
+	require.Equal(t, "ip:1.2.3.4", string(s.rateVisitor(topic).QuotaKey()))
+	// The phone moves networks and subscribes on a different node.
+	require.NoError(t, store.SetRateVisitor(topic.ID, "ip:1.2.3.5", ""))
+	// The same peer announcement only invalidates misses, not successful assignments.
+	s.mu.Lock()
+	s.topics[topic.ID] = topic
+	s.mu.Unlock()
+	s.clearRateVisitorMisses([]string{topic.ID})
+	require.Equal(t, "ip:1.2.3.5", string(s.rateVisitor(topic).QuotaKey()))
+}
+
+func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) {
+	s, err := New(newTestConfig(t, ""))
+	require.NoError(t, err)
+	// Deliberately no Stop cleanup: a failing test demonstrates the deadlock.
+	host, err := pg.Open(dbtest.CreateTestPostgresSchema(t))
+	require.NoError(t, err)
+	pool := db.New(host, nil)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	c, err := cluster.New(&cluster.Config{
+		Enabled: true, NodeID: "a", AdvertiseURL: "http://127.0.0.1:1", Secret: "test",
+		HeartbeatInterval: 10 * time.Millisecond, StateInterval: 10 * time.Millisecond,
+		NodeTTL: time.Minute,
+	}, pool, func(*model.Message) {}, func() []string {
+		once.Do(func() { close(entered) })
+		<-release
+		return s.liveTopics()
+	})
+	require.NoError(t, err)
+	s.cluster = c
+	_, err = pool.Exec(`INSERT INTO node_registry VALUES ('b', 'http://127.0.0.1:2', $1)`, time.Now().Unix())
+	require.NoError(t, err)
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("callback not reached")
+	}
+	done := make(chan struct{})
+	go func() { s.Stop(); close(done) }()
+	// Give Stop time to reach cluster.Close (and, in the buggy version, to take s.mu first),
+	// then let the parked heartbeat continue: it needs s.mu to finish
+	time.Sleep(100 * time.Millisecond)
+	close(release)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Error("Stop holds s.mu while cluster.Close waits for a heartbeat callback needing s.mu")
+	}
+}
+
+func TestServer_Cluster_PeerCancelInvalidatesACLBeforeReconnect(t *testing.T) {
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, dsn)
+	conf.AuthDefault = user.PermissionDenyAll
+	conf.AuthAccessCacheEnabled = true
+	conf.AuthAccessCacheReloadInterval = time.Hour
+	a := newTestServer(t, conf)
+	require.NoError(t, a.userManager.AddUser("alice", "password", user.RoleUser, false))
+	require.NoError(t, a.userManager.AllowAccess("alice", "private", user.PermissionRead))
+	confB := newTestConfig(t, dsn)
+	confB.AuthDefault = user.PermissionDenyAll
+	confB.AuthAccessCacheEnabled = true
+	confB.AuthAccessCacheReloadInterval = time.Hour
+	b := newTestServer(t, confB)
+	headers := map[string]string{"Authorization": util.BasicAuth("alice", "password")}
+	require.Equal(t, 200, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
+	u, err := a.userManager.User("alice")
+	require.NoError(t, err)
+	require.NoError(t, a.userManager.ResetAccess("alice", "private"))
+	b.applySubscriberCancel(&cluster.SubscriberCancel{Topic: "private", UserID: u.ID})
+	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", headers).Code,
+		"a disconnected subscriber can immediately reconnect using the peer's stale ACL cache")
+}
+
+func TestServer_Cluster_UntieredRateVisitorPreservesIPIdentity(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t, dbtest.CreateTestPostgresSchema(t)))
+	require.NoError(t, s.userManager.AddUser("alice", "password", user.RoleUser, false))
+	u, err := s.userManager.User("alice")
+	require.NoError(t, err)
+	require.Nil(t, u.Tier)
+	v, err := s.visitorFromKey("ip:1.2.3.4", u.ID)
+	require.NoError(t, err)
+	require.Equal(t, "ip:1.2.3.4", string(v.QuotaKey()), "untiered accounts are IP-keyed, even with a nonempty user ID")
 }

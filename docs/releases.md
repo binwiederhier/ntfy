@@ -2102,6 +2102,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Keep PostgreSQL pool connections idle instead of re-opening them: `pool_max_idle_conns` now defaults to `pool_max_conns`, so bursts no longer pay a DNS lookup, TCP/TLS handshake and authentication per query
 * Fix `since=<message-id>` replays flooding a client with a topic's entire retained history when the ID was not on the read replica yet (a client reconnecting right after receiving a message); the ID is now resolved on the primary in that case
 * Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
+* Detect Markdown when the `Content-Type` header has parameters or is uppercase, e.g. `text/markdown; charset=utf-8` ([#1995](https://github.com/binwiederhier/ntfy/pull/1995), thanks to [@cipherprofessor](https://github.com/cipherprofessor) for the contribution)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

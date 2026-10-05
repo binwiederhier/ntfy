@@ -2237,6 +2237,7 @@ func TestServer_PublishMarkdown_ContentTypeParameters(t *testing.T) {
 		expected    string
 	}{
 		{"text/markdown; charset=utf-8", "text/markdown"},
+		{"TEXT/MARKDOWN", "text/markdown"},
 		{"text/markdown;charset=UTF-8", "text/markdown"},
 		{"TEXT/Markdown ; charset=utf-8", "text/markdown"},
 		{"text/markdown; variant=GFM", "text/markdown"},

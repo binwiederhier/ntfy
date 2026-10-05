@@ -20,7 +20,7 @@ import (
 const (
 	tag            = "quota"
 	schemaStoreKey = "visitor_usage" // Store name in the shared schema_version table (see db/schema)
-	schemaVersion  = 1
+	schemaVersion  = 2
 
 	// DefaultFlushInterval is the cadence for pushing counter deltas and pulling cluster
 	// totals. It bounds quota overshoot (~nodes x interval x per-node rate) and the latency
@@ -52,6 +52,14 @@ const (
 			PRIMARY KEY (key, day)
 		);
 		CREATE INDEX IF NOT EXISTS idx_visitor_usage_updated_at ON visitor_usage (updated_at);
+	` + createDailyResetTable
+	// daily_reset records which usage days have had their shared daily reset run. One row per
+	// day, claimed by whichever node gets there first (see ClaimDailyReset).
+	createDailyResetTable = `
+		CREATE TABLE IF NOT EXISTS daily_reset (
+			day TEXT PRIMARY KEY,
+			claimed_at BIGINT NOT NULL
+		);
 	`
 	// Timestamps come from the database clock, never from a node's: the watermark below compares
 	// them, and node clocks neither agree with each other nor with the database
@@ -69,6 +77,9 @@ const (
 	selectChangedUsageQuery  = `SELECT key, requests, messages, emails, calls, bandwidth_bytes FROM visitor_usage WHERE day = $1 AND updated_at >= $2`
 	selectDatabaseClockQuery = `SELECT EXTRACT(EPOCH FROM now())::BIGINT`
 	pruneUsageQuery          = `DELETE FROM visitor_usage WHERE day < $1`
+	claimDailyResetQuery     = `INSERT INTO daily_reset (day, claimed_at) VALUES ($1, EXTRACT(EPOCH FROM now())::BIGINT) ON CONFLICT (day) DO NOTHING`
+	pruneDailyResetQuery     = `DELETE FROM daily_reset WHERE day < $1`
+	releaseDailyResetQuery   = `DELETE FROM daily_reset WHERE day = $1`
 )
 
 // Config is the tracker configuration. FlushInterval defaults to DefaultFlushInterval;
@@ -103,7 +114,15 @@ func New(conf *Config, pool *db.DB) (*Tracker, error) {
 		conf.FlushInterval = DefaultFlushInterval
 	}
 	t := newTracker(conf, pool)
-	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, schema.AsMigrateFunc(createTable), nil); err != nil {
+	migrations := map[int]schema.MigrateFunc{
+		1: schema.AsMigrateFunc(createDailyResetTable), // v1 -> v2: the daily-reset marker
+	}
+	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, schema.AsMigrateFunc(createTable), migrations); err != nil {
+		return nil, err
+	}
+	// Claim the current day without resetting anything: a node booting into a day that is
+	// already running must not reset stats that have been accumulating since its start
+	if _, err := t.ClaimDailyReset(); err != nil {
 		return nil, err
 	}
 	// Warm the totals cache so a freshly booted node enforces existing usage right away
@@ -172,11 +191,46 @@ func (t *Tracker) Totals(key Key) Counters {
 	return total
 }
 
-// Prune deletes usage rows older than the retention. Only the cluster leader calls this
-// (like the other singleton database jobs).
+// SetClockForTest replaces the tracker's clock, so a test can roll the usage day over without
+// waiting for one. It is not used in production code.
+func (t *Tracker) SetClockForTest(now func() time.Time) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.now = now
+}
+
+// Prune deletes usage and daily-reset rows older than the retention. Only the cluster leader
+// calls this (like the other singleton database jobs).
 func (t *Tracker) Prune() error {
 	cutoffDay := dayFor(t.now().Add(-retention), t.conf.StatsResetTime)
-	_, err := t.pool.Exec(pruneUsageQuery, cutoffDay)
+	if _, err := t.pool.Exec(pruneUsageQuery, cutoffDay); err != nil {
+		return err
+	}
+	_, err := t.pool.Exec(pruneDailyResetQuery, cutoffDay)
+	return err
+}
+
+// ClaimDailyReset reports whether the caller just claimed the current usage day's shared daily
+// reset, i.e. whether it must run it. Exactly one node per day wins the claim, and the row
+// survives a restart, so a leader that only appears after midnight still runs the reset instead
+// of the cluster skipping it for the day. The claim is taken for today at construction, so
+// booting into a running day never triggers a retroactive reset.
+func (t *Tracker) ClaimDailyReset() (bool, error) {
+	result, err := t.pool.Exec(claimDailyResetQuery, t.currentDay())
+	if err != nil {
+		return false, err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rows > 0, nil
+}
+
+// ReleaseDailyReset gives the current day's claim back, so another tick (or node) retries it.
+// The caller uses it when the reset it claimed did not actually succeed.
+func (t *Tracker) ReleaseDailyReset() error {
+	_, err := t.pool.Exec(releaseDailyResetQuery, t.currentDay())
 	return err
 }
 

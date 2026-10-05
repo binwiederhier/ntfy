@@ -279,11 +279,11 @@ func TestServer_Cluster_ManagerPrunesOnlyOnLeader(t *testing.T) {
 	require.Equal(t, model.ErrMessageNotFound, err)
 }
 
-func TestServer_Cluster_StatsResetOnlyOnLeader(t *testing.T) {
+func TestServer_StatsResetSingleNodeResetsVisitorsAndUsers(t *testing.T) {
+	// Single node: the scheduled reset covers both the in-memory visitor stats and the user
+	// database, because there is nobody else to coordinate with
 	c := newTestConfigWithAuthFile(t, "")
 	s := newTestServer(t, c)
-	cl := &fakeCluster{notLeader: true}
-	s.cluster = cl
 
 	// An anonymous visitor with an in-memory message count
 	v := newVisitor(c, s.messageCache, s.userManager, s.quota, netip.MustParseAddr("1.2.3.4"), nil)
@@ -293,7 +293,7 @@ func TestServer_Cluster_StatsResetOnlyOnLeader(t *testing.T) {
 	s.mu.Unlock()
 	require.Equal(t, int64(1), v.Stats().Messages)
 
-	// A user with persisted stats in the (shared) user database
+	// A user with persisted stats
 	require.Nil(t, s.userManager.AddUser("phil", "phil1234", user.RoleUser, false))
 	authDB, err := sql.Open("sqlite3", c.AuthFile)
 	require.Nil(t, err)
@@ -301,20 +301,39 @@ func TestServer_Cluster_StatsResetOnlyOnLeader(t *testing.T) {
 	_, err = authDB.Exec(`UPDATE user SET stats_messages = 5 WHERE user = 'phil'`)
 	require.Nil(t, err)
 
-	// A non-leader node resets its own in-memory visitor stats, but leaves the user database
-	// to the leader
 	s.resetStats()
 	require.Equal(t, int64(0), v.Stats().Messages)
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
-	require.Equal(t, int64(5), u.Stats.Messages)
-
-	// The leader resets the user database too
-	cl.setLeader(true)
-	s.resetStats()
-	u, err = s.userManager.User("phil")
-	require.Nil(t, err)
 	require.Equal(t, int64(0), u.Stats.Messages)
+}
+
+func TestServer_Cluster_ScheduledResetLeavesSharedStatsToTheClaim(t *testing.T) {
+	// Clustered: the scheduled reset is per node and must not touch the shared user stats, or
+	// every node would reset them (and a node whose clock or config differs would do it at the
+	// wrong moment). maybeResetSharedStats does that once per day, on a durable claim.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1"
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	s := newTestServer(t, conf)
+	require.Nil(t, s.userManager.AddUser("alice", "password", user.RoleUser, false))
+	_, err := s.db.Exec(`UPDATE "user" SET stats_messages = 5 WHERE user_name = 'alice'`)
+	require.Nil(t, err)
+
+	// An in-memory visitor is reset, the shared row is not
+	v := newVisitor(conf, s.messageCache, s.userManager, s.quota, netip.MustParseAddr("1.2.3.4"), nil)
+	require.True(t, v.MessageAllowed())
+	s.mu.Lock()
+	s.visitors["ip:1.2.3.4"] = v
+	s.mu.Unlock()
+	s.resetStats()
+	require.Equal(t, int64(0), v.Stats().Messages)
+	var messages int64
+	require.Nil(t, s.db.QueryRow(`SELECT stats_messages FROM "user" WHERE user_name = 'alice'`).Scan(&messages))
+	require.Equal(t, int64(5), messages)
 }
 
 func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
@@ -991,4 +1010,44 @@ func TestServer_Cluster_GapClosesSubscribersSoTheyReplay(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("subscriber was not closed on a cluster-wide gap")
 	}
+}
+
+func TestServer_Cluster_SharedStatsResetSurvivesALeaderlessMidnight(t *testing.T) {
+	// The shared reset used to run only if a leader existed at the scheduled instant, so a
+	// failover around midnight (where the leader hold-off is by design) skipped it for the
+	// whole day. It now runs on a durable per-day claim from the manager, so the first leader
+	// after the rollover still does it, exactly once.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1"
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	s := newTestServer(t, conf)
+	s.cluster = &fakeCluster{} // Leader without waiting out the real lease hold-off
+	require.Nil(t, s.userManager.AddUser("alice", "password", user.RoleUser, false))
+	setStats := func(messages int64) {
+		_, err := s.db.Exec(`UPDATE "user" SET stats_messages = $1 WHERE user_name = 'alice'`, messages)
+		require.Nil(t, err)
+	}
+	stats := func() int64 {
+		var messages int64
+		require.Nil(t, s.db.QueryRow(`SELECT stats_messages FROM "user" WHERE user_name = 'alice'`).Scan(&messages))
+		return messages
+	}
+	setStats(5)
+
+	s.execManager() // Mid-day: today was claimed at startup, nothing is reset
+	require.Equal(t, int64(5), stats())
+
+	// The usage day rolls over while nobody was leader; the first manager run after that
+	// claims the new day and resets
+	s.quota.SetClockForTest(func() time.Time { return time.Now().Add(24 * time.Hour) })
+	s.execManager()
+	require.Equal(t, int64(0), stats())
+
+	// Once per day: a later run of the same day leaves new counts alone
+	setStats(2)
+	s.execManager()
+	require.Equal(t, int64(2), stats())
 }

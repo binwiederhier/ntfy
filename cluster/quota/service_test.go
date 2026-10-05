@@ -255,3 +255,32 @@ func TestTracker_WatermarkSeesLateWriter(t *testing.T) {
 	require.NoError(t, b.flushAndPull())
 	require.Equal(t, int64(7), b.Totals("ip:1.2.3.4").Messages)
 }
+
+func TestTracker_ClaimDailyResetOncePerDay(t *testing.T) {
+	// The daily reset of shared user stats used to happen only if a leader existed at the
+	// scheduled instant, so a failover around midnight skipped it for a whole day. The claim
+	// is durable instead: exactly one node per day wins it, and a node that boots into a day
+	// nobody claimed does not retroactively reset it.
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	a := newTestTracker(t, openTestPool(t, dsn), nil)
+	b := newTestTracker(t, openTestPool(t, dsn), nil)
+
+	// Today was seeded at construction: nobody resets a day that was already running
+	claimed, err := a.ClaimDailyReset()
+	require.Nil(t, err)
+	require.False(t, claimed)
+
+	// The day rolls over: exactly one node claims it, whoever asks first
+	tomorrow := time.Now().Add(24 * time.Hour)
+	a.now = func() time.Time { return tomorrow }
+	b.now = func() time.Time { return tomorrow }
+	claimed, err = a.ClaimDailyReset()
+	require.Nil(t, err)
+	require.True(t, claimed)
+	claimed, err = a.ClaimDailyReset()
+	require.Nil(t, err)
+	require.False(t, claimed) // Same node asking again
+	claimed, err = b.ClaimDailyReset()
+	require.Nil(t, err)
+	require.False(t, claimed) // The other node, same day
+}

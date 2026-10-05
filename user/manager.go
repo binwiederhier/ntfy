@@ -451,6 +451,15 @@ func (a *Manager) ResetStats() error {
 	return nil
 }
 
+// ResetStatsQueue drops the queued stats deltas without touching the database. Nodes that do
+// not run the shared daily reset (only one node in a cluster does) use it so yesterday's
+// increments cannot be added on top of the freshly zeroed rows.
+func (a *Manager) ResetStatsQueue() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.statsQueue = make(map[string]*Stats)
+}
+
 // EnqueueUserStats adds the given stats *delta* to a queue which writes out user stats
 // (messages, emails, ..) in batches at a regular interval. Deltas accumulate in the queue and
 // are flushed as SQL increments, so concurrent flushes from multiple nodes add up instead of

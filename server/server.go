@@ -2324,6 +2324,11 @@ func (s *Server) runStatsResetter() {
 	}
 }
 
+// resetStats resets this node's in-memory visitor stats at the configured reset time. The
+// shared user stats in the database are NOT reset here in cluster mode: that is one job for the
+// whole cluster, and tying it to this instant means a leaderless moment (a failover around
+// midnight, where the hold-off is by design) skips it for the entire day. maybeResetSharedStats
+// runs it on a durable claim instead.
 func (s *Server) resetStats() {
 	log.Info("Resetting all visitor stats (daily task)")
 	s.mu.Lock()
@@ -2331,10 +2336,39 @@ func (s *Server) resetStats() {
 	for _, v := range s.visitors {
 		v.ResetStats()
 	}
-	// The user database is shared; only the cluster leader resets it (always true single-node)
-	if s.userManager != nil && s.cluster.IsLeader() {
-		if err := s.userManager.ResetStats(); err != nil {
-			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
+	if s.userManager == nil {
+		return
+	}
+	if s.quota != nil {
+		// Clustered: drop this node's queued stats deltas, so increments counted before the
+		// rollover cannot land on top of the freshly zeroed rows
+		s.userManager.ResetStatsQueue()
+		return
+	}
+	if err := s.userManager.ResetStats(); err != nil {
+		log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
+	}
+}
+
+// maybeResetSharedStats resets the shared user stats if this node claims the current usage
+// day's reset. Called from the manager on the leader, so a leader that only appears after
+// midnight still runs it; the claim is durable, so exactly one node per day does.
+func (s *Server) maybeResetSharedStats() {
+	if s.quota == nil || s.userManager == nil {
+		return
+	}
+	claimed, err := s.quota.ClaimDailyReset()
+	if err != nil {
+		log.Tag(tagResetter).Err(err).Warn("Cannot claim the daily stats reset")
+		return
+	} else if !claimed {
+		return
+	}
+	log.Tag(tagResetter).Info("Resetting shared user stats for the new usage day")
+	if err := s.userManager.ResetStats(); err != nil {
+		log.Tag(tagResetter).Err(err).Warn("Failed to reset shared user stats; releasing the claim for a retry")
+		if err := s.quota.ReleaseDailyReset(); err != nil {
+			log.Tag(tagResetter).Err(err).Warn("Cannot release the daily reset claim")
 		}
 	}
 }

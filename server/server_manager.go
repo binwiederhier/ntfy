@@ -18,6 +18,7 @@ func (s *Server) execManager() {
 	// the cluster leader only. In a single-node setup, IsLeader is always true.
 	s.pruneVisitors()
 	if s.cluster.IsLeader() {
+		s.maybeResetSharedStats()
 		s.pruneTokens()
 		s.pruneAttachments()
 		s.pruneMessages()

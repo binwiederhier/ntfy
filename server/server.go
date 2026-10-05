@@ -1295,7 +1295,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		}
 	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
-	if markdown || strings.ToLower(contentType) == "text/markdown" {
+	if markdown || isMarkdownContentType(contentType) {
 		m.ContentType = "text/markdown"
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!

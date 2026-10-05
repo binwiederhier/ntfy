@@ -95,8 +95,7 @@ func TestRegistry_TTLExcludesSilentNodes(t *testing.T) {
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
 	// A node whose heartbeat is older than the TTL does not count as live
-	_, err = pool.Exec(upsertNodeQuery, "node-silent", "http://10.0.0.9:2587", time.Now().Add(-2*time.Minute).Unix())
-	require.Nil(t, err)
+	insertNodeAt(t, pool, "node-silent", "http://10.0.0.9:2587", time.Now().Add(-2*time.Minute))
 	peers, err := r1.Refresh()
 	require.Nil(t, err)
 	require.Empty(t, peers)
@@ -108,10 +107,8 @@ func TestRegistry_PruneDeletesLongDeadOnly(t *testing.T) {
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
 	// One node beyond the 3x TTL grace period, one merely stale
-	_, err = pool.Exec(upsertNodeQuery, "node-long-dead", "http://10.0.0.8:2587", time.Now().Add(-4*time.Minute).Unix())
-	require.Nil(t, err)
-	_, err = pool.Exec(upsertNodeQuery, "node-slow", "http://10.0.0.9:2587", time.Now().Add(-2*time.Minute).Unix())
-	require.Nil(t, err)
+	insertNodeAt(t, pool, "node-long-dead", "http://10.0.0.8:2587", time.Now().Add(-4*time.Minute))
+	insertNodeAt(t, pool, "node-slow", "http://10.0.0.9:2587", time.Now().Add(-2*time.Minute))
 	require.Nil(t, r1.Prune())
 	require.Equal(t, 0, countRows(t, pool, "node-long-dead"))
 	require.Equal(t, 1, countRows(t, pool, "node-slow")) // Slow, not dead: kept
@@ -200,6 +197,14 @@ func TestRegistry_SchemaVersionFromTheFuture(t *testing.T) {
 	require.Nil(t, err)
 	_, err = New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
 	require.Error(t, err)
+}
+
+// insertNodeAt registers a fake node with a chosen heartbeat. Register() stamps the database
+// clock, which is what production wants but leaves tests no way to age a row.
+func insertNodeAt(t *testing.T, pool *db.DB, nodeID, url string, heartbeat time.Time) {
+	t.Helper()
+	_, err := pool.Exec(`INSERT INTO node_registry (node_id, advertise_url, last_heartbeat) VALUES ($1, $2, $3)`, nodeID, url, heartbeat.Unix())
+	require.Nil(t, err)
 }
 
 func countRows(t *testing.T, pool *db.DB, nodeID string) int {

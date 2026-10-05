@@ -39,14 +39,13 @@ func openTestPool(t testing.TB, dsn string) *db.DB {
 
 func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 	return &Config{
-		Enabled:             true,
-		NodeID:              NodeID(nodeID),
-		AdvertiseURL:        advertiseURL,
-		Secret:              testSecret,
-		HeartbeatInterval:   100 * time.Millisecond,
-		LeaderRenewInterval: 20 * time.Millisecond, // Lease duration 60ms, hold-off 120ms; keeps leadership tests fast
-		NodeTTL:             time.Second,           // Also the peer cache bound; short so fake peers registered mid-test are seen quickly
-		MaxMessageBytes:     1 << 20,
+		Enabled:           true,
+		NodeID:            NodeID(nodeID),
+		AdvertiseURL:      advertiseURL,
+		Secret:            testSecret,
+		HeartbeatInterval: 100 * time.Millisecond,
+		NodeTTL:           300 * time.Millisecond, // Liveness window AND the leadership hold-off; short keeps the tests fast
+		MaxMessageBytes:   1 << 20,
 	}
 }
 
@@ -549,7 +548,6 @@ func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
 		}
 	}))
 	defer peer.Close()
-	registerFakePeer(t, openTestPool(t, schemaDSN), "node-peer", peer.URL)
 
 	host, err := pg.Open(schemaDSN)
 	require.Nil(t, err)
@@ -558,6 +556,9 @@ func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.NodeTTL = 300 * time.Millisecond
 	conf.IsolatedFunc = func() { isolated.Add(1) }
+	// Registered last: the fake peer never heartbeats again, so its row must still be fresh
+	// when the mesh takes its first peer snapshot
+	registerFakePeer(t, openTestPool(t, schemaDSN), "node-peer", peer.URL)
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
@@ -580,13 +581,15 @@ func TestMesh_IsolatedFuncWhenDatabaseHangs(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer peer.Close()
-	registerFakePeer(t, openTestPool(t, schemaDSN), "node-peer", peer.URL)
 
 	proxy := newFreezableProxy(t, schemaDSN)
 	var isolated atomic.Int32
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	conf.NodeTTL = 300 * time.Millisecond
 	conf.IsolatedFunc = func() { isolated.Add(1) }
+	// Registered last, and through its own pool: the fake peer never heartbeats again, so its
+	// row must still be fresh when the mesh takes its first peer snapshot
+	registerFakePeer(t, openTestPool(t, schemaDSN), "node-peer", peer.URL)
 	mesh, err := newMeshCluster(conf, openTestPool(t, proxy.dsn), nil)
 	require.Nil(t, err)
 	defer mesh.Close()

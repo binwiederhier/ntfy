@@ -70,8 +70,12 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc, topics Topic
 		return nil, err
 	}
 	// Register synchronously so the node is discoverable before the constructor returns; the
-	// heartbeat loop refreshes the registration from here on
+	// heartbeat loop refreshes the registration from here on. The first peer snapshot is taken
+	// here too, so fan-out works from the first publish rather than the first heartbeat.
 	if err := reg.Register(); err != nil {
+		return nil, err
+	}
+	if _, err := reg.Refresh(); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -152,12 +156,7 @@ func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
 // list is the cached registry view, so it is at most one heartbeat stale.
 func (c *meshCluster) Members() []Member {
 	members := []Member{{NodeID: c.conf.NodeID, AdvertiseURL: c.conf.AdvertiseURL, Healthy: c.Healthy()}}
-	peers, err := c.registry.Peers()
-	if err != nil {
-		log.Tag(tag).Err(err).Warn("Cannot read peers for the member list")
-		return members
-	}
-	for _, p := range peers {
+	for _, p := range c.registry.Peers() {
 		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Healthy: true})
 	}
 	return members
@@ -345,10 +344,7 @@ func (c *meshCluster) queueFor(p *registry.Peer) *peerQueue {
 // bounded batching queue; if a peer's queue is full the message is dropped for that peer
 // (subscribers reconnect and re-poll history from the database).
 func (c *meshCluster) ForwardMessage(msg *model.Message) error {
-	peers, err := c.registry.Peers()
-	if err != nil {
-		return err
-	}
+	peers := c.registry.Peers() // The heartbeat's snapshot; never a database call on the publish path
 	if len(peers) == 0 {
 		return nil // Cluster of one; skip the marshal
 	}
@@ -548,8 +544,8 @@ func (c *meshCluster) BroadcastState(state *State) {
 	if len(state.AddedTopics) == 0 && len(state.SubscriberCancels) == 0 {
 		return
 	}
-	peers, err := c.registry.Peers()
-	if err != nil || len(peers) == 0 {
+	peers := c.registry.Peers()
+	if len(peers) == 0 {
 		return
 	}
 	envelope := &apiState{Cancels: state.SubscriberCancels}

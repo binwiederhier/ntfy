@@ -43,12 +43,12 @@ func TestRegistry_RegisterAndPeers(t *testing.T) {
 	require.Nil(t, err)
 	require.Nil(t, r2.Register())
 	// Each node sees the other, never itself
-	peers, err := r1.Peers()
+	peers, err := r1.Refresh()
 	require.Nil(t, err)
 	require.Len(t, peers, 1)
 	require.Equal(t, "node-2", peers[0].NodeID)
 	require.Equal(t, "http://10.0.0.2:2587", peers[0].AdvertiseURL)
-	peers, err = r2.Peers()
+	peers, err = r2.Refresh()
 	require.Nil(t, err)
 	require.Len(t, peers, 1)
 	require.Equal(t, "node-1", peers[0].NodeID)
@@ -66,32 +66,27 @@ func TestRegistry_ReRegisterUpdatesAdvertiseURL(t *testing.T) {
 	renewed, err := New(pool, "node-2", "http://new:2587", time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, renewed.Register())
-	expireCache(r1)
-	peers, err := r1.Peers()
+	peers, err := r1.Refresh()
 	require.Nil(t, err)
 	require.Len(t, peers, 1)
 	require.Equal(t, "http://new:2587", peers[0].AdvertiseURL)
 }
 
-func TestRegistry_PeersCachedForTTL(t *testing.T) {
+func TestRegistry_PeersIsTheLastRefresh(t *testing.T) {
+	// Peers never queries: it is empty before the first Refresh, and a node joining afterwards
+	// stays invisible until the next one (the heartbeat's job)
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
-	peers, err := r1.Peers()
-	require.Nil(t, err)
-	require.Empty(t, peers)
-	// A node joining after the cache was populated is invisible until the cache expires
+	require.Empty(t, r1.Peers())
 	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r2.Register())
-	peers, err = r1.Peers()
+	require.Empty(t, r1.Peers())
+	_, err = r1.Refresh()
 	require.Nil(t, err)
-	require.Empty(t, peers)
-	expireCache(r1)
-	peers, err = r1.Peers()
-	require.Nil(t, err)
-	require.Len(t, peers, 1)
+	require.Len(t, r1.Peers(), 1)
 }
 
 func TestRegistry_TTLExcludesSilentNodes(t *testing.T) {
@@ -102,7 +97,7 @@ func TestRegistry_TTLExcludesSilentNodes(t *testing.T) {
 	// A node whose heartbeat is older than the TTL does not count as live
 	_, err = pool.Exec(upsertNodeQuery, "node-silent", "http://10.0.0.9:2587", time.Now().Add(-2*time.Minute).Unix())
 	require.Nil(t, err)
-	peers, err := r1.Peers()
+	peers, err := r1.Refresh()
 	require.Nil(t, err)
 	require.Empty(t, peers)
 }
@@ -133,10 +128,10 @@ func TestRegistry_Deregister(t *testing.T) {
 	require.Equal(t, 0, countRows(t, pool, "node-1"))
 }
 
-func TestRegistry_PeersStaleCacheOnError(t *testing.T) {
-	// During a database hiccup, Peers serves the last-known peer list instead of erroring:
-	// fan-out keeps flowing to known peers, and the publish path does not log a warning per
-	// message for the duration of the outage.
+func TestRegistry_PeersSurvivesDatabaseOutage(t *testing.T) {
+	// During a database outage, Refresh fails but Peers keeps serving the last snapshot, without
+	// a query and without an error: fan-out keeps flowing to known peers, and the publish path
+	// neither waits on the database nor logs a warning per message.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
@@ -144,14 +139,14 @@ func TestRegistry_PeersStaleCacheOnError(t *testing.T) {
 	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r2.Register())
-	peers, err := r1.Peers()
+	_, err = r1.Refresh()
 	require.Nil(t, err)
-	require.Len(t, peers, 1)
-	// Expire the cache and break the database; the stale list must still be served
-	expireCache(r1)
 	require.Nil(t, pool.Close())
-	peers, err = r1.Peers()
-	require.Nil(t, err)
+	_, err = r1.Refresh()
+	require.NotNil(t, err)
+	started := time.Now()
+	peers := r1.Peers()
+	require.Less(t, time.Since(started), 100*time.Millisecond) // No database round trip, let alone a timeout
 	require.Len(t, peers, 1)
 	require.Equal(t, "node-2", peers[0].NodeID)
 }
@@ -207,13 +202,6 @@ func TestRegistry_SchemaVersionFromTheFuture(t *testing.T) {
 	require.Error(t, err)
 }
 
-// expireCache forces the next Peers() call to re-read the registry table.
-func expireCache(r *Registry) {
-	r.mu.Lock()
-	r.peersFetched = time.Time{}
-	r.mu.Unlock()
-}
-
 func countRows(t *testing.T, pool *db.DB, nodeID string) int {
 	t.Helper()
 	var count int
@@ -221,30 +209,25 @@ func countRows(t *testing.T, pool *db.DB, nodeID string) int {
 	return count
 }
 
-func TestRegistry_RefreshBypassesCache(t *testing.T) {
-	// Peers() serves a cached view for up to the TTL; Refresh (called by the mesh heartbeat)
-	// must see a newly joined node immediately and replace the cache with the fresh view
+func TestRegistry_RefreshReplacesSnapshot(t *testing.T) {
+	// Refresh (called by the mesh heartbeat) sees a newly joined node and replaces the snapshot
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r1.Register())
-	peers, err := r1.Peers()
+	_, err = r1.Refresh()
 	require.Nil(t, err)
-	require.Len(t, peers, 0) // Cache primed while alone
+	require.Len(t, r1.Peers(), 0) // Snapshot taken while alone
 
 	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r2.Register())
-	peers, err = r1.Peers()
-	require.Nil(t, err)
-	require.Len(t, peers, 0) // Still the cached view (TTL far away)
+	require.Len(t, r1.Peers(), 0) // Still the old snapshot
 
-	peers, err = r1.Refresh()
+	peers, err := r1.Refresh()
 	require.Nil(t, err)
 	require.Len(t, peers, 1)
 	require.Equal(t, "node-2", peers[0].NodeID)
-	peers, err = r1.Peers() // The cache now holds the fresh view
-	require.Nil(t, err)
-	require.Len(t, peers, 1)
+	require.Len(t, r1.Peers(), 1) // Snapshot replaced
 }

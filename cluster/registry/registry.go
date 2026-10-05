@@ -52,17 +52,18 @@ type Peer struct {
 
 // Registry is the node membership table (control plane): each node upserts its own row with a
 // fresh heartbeat every few seconds, and peers are the other rows with a heartbeat newer than
-// the TTL. Stale rows are pruned by the leader. The TTL bounds membership staleness in BOTH
-// directions: how long a silent node still counts as live, and how long the cached peer list is
-// served before a re-read -- so a new node may take up to a TTL to become visible.
+// the TTL. Stale rows are pruned by the leader.
+//
+// Reads are split in two: Refresh queries the table and is called from the heartbeat loop, and
+// Peers only ever returns the snapshot of the last Refresh. The publish path therefore never
+// waits on the database, not even during an outage, when the snapshot simply goes stale.
 type Registry struct {
 	pool         *db.DB
 	nodeID       string
 	advertiseURL string
 	ttl          time.Duration
-	peers        []*Peer // cached peer list
-	peersFetched time.Time
-	mu           sync.Mutex // Protects peers and peersFetched
+	peers        []*Peer    // Snapshot of the last Refresh; nil until the first one
+	mu           sync.Mutex // Protects peers
 }
 
 // New creates or migrates the registry schema and returns this node's membership handle. It
@@ -89,33 +90,14 @@ func (r *Registry) Register() error {
 	return err
 }
 
-// Peers returns the current set of live peer nodes (all registry rows with a fresh heartbeat,
-// excluding this node), cached for the TTL.
-func (r *Registry) Peers() ([]*Peer, error) {
+// Peers returns the live peer nodes as of the last Refresh (all registry rows with a fresh
+// heartbeat then, excluding this node). It never touches the database: before the first Refresh
+// there are no peers, and during an outage the snapshot is served as is (dead peers in it only
+// cost failed sends).
+func (r *Registry) Peers() []*Peer {
 	r.mu.Lock()
-	if r.peers != nil && time.Since(r.peersFetched) < r.ttl {
-		peers := r.peers
-		r.mu.Unlock()
-		return peers, nil
-	}
-	r.mu.Unlock()
-	peers, err := r.queryPeers()
-	if err != nil {
-		// Serve the last-known peer list during database hiccups: fan-out keeps flowing to
-		// known peers instead of erroring (and logging) once per published message for the
-		// duration of the outage. Dead peers in the stale list only cost failed sends.
-		r.mu.Lock()
-		defer r.mu.Unlock()
-		if r.peers != nil {
-			return r.peers, nil
-		}
-		return nil, err
-	}
-	r.mu.Lock()
-	r.peers = peers
-	r.peersFetched = time.Now()
-	r.mu.Unlock()
-	return peers, nil
+	defer r.mu.Unlock()
+	return r.peers
 }
 
 // Prune deletes registry rows whose heartbeat is long expired. Only the leader calls this; the
@@ -135,10 +117,9 @@ func (r *Registry) Deregister() error {
 	return err
 }
 
-// Refresh reads the live peer set from the database, bypassing and replacing the cache. The
-// mesh calls it on every heartbeat tick, so peer-set staleness is bounded by the heartbeat
-// interval, not the (much longer) cache TTL: without this, a freshly joined node stays
-// invisible to established peers -- and receives no fan-out -- for up to a full TTL.
+// Refresh reads the live peer set from the database and replaces the snapshot Peers serves.
+// The mesh calls it once at startup and on every heartbeat tick, so peer-set staleness is
+// bounded by the heartbeat interval. On error the previous snapshot stays in place.
 func (r *Registry) Refresh() ([]*Peer, error) {
 	peers, err := r.queryPeers()
 	if err != nil {
@@ -146,7 +127,6 @@ func (r *Registry) Refresh() ([]*Peer, error) {
 	}
 	r.mu.Lock()
 	r.peers = peers
-	r.peersFetched = time.Now()
 	r.mu.Unlock()
 	return peers, nil
 }

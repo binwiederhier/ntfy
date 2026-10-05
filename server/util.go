@@ -201,5 +201,8 @@ func maybeIgnoreSpecialHeader(name, value string) string {
 // ignoring case and any media type parameters, e.g. "text/markdown; charset=utf-8".
 func isMarkdownContentType(contentType string) bool {
 	mediaType, _, err := mime.ParseMediaType(contentType)
-	return err == nil && mediaType == "text/markdown"
+	if err != nil {
+		return strings.ToLower(contentType) == "text/markdown"
+	}
+	return strings.ToLower(mediaType) == "text/markdown"
 }

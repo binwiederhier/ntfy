@@ -2093,6 +2093,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.28.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Fix a recurring panic in the account token-update endpoint when a concurrent anonymous request from the same IP raced the authenticated request on the shared visitor (nil-user dereference); the request now fails with HTTP 401
+* Fix accepted messages being dropped from the cache on shutdown: the batched-write queue is now flushed, and `ntfy serve` shuts down gracefully on `SIGTERM`/`SIGINT` instead of dying mid-batch
+* Keep PostgreSQL pool connections idle instead of re-opening them: `pool_max_idle_conns` now defaults to `pool_max_conns`, so bursts no longer pay a DNS lookup, TCP/TLS handshake and authentication per query
+* Fix `since=<message-id>` replays flooding a client with a topic's entire retained history when the ID was not on the read replica yet (a client reconnecting right after receiving a message); the ID is now resolved on the primary in that case
+* Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

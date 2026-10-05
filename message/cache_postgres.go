@@ -33,11 +33,12 @@ const (
 		WHERE topic = $1 AND time >= $2
 		ORDER BY time DESC, id DESC
 	`
+	postgresSelectMessageRowIDQuery    = `SELECT id FROM message WHERE mid = $1 LIMIT 1`
 	postgresSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE topic = $1
-		  AND id > COALESCE((SELECT id FROM message WHERE mid = $2), 0)
+		  AND id > $2
 		  AND published = TRUE
 		ORDER BY time DESC, id DESC
 	`
@@ -45,7 +46,7 @@ const (
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE topic = $1
-		  AND (id > COALESCE((SELECT id FROM message WHERE mid = $2), 0) OR published = FALSE)
+		  AND (id > $2 OR published = FALSE)
 		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesLatestQuery = `
@@ -62,8 +63,13 @@ const (
 		ORDER BY time, id
 	`
 	postgresUpdateMessagePublishedQuery = `UPDATE message SET published = TRUE WHERE mid = $1`
-	postgresSelectMessagesCountQuery    = `SELECT COUNT(*) FROM message`
-	postgresSelectTopicsQuery           = `SELECT topic FROM message GROUP BY topic`
+	// Planner estimate, since a COUNT(*) scans the whole table; reltuples is -1 if never analyzed
+	postgresSelectMessagesCountQuery = `
+		SELECT CASE WHEN reltuples < 0 THEN (SELECT COUNT(*) FROM message) ELSE reltuples::BIGINT END
+		FROM pg_class
+		WHERE oid = 'message'::regclass
+	`
+	postgresSelectTopicsQuery = `SELECT topic FROM message GROUP BY topic`
 
 	postgresDeleteExpiredMessagesQuery         = `DELETE FROM message WHERE mid IN (SELECT mid FROM message WHERE expires <= $1 AND published = TRUE LIMIT $2)`
 	postgresMarkExpiredAttachmentsDeletedQuery = `UPDATE message SET attachment_deleted = TRUE WHERE mid IN (SELECT mid FROM message WHERE attachment_expires > 0 AND attachment_expires <= $1 AND attachment_deleted = FALSE LIMIT $2)`
@@ -84,6 +90,7 @@ var postgresQueries = queries{
 	selectMessagesByID:               postgresSelectMessagesByIDQuery,
 	selectMessagesSinceTime:          postgresSelectMessagesSinceTimeQuery,
 	selectMessagesSinceTimeScheduled: postgresSelectMessagesSinceTimeIncludeScheduledQuery,
+	selectMessageRowID:               postgresSelectMessageRowIDQuery,
 	selectMessagesSinceID:            postgresSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,

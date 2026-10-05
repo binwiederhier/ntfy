@@ -28,7 +28,10 @@ type BatchingQueue[T any] struct {
 	timeout   time.Duration
 	in        []T
 	out       chan []T
-	mu        sync.Mutex
+	done      chan struct{}  // Closed by Close, stops the timeout ticker
+	sending   sync.WaitGroup // In-flight sends to out; Close waits for them before closing out
+	closed    bool
+	mu        sync.Mutex // Protects in, closed, and sending.Add
 }
 
 // NewBatchingQueue creates a new BatchingQueue
@@ -38,23 +41,30 @@ func NewBatchingQueue[T any](batchSize int, timeout time.Duration) *BatchingQueu
 		timeout:   timeout,
 		in:        make([]T, 0),
 		out:       make(chan []T),
+		done:      make(chan struct{}),
 	}
 	go q.timeoutTicker()
 	return q
 }
 
 // Enqueue enqueues an element to the queue. If the configured batch size is reached,
-// the batch will be emitted immediately.
+// the batch will be emitted immediately. Elements enqueued after Close are dropped.
 func (q *BatchingQueue[T]) Enqueue(element T) {
 	q.mu.Lock()
+	if q.closed {
+		q.mu.Unlock()
+		return
+	}
 	q.in = append(q.in, element)
 	var elements []T
 	if len(q.in) == q.batchSize {
 		elements = q.dequeueAll()
+		q.sending.Add(1)
 	}
 	q.mu.Unlock()
 	if len(elements) > 0 {
 		q.out <- elements
+		q.sending.Done()
 	}
 }
 
@@ -75,12 +85,47 @@ func (q *BatchingQueue[T]) timeoutTicker() {
 		return
 	}
 	ticker := time.NewTicker(q.timeout)
-	for range ticker.C {
+	defer ticker.Stop()
+	for {
+		select {
+		case <-q.done:
+			return
+		case <-ticker.C:
+		}
 		q.mu.Lock()
+		if q.closed {
+			q.mu.Unlock()
+			return
+		}
 		elements := q.dequeueAll()
+		if len(elements) > 0 {
+			q.sending.Add(1)
+		}
 		q.mu.Unlock()
 		if len(elements) > 0 {
 			q.out <- elements
+			q.sending.Done()
 		}
 	}
+}
+
+// Close emits the elements still waiting for their batch and closes the output channel. The
+// consumer must keep reading from Dequeue until the channel is closed. Close blocks until it has
+// handed those elements over, so a caller that cannot wait forever for a stuck consumer has to
+// bound the call itself (see message.Cache.Close).
+func (q *BatchingQueue[T]) Close() {
+	q.mu.Lock()
+	if q.closed {
+		q.mu.Unlock()
+		return
+	}
+	q.closed = true
+	elements := q.dequeueAll()
+	q.mu.Unlock()
+	close(q.done)
+	q.sending.Wait()
+	if len(elements) > 0 {
+		q.out <- elements
+	}
+	close(q.out)
 }

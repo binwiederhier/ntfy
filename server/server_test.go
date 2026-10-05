@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -26,6 +27,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
+	"heckel.io/ntfy/v2/attachment"
+	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
@@ -5456,4 +5459,98 @@ func TestServer_BanFeed_SuccessfulRequestsNotBanned(t *testing.T) {
 	}
 	s.ban.Close() // Flush any buffered bans (there should be none) before asserting no file
 	require.NoFileExists(t, banFile)
+}
+
+func TestServer_StopFlushesBatchedMessages(t *testing.T) {
+	// Published messages that are still in the cache's write batch must be persisted when the
+	// server stops gracefully (SIGTERM on every deploy), not dropped
+	conf := newTestConfig(t, "")
+	conf.CacheBatchSize = 100
+	conf.CacheBatchTimeout = time.Hour
+	s := newTestServer(t, conf)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "batched 1", nil).Code)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "batched 2", nil).Code)
+	s.Stop()
+
+	cache, err := message.NewSQLiteStore(conf.CacheFile, "", time.Hour, 0, 0, false)
+	require.Nil(t, err)
+	defer cache.Close()
+	messages, err := cache.Messages("mytopic", model.SinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(messages))
+}
+
+func TestServer_StopFlushesBatchedMessages_Postgres(t *testing.T) {
+	// Same as TestServer_StopFlushesBatchedMessages on Postgres, where all stores share one
+	// pool: closing another store first used to close the pool under the pending batch write
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.CacheBatchSize = 100
+	conf.CacheBatchTimeout = time.Hour
+	s := newTestServer(t, conf)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "batched 1", nil).Code)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "batched 2", nil).Code)
+	s.Stop()
+
+	host, err := pg.Open(schemaDSN)
+	require.Nil(t, err)
+	defer host.DB.Close()
+	var count int
+	require.Nil(t, host.DB.QueryRow(`SELECT COUNT(*) FROM message WHERE topic = 'mytopic'`).Scan(&count))
+	require.Equal(t, 2, count)
+}
+
+func TestServer_RunDoesNotStartListenersAfterStop(t *testing.T) {
+	// A signal can arrive before Run has set up its listeners. Run must not start them then: it
+	// would serve from closed stores and never return, so the process would hang until SIGKILL
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	addr := ln.Addr().String()
+	require.Nil(t, ln.Close())
+	conf := newTestConfig(t, "")
+	conf.ListenHTTP = addr
+	s := newTestServer(t, conf)
+	s.Stop()
+
+	done := make(chan error, 1)
+	go func() { done <- s.Run() }()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return after Stop")
+	}
+	_, err = net.DialTimeout("tcp", addr, time.Second)
+	require.Error(t, err, "listener was started after Stop")
+}
+
+func TestServer_StopIsBoundedWhenAStoreBlocks(t *testing.T) {
+	// Stop waits for every store to close, and those waits have no deadline of their own: the
+	// attachment sync loop queries the database, so a wedged database can park it indefinitely.
+	// Shutdown must give up rather than wait for systemd to SIGKILL us
+	s := newTestServer(t, newTestConfig(t, ""))
+	syncing := make(chan struct{})
+	var calls atomic.Int32
+	store, err := attachment.NewFileStore(t.TempDir(), 1024, time.Hour, func() (map[string]int64, error) {
+		if calls.Add(1) > 1 {
+			close(syncing)
+			select {} // Block forever, like a query against a wedged database
+		}
+		return map[string]int64{}, nil
+	})
+	require.Nil(t, err)
+	<-syncing
+	s.mu.Lock()
+	s.attachment = store
+	s.mu.Unlock()
+
+	stopped := make(chan struct{})
+	go func() {
+		s.Stop()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+	case <-time.After(60 * time.Second):
+		t.Fatal("Stop did not return while a store was stuck")
+	}
 }

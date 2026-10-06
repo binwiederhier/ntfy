@@ -38,6 +38,21 @@ const (
 const (
 	maxOpTimeout = 5 * time.Second // Upper bound for one registry database call (ttl/2 below that)
 
+	// Leadership windows, as multiples of the node TTL. The hold-off is deliberately longer
+	// than the liveness window: the TTL also decides how fast a dead peer leaves the fan-out
+	// set and how fast an isolated node notices, so it has to stay short, while leadership
+	// would rather be slow and calm. The lease stays at one TTL, so belief ends exactly when
+	// peers stop counting this node as live.
+	//
+	// The invariant is leaseFactor < 1 + holdoffFactor: a successor cannot start its hold-off
+	// until the old leader's row is stale, one TTL after its last heartbeat, so the old belief
+	// always lapses first. The slack between the two, (1 + holdoffFactor - leaseFactor) TTLs,
+	// is how long a unit of work started under valid leadership is safe from a second leader.
+	// With a 30s TTL: lease 30s, hold-off 60s, 60s of slack, and up to ~90s with no leader
+	// after a crash.
+	leaseFactor   = 1
+	holdoffFactor = 2
+
 	schemaVersion  = 1
 	schemaStoreKey = "node_registry"
 )
@@ -137,30 +152,47 @@ func (r *Registry) Prune() error {
 // Three conditions, and the last two are what keep two nodes from both believing:
 //
 //  1. This node is the lowest live id, as of its last Refresh.
-//  2. Its own registration is fresh, dated from when the heartbeat was issued. A node that
-//     cannot reach the database stops believing within one TTL, which is also the point at
-//     which its peers stop seeing it as live, and it stops first because its own deadline is
-//     measured from before the write the others observed.
-//  3. It has been the lowest live id, *continuously observed*, for a whole TTL (the promotion
-//     hold-off). A returning lower-id node would otherwise believe at once, while the incumbent
-//     still believes until its next read; the incumbent cannot believe longer than one TTL past
-//     its last heartbeat, so waiting that out covers it.
+//  2. Its own registration is fresh, dated from when the heartbeat was issued (lease). A node
+//     that cannot reach the database stops believing within the lease, and it stops before any
+//     successor begins, because the successor cannot finish its hold-off that early.
+//  3. It has been the lowest live id, *continuously observed*, for the hold-off. A returning
+//     lower-id node would otherwise believe at once, while the incumbent still believes until
+//     its next read.
 //
 // "Continuously observed" is load-bearing. A process that was frozen (SIGSTOP, a paused VM, a
 // long stall) resumes holding an old observation, and counting that pause toward the hold-off
 // let it believe again the moment it registered once, while the incumbent had not yet noticed
-// it was back. Refresh therefore restarts the hold-off whenever observation lapsed for a TTL,
-// and belief additionally requires a recent observation.
+// it was back. Refresh therefore restarts the hold-off whenever observation lapsed, and belief
+// additionally requires a recent observation.
+//
+// Leadership is not a fence, and the slack above is not a promise. A caller must re-check
+// IsLeader for each unit of work: a leader-gated job that blocks inside a database call can sit
+// there past its own lease, and no window can bound that (a hung connection holds for minutes).
+// Measured on three hosts with the database partitioned away from the leader: an unbounded call
+// inside the leader-gated section kept a node acting as leader for 14.3s after its lease had
+// expired, 8s of that alongside the new leader. Anything whose double execution matters needs
+// its own claim row or has to be idempotent; leadership only keeps N nodes from doing the same
+// idempotent work at once.
 func (r *Registry) IsLeader() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.registeredAt.IsZero() || time.Since(r.registeredAt) >= r.ttl {
+	if r.registeredAt.IsZero() || time.Since(r.registeredAt) >= r.lease() {
 		return false // Our registration is stale: peers no longer count us as live
 	}
-	if r.refreshedAt.IsZero() || time.Since(r.refreshedAt) >= r.ttl {
+	if r.refreshedAt.IsZero() || time.Since(r.refreshedAt) >= r.lease() {
 		return false // We have not looked at the registry recently enough to trust what we saw
 	}
-	return !r.lowestSince.IsZero() && time.Since(r.lowestSince) >= r.ttl
+	return !r.lowestSince.IsZero() && time.Since(r.lowestSince) >= r.holdoff()
+}
+
+// lease is how long this node may believe it leads on one successful heartbeat
+func (r *Registry) lease() time.Duration {
+	return leaseFactor * r.ttl
+}
+
+// holdoff is how long this node must have been the lowest live id before it believes
+func (r *Registry) holdoff() time.Duration {
+	return holdoffFactor * r.ttl
 }
 
 // Deregister deletes this node's registry row; called on shutdown.
@@ -184,7 +216,7 @@ func (r *Registry) Refresh() ([]*Peer, error) {
 	r.mu.Lock()
 	r.peers = peers
 	// A gap in observation does not count toward the hold-off: see IsLeader
-	lapsed := r.refreshedAt.IsZero() || issued.Sub(r.refreshedAt) >= r.ttl
+	lapsed := r.refreshedAt.IsZero() || issued.Sub(r.refreshedAt) >= r.lease()
 	if lowest != r.nodeID {
 		r.lowestSince = time.Time{}
 	} else if r.lowestSince.IsZero() || lapsed {

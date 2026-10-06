@@ -2049,6 +2049,40 @@ func TestServer_PublishUnifiedPushText(t *testing.T) {
 	})
 }
 
+func TestServer_PublishUpTopicBinaryDoesNotCreateAttachment(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		b := make([]byte, 5000)
+		_, err := rand.Read(b)
+		require.Nil(t, err)
+
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/upTEST", string(b), nil)
+		require.Equal(t, 200, response.Code)
+
+		m := toMessage(t, response.Body.String())
+		require.Nil(t, m.Attachment)
+		require.Equal(t, "base64", m.Encoding)
+		decoded, err := base64.StdEncoding.DecodeString(m.Message)
+		require.Nil(t, err)
+		require.Equal(t, b[:4096], decoded)
+		require.NoFileExists(t, filepath.Join(s.config.AttachmentCacheDir, m.ID))
+	})
+}
+
+func TestServer_PublishUpTopicRejectsExplicitAttachments(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for _, headers := range []map[string]string{
+			{"Filename": "payload.bin"},
+			{"X-Attach": "https://example.com/payload.bin"},
+		} {
+			response := request(t, s, "PUT", "/upTEST", "payload", headers)
+			require.Equal(t, 400, response.Code)
+			require.Equal(t, 40014, toHTTPError(t, response.Body.String()).Code)
+		}
+	})
+}
+
 func TestServer_MatrixGateway_Discovery_Success(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))

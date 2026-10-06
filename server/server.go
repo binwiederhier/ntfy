@@ -916,6 +916,10 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
+	attachmentsAllowed := !strings.HasPrefix(t.ID, unifiedPushTopicPrefix)
+	if !attachmentsAllowed && m.Attachment != nil {
+		return nil, errHTTPBadRequestAttachmentsDisallowed.With(m)
+	}
 	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
@@ -951,7 +955,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if cache {
 		m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
 	}
-	if err := s.handlePublishBody(r, v, m, body, template, unifiedpush, priorityStr); err != nil {
+	if err := s.handlePublishBody(r, v, m, body, template, unifiedpush, attachmentsAllowed, priorityStr); err != nil {
 		return nil, err
 	}
 	if m.Message == "" {
@@ -1337,10 +1341,10 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 //     If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
 //  7. curl -T file.txt ntfy.sh/mytopic
 //     In all other cases, mostly if file.txt is > message limit, treat it as an attachment
-func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *model.Message, body *util.PeekedReadCloser, template templateMode, unifiedpush bool, priorityStr string) error {
+func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *model.Message, body *util.PeekedReadCloser, template templateMode, unifiedpush bool, attachmentsAllowed bool, priorityStr string) error {
 	if m.Event == model.PollRequestEvent { // Case 1
 		return s.handleBodyDiscard(body)
-	} else if unifiedpush {
+	} else if unifiedpush || !attachmentsAllowed {
 		return s.handleBodyAsMessageAutoDetect(m, body) // Case 2
 	} else if m.Attachment != nil && m.Attachment.URL != "" {
 		return s.handleBodyAsTextMessage(m, body) // Case 3

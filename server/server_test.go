@@ -2231,6 +2231,48 @@ func TestServer_PublishMarkdown_NotMarkdown(t *testing.T) {
 	})
 }
 
+func TestServer_PublishMarkdown_ContentTypeParameters(t *testing.T) {
+	tests := []struct {
+		contentType string
+		expected    string
+	}{
+		{"text/markdown; charset=utf-8", "text/markdown"},
+		{"TEXT/MARKDOWN", "text/markdown"},
+		{"text/markdown;charset=UTF-8", "text/markdown"},
+		{"TEXT/Markdown ; charset=utf-8", "text/markdown"},
+		{"text/markdown; variant=GFM", "text/markdown"},
+		{"text/markdownx; charset=utf-8", ""},
+		{"text/plain; charset=utf-8", ""},
+		{"text/markdown; charset=\"unterminated", ""},
+	}
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		for _, tc := range tests {
+			t.Run(tc.contentType, func(t *testing.T) {
+				s := newTestServer(t, newTestConfig(t, databaseURL))
+				response := request(t, s, "PUT", "/mytopic", "**make this bold**", map[string]string{
+					"Content-Type": tc.contentType,
+				})
+				require.Equal(t, 200, response.Code)
+
+				m := toMessage(t, response.Body.String())
+				require.Equal(t, "**make this bold**", m.Message)
+				require.Equal(t, tc.expected, m.ContentType)
+			})
+		}
+	})
+}
+
+func TestServer_PublishMarkdown_ContentTypeQueryParamWithCharset(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic?content-type=text/markdown%3B%20charset=utf-8", "**make this bold**", nil)
+		require.Equal(t, 200, response.Code)
+
+		m := toMessage(t, response.Body.String())
+		require.Equal(t, "text/markdown", m.ContentType)
+	})
+}
+
 func TestServer_PublishAsJSON(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))

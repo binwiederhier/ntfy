@@ -1560,7 +1560,15 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		if call != "" {
 			return false, false, "", "", "", false, "", errHTTPBadRequestDelayNoCall // we cannot store the phone number (yet)
 		}
-		delay, err := util.ParseFutureTime(delayStr, time.Now())
+		now := time.Now()
+		if timezone := readParam(r, "x-timezone", "timezone"); timezone != "" {
+			location, err := time.LoadLocation(timezone)
+			if err != nil {
+				return false, false, "", "", "", false, "", errHTTPBadRequestTimezoneInvalid
+			}
+			now = now.In(location)
+		}
+		delay, err := util.ParseFutureTime(delayStr, now)
 		if err != nil {
 			return false, false, "", "", "", false, "", errHTTPBadRequestDelayCannotParse
 		} else if delay.Unix() < time.Now().Add(s.config.MessageDelayMin).Unix() {
@@ -1578,7 +1586,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		}
 	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
-	if markdown || strings.ToLower(contentType) == "text/markdown" {
+	if markdown || isMarkdownContentType(contentType) {
 		m.ContentType = "text/markdown"
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
@@ -2509,6 +2517,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Delay != "" {
 			r.Header.Set("X-Delay", m.Delay)
+		}
+		if m.Timezone != "" {
+			r.Header.Set("X-Timezone", m.Timezone)
 		}
 		if m.Call != "" {
 			r.Header.Set("X-Call", m.Call)

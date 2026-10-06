@@ -137,7 +137,7 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 		return nil
 	}, "", func() {})
 	// A valid fan-out request against the PUBLIC handler must not deliver
-	response := request(t, s, "POST", "/v1/internal/message",
+	response := request(t, s, "POST", "/v1/cluster/message",
 		`{"message":{"id":"x1","time":1,"event":"message","topic":"mytopic","message":"sneaky"}}`,
 		map[string]string{"X-Cluster-Secret": "s3cret", "X-Cluster-Origin": "node-b"})
 	require.Equal(t, 404, response.Code)
@@ -147,7 +147,7 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 	mu.Unlock()
 	// The same request against the cluster listener handler DOES deliver
 	rr := httptest.NewRecorder()
-	req, err := http.NewRequest("POST", "/v1/internal/message",
+	req, err := http.NewRequest("POST", "/v1/cluster/message",
 		strings.NewReader(`{"message":{"id":"x2","time":1,"event":"message","topic":"mytopic","message":"legit"}}`))
 	require.Nil(t, err)
 	req.Header.Set("X-Cluster-Secret", "s3cret")

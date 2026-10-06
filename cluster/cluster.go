@@ -13,18 +13,18 @@ import (
 	"heckel.io/ntfy/v2/model"
 )
 
-// The internal peer API: every kind of node-to-node communication is a path under
-// /v1/internal/, served only on the dedicated cluster listener. Future concerns (rate limit
-// counters, stats) become new paths or new sections of the state envelope.
+// The cluster API: every kind of node-to-node communication is a path under /v1/cluster/,
+// served only on the dedicated cluster listener. Future concerns (rate limit counters, stats)
+// become new paths or new sections of the state envelope.
 const (
 	// MessagePath receives batches of published messages (NDJSON, one apiMessage per line).
-	MessagePath = "/v1/internal/message"
+	MessagePath = "/v1/cluster/message"
 	// StatePath receives peer state (JSON apiState): full subscription snapshots and
 	// incremental updates.
-	StatePath = "/v1/internal/state"
+	StatePath = "/v1/cluster/state"
 	// MembersPath lists the live cluster members (this node plus its live peers), for the
 	// load balancers' agents: each LB maintains its own upstream list from it.
-	MembersPath = "/v1/internal/members"
+	MembersPath = "/v1/cluster/members"
 	// HealthPath reports a node's cluster health (200 healthy, 503 not); served on the cluster
 	// listener too, where isolated nodes probe their peers.
 	HealthPath = "/v1/health"

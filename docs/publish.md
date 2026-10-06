@@ -4959,6 +4959,10 @@ but just in case, let's list them all:
 These limits can be changed on a per-user basis using [tiers](config.md#tiers). If [payments](config.md#payments) are enabled, a user tier can be changed by purchasing
 a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier limits than the ones listed above. 
 
+!!! tip
+    If you repeatedly exceed the limits on ntfy.sh, or otherwise abuse the service, your IP address may be temporarily
+    banned. You can check if you have been banned at [am-i-banned.ntfy.sh](https://am-i-banned.ntfy.sh/).
+
 ## List of all parameters
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**
 when used in **HTTP headers**, and must be **lowercase** when used as **query parameters in the URL**. They are listed in the 

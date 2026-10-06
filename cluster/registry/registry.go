@@ -75,8 +75,9 @@ type Registry struct {
 	ttl          time.Duration
 	peers        []*Peer    // Snapshot of the last Refresh; nil until the first one
 	registeredAt time.Time  // When the last successful Register was ISSUED; zero = never
+	refreshedAt  time.Time  // When the last successful Refresh was ISSUED; zero = never
 	lowestSince  time.Time  // When this node first saw itself as the lowest live id; zero = it is not
-	mu           sync.Mutex // Protects peers, registeredAt and lowestSince
+	mu           sync.Mutex // Protects peers, registeredAt, refreshedAt and lowestSince
 }
 
 // New creates or migrates the registry schema and returns this node's membership handle. It
@@ -140,15 +141,24 @@ func (r *Registry) Prune() error {
 //     cannot reach the database stops believing within one TTL, which is also the point at
 //     which its peers stop seeing it as live, and it stops first because its own deadline is
 //     measured from before the write the others observed.
-//  3. It has been the lowest live id for a whole TTL (the promotion hold-off). A returning
-//     lower-id node would otherwise believe at once, while the incumbent still believes until
-//     its next read; the incumbent cannot believe longer than one TTL past its last heartbeat,
-//     so waiting that out covers it.
+//  3. It has been the lowest live id, *continuously observed*, for a whole TTL (the promotion
+//     hold-off). A returning lower-id node would otherwise believe at once, while the incumbent
+//     still believes until its next read; the incumbent cannot believe longer than one TTL past
+//     its last heartbeat, so waiting that out covers it.
+//
+// "Continuously observed" is load-bearing. A process that was frozen (SIGSTOP, a paused VM, a
+// long stall) resumes holding an old observation, and counting that pause toward the hold-off
+// let it believe again the moment it registered once, while the incumbent had not yet noticed
+// it was back. Refresh therefore restarts the hold-off whenever observation lapsed for a TTL,
+// and belief additionally requires a recent observation.
 func (r *Registry) IsLeader() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.registeredAt.IsZero() || time.Since(r.registeredAt) >= r.ttl {
 		return false // Our registration is stale: peers no longer count us as live
+	}
+	if r.refreshedAt.IsZero() || time.Since(r.refreshedAt) >= r.ttl {
+		return false // We have not looked at the registry recently enough to trust what we saw
 	}
 	return !r.lowestSince.IsZero() && time.Since(r.lowestSince) >= r.ttl
 }
@@ -166,19 +176,21 @@ func (r *Registry) Deregister() error {
 // heartbeat tick, so both are bounded by the heartbeat interval. On error the previous snapshot
 // and standing stay in place; leadership then lapses on its own via the registration deadline.
 func (r *Registry) Refresh() ([]*Peer, error) {
+	issued := time.Now()
 	peers, lowest, err := r.queryLiveNodes()
 	if err != nil {
 		return nil, err
 	}
 	r.mu.Lock()
 	r.peers = peers
-	if lowest == r.nodeID {
-		if r.lowestSince.IsZero() {
-			r.lowestSince = time.Now() // Start of the promotion hold-off
-		}
-	} else {
+	// A gap in observation does not count toward the hold-off: see IsLeader
+	lapsed := r.refreshedAt.IsZero() || issued.Sub(r.refreshedAt) >= r.ttl
+	if lowest != r.nodeID {
 		r.lowestSince = time.Time{}
+	} else if r.lowestSince.IsZero() || lapsed {
+		r.lowestSince = issued // Start, or restart, the promotion hold-off
 	}
+	r.refreshedAt = issued
 	r.mu.Unlock()
 	return peers, nil
 }

@@ -123,3 +123,45 @@ func TestRegistry_LivenessUsesTheDatabaseClock(t *testing.T) {
 	insertNodeAt(t, pool, "app1", "http://10.0.0.1:2587", time.Now().Add(-time.Hour))
 	waitForLeader(t, a)
 }
+
+func TestRegistry_FrozenLeaderMustReEarnTheHoldOff(t *testing.T) {
+	// A process that was frozen (SIGSTOP, a paused VM, a long stall) comes back holding an old
+	// observation. Counting that pause toward the promotion hold-off let it believe again the
+	// moment it registered once, while the incumbent had not yet noticed it was back: two
+	// leaders, measured at 436ms in a two-process run before this was fixed.
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
+	require.Nil(t, err)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
+	require.Nil(t, err)
+	waitForLeader(t, a, b)
+
+	// app1 freezes: no heartbeats, no reads. Its own deadlines lapse and app2 takes over,
+	// which means ticking only app2 from here (ticking app1 would thaw it).
+	time.Sleep(2 * leaderTestTTL)
+	require.False(t, a.IsLeader())
+	frozen := time.Now()
+	for !b.IsLeader() {
+		require.False(t, a.IsLeader() && b.IsLeader(), "two leaders at once")
+		require.Less(t, time.Since(frozen), 5*time.Second, "app2 never took over")
+		tick(t, b)
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// app1 thaws. One register plus one refresh must NOT hand leadership straight back.
+	require.Nil(t, a.Register())
+	_, err = a.Refresh()
+	require.Nil(t, err)
+	require.False(t, a.IsLeader(), "a thawed node believed again without re-earning the hold-off")
+	require.True(t, b.IsLeader(), "the incumbent should still hold it at this point")
+
+	// And once it has observed continuously for a hold-off, it may take over, with b stepping
+	// down first (that part is TestRegistry_ReturningLowerNodePreemptsWithoutOverlap)
+	started := time.Now()
+	for !a.IsLeader() {
+		require.False(t, a.IsLeader() && b.IsLeader(), "two leaders at once")
+		require.Less(t, time.Since(started), 5*time.Second, "app1 never recovered leadership")
+		tick(t, a, b)
+		time.Sleep(10 * time.Millisecond)
+	}
+}

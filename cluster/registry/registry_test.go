@@ -351,16 +351,60 @@ func TestRegistry_PartitionedLeaderStepsDown(t *testing.T) {
 	require.Eventually(t, func() bool { return !a.IsLeader() }, 2*time.Second, 5*time.Millisecond)
 }
 
-func TestRegistry_LivenessUsesTheDatabaseClock(t *testing.T) {
-	// Liveness and leadership compare timestamps across nodes, so they must not depend on any
-	// node's clock: a row written with a badly skewed clock is judged by the database's now().
+func TestRegistry_LivenessIsDecidedByTheDatabaseClock(t *testing.T) {
+	// Liveness timestamps are compared across nodes, so both the write and the cutoff have to
+	// come from the database: with node clocks, one running fast declares live peers dead and
+	// one running behind looks dead to everybody. Behaviour alone cannot tell the two apart
+	// here, because the test process and the database share a clock, so this pins the mechanism
+	// as well. (The cross-host version is a harness drill: a node's clock pushed an hour ahead
+	// changed neither liveness nor leadership.)
+	require.Contains(t, upsertNodeQuery, "EXTRACT(EPOCH FROM now())", "heartbeats must be stamped by the database")
+	require.Contains(t, selectLiveNodesQuery, "EXTRACT(EPOCH FROM now())", "the liveness cutoff must be evaluated by the database")
+	require.Contains(t, pruneStaleNodesQuery, "EXTRACT(EPOCH FROM now())", "pruning must use the database clock")
+
+	// And the behaviour that follows: this node's heartbeat lands on the database's clock, a row
+	// as an hour-fast node would have written it still counts as live, and one from an hour-slow
+	// node does not.
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	a, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
+	r, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
 	require.Nil(t, err)
-	// A lower-id node whose clock is an hour ahead: it would look live forever if the cutoff
-	// came from a node's clock, and would hold leadership away from app2
-	insertNodeAt(t, pool, "app1", "http://10.0.0.1:2587", time.Now().Add(-time.Hour))
-	waitForLeader(t, a)
+	require.Nil(t, r.Register())
+	var skew int64
+	require.Nil(t, pool.QueryRow(`SELECT EXTRACT(EPOCH FROM now())::BIGINT - last_heartbeat FROM node_registry WHERE node_id = 'node-1'`).Scan(&skew))
+	require.LessOrEqual(t, skew, int64(1))
+
+	insertNodeAt(t, pool, "node-fast", "http://10.0.0.2:2587", time.Now().Add(time.Hour))
+	insertNodeAt(t, pool, "node-slow", "http://10.0.0.3:2587", time.Now().Add(-time.Hour))
+	peers, err := r.Refresh()
+	require.Nil(t, err)
+	require.Len(t, peers, 1)
+	require.Equal(t, "node-fast", peers[0].NodeID)
+}
+
+func TestRegistry_HeartbeatWithoutObservingIsNotLeadership(t *testing.T) {
+	// A node can keep its registration fresh while its view of the registry goes stale: its
+	// refresh stalls, or it only ever writes. It must stop believing then, because the hold-off
+	// it earned rests on an observation that no longer holds. Without that check the incumbent
+	// keeps leading while a returning lower-id node earns its own hold-off, and both believe.
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
+	require.Nil(t, err)
+	waitForLeader(t, b)
+
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
+	require.Nil(t, err)
+	deadline := time.Now().Add(leaderTestWait)
+	for time.Now().Before(deadline) {
+		require.Nil(t, b.Register()) // The incumbent's registration stays fresh...
+		tick(t, a)                   // ...but only app1 ever looks at the registry
+		require.False(t, a.IsLeader() && b.IsLeader(), "two leaders at once")
+		if a.IsLeader() {
+			require.False(t, b.IsLeader(), "the incumbent kept believing on a stale observation")
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("app1 never took over")
 }
 
 func TestRegistry_FrozenLeaderMustReEarnTheHoldOff(t *testing.T) {

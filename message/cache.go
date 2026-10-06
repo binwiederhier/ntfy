@@ -22,6 +22,11 @@ const (
 
 	// NoLimit reads a topic's cached messages without a size budget.
 	NoLimit = 0
+
+	// closeFlushTimeout bounds how long Close waits for the last batch to be written. A batch
+	// write takes milliseconds, so this only ever trips when the database is wedged, and then
+	// shutdown must still finish well inside systemd's stop timeout.
+	closeFlushTimeout = 5 * time.Second
 )
 
 var errNoRows = errors.New("no rows found")
@@ -35,6 +40,7 @@ type queries struct {
 	selectMessagesByID               string
 	selectMessagesSinceTime          string
 	selectMessagesSinceTimeScheduled string
+	selectMessageRowID               string
 	selectMessagesSinceID            string
 	selectMessagesSinceIDScheduled   string
 	selectMessagesLatest             string
@@ -56,6 +62,7 @@ type queries struct {
 type Cache struct {
 	db      *db.DB
 	queue   *util.BatchingQueue[*model.Message]
+	written chan struct{} // Closed once the batch writer has drained the queue (after queue.Close)
 	nop     bool
 	mu      *sync.Mutex // nil for PostgreSQL (concurrent writes supported), set for SQLite (single writer)
 	queries queries
@@ -69,6 +76,7 @@ func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTi
 	c := &Cache{
 		db:      db,
 		queue:   queue,
+		written: make(chan struct{}),
 		nop:     nop,
 		mu:      mu,
 		queries: queries,
@@ -237,18 +245,50 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 }
 
 func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
+	rowID, err := c.resolveMessageRowID(since.ID())
+	if err != nil {
+		return nil, false, err
+	}
 	var rows *sql.Rows
-	var err error
 	rdb := c.db.ReadOnly()
 	if scheduled {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, since.ID())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, rowID)
 	} else {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, since.ID())
+		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, rowID)
 	}
 	if err != nil {
 		return nil, false, err
 	}
 	return readMessagesCapped(rows, maxBytes)
+}
+
+// resolveMessageRowID resolves a since=<mid> marker to the row id used as the replay cut-off.
+// It asks the replica first and, only if the mid is unknown there, the primary: a client that
+// reconnects right after receiving a message can be ahead of replication, and without the retry
+// its unknown mid resolved to 0 and replayed the topic's entire retained history. A mid unknown
+// to the primary as well (e.g. expired) returns 0, which deliberately keeps that full replay.
+func (c *Cache) resolveMessageRowID(mid string) (int64, error) {
+	rdb := c.db.ReadOnly()
+	rowID, err := c.resolveMessageRowIDOn(rdb, mid)
+	if err != nil {
+		return 0, err
+	}
+	if rowID == 0 && rdb != c.db.Primary() {
+		return c.resolveMessageRowIDOn(c.db.Primary(), mid)
+	}
+	return rowID, nil
+}
+
+// resolveMessageRowIDOn looks the mid up on one database handle; 0 means unknown
+func (c *Cache) resolveMessageRowIDOn(h *sql.DB, mid string) (int64, error) {
+	var rowID int64
+	err := h.QueryRow(c.queries.selectMessageRowID, mid).Scan(&rowID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+	return rowID, nil
 }
 
 func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
@@ -467,11 +507,27 @@ func (c *Cache) Stats() (messages int64, err error) {
 }
 
 // Close closes the underlying database connection
+// Close writes the messages still waiting in the batch queue, then closes the database. A
+// database that does not accept the last batch delays shutdown by at most closeFlushTimeout.
 func (c *Cache) Close() error {
+	if c.queue != nil {
+		flushed := make(chan struct{})
+		go func() {
+			c.queue.Close() // Hands the pending messages to the batch writer
+			<-c.written
+			close(flushed)
+		}()
+		select {
+		case <-flushed:
+		case <-time.After(closeFlushTimeout):
+			log.Tag(tagMessageCache).Warn("Giving up on the last message batch after %v", closeFlushTimeout)
+		}
+	}
 	return c.db.Close()
 }
 
 func (c *Cache) processMessageBatches() {
+	defer close(c.written)
 	if c.queue == nil {
 		return
 	}

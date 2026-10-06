@@ -733,7 +733,7 @@ them with a comma, e.g. `tag1,tag2,tag3`.
 _Supported on:_ :material-android: :material-firefox:
 
 You can format messages using [Markdown](https://www.markdownguide.org/basic-syntax/) 🤩. That means you can use 
-**bold text**, *italicized text*, links, images, and more. Supported Markdown features (web app only for now):
+**bold text**, *italicized text*, links, images, and more. Supported Markdown features:
 
 - [Emphasis](https://www.markdownguide.org/basic-syntax/#emphasis) such as **bold** (`**bold**`), *italics* (`*italics*`)
 - [Links](https://www.markdownguide.org/basic-syntax/#links) (`[some tool](https://ntfy.sh)`)
@@ -2662,6 +2662,19 @@ Usage is pretty straight forward. You can set the delivery time using the `X-Del
 `3h`, `2 days`), or a natural language time string (e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`, 
 [and more](https://github.com/olebedev/when)). 
 
+To interpret a natural language time in a specific timezone, set the `X-Timezone` header
+(alias: `Timezone`), the `timezone` query parameter, or the `timezone` JSON field to an
+IANA timezone name such as `Asia/Tokyo` or `America/New_York`:
+
+```
+curl -H "At: tomorrow, 10am" -H "Timezone: Asia/Tokyo" -d "Good morning" ntfy.sh/hello
+```
+
+Without a timezone, the server's local timezone is used as before. The web app sends your
+browser's timezone automatically when scheduling a message. Relative durations such as
+`1h` and Unix timestamps still refer to the same instant regardless of timezone. Invalid
+timezone names return HTTP 400 when a delay is supplied; without a delay, the timezone is ignored.
+
 As of today, the minimum delay you can set is **10 seconds** and the maximum delay is **3 days**. This can be configured
 with the `message-delay-limit` option.
 
@@ -3786,6 +3799,7 @@ all the supported fields:
 | `icon`        | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                                                 |
 | `filename`    | -        | *string*                         | `file.jpg`                                | File name of the attachment                                                               |
 | `delay`       | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                                                |
+| `timezone`    | -        | *string*                         | `Asia/Tokyo`                             | Timezone for natural language delayed delivery times                                      |
 | `email`       | -        | *e-mail address or 'yes'*        | `phil@example.com` or `yes`               | E-mail address for e-mail notifications, or `yes` to use your primary verified address    |
 | `call`        | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                                        |
 | `sequence_id` | -        | *string*                         | `my-sequence-123`                         | Sequence ID for [updating/deleting notifications](#updating-deleting-notifications)   |
@@ -4764,6 +4778,13 @@ authParam  = base64_raw(authHeader) // -> QmFzaWMgZEdWemRIVnpaWEk2Wm1GclpYQmhjM0
 // If your language does not have a function to encode raw base64, simply use normal base64
 // and REMOVE TRAILING "=" characters. 
 ```
+You can use following one liner to create `auth` parameter from ntfy token using powershell:
+``` powershell
+(Read-Host -Prompt 'Enter Ntfy token' | ForEach-Object { ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(":$_"))))) }).TrimEnd('=')
+
+# If you have base64 module installed
+(Read-Host -Prompt "Enter Ntfy token" | ForEach-Object { ":$_" } | ConvertTo-Base64 | ForEach-Object { "Basic $_" } | ConvertTo-Base64 ).TrimEnd('=')
+```
 
 The following command will generate the appropriate value for you on *nix systems:
 
@@ -5006,6 +5027,10 @@ but just in case, let's list them all:
 These limits can be changed on a per-user basis using [tiers](config.md#tiers). If [payments](config.md#payments) are enabled, a user tier can be changed by purchasing
 a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier limits than the ones listed above. 
 
+!!! tip
+    If you repeatedly exceed the limits on ntfy.sh, or otherwise abuse the service, your IP address may be temporarily
+    banned. You can check if you have been banned at [am-i-banned.ntfy.sh](https://am-i-banned.ntfy.sh/).
+
 ## List of all parameters
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**
 when used in **HTTP headers**, and must be **lowercase** when used as **query parameters in the URL**. They are listed in the 
@@ -5028,6 +5053,7 @@ table in their canonical form.
 | `X-Apple-Volume` | `Apple-Volume`                            | Sound volume (greater than `0.0`, at most `1.0`) for [iOS critical alerts](#ios-critical-alerts) |
 | `X-Tags`        | `Tags`, `Tag`, `ta`                        | [Tags and emojis](#tags-emojis)                                                               |
 | `X-Delay`       | `Delay`, `X-At`, `At`, `X-In`, `In`        | Timestamp or duration for [delayed delivery](#scheduled-delivery)                             |
+| `X-Timezone`    | `Timezone`                               | IANA timezone for [delayed delivery](#scheduled-delivery)                                     |
 | `X-Actions`     | `Actions`, `Action`                        | JSON array or short format of [user actions](#action-buttons)                                 |
 | `X-Click`       | `Click`                                    | URL to open when [notification is clicked](#click-action)                                     |
 | `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |

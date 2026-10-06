@@ -1,6 +1,7 @@
 package message_test
 
 import (
+	"fmt"
 	"net/netip"
 	"path/filepath"
 	"sync"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/model"
@@ -981,4 +984,110 @@ func TestStore_AddMessage_InvalidUTF8BatchDoesNotDropValidMessages(t *testing.T)
 		require.Nil(t, err)
 		require.Equal(t, 3, len(messages))
 	})
+}
+
+func TestStore_CloseGivesUpOnAStuckBatchWrite(t *testing.T) {
+	// A wedged database must not make Close, and with it the entire shutdown, block forever.
+	// systemd would SIGKILL us eventually, but only after its stop timeout.
+	testDB := dbtest.CreateTestPostgres(t)
+	s, err := message.NewPostgresStore(testDB, 100, time.Hour)
+	require.Nil(t, err)
+
+	// Hold a lock on the message table, so the final batch write cannot make progress
+	tx, err := testDB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE")
+	require.Nil(t, err)
+
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "my message")))
+	done := make(chan struct{})
+	go func() {
+		s.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Close did not return while the database was stuck")
+	}
+}
+
+func TestStore_CloseGivesUpOnAnInFlightBatchWrite(t *testing.T) {
+	// Same as TestStore_CloseGivesUpOnAStuckBatchWrite, but with a batch already handed to the
+	// batch writer, so Close cannot even hand over the messages that are still pending
+	testDB := dbtest.CreateTestPostgres(t)
+	s, err := message.NewPostgresStore(testDB, 2, time.Hour)
+	require.Nil(t, err)
+
+	tx, err := testDB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE")
+	require.Nil(t, err)
+
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "stuck 1")))
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "stuck 2"))) // Batch of 2, handed over
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "pending")))
+	done := make(chan struct{})
+	go func() {
+		s.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Close did not return while the database was stuck")
+	}
+}
+
+func TestStore_MessagesSinceID_ForeignMidActsAsPositionalMarker(t *testing.T) {
+	// Multi-topic subscriptions apply ONE since=<mid> marker to every subscribed topic, so for
+	// all but the marker's own topic the mid is foreign; it must act as a positional cut-off
+	// (everything the marker's row precedes), not as "unknown -> full replay"
+	s := newTestPostgresStore(t)
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("topicb", "b old")))
+	marker := model.NewDefaultMessage("topica", "marker a")
+	require.Nil(t, s.AddMessage(marker))
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("topicb", "b new")))
+	messages, err := s.Messages("topicb", model.NewSinceID(marker.ID), false)
+	require.Nil(t, err)
+	require.Len(t, messages, 1)
+	require.Equal(t, "b new", messages[0].Message)
+}
+
+func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
+	// since=<mid> resolution must fall back to the primary when the replica does not know the
+	// mid yet (publish on node A, client reconnects to node B before replication catches up).
+	// Without the fallback, the unknown mid resolves to "id > 0" and the client is flooded
+	// with the topic's whole retained history.
+	primaryDSN, replicaDSN := dbtest.CreateTestPostgresSchema(t), dbtest.CreateTestPostgresSchema(t)
+	openStoreOn := func(dsn string, replicas []*db.Host) *message.Cache {
+		host, err := pg.Open(dsn)
+		require.Nil(t, err)
+		d := db.New(host, replicas)
+		d.MarkReplicasHealthyForTest() // Route ReadOnly() to the lagged replica deterministically
+		store, err := message.NewPostgresStore(d, 0, 0)
+		require.Nil(t, err)
+		t.Cleanup(func() { store.Close() })
+		return store
+	}
+	// The "replica" is a separate schema holding only the first 3 messages (fully lagged after
+	// that); row ids align because both schemas insert in the same order
+	replicaOnly := openStoreOn(replicaDSN, nil)
+	primaryOnly := openStoreOn(primaryDSN, nil)
+	for i := 1; i <= 3; i++ {
+		m := model.NewDefaultMessage("mytopic", fmt.Sprintf("m%d", i))
+		require.Nil(t, primaryOnly.AddMessage(m))
+		require.Nil(t, replicaOnly.AddMessage(m))
+	}
+	m4 := model.NewDefaultMessage("mytopic", "m4")
+	require.Nil(t, primaryOnly.AddMessage(m4)) // Not yet replicated
+
+	replicaHost, err := pg.OpenReplica(replicaDSN)
+	require.Nil(t, err)
+	combined := openStoreOn(primaryDSN, []*db.Host{replicaHost})
+	messages, err := combined.Messages("mytopic", model.NewSinceID(m4.ID), false)
+	require.Nil(t, err)
+	require.Len(t, messages, 0) // Correct cut-off via primary; the lagged replica has nothing newer
 }

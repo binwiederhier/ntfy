@@ -163,9 +163,9 @@ const (
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
 	jsonBodyBytesLimit       = 131072                    // Max number of bytes for a request bodys (unless MessageLimit is higher)
-	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
-	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
-	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+	unifiedPushTopicPrefix   = "up"
+	unifiedPushTopicLength   = 14 // Length of UnifiedPush topics, including the "up" part
+	messagesHistoryMax       = 10 // Number of message count values to keep in memory
 
 	// stopTimeout bounds the entire shutdown. The stores wait for their own background work
 	// (the attachment sync loop queries the database), and none of those waits has a deadline,
@@ -916,7 +916,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	attachmentsAllowed := !strings.HasPrefix(t.ID, unifiedPushTopicPrefix)
+	attachmentsAllowed := !isUnifiedPushTopicID(t.ID) && !unifiedpush
 	if !attachmentsAllowed && m.Attachment != nil {
 		return nil, errHTTPBadRequestAttachmentsDisallowed.With(m)
 	}
@@ -1742,6 +1742,10 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 // - or the topic is not reserved, and v.user has write access
 //
 // This only applies to UnifiedPush topics ("up...").
+func isUnifiedPushTopicID(topicID string) bool {
+	return strings.HasPrefix(topicID, unifiedPushTopicPrefix) && len(topicID) == unifiedPushTopicLength
+}
+
 func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic) error {
 	// Bail out if not enabled
 	if !s.config.VisitorSubscriberRateLimiting {
@@ -1751,10 +1755,11 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	// Make a list of topics that we'll actually set the RateVisitor on
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
+		if isUnifiedPushTopicID(t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
+
 	if len(eligibleRateTopics) == 0 {
 		return nil
 	}

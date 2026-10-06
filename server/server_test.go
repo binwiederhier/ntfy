@@ -2056,7 +2056,7 @@ func TestServer_PublishUpTopicBinaryDoesNotCreateAttachment(t *testing.T) {
 		require.Nil(t, err)
 
 		s := newTestServer(t, newTestConfig(t, databaseURL))
-		response := request(t, s, "PUT", "/upTEST", string(b), nil)
+		response := request(t, s, "PUT", "/up123456789012", string(b), nil)
 		require.Equal(t, 200, response.Code)
 
 		m := toMessage(t, response.Body.String())
@@ -2076,10 +2076,26 @@ func TestServer_PublishUpTopicRejectsExplicitAttachments(t *testing.T) {
 			{"Filename": "payload.bin"},
 			{"X-Attach": "https://example.com/payload.bin"},
 		} {
-			response := request(t, s, "PUT", "/upTEST", "payload", headers)
+			response := request(t, s, "PUT", "/up123456789012", "payload", headers)
 			require.Equal(t, 400, response.Code)
 			require.Equal(t, 40014, toHTTPError(t, response.Body.String()).Code)
 		}
+	})
+}
+
+func TestServer_PublishUpstairsTopicAllowsAttachments(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		b := make([]byte, 5000)
+		_, err := rand.Read(b)
+		require.Nil(t, err)
+
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/upstairs", string(b), nil)
+		require.Equal(t, 200, response.Code)
+
+		m := toMessage(t, response.Body.String())
+		require.NotNil(t, m.Attachment)
+		require.FileExists(t, filepath.Join(s.config.AttachmentCacheDir, m.ID))
 	})
 }
 

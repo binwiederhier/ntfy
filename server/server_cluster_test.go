@@ -875,7 +875,10 @@ func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) 
 	var once sync.Once
 	c, err := cluster.New(&cluster.Config{
 		Enabled: true, NodeID: "a", AdvertiseURL: "http://127.0.0.1:1", Secret: "test",
-		HeartbeatInterval: 10 * time.Millisecond, NodeTTL: 50 * time.Millisecond,
+		// The TTL must be at least a second: last_heartbeat is whole seconds, so a sub-second
+		// TTL truncates the liveness cutoff to 0 and the peer inserted below counts as live
+		// only within the same wall-clock second, leaving nothing to probe for isolation
+		HeartbeatInterval: 10 * time.Millisecond, NodeTTL: time.Second,
 		IsolatedFunc: func() {
 			once.Do(func() { close(entered) })
 			<-release
@@ -1050,4 +1053,104 @@ func TestServer_Cluster_SharedStatsResetSurvivesALeaderlessMidnight(t *testing.T
 	setStats(2)
 	s.execManager()
 	require.Equal(t, int64(2), stats())
+}
+
+func TestServer_Cluster_GapReplaysTheMessageTheClientCannotAskFor(t *testing.T) {
+	// Closing the subscriber is not a repair. A peer drops message A for a topic, the queue
+	// drains, message B on the same topic is delivered, and only then does the gap report
+	// arrive. The client reconnects with since=B, whose row id is higher than A's, and the
+	// catch-up window starts shortly before B, so nothing ever replays A. The report carries
+	// the time of the oldest lost message instead, and this node replays that range itself.
+	s := newTestServer(t, newTestConfig(t, ""))
+	s.catchUpDelay = 100 * time.Millisecond
+	lost := newMessageWithTimestamp("mytopic", "lost in fan-out", time.Now().Add(-10*time.Second).Unix())
+	arrived := newMessageWithTimestamp("mytopic", "arrived fine", time.Now().Unix())
+	require.Nil(t, s.messageCache.AddMessages([]*model.Message{lost, arrived}))
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	received := make(chan *model.Message, 10)
+	topics[0].Subscribe(func(_ *visitor, m *model.Message) error {
+		received <- m
+		return nil
+	}, "", func() {})
+
+	s.handleDeliveryGap([]string{"mytopic"}, lost.Time)
+
+	// topic.Publish delivers asynchronously, so the range arrives in no particular order
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case m := <-received:
+			if m.ID == lost.ID { // The hole, replayed without the client asking
+				return
+			}
+		case <-deadline:
+			t.Fatal("the lost message was never replayed")
+		}
+	}
+}
+
+func TestServer_Cluster_UndatedGapStillClosesSubscribers(t *testing.T) {
+	// A peer that does not date its report (one running an older build) gets the old
+	// behaviour: close the subscribers and let their clients replay with since=
+	s := newTestServer(t, newTestConfig(t, ""))
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	var once sync.Once
+	closed := make(chan struct{})
+	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, "", func() {
+		once.Do(func() { close(closed) })
+	})
+
+	s.handleDeliveryGap([]string{"mytopic"}, 0)
+
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("subscriber of an undated gap was not closed")
+	}
+}
+
+func TestServer_Cluster_StaleGapClosesSubscribersInsteadOfReplaying(t *testing.T) {
+	// A gap that went unreported for a long time (the peer was unreachable, so the report kept
+	// failing) is exactly the case where the clients' own markers are correct: they received
+	// nothing in the meantime. Replaying that range server-side would re-send minutes of
+	// messages to everyone, so past the cap this falls back to closing them.
+	s := newTestServer(t, newTestConfig(t, ""))
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	var once sync.Once
+	closed := make(chan struct{})
+	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, "", func() {
+		once.Do(func() { close(closed) })
+	})
+
+	s.handleDeliveryGap([]string{"mytopic"}, time.Now().Add(-2*gapReplayMaxAge).Unix())
+
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("subscriber of a stale gap was not closed")
+	}
+}
+
+func TestServer_Cluster_DatedGapForAllTopicsClosesSubscribers(t *testing.T) {
+	// "Every topic" is not a range anyone can replay: too many topics to enumerate means too
+	// many to read back, so the subscribers are closed even though the report is dated
+	s := newTestServer(t, newTestConfig(t, ""))
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	var once sync.Once
+	closed := make(chan struct{})
+	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, "", func() {
+		once.Do(func() { close(closed) })
+	})
+
+	s.handleDeliveryGap([]string{cluster.GapAllTopics}, time.Now().Unix())
+
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("subscriber was not closed on a dated cluster-wide gap")
+	}
 }

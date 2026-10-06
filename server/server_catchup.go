@@ -20,6 +20,10 @@ const (
 
 	// catchUpMargin is added to the batch timeout and linger to cover replica lag
 	catchUpMargin = time.Second
+
+	// gapReplayMaxAge is how old a peer's delivery gap may be for this node to replay it
+	// itself; past that the subscribers are closed and their clients replay instead
+	gapReplayMaxAge = 5 * time.Minute
 )
 
 // replayDeduper remembers the stored messages sent on one subscriber connection until the

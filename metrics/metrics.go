@@ -101,6 +101,10 @@ var (
 		Name: "ntfy_cluster_gaps_received_total",
 		Help: "Number of delivery-gap reports received from peer nodes",
 	})
+	ClusterGapsReplayed = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_gap_messages_replayed_total",
+		Help: "Number of messages re-published to local subscribers to fill a peer's reported delivery gap",
+	})
 	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_leader",
 	})
@@ -140,6 +144,7 @@ func init() {
 		ClusterMessagesWasted,
 		ClusterGapsReported,
 		ClusterGapsReceived,
+		ClusterGapsReplayed,
 		ClusterLeader,
 	)
 }

@@ -55,6 +55,18 @@ func fragmentTopics(frags []*fragment) []string {
 	return topics
 }
 
+// fragmentOldest returns the publish time of the oldest message in a batch, which dates the
+// delivery gap a failed batch leaves behind (see GapFunc).
+func fragmentOldest(frags []*fragment) int64 {
+	var oldest int64
+	for _, f := range frags {
+		if oldest == 0 || f.time < oldest {
+			oldest = f.time
+		}
+	}
+	return oldest
+}
+
 // decodeMessageBody reads NDJSON apiMessage lines from r, reattaches the non-JSON fields
 // (Sender, User) onto each message, and hands them to deliver. Malformed or message-less lines
 // are skipped and logged, not fatal: fan-out is fire-and-forget, so the valid remainder of a

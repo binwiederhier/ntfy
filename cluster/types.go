@@ -51,10 +51,11 @@ type SubscriberCancel struct {
 type CancelFunc func(cancel *SubscriberCancel)
 
 // GapFunc is called with topics for which a peer could not deliver one or more messages to this
-// node (its queue overflowed, or the request failed). The server closes those topics' local
-// subscribers so their clients reconnect and replay the gap from the message cache with
-// since=. GapAllTopics means "every topic": too many topics to enumerate.
-type GapFunc func(topics []string)
+// node (its queue overflowed, or the request failed), plus the unix time of the oldest message
+// the peer lost (0 if it did not report one). The server replays that range for those topics,
+// or closes their subscribers so their clients replay with since=. GapAllTopics means "every
+// topic": too many topics to enumerate.
+type GapFunc func(topics []string, since int64)
 
 // GapAllTopics is the GapFunc marker for "gaps in so many topics that they are not worth
 // enumerating; treat every local subscriber as having missed something".
@@ -82,11 +83,22 @@ type apiState struct {
 	Topics  *apiStateTopics     `json:"topics,omitempty"`
 	Cancels []*SubscriberCancel `json:"cancels,omitempty"`
 	Gaps    []string            `json:"gaps,omitempty"`
+	// GapSince is the unix time of the oldest message in Gaps the sender could not deliver, so
+	// the receiver can replay exactly that range instead of trusting its clients' markers. Zero
+	// from a peer that predates it, which means "close the subscribers" as before.
+	GapSince int64 `json:"gapSince,omitempty"`
 }
 
 // apiStateTopics carries topics that just gained their first subscriber on the sending node.
 type apiStateTopics struct {
 	Added []string `json:"added,omitempty"`
+}
+
+// peerGap is what could not be delivered to one peer since the last report: the topics, and the
+// time of the oldest message among them, which is what the peer replays from (see GapFunc).
+type peerGap struct {
+	topics []string
+	since  int64
 }
 
 // peerQueue is the bounded, batching send queue for a single peer, pinned to the advertise URL
@@ -97,9 +109,11 @@ type peerQueue struct {
 	queue        *util.LingerQueue[*fragment]
 }
 
-// fragment is one pre-marshaled apiMessage line plus the topic it belongs to: a batch that is
-// dropped or rejected turns into a delivery gap, which is reported per topic (see GapFunc).
+// fragment is one pre-marshaled apiMessage line plus the topic and publish time it belongs to:
+// a batch that is dropped or rejected turns into a delivery gap, reported per topic and dated
+// with the oldest message in it (see GapFunc).
 type fragment struct {
 	topic string
+	time  int64
 	data  []byte
 }

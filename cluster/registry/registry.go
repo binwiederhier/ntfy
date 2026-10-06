@@ -98,6 +98,10 @@ type Registry struct {
 // New creates or migrates the registry schema and returns this node's membership handle. It
 // does NOT register the node: joining the cluster is an explicit Register call, owned by the
 // caller, so read-only uses of the registry stay side-effect free.
+//
+// The TTL is the liveness window, and it must be at least a second: last_heartbeat is stored in
+// whole seconds, so a sub-second TTL truncates the SQL cutoff to zero, which makes a node live
+// only within the wall-clock second it heartbeated in.
 func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry, error) {
 	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, createTable, nil); err != nil {
 		return nil, err
@@ -134,6 +138,16 @@ func (r *Registry) Peers() []*Peer {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.peers
+}
+
+// Fresh reports whether the snapshot Peers serves is recent enough to act on. Peers keeps
+// serving the last known list when the database is unreachable, which is what keeps fan-out
+// alive through a hiccup, but a view that old must not be reported outwards as the current
+// membership (see cluster.Member).
+func (r *Registry) Fresh() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return !r.refreshedAt.IsZero() && time.Since(r.refreshedAt) < r.ttl
 }
 
 // Prune deletes registry rows whose heartbeat is long expired. Only the leader calls this; the

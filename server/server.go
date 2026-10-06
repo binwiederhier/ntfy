@@ -359,7 +359,7 @@ func New(conf *Config) (*Server, error) {
 		BatchLinger:     conf.ClusterBatchLinger,
 		CancelFunc:      s.applySubscriberCancel,
 		TopicsAddedFunc: s.clearRateVisitorMisses,
-		GapFunc:         s.closeGappedSubscribers,
+		GapFunc:         s.handleDeliveryGap,
 		IsolatedFunc:    s.closeLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
@@ -431,11 +431,61 @@ func (s *Server) closeLocalSubscribers() {
 	}
 }
 
-// closeGappedSubscribers closes the local subscribers of topics a peer could not deliver to
-// this node (see cluster.GapFunc). Their clients reconnect with since=<last message id> and
-// replay what they missed from the message cache, which is the only recovery path that does not
-// require the peers to agree on what was lost. Messages published with cache: no cannot be
-// replayed; cross-node delivery is best-effort for those.
+// handleDeliveryGap repairs what a peer could not deliver to this node (see cluster.GapFunc).
+// A dated gap is replayed here, because the clients cannot ask for it: one that received a newer
+// message on the same topic reconnects with that newer marker, and neither the initial replay
+// (higher row id) nor the catch-up window (shortly before the marker) covers the older hole.
+//
+// Undated, cluster-wide and long-stale gaps close the subscribers instead. A gap that went
+// unreported for minutes means the peer was unreachable for minutes, so those clients received
+// nothing in between and their own markers are the better source of truth.
+func (s *Server) handleDeliveryGap(topics []string, since int64) {
+	if since <= 0 || slices.Contains(topics, cluster.GapAllTopics) || time.Since(time.Unix(since, 0)) > gapReplayMaxAge {
+		log.Tag(tagCluster).Info("Closing the subscribers of %d gapped topic(s), so their clients replay", len(topics))
+		s.closeGappedSubscribers(topics)
+		return
+	}
+	log.Tag(tagCluster).Info("Replaying %d gapped topic(s) from %v", len(topics), time.Unix(since, 0).Format(time.RFC3339))
+	go s.replayDeliveryGap(topics, since) // The peer's report must not wait for the replay
+}
+
+// replayDeliveryGap re-publishes a topic's messages from the peer's oldest lost message to this
+// node's local subscribers, after the origin's cache batch and fan-out linger have had time to
+// land (the same wait a reconnecting subscriber's catch-up uses). Subscribers that did receive
+// part of the range see those messages twice; official clients dedupe by message ID, and the
+// alternative is a hole that nothing closes.
+func (s *Server) replayDeliveryGap(topics []string, since int64) {
+	time.Sleep(s.catchUpDelay)
+	if s.stopped.Load() {
+		return
+	}
+	marker := model.NewSinceTime(since)
+	for _, id := range topics {
+		s.mu.RLock()
+		t, ok := s.topics[id]
+		s.mu.RUnlock()
+		if !ok {
+			continue // Nobody here is subscribed any more, so there is nothing to repair
+		}
+		messages, err := s.messageCache.Messages(id, marker, false)
+		if err != nil {
+			log.Tag(tagCluster).Err(err).Field("topic", id).Warn("Cannot read back a peer's delivery gap")
+			continue
+		}
+		for _, m := range messages {
+			v := s.visitor(m.Sender, nil)
+			if err := t.Publish(v, m); err != nil {
+				logvm(v, m).Err(err).Warn("Cluster: unable to replay gapped message to local subscribers")
+				continue
+			}
+			metrics.ClusterGapsReplayed.Inc()
+		}
+	}
+}
+
+// closeGappedSubscribers closes the local subscribers of gapped topics, so their clients
+// reconnect and replay from the message cache with since=<last message id>. Messages published
+// with cache: no cannot be replayed; cross-node delivery is best-effort for those.
 func (s *Server) closeGappedSubscribers(topics []string) {
 	if slices.Contains(topics, cluster.GapAllTopics) {
 		s.closeLocalSubscribers()

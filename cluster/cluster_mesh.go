@@ -52,7 +52,7 @@ type meshCluster struct {
 	queues         map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
 	closed         bool                  // Guards against ForwardMessage spawning new workers after Close
 	knownPeers     map[NodeID]string     // Peers seen in the last reconcile, for join/leave logging
-	gaps           map[NodeID][]string   // Topics whose messages we could not deliver, per peer; reported and cleared by the heartbeat
+	gaps           map[NodeID]*peerGap   // What we could not deliver, per peer; reported and cleared by the heartbeat
 	lastRegistered time.Time             // Last successful registry heartbeat, for Healthy
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -86,7 +86,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		queues:         make(map[NodeID]*peerQueue),
 		lastRegistered: time.Now(), // The synchronous Register above just succeeded
 		knownPeers:     make(map[NodeID]string),
-		gaps:           make(map[NodeID][]string),
+		gaps:           make(map[NodeID]*peerGap),
 		ctx:            ctx,
 		cancel:         cancel,
 	}
@@ -148,12 +148,16 @@ func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-// Members returns this node plus the peers the registry currently considers live. The peer
-// list is the cached registry view, so it is at most one heartbeat stale.
+// Members returns this node plus the peers the registry currently considers live, for the LB
+// agents. A peer's health here is this node's knowledge of it, not a probe: it is healthy if the
+// registry view is still fresh, and unknown (reported unhealthy) once this node can no longer
+// read the registry. An isolated node therefore reports nobody as healthy, including itself,
+// which is what an agent needs to disregard its answer and keep the upstreams it has.
 func (c *meshCluster) Members() []Member {
+	fresh := c.registry.Fresh()
 	members := []Member{{NodeID: c.conf.NodeID, AdvertiseURL: c.conf.AdvertiseURL, Healthy: c.Healthy()}}
 	for _, p := range c.registry.Peers() {
-		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Healthy: true})
+		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Healthy: fresh})
 	}
 	return members
 }
@@ -332,7 +336,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 	if err != nil {
 		return err
 	}
-	frag := &fragment{topic: msg.Topic, data: data}
+	frag := &fragment{topic: msg.Topic, time: msg.Time, data: data}
 	metrics.ClusterMessagesForwarded.Inc()
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -343,7 +347,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 		if !c.queueFor(p).queue.TryEnqueue(frag) {
 			metrics.ClusterQueueDropped.Inc()
 			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
-			c.recordGapLocked(NodeID(p.NodeID), []string{msg.Topic})
+			c.recordGapLocked(NodeID(p.NodeID), []string{msg.Topic}, msg.Time)
 		} else if ev := log.Tag(tag); ev.IsTrace() {
 			ev.Trace("Enqueued message %s (topic %s) for peer %s", msg.ID, msg.Topic, p.NodeID)
 		}
@@ -363,7 +367,7 @@ func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 		body := assembleMessageBody(frags)
 		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(frags), len(body), nodeID)
 		if err := c.postToPeer(nodeID, messageURL(q.advertiseURL), contentTypeNDJSON, body); err != nil {
-			c.recordGap(nodeID, fragmentTopics(frags))
+			c.recordGap(nodeID, fragmentTopics(frags), fragmentOldest(frags))
 		}
 		metrics.ClusterBatchesSent.Inc()
 	}
@@ -402,27 +406,33 @@ func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload
 // recordGap remembers that messages for these topics did not reach the peer. The heartbeat
 // reports them; until then they accumulate, and a peer with more than gapMaxTopics gapped
 // topics is reported as GapAllTopics rather than a list.
-func (c *meshCluster) recordGap(nodeID NodeID, topics []string) {
+func (c *meshCluster) recordGap(nodeID NodeID, topics []string, since int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.recordGapLocked(nodeID, topics)
+	c.recordGapLocked(nodeID, topics, since)
 }
 
 // recordGapLocked is recordGap for callers already holding c.mu
-func (c *meshCluster) recordGapLocked(nodeID NodeID, topics []string) {
-	gapped := c.gaps[nodeID]
-	if slices.Contains(gapped, GapAllTopics) {
+func (c *meshCluster) recordGapLocked(nodeID NodeID, topics []string, since int64) {
+	gap := c.gaps[nodeID]
+	if gap == nil {
+		gap = &peerGap{}
+		c.gaps[nodeID] = gap
+	}
+	if gap.since == 0 || (since > 0 && since < gap.since) {
+		gap.since = since // The report dates the whole accumulation at its oldest message
+	}
+	if slices.Contains(gap.topics, GapAllTopics) {
 		return
 	}
 	for _, topic := range topics {
-		if !slices.Contains(gapped, topic) {
-			gapped = append(gapped, topic)
+		if !slices.Contains(gap.topics, topic) {
+			gap.topics = append(gap.topics, topic)
 		}
 	}
-	if len(gapped) > gapMaxTopics {
-		gapped = []string{GapAllTopics}
+	if len(gap.topics) > gapMaxTopics {
+		gap.topics = []string{GapAllTopics}
 	}
-	c.gaps[nodeID] = gapped
 }
 
 // reportGaps tells each live peer which topics we failed to deliver to it, so it can make the
@@ -430,9 +440,9 @@ func (c *meshCluster) recordGapLocked(nodeID NodeID, topics []string) {
 // forgotten because the peer was briefly unreachable (which is usually why there is a gap).
 func (c *meshCluster) reportGaps(peers []*registry.Peer) {
 	c.mu.Lock()
-	pending := make(map[NodeID][]string, len(c.gaps))
-	for nodeID, topics := range c.gaps {
-		pending[nodeID] = topics
+	pending := make(map[NodeID]*peerGap, len(c.gaps))
+	for nodeID, gap := range c.gaps {
+		pending[nodeID] = &peerGap{topics: gap.topics, since: gap.since}
 	}
 	c.mu.Unlock()
 	if len(pending) == 0 {
@@ -440,11 +450,12 @@ func (c *meshCluster) reportGaps(peers []*registry.Peer) {
 	}
 	for _, p := range peers {
 		nodeID := NodeID(p.NodeID)
-		topics, ok := pending[nodeID]
-		if !ok || len(topics) == 0 {
+		gap, ok := pending[nodeID]
+		if !ok || len(gap.topics) == 0 {
 			continue
 		}
-		body, err := json.Marshal(&apiState{Gaps: topics})
+		topics := gap.topics
+		body, err := json.Marshal(&apiState{Gaps: topics, GapSince: gap.since})
 		if err != nil {
 			continue
 		}
@@ -454,10 +465,10 @@ func (c *meshCluster) reportGaps(peers []*registry.Peer) {
 		}
 		metrics.ClusterGapsReported.Inc()
 		c.mu.Lock()
-		if slices.Equal(c.gaps[nodeID], topics) { // Nothing new while we were sending
+		if slices.Equal(c.gaps[nodeID].topics, topics) { // Nothing new while we were sending
 			delete(c.gaps, nodeID)
 		} else {
-			c.gaps[nodeID] = subtractTopics(c.gaps[nodeID], topics)
+			c.gaps[nodeID].topics = subtractTopics(c.gaps[nodeID].topics, topics)
 		}
 		c.mu.Unlock()
 	}
@@ -501,9 +512,9 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 		c.conf.TopicsAddedFunc(state.Topics.Added)
 	}
 	if len(state.Gaps) > 0 && c.conf.GapFunc != nil {
-		log.Tag(tag).Warn("Peer %s could not deliver messages for %d topic(s); closing their subscribers so clients replay", origin, len(state.Gaps))
+		log.Tag(tag).Warn("Peer %s could not deliver messages for %d topic(s) since %d", origin, len(state.Gaps), state.GapSince)
 		metrics.ClusterGapsReceived.Inc()
-		c.conf.GapFunc(state.Gaps)
+		c.conf.GapFunc(state.Gaps, state.GapSince)
 	}
 	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
 		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)

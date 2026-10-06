@@ -14,7 +14,6 @@ import (
 
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
-	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
@@ -48,7 +47,6 @@ type meshCluster struct {
 	conf           *Config
 	deliver        DeliverFunc
 	registry       *registry.Registry
-	leader         *pg.Leader
 	httpClient     *http.Client
 	mux            *http.ServeMux        // The internal peer API; Cluster is an http.Handler
 	queues         map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
@@ -81,11 +79,9 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &meshCluster{
-		conf:     conf,
-		deliver:  deliver,
-		registry: reg,
-		// Renews its lease on its own fixed cadence; see pg.Leader for the semantics
-		leader:         pg.NewLeader(pool.Primary(), pg.LeaderLockKey, conf.LeaderRenewInterval),
+		conf:           conf,
+		deliver:        deliver,
+		registry:       reg,
 		httpClient:     &http.Client{Timeout: meshHTTPTimeout},
 		queues:         make(map[NodeID]*peerQueue),
 		lastRegistered: time.Now(), // The synchronous Register above just succeeded
@@ -250,9 +246,9 @@ func (c *meshCluster) heartbeat() error {
 	c.mu.Lock()
 	c.lastRegistered = time.Now()
 	c.mu.Unlock()
-	// Effective leadership: pg.Leader's lease semantics guarantee a no-leader gap on
-	// failover, never two leaders
-	if c.leader.IsLeader() {
+	// Effective leadership: the lowest live node id, with a hold-off that guarantees a
+	// no-leader gap on failover rather than two leaders (see registry.IsLeader)
+	if c.registry.IsLeader() {
 		metrics.ClusterLeader.Set(1)
 		if err := c.registry.Prune(); err != nil {
 			log.Tag(tag).Err(err).Warn("Failed to prune stale nodes") // Housekeeping only; not fatal for the tick
@@ -545,7 +541,7 @@ func (c *meshCluster) BroadcastState(state *State) {
 
 // IsLeader reports whether this node currently holds singleton-job leadership.
 func (c *meshCluster) IsLeader() bool {
-	return c.leader.IsLeader()
+	return c.registry.IsLeader()
 }
 
 // Healthy reports whether this node's registry heartbeat is fresh enough that peers still
@@ -573,9 +569,8 @@ func (c *meshCluster) Close() error {
 	// re-insert our row right after Deregister deleted it
 	c.wg.Wait()
 	if err := c.registry.Deregister(); err != nil {
-		log.Tag(tag).Err(err).Warn("Failed to deregister node")
+		log.Tag(tag).Err(err).Warn("Failed to deregister node") // Its row goes stale on its own
 	}
-	c.leader.Close()
 	metrics.ClusterLeader.Set(0)
 	return nil
 }

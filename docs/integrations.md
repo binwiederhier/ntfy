@@ -324,5 +324,7 @@ ntfy community. Thanks to everyone running a public server. **You guys rock!**
 | [ntfy.hostux.net](https://ntfy.hostux.net/)       | 🇫🇷 France        |
 | [ntfy.fossman.de](https://ntfy.fossman.de/)       | 🇩🇪 Germany       |
 
+| [notify.utilibre.org](https://notify.utilibre.org/) | 🇩🇪 Germany |
+
 Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
 and uptime of third party servers, so use of each server is **at your own discretion**.

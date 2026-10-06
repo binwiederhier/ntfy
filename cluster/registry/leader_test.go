@@ -12,7 +12,10 @@ import (
 // mesh's heartbeat does both every tick) and assert the one invariant that matters: never two
 // leaders, and eventually one.
 
-const leaderTestTTL = 200 * time.Millisecond // Liveness window and the promotion hold-off
+// leaderTestTTL is the liveness window and the promotion hold-off. Registry calls are bounded
+// at ttl/2 (see opContext), so a tighter value makes these tests fail on a slow or contended
+// database rather than on the behaviour they are checking.
+const leaderTestTTL = time.Second
 
 func tick(t *testing.T, rs ...*Registry) {
 	t.Helper()

@@ -251,6 +251,10 @@ const (
 	leaderTestLease   = leaseFactor * leaderTestTTL
 	leaderTestHoldoff = holdoffFactor * leaderTestTTL
 	leaderTestWait    = 3 * (leaderTestTTL + leaderTestHoldoff)
+	// How often the leadership tests drive a tick. Each tick is a round trip per registry, so
+	// this is also the query rate they put on the database while running in parallel; the
+	// windows under test are seconds, so 50ms granularity costs nothing.
+	leaderTestPoll = 50 * time.Millisecond
 )
 
 func tick(t *testing.T, rs ...*Registry) {
@@ -273,12 +277,13 @@ func waitForLeader(t *testing.T, r *Registry, others ...*Registry) {
 		if r.IsLeader() {
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(leaderTestPoll)
 	}
 	t.Fatal("never became leader")
 }
 
 func TestRegistry_LowestLiveNodeLeads(t *testing.T) {
+	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
 	require.Nil(t, err)
@@ -295,6 +300,7 @@ func TestRegistry_LowestLiveNodeLeads(t *testing.T) {
 }
 
 func TestRegistry_LeaderFailoverHasAGapNotAnOverlap(t *testing.T) {
+	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
 	require.Nil(t, err)
@@ -308,7 +314,7 @@ func TestRegistry_LeaderFailoverHasAGapNotAnOverlap(t *testing.T) {
 		require.False(t, a.IsLeader() && b.IsLeader(), "two leaders at once")
 		require.Less(t, time.Since(started), leaderTestWait, "app2 never took over")
 		tick(t, b)
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(leaderTestPoll)
 	}
 	require.False(t, a.IsLeader())
 	t.Logf("takeover after the leader stopped heartbeating: %v (TTL %v)", time.Since(started).Round(time.Millisecond), leaderTestTTL)
@@ -318,6 +324,7 @@ func TestRegistry_ReturningLowerNodePreemptsWithoutOverlap(t *testing.T) {
 	// The case that makes this approach need a hold-off at all: app1 comes back and will take
 	// leadership from app2 purely because its id sorts lower. It must not believe until app2's
 	// own belief can no longer be alive.
+	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
 	require.Nil(t, err)
@@ -332,7 +339,7 @@ func TestRegistry_ReturningLowerNodePreemptsWithoutOverlap(t *testing.T) {
 		require.False(t, a.IsLeader() && b.IsLeader(), "two leaders at once")
 		require.Less(t, time.Since(started), leaderTestWait, "app1 never took over")
 		tick(t, a, b)
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(leaderTestPoll)
 	}
 	require.False(t, b.IsLeader(), "the incumbent must have stepped down")
 	t.Logf("preemption by a returning lower id took %v", time.Since(started).Round(time.Millisecond))
@@ -341,6 +348,7 @@ func TestRegistry_ReturningLowerNodePreemptsWithoutOverlap(t *testing.T) {
 func TestRegistry_PartitionedLeaderStepsDown(t *testing.T) {
 	// A leader that cannot reach the database stops believing within one TTL, because its
 	// registration deadline runs out. Peers stop seeing it as live at the same point.
+	t.Parallel() // Own schema and own registries, so these run alongside each other
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
@@ -386,6 +394,7 @@ func TestRegistry_HeartbeatWithoutObservingIsNotLeadership(t *testing.T) {
 	// refresh stalls, or it only ever writes. It must stop believing then, because the hold-off
 	// it earned rests on an observation that no longer holds. Without that check the incumbent
 	// keeps leading while a returning lower-id node earns its own hold-off, and both believe.
+	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
 	require.Nil(t, err)
@@ -402,7 +411,7 @@ func TestRegistry_HeartbeatWithoutObservingIsNotLeadership(t *testing.T) {
 			require.False(t, b.IsLeader(), "the incumbent kept believing on a stale observation")
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(leaderTestPoll)
 	}
 	t.Fatal("app1 never took over")
 }
@@ -412,6 +421,7 @@ func TestRegistry_FrozenLeaderMustReEarnTheHoldOff(t *testing.T) {
 	// observation. Counting that pause toward the promotion hold-off let it believe again the
 	// moment it registered once, while the incumbent had not yet noticed it was back: two
 	// leaders, measured at 436ms in a two-process run before this was fixed.
+	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
 	require.Nil(t, err)
@@ -428,7 +438,7 @@ func TestRegistry_FrozenLeaderMustReEarnTheHoldOff(t *testing.T) {
 		require.False(t, a.IsLeader() && b.IsLeader(), "two leaders at once")
 		require.Less(t, time.Since(frozen), leaderTestWait, "app2 never took over")
 		tick(t, b)
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(leaderTestPoll)
 	}
 
 	// app1 thaws. One register plus one refresh must NOT hand leadership straight back.
@@ -445,7 +455,7 @@ func TestRegistry_FrozenLeaderMustReEarnTheHoldOff(t *testing.T) {
 		require.False(t, a.IsLeader() && b.IsLeader(), "two leaders at once")
 		require.Less(t, time.Since(started), leaderTestWait, "app1 never recovered leadership")
 		tick(t, a, b)
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(leaderTestPoll)
 	}
 }
 

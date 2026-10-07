@@ -11,18 +11,30 @@ import (
 // no special-casing in single-node mode).
 type nopCluster struct{}
 
-func (c *nopCluster) ForwardMessage(_ *model.Message) error { return nil }
-
-func (c *nopCluster) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
-	w.WriteHeader(http.StatusNotFound)
+func (c *nopCluster) ForwardMessage(_ *model.Message) error {
+	return nil // No peers to forward to
 }
 
-func (c *nopCluster) BroadcastState(_ *State) {}
+func (c *nopCluster) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
+	w.WriteHeader(http.StatusNotFound) // The peer API does not exist on a single node
+}
 
-func (c *nopCluster) IsLeader() bool { return true }
+func (c *nopCluster) BroadcastState(_ *State) {
+	// No peers to tell
+}
 
-func (c *nopCluster) Members() []Member { return nil }
+func (c *nopCluster) IsLeader() bool {
+	return true // A single node is trivially the leader
+}
 
-func (c *nopCluster) Healthy() bool { return true }
+func (c *nopCluster) Members() []Member {
+	return nil // No registry, so no membership to report
+}
 
-func (c *nopCluster) Close() error { return nil }
+func (c *nopCluster) Healthy() bool {
+	return true // Health here means "the registry heartbeat is fresh", and there is no registry
+}
+
+func (c *nopCluster) Close() error {
+	return nil // Nothing was started
+}

@@ -4906,6 +4906,57 @@ func TestServer_UpdateScheduledMessage(t *testing.T) {
 	})
 }
 
+func TestServer_UpdateScheduledMessage_SequenceIDParam(t *testing.T) {
+	// Same as TestServer_UpdateScheduledMessage, but with the sequence ID passed as a query
+	// parameter instead of in the path; the scheduled message must still be replaced
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic?sid=sched-seq&delay=1h", "original scheduled message", nil)
+		require.Equal(t, 200, response.Code)
+		msg1 := toMessage(t, response.Body.String())
+		require.Equal(t, "sched-seq", msg1.SequenceID)
+
+		response = request(t, s, "PUT", "/mytopic?sid=sched-seq&delay=2h", "updated scheduled message", nil)
+		require.Equal(t, 200, response.Code)
+		msg2 := toMessage(t, response.Body.String())
+		require.Equal(t, "sched-seq", msg2.SequenceID)
+		require.NotEqual(t, msg1.ID, msg2.ID)
+
+		response = request(t, s, "GET", "/mytopic/json?poll=1&scheduled=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 1, len(messages))
+		require.Equal(t, msg2.ID, messages[0].ID)
+		require.Equal(t, "updated scheduled message", messages[0].Message)
+	})
+}
+
+func TestServer_PublishWithoutSequenceID_NoDatabaseRoundTrip(t *testing.T) {
+	// A message without a client-provided sequence ID gets its own fresh ID as sequence ID, so no
+	// scheduled message can share it; publishing it must not wait for the database. Each round
+	// trip costs latency here, like against a remote database.
+	const latency = 50 * time.Millisecond
+	conf := newTestConfig(t, dbtest.WithLatency(t, dbtest.CreateTestPostgresSchema(t), latency))
+	conf.CacheBatchSize = 10
+	conf.CacheBatchTimeout = 100 * time.Millisecond
+	conf.AuthAccessCacheEnabled = true // Like on high-volume servers; otherwise the ACL check is a round trip
+	s := newTestServer(t, conf)
+	request(t, s, "PUT", "/mytopic", "warm up", nil)
+
+	start := time.Now()
+	response := request(t, s, "PUT", "/mytopic", "hi", nil)
+	took := time.Since(start)
+	require.Equal(t, 200, response.Code)
+	require.Less(t, took, latency, "publish took %v", took)
+
+	// The message still reaches the database
+	require.Eventually(t, func() bool {
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		return strings.Contains(response.Body.String(), `"message":"hi"`)
+	}, 5*time.Second, 100*time.Millisecond)
+}
+
 func TestServer_DeleteScheduledMessage(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()

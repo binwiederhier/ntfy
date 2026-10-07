@@ -1,6 +1,7 @@
 package message
 
 import (
+	"strconv"
 	"time"
 
 	"heckel.io/ntfy/v2/db"
@@ -9,10 +10,6 @@ import (
 
 // PostgreSQL runtime query constants
 const (
-	postgresInsertMessageQuery = `
-		INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user_id, content_type, encoding, published)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
-	`
 	postgresSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
 	postgresDeleteScheduledBySequenceIDQuery      = `DELETE FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
 	postgresUpdateMessagesForTopicExpiryQuery     = `UPDATE message SET expires = $1 WHERE topic = $2`
@@ -83,7 +80,7 @@ const (
 )
 
 var postgresQueries = queries{
-	insertMessage:                    postgresInsertMessageQuery,
+	insertMessages:                   postgresInsertMessages,
 	selectScheduledMessageIDsBySeqID: postgresSelectScheduledMessageIDsBySeqIDQuery,
 	deleteScheduledBySequenceID:      postgresDeleteScheduledBySequenceIDQuery,
 	updateMessagesForTopicExpiry:     postgresUpdateMessagesForTopicExpiryQuery,
@@ -114,4 +111,14 @@ func NewPostgresStore(d *db.DB, batchSize int, batchTimeout time.Duration) (*Cac
 		return nil, err
 	}
 	return newCache(d, postgresQueries, nil, batchSize, batchTimeout, false), nil
+}
+
+// postgresInsertMessageColumns lists the message columns in the order insertMessageArgs fills them
+var postgresInsertMessageColumns = []string{"mid", "sequence_id", "time", "event", "expires", "topic", "message", "title", "priority", "tags", "click", "icon", "actions", "attachment_name", "attachment_type", "attachment_size", "attachment_expires", "attachment_url", "attachment_deleted", "sender", "user_id", "content_type", "encoding", "published"}
+
+// postgresInsertMessages returns a multi-row INSERT for the given number of message rows
+func postgresInsertMessages(rows int) string {
+	return insertMessagesQuery("message", postgresInsertMessageColumns, rows, func(i int) string {
+		return "$" + strconv.Itoa(i)
+	})
 }

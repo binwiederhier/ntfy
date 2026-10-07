@@ -339,14 +339,9 @@ func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
 	return readMessages(rows)
 }
 
-// MessagesDue returns all messages that are due for publishing
+// MessagesDue returns all messages that are due for publishing. On Postgres it CLAIMS them, so
+// every node may call it, leader or not: each row is handed to exactly one caller.
 func (c *Cache) MessagesDue() ([]*model.Message, error) {
-	// On Postgres (cluster mode), claim due rows atomically so that concurrent delayed senders
-	// on other nodes cannot pick up the same message. We SELECT ... FOR UPDATE SKIP LOCKED and
-	// mark the claimed rows published in the same transaction; each row is thus handed to exactly
-	// one node. We deliberately mark published at claim time (not after delivery) to keep the row
-	// lock short: holding a transaction open across Firebase/WebPush/email delivery would be far
-	// worse than the small at-most-once window if a node crashes between claim and delivery.
 	if c.queries.selectMessagesDueForUpdate != "" {
 		return c.claimMessagesDue()
 	}
@@ -357,7 +352,12 @@ func (c *Cache) MessagesDue() ([]*model.Message, error) {
 	return readMessages(rows)
 }
 
-// claimMessagesDue is the Postgres claiming path for MessagesDue (see its comment).
+// claimMessagesDue claims due rows with FOR UPDATE SKIP LOCKED and marks them published in the
+// same transaction, so concurrent senders on other nodes get disjoint sets rather than all
+// delivering the same message. Marking at claim time rather than after delivery keeps the row
+// lock short: holding a transaction open across Firebase, web push and email delivery would
+// block every node behind one stuck delivery, which is worse than losing a message if this node
+// dies between the claim and the delivery.
 func (c *Cache) claimMessagesDue() ([]*model.Message, error) {
 	tx, err := c.db.Begin()
 	if err != nil {

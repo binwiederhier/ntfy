@@ -67,6 +67,13 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	// Register synchronously so the node is discoverable before the constructor returns; the
 	// heartbeat loop refreshes the registration from here on. The first peer snapshot is taken
 	// here too, so fan-out works from the first publish rather than the first heartbeat.
+	//
+	// This does announce the node before anything is listening for peers: the cluster listener
+	// binds later, in the server's Run. The window is bounded by process startup (74ms measured
+	// on a three-node harness during a rolling restart, one refused batch per peer), it is a
+	// fraction of the restart gap during which nothing is listening at all, and a refused batch
+	// is recovered by the delivery-gap report that follows it. Binding earlier would shrink the
+	// window, not close it.
 	if err := reg.Register(); err != nil {
 		return nil, err
 	}

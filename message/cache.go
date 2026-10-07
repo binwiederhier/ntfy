@@ -28,16 +28,13 @@ const (
 	// shutdown must still finish well inside systemd's stop timeout.
 	closeFlushTimeout = 5 * time.Second
 
-	// insertMessageColumns is the number of values per row in insertMessage and insertMessages
-	insertMessageColumns = 24
-
 	// queueBufferedBatches is how many full batches can wait for the batch writer before publishes
 	// block. 100 batches of the default 100 messages are ~10 MB typical, ~60 MB at the 4 KB limit.
 	// Every buffered batch must be written within closeFlushTimeout on shutdown.
 	queueBufferedBatches = 100
 
-	// insertMessagesMaxRows caps the rows per multi-row INSERT, keeping it well below PostgreSQL's
-	// limit of 65535 parameters per statement
+	// insertMessagesMaxRows caps the rows per multi-row INSERT, keeping the parameter count well
+	// below PostgreSQL's 65535 and SQLite's 32766
 	insertMessagesMaxRows = 1000
 )
 
@@ -45,8 +42,7 @@ var errNoRows = errors.New("no rows found")
 
 // queries holds the database-specific SQL queries
 type queries struct {
-	insertMessage                    string
-	insertMessages                   func(rows int) string // Multi-row INSERT; nil writes row by row with insertMessage
+	insertMessages                   func(rows int) string // Multi-row INSERT for the given number of rows
 	selectScheduledMessageIDsBySeqID string
 	deleteScheduledBySequenceID      string
 	updateMessagesForTopicExpiry     string
@@ -140,12 +136,7 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 		return err
 	}
 	defer tx.Rollback()
-	if c.queries.insertMessages != nil {
-		err = insertMessagesMultiRow(tx, c.queries.insertMessages, ms)
-	} else {
-		err = insertMessagesRowByRow(tx, c.queries.insertMessage, ms)
-	}
-	if err != nil {
+	if err := insertMessages(tx, c.queries.insertMessages, ms); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -156,13 +147,13 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 	return nil
 }
 
-// insertMessagesMultiRow writes the messages with as few statements as possible: against a remote
+// insertMessages writes the messages with as few statements as possible: against a remote
 // database, every statement is a round trip, and the batch writer is the only writer
-func insertMessagesMultiRow(tx *sql.Tx, query func(rows int) string, ms []*model.Message) error {
+func insertMessages(tx *sql.Tx, query func(rows int) string, ms []*model.Message) error {
 	for len(ms) > 0 {
 		chunk := ms[:min(len(ms), insertMessagesMaxRows)]
 		ms = ms[len(chunk):]
-		args := make([]any, 0, len(chunk)*insertMessageColumns)
+		args := make([]any, 0)
 		for _, m := range chunk {
 			rowArgs, err := insertMessageArgs(m)
 			if err != nil {
@@ -177,25 +168,28 @@ func insertMessagesMultiRow(tx *sql.Tx, query func(rows int) string, ms []*model
 	return nil
 }
 
-func insertMessagesRowByRow(tx *sql.Tx, query string, ms []*model.Message) error {
-	stmt, err := tx.Prepare(query)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-	for _, m := range ms {
-		args, err := insertMessageArgs(m)
-		if err != nil {
-			return err
+// insertMessagesQuery builds a multi-row INSERT into table for rows rows of columns, with
+// placeholder producing the parameter marker for the i-th (1-based) value
+func insertMessagesQuery(table string, columns []string, rows int, placeholder func(i int) string) string {
+	var b strings.Builder
+	b.WriteString("INSERT INTO " + table + " (" + strings.Join(columns, ", ") + ") VALUES ")
+	for r := 0; r < rows; r++ {
+		if r > 0 {
+			b.WriteString(", ")
 		}
-		if _, err := stmt.Exec(args...); err != nil {
-			return err
+		b.WriteString("(")
+		for c := range columns {
+			if c > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(placeholder(r*len(columns) + c + 1))
 		}
+		b.WriteString(")")
 	}
-	return nil
+	return b.String()
 }
 
-// insertMessageArgs returns the insertMessageColumns values of one message row, in column order
+// insertMessageArgs returns the values of one message row, in the order of the backend's insert columns
 func insertMessageArgs(m *model.Message) ([]any, error) {
 	if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
 		return nil, model.ErrUnexpectedMessageType

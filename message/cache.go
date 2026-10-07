@@ -31,6 +31,11 @@ const (
 	// insertMessageColumns is the number of values per row in insertMessage and insertMessages
 	insertMessageColumns = 24
 
+	// queueBufferedBatches is how many full batches can wait for the batch writer before publishes
+	// block. 100 batches of the default 100 messages are ~10 MB typical, ~60 MB at the 4 KB limit.
+	// Every buffered batch must be written within closeFlushTimeout on shutdown.
+	queueBufferedBatches = 100
+
 	// insertMessagesMaxRows caps the rows per multi-row INSERT, keeping it well below PostgreSQL's
 	// limit of 65535 parameters per statement
 	insertMessagesMaxRows = 1000
@@ -79,7 +84,7 @@ type Cache struct {
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
 	var queue *util.BatchingQueue[*model.Message]
 	if batchSize > 0 || batchTimeout > 0 {
-		queue = util.NewBatchingQueue[*model.Message](batchSize, batchTimeout)
+		queue = util.NewBatchingQueue[*model.Message](batchSize, batchTimeout, queueBufferedBatches)
 	}
 	c := &Cache{
 		db:      db,

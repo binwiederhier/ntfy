@@ -241,3 +241,40 @@ func (w *LimitWriter) Write(p []byte) (n int, err error) {
 	w.written += int64(n)
 	return
 }
+
+// Burn forcibly consumes up to n tokens from the bucket, regardless of availability: the bucket
+// may go into debt (up to one extra burst), delaying future Allow calls until it replenishes.
+// It reflects consumption that happened elsewhere (on another cluster node), so it does not
+// count toward the limiter's own Value.
+func (l *RateLimiter) Burn(n int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	BurnTokens(l.limiter, n)
+}
+
+// BurnTokens forcibly consumes up to n tokens from the limiter, driving the bucket into debt
+// (future Allow calls fail until it replenishes). The debt is capped at one burst beyond the
+// currently available tokens, so external usage can drain the bucket but not lock a visitor out
+// for an unbounded time. Reservations are made in burst-sized chunks because ReserveN rejects
+// requests larger than the burst.
+func BurnTokens(l *rate.Limiter, n int64) {
+	now := time.Now()
+	burst := int64(l.Burst())
+	if burst <= 0 {
+		return
+	}
+	burnable := int64(l.TokensAt(now)) + burst // Down to one burst of debt, never further
+	if n > burnable {
+		n = burnable
+	}
+	for n > 0 {
+		chunk := n
+		if chunk > burst {
+			chunk = burst
+		}
+		if r := l.ReserveN(now, int(chunk)); !r.OK() {
+			return
+		}
+		n -= chunk
+	}
+}

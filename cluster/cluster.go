@@ -2,10 +2,6 @@
 // register themselves in a PostgreSQL node registry (control plane) and fan published messages
 // out to each other directly over HTTP (data plane); PostgreSQL is never on the message path.
 // The single-node default is the nop cluster, which does nothing.
-//
-// This is the seam only: the interface the server talks to, the single-node default behind it,
-// and the message wire format. The peer mesh that implements the interface for real is the next
-// piece, so on a single node this package is the nop and nothing else.
 package cluster
 
 import (
@@ -41,6 +37,24 @@ const (
 // config); a "peer" is another node as seen from this one (Peers, peerQueue, peerState). A peer
 // IS a node, which is why peer values carry a NodeID.
 type NodeID string
+
+const (
+	// secretHeader carries the shared secret authenticating node-to-node fan-out requests.
+	secretHeader = "X-Cluster-Secret"
+
+	// originHeader carries the sending node's ID on fan-out requests, so a node can skip
+	// requests that carry its own broadcasts (loop prevention).
+	originHeader = "X-Cluster-Origin"
+)
+
+// Content types of the peer API: message bodies are NDJSON (one JSON message per line, matching
+// the framing of ntfy's own /topic/json subscribe stream), state bodies are plain JSON. Future
+// node-to-node request types get their own paths on the cluster listener; an old node answering
+// 404 on an unknown path keeps mixed-version clusters working during rolling deploys.
+const (
+	contentTypeNDJSON = "application/x-ndjson"
+	contentTypeJSON   = "application/json"
+)
 
 // tag is the log tag for everything cluster-related, so "tag=cluster -> trace" turns on
 // per-message decisions without raising the level anywhere else
@@ -108,8 +122,5 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 	if conf.NodeTTL == 0 {
 		conf.NodeTTL = defaultNodeTTL
 	}
-	// Everything above is the config contract the mesh relies on. The mesh itself is the next
-	// piece, and cmd refuses to start a server with experimental-cluster-listen set, so nothing
-	// but a test reaches this line.
-	return nil, errors.New("clustering is not implemented in this build")
+	return newMeshCluster(conf, pool, deliver)
 }

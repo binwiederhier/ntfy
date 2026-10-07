@@ -536,6 +536,53 @@ func TestIP_Host_Parsing(t *testing.T) {
 	}
 }
 
+func TestCLI_Serve_ClusterValidation(t *testing.T) {
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
+	// Setting experimental-cluster-listen implicitly enables clustering, which requires
+	// database-url; all validation must fail before any database connection is attempted
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "database-url")
+	// It also requires a shared secret
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-secret")
+	// ... and an explicit stable node ID
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-node-id")
+	// A secret without a listen address is a config error: clustering would silently be off
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-secret=s3cret"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-listen")
+	// A wildcard bind cannot derive an advertise URL
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-advertise-url")
+	// The linger must not be negative
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-batch-linger=-1s"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster batch linger")
+}
+
+func TestCLI_Serve_ClusterNotImplementedYet(t *testing.T) {
+	// A complete, valid cluster config is still refused: the options are reserved, but no
+	// node-to-node implementation ships yet, and starting single-node would look like it worked
+	configFile := newEmptyFile(t)
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587",
+		"--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret",
+		"--experimental-cluster-node-id=node-a", "--experimental-cluster-advertise-url=http://127.0.0.1:2587"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not available in this build yet")
+}
+
 func newEmptyFile(t *testing.T) string {
 	filename := filepath.Join(t.TempDir(), "empty")
 	require.Nil(t, os.WriteFile(filename, []byte{}, 0600))

@@ -520,20 +520,29 @@ func TestMesh_IsolatedFuncWhenPeersHealthy(t *testing.T) {
 	// A node that lost its database (registration goes stale) while a peer is still healthy
 	// is isolated: peers stop forwarding to it, so its subscribers would silently receive
 	// nothing. IsolatedFunc tells the server to close them so clients reconnect elsewhere.
-	isolatedTest(t, http.StatusOK, true)
+	isolatedTest(t, http.StatusOK, `{"healthy":true}`, true)
 }
 
 func TestMesh_NoIsolatedFuncWhenNoPeerHealthy(t *testing.T) {
 	// Full database outage: every node is unhealthy, the mesh keeps delivering on its cached
 	// peer view, so subscribers must be kept (fail open)
-	isolatedTest(t, http.StatusServiceUnavailable, false)
+	isolatedTest(t, http.StatusServiceUnavailable, `{"healthy":false}`, false)
 }
 
-func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
+func TestMesh_NoIsolatedFuncWhenAPeerAnswers200WithoutBeingNtfy(t *testing.T) {
+	// A 200 is not evidence that the peer is a healthy ntfy: a misconfigured advertise URL can
+	// point at a proxy or an unrelated service that answers 200 for any path. Believing that
+	// would close this node's subscribers while nothing else can serve them, which is the one
+	// thing the isolation check must not do.
+	isolatedTest(t, http.StatusOK, "<html>hello from some proxy</html>", false)
+}
+
+func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wantIsolated bool) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/health" {
 			w.WriteHeader(peerHealthStatus)
+			io.WriteString(w, peerHealthBody)
 		}
 	}))
 	defer peer.Close()
@@ -568,7 +577,9 @@ func TestMesh_IsolatedFuncWhenDatabaseHangs(t *testing.T) {
 	// A network partition makes database calls hang (dropped packets) instead of failing, which
 	// blocks the heartbeat loop. Isolation must still be detected (Healthy is time-based).
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, `{"healthy":true}`) // Answers like a healthy ntfy, which is what the probe requires
+	}))
 	defer peer.Close()
 
 	proxy := newFreezableProxy(t, schemaDSN)

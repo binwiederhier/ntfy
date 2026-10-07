@@ -26,6 +26,7 @@ const (
 	batchMaxMessages  = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes     = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes     = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
+	healthMaxBytes    = 4 * 1024        // Upper bound for a peer's health response
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -235,8 +236,21 @@ func (c *meshCluster) peerHealthy(url string) bool {
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	// A 200 is not evidence of a healthy ntfy. An advertise URL that points at a proxy, a load
+	// balancer or an unrelated service can answer 200 for any path, and believing it would close
+	// this node's subscribers while nothing else can serve them, which is the one thing this
+	// check must not do. Require the health answer itself.
+	var health struct {
+		Healthy bool `json:"healthy"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, healthMaxBytes)).Decode(&health); err != nil {
+		return false
+	}
+	return health.Healthy
 }
 
 // heartbeat is one control-plane tick: refresh this node's registry row, read the live set back

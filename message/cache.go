@@ -28,15 +28,12 @@ const (
 	// shutdown must still finish well inside systemd's stop timeout.
 	closeFlushTimeout = 5 * time.Second
 
-	// claimTimeout is how long a claimed-but-unpublished message stays invisible to other nodes.
-	// A node that dies between claiming and delivering leaves its rows stamped, and nothing would
-	// ever deliver them again without this; past it, any node may claim them afresh. It has to
-	// exceed the time to dispatch one claimed batch, which is a goroutine handoff per message, so
-	// this is orders of magnitude more than needed.
+	// claimTimeout is how long a claim holds a due message off from the other nodes. It must
+	// exceed the time to dispatch one claim, or a slow node is overtaken and the message goes
+	// twice; a node that dies mid-claim costs this much delay.
 	claimTimeout = 2 * time.Minute
 
-	// claimBatchSize caps how many due messages one claim takes, so a backlog drains over several
-	// ticks instead of one node holding all of it (and so claimTimeout stays easy to reason about)
+	// claimBatchSize caps one claim, so the time to dispatch it is bounded (see claimTimeout)
 	claimBatchSize = 1000
 
 	// queueBufferedBatches is how many full batches can wait for the batch writer before publishes
@@ -367,12 +364,8 @@ func (c *Cache) MessagesDue() ([]*model.Message, error) {
 	return readMessages(rows)
 }
 
-// claimMessagesDue claims due rows with FOR UPDATE SKIP LOCKED and marks them published in the
-// same transaction, so concurrent senders on other nodes get disjoint sets rather than all
-// delivering the same message. Marking at claim time rather than after delivery keeps the row
-// lock short: holding a transaction open across Firebase, web push and email delivery would
-// block every node behind one stuck delivery, which is worse than losing a message if this node
-// dies between the claim and the delivery.
+// claimMessagesDue stamps the due rows it takes, so concurrent senders on other nodes get
+// disjoint sets. The rows stay unpublished: MarkPublished still runs after delivery.
 func (c *Cache) claimMessagesDue() ([]*model.Message, error) {
 	now := time.Now().Unix()
 	rows, err := c.db.Query(c.queries.claimMessagesDue, now, now-int64(c.claimTimeout.Seconds()), claimBatchSize, now)

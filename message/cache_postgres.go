@@ -75,9 +75,9 @@ const (
 	postgresSelectAttachmentsWithSizesQuery    = `SELECT mid, attachment_size FROM message WHERE attachment_expires > $1 AND attachment_deleted = FALSE`
 
 	postgresSelectStatsQuery = `SELECT value FROM message_stats WHERE key = 'messages'`
-	// Claims due rows and stamps them in one statement: the CTE locks the rows it picks and
-	// skips rows another node is already claiming, so concurrent senders get disjoint sets.
-	// claimed_at is 0 until claimed, which is why the cutoff ($2) also matches unclaimed rows.
+	// Claims due rows in one statement: the CTE locks what it picks and skips what another node
+	// is claiming, so concurrent senders get disjoint sets. Unclaimed rows have claimed_at 0, so
+	// the cutoff ($2) matches them too.
 	postgresClaimMessagesDueQuery = `
 		WITH due AS (
 			SELECT id FROM message

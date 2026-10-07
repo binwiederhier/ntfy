@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http/httptest"
 	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -81,4 +82,43 @@ func TestNew_EnabledRequiresDatabase(t *testing.T) {
 	_, err := New(&Config{Enabled: true, Secret: "secret"}, nil, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "database")
+}
+
+func TestDeliver_LineLimitBelowTheScanBufferIsEnforced(t *testing.T) {
+	// The configured limit is what the sender's own message size limit implies (MessageSizeLimit
+	// * 4 + 1024, so about 17KB for ntfy's default), which is well under bufio's buffer. A
+	// scanner whose initial buffer is bigger than the limit accepts tokens up to the buffer
+	// instead, so the limit silently did not apply to anything smaller than 64KB.
+	const limit = 512
+	big := model.NewDefaultMessage("mytopic", strings.Repeat("x", 4*limit))
+	line, err := marshalMessage(big)
+	require.Nil(t, err)
+	require.Greater(t, len(line), limit) // The line under test really is over the limit
+
+	var delivered []*model.Message
+	err = decodeMessageBody(bytes.NewReader(line), limit, func(m *model.Message) {
+		delivered = append(delivered, m)
+	})
+
+	require.Error(t, err)
+	require.Empty(t, delivered, "a line over the configured limit was delivered")
+}
+
+func TestDeliver_LineOfExactlyTheLimitIsAccepted(t *testing.T) {
+	// maxLineBytes is inclusive: bufio's own limit is exclusive, so this is off by one unless
+	// the decoder accounts for it, and a peer sending a message right at the limit would have
+	// its whole batch rejected
+	line, err := marshalMessage(model.NewDefaultMessage("mytopic", "hello"))
+	require.Nil(t, err)
+	limit := len(bytes.TrimRight(line, "\n"))
+
+	var delivered []*model.Message
+	collect := func(m *model.Message) { delivered = append(delivered, m) }
+	require.Nil(t, decodeMessageBody(bytes.NewReader(line), limit, collect))
+	require.Len(t, delivered, 1)
+
+	// One byte over, and the batch fails rather than delivering a line past the limit
+	delivered = nil
+	require.Error(t, decodeMessageBody(bytes.NewReader(line), limit-1, collect))
+	require.Empty(t, delivered)
 }

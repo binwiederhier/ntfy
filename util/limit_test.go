@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -275,4 +276,53 @@ func TestBurnTokens(t *testing.T) {
 	BurnTokens(l, 1000)
 	require.False(t, l.Allow())
 	require.Greater(t, l.Tokens(), -11.0) // Debt capped at ~one burst
+}
+
+func TestBurnTokens_DebtCapHoldsWhileTheBucketIsBeingConsumed(t *testing.T) {
+	// The cap used to come from a separate read of the available tokens, so anything consuming
+	// the limiter between that read and the reservation made the burn land deeper than one
+	// burst. The cap is enforced per reservation now, which ordinary traffic cannot outrun.
+	const burst = 10
+	l := rate.NewLimiter(rate.Every(time.Second), burst)
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					l.Allow() // Ordinary consumption, racing the burn below
+				}
+			}
+		}()
+	}
+	BurnTokens(l, 1000)
+	close(stop)
+	wg.Wait()
+	require.GreaterOrEqual(t, l.Tokens(), -float64(burst), "debt went deeper than one burst")
+}
+
+func TestBurnTokens_SerializedBurnersShareOneBurstOfDebt(t *testing.T) {
+	// Several burners have to be serialized by the caller (RateLimiter.Burn does it with its own
+	// mutex). Serialized, they share one burst of debt rather than each taking one.
+	const burst = 10
+	l := rate.NewLimiter(rate.Every(time.Second), burst)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mu.Lock()
+			defer mu.Unlock()
+			BurnTokens(l, 1000)
+		}()
+	}
+	wg.Wait()
+	require.GreaterOrEqual(t, l.Tokens(), -float64(burst), "debt went deeper than one burst")
+	require.Less(t, l.Tokens(), -float64(burst)+1, "the burn did not reach the full depth")
 }

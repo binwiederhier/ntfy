@@ -28,13 +28,8 @@ const (
 	// shutdown must still finish well inside systemd's stop timeout.
 	closeFlushTimeout = 5 * time.Second
 
-	// claimTimeout is how long a claim holds a due message off from the other nodes. It must
-	// exceed the time to dispatch one claim, or a slow node is overtaken and the message goes
-	// twice; a node that dies mid-claim costs this much delay.
-	claimTimeout = 2 * time.Minute
-
-	// claimBatchSize caps one claim, so the time to dispatch it is bounded (see claimTimeout)
-	claimBatchSize = 1000
+	claimTimeout   = 2 * time.Minute // How long a claim hides a due message from other nodes; must exceed dispatching one claim
+	claimBatchSize = 1000            // Rows per claim, so the dispatch time that claimTimeout must cover is bounded
 
 	// queueBufferedBatches is how many full batches can wait for the batch writer before publishes
 	// block. 100 batches of the default 100 messages are ~10 MB typical, ~60 MB at the 4 KB limit.

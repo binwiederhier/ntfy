@@ -6,11 +6,38 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.28.0 | Aug 27, 2026  |
+| ntfy server      | v2.29.0 | Oct 7, 2026   |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.29.0
+Released October 7, 2026
+
+This release fixes how ntfy writes messages to the cache under load. On ntfy.sh, every top of the hour brought a
+burst of cron-driven publishes that the single batch writer could not keep up with: messages took up to 40 seconds
+to reach the database (so `poll=1` and `since=` requests missed them), and publish requests stalled behind the full
+queue. The writer now stores a whole batch in one statement, publishes no longer wait on the writer, and PostgreSQL
+connections are kept idle instead of re-opened on every burst. The rest is smaller fixes that accumulated since
+v2.28.0, plus timezone and RFC 3339 support for delayed notifications.
+
+**Features:**
+
+* Support a timezone for delayed notifications via the `X-Timezone` header, `timezone` query parameter or JSON field, e.g. `At: tomorrow, 10am` with `Timezone: Asia/Tokyo`; the web app sends the browser's timezone automatically ([#1967](https://github.com/binwiederhier/ntfy/pull/1967)/[#1924](https://github.com/binwiederhier/ntfy/issues/1924), thanks to [@beemines](https://github.com/beemines) for the contribution)
+* Support RFC 3339 timestamps for delayed notifications, e.g. `Delay: 2026-09-02T10:00:00Z` or `At: 2021-12-10T11:00:00-05:00`, to schedule a message at a precise point in time ([#1931](https://github.com/binwiederhier/ntfy/pull/1931), thanks to [@ALPHACOM-Brehmer](https://github.com/ALPHACOM-Brehmer) for the contribution)
+
+**Bug fixes + maintenance:**
+
+* Fix messages becoming visible to pollers only seconds later (and publishes stalling) under publish bursts: the message cache writer now stores each batch with a single multi-row `INSERT` instead of one statement per message (on PostgreSQL and SQLite), publishes no longer block while the writer is busy, and the per-publish lookup for a scheduled message with the same sequence ID is skipped when the client did not set one ([#2006](https://github.com/binwiederhier/ntfy/pull/2006))
+* Fix a recurring panic in the account token-update endpoint when a concurrent anonymous request from the same IP raced the authenticated request on the shared visitor (nil-user dereference); the request now fails with HTTP 401
+* Fix accepted messages being dropped from the cache on shutdown: the batched-write queue is now flushed, and `ntfy serve` shuts down gracefully on `SIGTERM`/`SIGINT` instead of dying mid-batch
+* Keep PostgreSQL pool connections idle instead of re-opening them: `pool_max_idle_conns` now defaults to `pool_max_conns`, so bursts no longer pay a DNS lookup, TCP/TLS handshake and authentication per query
+* Fix `since=<message-id>` replays flooding a client with a topic's entire retained history when the ID was not on the read replica yet (a client reconnecting right after receiving a message); the ID is now resolved on the primary in that case
+* Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
+* Detect Markdown when the `Content-Type` header has parameters or is uppercase, e.g. `text/markdown; charset=utf-8` ([#1995](https://github.com/binwiederhier/ntfy/pull/1995), thanks to [@cipherprofessor](https://github.com/cipherprofessor) for the contribution)
+* Fix the built-in Alertmanager template showing a bogus `0001-01-01` end time for firing alerts and joining a resolved alert's start and end times onto one line ([#1946](https://github.com/binwiederhier/ntfy/pull/1946)/[#1940](https://github.com/binwiederhier/ntfy/issues/1940), thanks to [@justadityaraj](https://github.com/justadityaraj) for the contribution and [@deferred](https://github.com/deferred) for reporting)
+* Groundwork for horizontal scaling: merged the first building blocks for running multiple ntfy servers as a cluster (node registry, util primitives, reserved experimental config options); clustering is not usable yet ([#1991](https://github.com/binwiederhier/ntfy/pull/1991), [#1997](https://github.com/binwiederhier/ntfy/pull/1997), [#2001](https://github.com/binwiederhier/ntfy/pull/2001), [#2003](https://github.com/binwiederhier/ntfy/pull/2003))
 
 ### ntfy server v2.28.0
 Released August 27, 2026
@@ -2092,24 +2119,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.28.1 (UNRELEASED)
-
-**Features:**
-
-* Support a timezone for delayed notifications via the `X-Timezone` header, `timezone` query parameter or JSON field, e.g. `At: tomorrow, 10am` with `Timezone: Asia/Tokyo`; the web app sends the browser's timezone automatically ([#1967](https://github.com/binwiederhier/ntfy/pull/1967)/[#1924](https://github.com/binwiederhier/ntfy/issues/1924), thanks to [@beemines](https://github.com/beemines) for the contribution)
-* Support RFC 3339 timestamps for delayed notifications, e.g. `Delay: 2026-09-02T10:00:00Z` or `At: 2021-12-10T11:00:00-05:00`, to schedule a message at a precise point in time ([#1931](https://github.com/binwiederhier/ntfy/pull/1931), thanks to [@ALPHACOM-Brehmer](https://github.com/ALPHACOM-Brehmer) for the contribution)
-
-**Bug fixes + maintenance:**
-
-* Fix a recurring panic in the account token-update endpoint when a concurrent anonymous request from the same IP raced the authenticated request on the shared visitor (nil-user dereference); the request now fails with HTTP 401
-* Fix accepted messages being dropped from the cache on shutdown: the batched-write queue is now flushed, and `ntfy serve` shuts down gracefully on `SIGTERM`/`SIGINT` instead of dying mid-batch
-* Keep PostgreSQL pool connections idle instead of re-opening them: `pool_max_idle_conns` now defaults to `pool_max_conns`, so bursts no longer pay a DNS lookup, TCP/TLS handshake and authentication per query
-* Fix `since=<message-id>` replays flooding a client with a topic's entire retained history when the ID was not on the read replica yet (a client reconnecting right after receiving a message); the ID is now resolved on the primary in that case
-* Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
-* Detect Markdown when the `Content-Type` header has parameters or is uppercase, e.g. `text/markdown; charset=utf-8` ([#1995](https://github.com/binwiederhier/ntfy/pull/1995), thanks to [@cipherprofessor](https://github.com/cipherprofessor) for the contribution)
-* Fix the built-in Alertmanager template showing a bogus `0001-01-01` end time for firing alerts and joining a resolved alert's start and end times onto one line ([#1946](https://github.com/binwiederhier/ntfy/pull/1946)/[#1940](https://github.com/binwiederhier/ntfy/issues/1940), thanks to [@justadityaraj](https://github.com/justadityaraj) for the contribution and [@deferred](https://github.com/deferred) for reporting)
-* Groundwork for horizontal scaling: merged the first building blocks for running multiple ntfy servers as a cluster (node registry, util primitives, reserved experimental config options); clustering is not usable yet ([#1991](https://github.com/binwiederhier/ntfy/pull/1991), [#1997](https://github.com/binwiederhier/ntfy/pull/1997), [#2001](https://github.com/binwiederhier/ntfy/pull/2001), [#2003](https://github.com/binwiederhier/ntfy/pull/2003))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -11,7 +12,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/s3"
+	"heckel.io/ntfy/v2/util"
 )
+
+// testRunID separates concurrent runs that share the test bucket
+var testRunID = util.RandomString(10)
+
+// testKeyPrefix returns a key space belonging to this test alone. The bucket is shared with
+// every other CI run, and deleteAllObjects wipes everything under the prefix it is given, so
+// tests sharing one prefix delete each other's objects mid-run (seen as NoSuchKey 404s on an
+// unrelated pull request).
+func testKeyPrefix(t *testing.T, configuredPrefix string) string {
+	return path.Join(configuredPrefix, "testpkg-attachment", testRunID, t.Name())
+}
 
 func TestS3Store_WriteWithPrefix(t *testing.T) {
 	s3URL := os.Getenv("NTFY_TEST_S3_URL")
@@ -20,7 +33,7 @@ func TestS3Store_WriteWithPrefix(t *testing.T) {
 	}
 	cfg, err := s3.ParseURL(s3URL)
 	require.Nil(t, err)
-	cfg.Prefix = "test-prefix"
+	cfg.Prefix = testKeyPrefix(t, "test-prefix")
 	client := s3.New(cfg)
 	deleteAllObjects(t, client)
 	backend := newS3Backend(client)
@@ -53,11 +66,7 @@ func newTestRealS3Store(t *testing.T, totalSizeLimit int64) (*Store, *modTimeOve
 	}
 	cfg, err := s3.ParseURL(s3URL)
 	require.Nil(t, err)
-	if cfg.Prefix != "" {
-		cfg.Prefix = cfg.Prefix + "/testpkg-attachment"
-	} else {
-		cfg.Prefix = "testpkg-attachment"
-	}
+	cfg.Prefix = testKeyPrefix(t, cfg.Prefix)
 	client := s3.New(cfg)
 	inner := newS3Backend(client)
 	wrapper := &modTimeOverrideBackend{backend: inner, modTimes: make(map[string]time.Time)}

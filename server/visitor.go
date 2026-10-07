@@ -342,6 +342,10 @@ func (v *visitor) Stats() *user.Stats {
 	}
 }
 
+// ResetStats zeroes the visitor's in-memory stats at the daily rollover, and with them the
+// persisted seeds its deltas are measured against, because the caller zeroes the user's
+// database row in the same pass (in a cluster that row is reset once, by the leader). Only the
+// stats resetter calls this.
 func (v *visitor) ResetStats() {
 	v.mu.Lock() // Also protects statsPersisted
 	defer v.mu.Unlock()
@@ -360,7 +364,8 @@ func (v *visitor) EnqueueUserStatsDelta() {
 }
 
 func (v *visitor) enqueueUserStatsDeltaNoLock() {
-	if v.userManager == nil || v.user == nil {
+	u := v.user // Pinned for the whole function: SetUser(nil) must not turn this into a nil deref
+	if v.userManager == nil || u == nil {
 		return
 	}
 	current := user.Stats{
@@ -377,7 +382,7 @@ func (v *visitor) enqueueUserStatsDeltaNoLock() {
 		return
 	}
 	v.statsPersisted = current
-	v.userManager.EnqueueUserStats(v.user.ID, &delta)
+	v.userManager.EnqueueUserStats(u.ID, &delta)
 }
 
 // User returns the visitor user, or nil if there is none
@@ -452,7 +457,7 @@ func (v *visitor) resetLimitersNoLock(messages, emails, calls int64, enqueueUpda
 		v.authLimiter = nil    // Users are already logged in, no need to limit requests
 	}
 	v.statsPersisted = user.Stats{Messages: messages, Emails: emails, Calls: calls} // Seeds come from the persisted user stats, so nothing is owed to the queue
-	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor") // Must be after function, because contextNoLock() describes rate limiters
+	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor")          // Must be after function, because contextNoLock() describes rate limiters
 }
 
 func (v *visitor) Limits() *visitorLimits {

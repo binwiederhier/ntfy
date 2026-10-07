@@ -9,7 +9,7 @@ import (
 
 // Initial SQLite schema
 const (
-	sqliteCurrentSchemaVersion = 15
+	sqliteCurrentSchemaVersion = 16
 	sqliteCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -200,6 +200,7 @@ func sqliteMigrations(cacheDuration time.Duration) map[int]schema.MigrateFunc {
 		12: schema.AsMigrateFunc(sqliteMigrate12To13AlterMessagesTableQuery),
 		13: schema.AsMigrateFunc(sqliteMigrate13To14AlterMessagesTableQuery),
 		14: schema.NopMigrateFunc, // Corresponds to Postgres migration
+		15: schema.NopMigrateFunc, // 15 -> 16 adds the Postgres claim column; SQLite is single-node
 	}
 }
 

@@ -44,8 +44,12 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 		AdvertiseURL:      advertiseURL,
 		Secret:            testSecret,
 		HeartbeatInterval: 100 * time.Millisecond,
-		NodeTTL:           300 * time.Millisecond, // Liveness window AND the leadership hold-off; short keeps the tests fast
-		MaxMessageBytes:   1 << 20,
+		// The liveness window AND the leadership hold-off. One second is the floor: heartbeats
+		// are stored in whole seconds, so a shorter TTL truncates the SQL cutoff to zero and a
+		// peer counts as live only inside the wall-clock second it registered in, which makes
+		// every test that waits for a peer to appear or leave a coin flip
+		NodeTTL:         time.Second,
+		MaxMessageBytes: 1 << 20,
 	}
 }
 
@@ -727,9 +731,7 @@ func TestMesh_UndeliveredBatchIsReportedAsAGap(t *testing.T) {
 	}))
 	defer srv.Close()
 	registerFakePeer(t, pool, "node-b", srv.URL)
-	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.NodeTTL = 5 * time.Second // The fake peer never heartbeats; it must stay live for the retry
-	mesh, err := newMeshCluster(conf, pool, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("gapped-topic", "lost")))
@@ -808,9 +810,7 @@ func TestMesh_GapReportCarriesTheOldestLostMessageTime(t *testing.T) {
 	}))
 	defer srv.Close()
 	registerFakePeer(t, pool, "node-b", srv.URL)
-	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.NodeTTL = 5 * time.Second // The fake peer never heartbeats; it must stay live to be told
-	mesh, err := newMeshCluster(conf, pool, nil)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 
@@ -864,7 +864,6 @@ func TestMesh_MembersOfAnIsolatedNodeAreNotReportedHealthy(t *testing.T) {
 	pool := openTestPool(t, schemaDSN)
 	registerFakePeer(t, pool, "node-peer", "http://192.168.1.50:2587")
 	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
-	conf.NodeTTL = time.Second // Whole-second heartbeats: anything shorter is not a window
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()

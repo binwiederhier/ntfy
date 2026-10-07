@@ -59,11 +59,6 @@ const (
 const (
 	defaultHeartbeatInterval = 3 * time.Second  // How often a node refreshes its registry heartbeat
 	defaultNodeTTL           = 30 * time.Second // A node counts as live if its heartbeat is newer than this; generous to avoid false-dead flapping (see plans)
-
-	// DefaultBatchLinger is how long a fan-out message may wait in a peer's queue for more
-	// messages to arrive, so they are delivered as one batch. It trades up to this much
-	// cross-node latency for a bounded request rate per peer.
-	DefaultBatchLinger = 500 * time.Millisecond
 )
 
 // Member is one live cluster node as reported by MembersPath
@@ -110,10 +105,10 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 		return nil, errors.New("cluster mode requires a PostgreSQL database (set database-url)")
 	}
 	if conf.AdvertiseURL == "" {
-		return nil, errors.New("cluster mode requires an advertise URL (set cluster-advertise-url)")
+		return nil, errors.New("cluster mode requires an advertise URL (set experimental-cluster-advertise-url)")
 	}
 	if conf.NodeID == "" {
-		return nil, errors.New("cluster mode requires a stable node ID (set cluster-node-id)")
+		return nil, errors.New("cluster mode requires a stable node ID (set experimental-cluster-node-id)")
 	}
 	if conf.HeartbeatInterval == 0 {
 		conf.HeartbeatInterval = defaultHeartbeatInterval

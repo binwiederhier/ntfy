@@ -10,7 +10,6 @@ import (
 	"text/template"
 	"time"
 
-	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/cluster/quota"
 
 	"heckel.io/ntfy/v2/ban"
@@ -28,11 +27,12 @@ const (
 	DefaultDelayedSenderInterval                = 10 * time.Second
 	DefaultMessageDelayMin                      = 10 * time.Second
 	DefaultMessageDelayMax                      = 3 * 24 * time.Hour
-	DefaultFirebaseKeepaliveInterval            = 3 * time.Hour    // ~control topic (Android), not too frequently to save battery
-	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
-	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
-	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
-	DefaultTopicStoreUpdateInterval             = 5 * time.Minute  // Per-topic throttle for shared liveness records (cluster mode; keeps the topic table off the hot path)
+	DefaultFirebaseKeepaliveInterval            = 3 * time.Hour          // ~control topic (Android), not too frequently to save battery
+	DefaultFirebasePollInterval                 = 20 * time.Minute       // ~poll topic (iOS), max. 2-3 times per hour (see docs)
+	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute       // Time that over-users are locked out of Firebase if it returns "quota exceeded"
+	DefaultStripePriceCacheDuration             = 3 * time.Hour          // Time to keep Stripe prices cached in memory before a refresh is needed
+	DefaultClusterBatchLinger                   = 500 * time.Millisecond // How long fan-out messages wait to form a per-peer batch (experimental clustering)
+	DefaultTopicStoreUpdateInterval             = 5 * time.Minute        // Per-topic throttle for shared liveness records (cluster mode; keeps the topic table off the hot path)
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -137,7 +137,7 @@ type Config struct {
 	DatabaseReplicaURLs                  []string      // PostgreSQL read replica connection strings
 	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; required in cluster mode
 	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
-	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
+	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<experimental-cluster-listen>")
 	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	FirebaseKeyFile                      string
@@ -262,7 +262,7 @@ func NewConfig() *Config {
 		ClusterListen:                        "",
 		ClusterAdvertiseURL:                  "",
 		ClusterSecret:                        "",
-		ClusterBatchLinger:                   cluster.DefaultBatchLinger,
+		ClusterBatchLinger:                   DefaultClusterBatchLinger,
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,

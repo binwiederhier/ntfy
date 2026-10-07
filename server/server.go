@@ -83,7 +83,7 @@ type Server struct {
 	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
 	topicStore        *topicstore.Store                   // Shared per-topic state (rate visitors, liveness); nil when not clustered
 	catchUpDelay      time.Duration                       // When the catch-up replay runs after a since= subscribe (see server_catchup.go)
-	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (cluster-listen)
+	httpClusterServer *http.Server                        // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	closeChan         chan bool
 	stopOnce          sync.Once   // Makes Stop idempotent (double close panics otherwise)
 	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
@@ -352,7 +352,7 @@ func New(conf *Config) (*Server, error) {
 		advertiseURL = "http://" + conf.ClusterListen
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
-		Enabled:         conf.ClusterListen != "", // Setting cluster-listen implicitly enables clustering
+		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
 		NodeID:          cluster.NodeID(conf.ClusterNodeID),
 		AdvertiseURL:    advertiseURL,
 		Secret:          conf.ClusterSecret,
@@ -368,7 +368,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	// Cluster-wide visitor usage: nodes count locally and converge via the shared database, so
 	// daily quotas hold across the cluster instead of multiplying by node count. Single-node
-	// setups (no cluster-listen) keep their purely local limiters (s.quota stays nil).
+	// setups (no experimental-cluster-listen) keep their purely local limiters (s.quota stays nil).
 	if conf.ClusterListen != "" && pool != nil {
 		s.quota, err = quota.New(&quota.Config{
 			FlushInterval:  conf.VisitorUsageFlushInterval,
@@ -392,7 +392,7 @@ func New(conf *Config) (*Server, error) {
 	return s, nil
 }
 
-// clusterHandler returns the handler served on the dedicated cluster listener (cluster-listen).
+// clusterHandler returns the handler served on the dedicated cluster listener (experimental-cluster-listen).
 // It serves the internal peer API (owned and routed by the cluster itself, including auth) plus
 // a health endpoint; the public listeners never expose these paths, so internal traffic cannot
 // be reached from the outside even before any firewalling.

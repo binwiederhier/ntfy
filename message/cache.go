@@ -27,6 +27,13 @@ const (
 	// write takes milliseconds, so this only ever trips when the database is wedged, and then
 	// shutdown must still finish well inside systemd's stop timeout.
 	closeFlushTimeout = 5 * time.Second
+
+	// insertMessageColumns is the number of values per row in insertMessage and insertMessages
+	insertMessageColumns = 24
+
+	// insertMessagesMaxRows caps the rows per multi-row INSERT, keeping it well below PostgreSQL's
+	// limit of 65535 parameters per statement
+	insertMessagesMaxRows = 1000
 )
 
 var errNoRows = errors.New("no rows found")
@@ -34,6 +41,7 @@ var errNoRows = errors.New("no rows found")
 // queries holds the database-specific SQL queries
 type queries struct {
 	insertMessage                    string
+	insertMessages                   func(rows int) string // Multi-row INSERT; nil writes row by row with insertMessage
 	selectScheduledMessageIDsBySeqID string
 	deleteScheduledBySequenceID      string
 	updateMessagesForTopicExpiry     string
@@ -127,68 +135,13 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare(c.queries.insertMessage)
+	if c.queries.insertMessages != nil {
+		err = insertMessagesMultiRow(tx, c.queries.insertMessages, ms)
+	} else {
+		err = insertMessagesRowByRow(tx, c.queries.insertMessage, ms)
+	}
 	if err != nil {
 		return err
-	}
-	defer stmt.Close()
-	for _, m := range ms {
-		if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
-			return model.ErrUnexpectedMessageType
-		}
-		published := m.Time <= time.Now().Unix()
-		tags := util.SanitizeUTF8(strings.Join(m.Tags, ","))
-		var attachmentName, attachmentType, attachmentURL string
-		var attachmentSize, attachmentExpires int64
-		var attachmentDeleted bool
-		if m.Attachment != nil {
-			attachmentName = util.SanitizeUTF8(m.Attachment.Name)
-			attachmentType = util.SanitizeUTF8(m.Attachment.Type)
-			attachmentSize = m.Attachment.Size
-			attachmentExpires = m.Attachment.Expires
-			attachmentURL = util.SanitizeUTF8(m.Attachment.URL)
-		}
-		var actionsStr string
-		if len(m.Actions) > 0 {
-			actionsBytes, err := json.Marshal(m.Actions)
-			if err != nil {
-				return err
-			}
-			actionsStr = string(actionsBytes)
-		}
-		var sender string
-		if m.Sender.IsValid() {
-			sender = m.Sender.String()
-		}
-		_, err := stmt.Exec(
-			m.ID,
-			m.SequenceID,
-			m.Time,
-			m.Event,
-			m.Expires,
-			util.SanitizeUTF8(m.Topic),
-			util.SanitizeUTF8(m.Message),
-			util.SanitizeUTF8(m.Title),
-			m.Priority,
-			tags,
-			util.SanitizeUTF8(m.Click),
-			util.SanitizeUTF8(m.Icon),
-			actionsStr,
-			attachmentName,
-			attachmentType,
-			attachmentSize,
-			attachmentExpires,
-			attachmentURL,
-			attachmentDeleted, // Always zero
-			sender,
-			m.User,
-			util.SanitizeUTF8(m.ContentType),
-			m.Encoding,
-			published,
-		)
-		if err != nil {
-			return err
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		log.Tag(tagMessageCache).Err(err).Error("Writing %d message(s) failed (took %v)", len(ms), time.Since(start))
@@ -196,6 +149,102 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 	}
 	log.Tag(tagMessageCache).Debug("Wrote %d message(s) in %v", len(ms), time.Since(start))
 	return nil
+}
+
+// insertMessagesMultiRow writes the messages with as few statements as possible: against a remote
+// database, every statement is a round trip, and the batch writer is the only writer
+func insertMessagesMultiRow(tx *sql.Tx, query func(rows int) string, ms []*model.Message) error {
+	for len(ms) > 0 {
+		chunk := ms[:min(len(ms), insertMessagesMaxRows)]
+		ms = ms[len(chunk):]
+		args := make([]any, 0, len(chunk)*insertMessageColumns)
+		for _, m := range chunk {
+			rowArgs, err := insertMessageArgs(m)
+			if err != nil {
+				return err
+			}
+			args = append(args, rowArgs...)
+		}
+		if _, err := tx.Exec(query(len(chunk)), args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertMessagesRowByRow(tx *sql.Tx, query string, ms []*model.Message) error {
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, m := range ms {
+		args, err := insertMessageArgs(m)
+		if err != nil {
+			return err
+		}
+		if _, err := stmt.Exec(args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// insertMessageArgs returns the insertMessageColumns values of one message row, in column order
+func insertMessageArgs(m *model.Message) ([]any, error) {
+	if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
+		return nil, model.ErrUnexpectedMessageType
+	}
+	published := m.Time <= time.Now().Unix()
+	tags := util.SanitizeUTF8(strings.Join(m.Tags, ","))
+	var attachmentName, attachmentType, attachmentURL string
+	var attachmentSize, attachmentExpires int64
+	var attachmentDeleted bool
+	if m.Attachment != nil {
+		attachmentName = util.SanitizeUTF8(m.Attachment.Name)
+		attachmentType = util.SanitizeUTF8(m.Attachment.Type)
+		attachmentSize = m.Attachment.Size
+		attachmentExpires = m.Attachment.Expires
+		attachmentURL = util.SanitizeUTF8(m.Attachment.URL)
+	}
+	var actionsStr string
+	if len(m.Actions) > 0 {
+		actionsBytes, err := json.Marshal(m.Actions)
+		if err != nil {
+			return nil, err
+		}
+		actionsStr = string(actionsBytes)
+	}
+	var sender string
+	if m.Sender.IsValid() {
+		sender = m.Sender.String()
+	}
+	return []any{
+		m.ID,
+		m.SequenceID,
+		m.Time,
+		m.Event,
+		m.Expires,
+		util.SanitizeUTF8(m.Topic),
+		util.SanitizeUTF8(m.Message),
+		util.SanitizeUTF8(m.Title),
+		m.Priority,
+		tags,
+		util.SanitizeUTF8(m.Click),
+		util.SanitizeUTF8(m.Icon),
+		actionsStr,
+		attachmentName,
+		attachmentType,
+		attachmentSize,
+		attachmentExpires,
+		attachmentURL,
+		attachmentDeleted, // Always zero
+		sender,
+		m.User,
+		util.SanitizeUTF8(m.ContentType),
+		m.Encoding,
+		published,
+	}, nil
 }
 
 // Messages returns all cached messages for a topic, oldest first. Prefer MessagesCapped on

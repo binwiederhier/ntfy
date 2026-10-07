@@ -81,3 +81,26 @@ func TestBatchingQueue_CloseFlushesRemaining(t *testing.T) {
 	}
 	q.Enqueue(4) // Must not panic after Close
 }
+
+func TestBatchingQueue_EnqueueDoesNotBlockOnBusyConsumer(t *testing.T) {
+	// A slow consumer (e.g. the message batch writer on a busy database) must not stall the
+	// goroutines that enqueue (e.g. publish requests) while there is room in the buffer
+	q := util.NewBatchingQueue[int](2, time.Hour)
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 20; i++ { // 10 full batches, nobody reading yet
+			q.Enqueue(i)
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Enqueue blocked while the consumer was busy")
+	}
+	total := 0
+	for i := 0; i < 10; i++ {
+		total += len(<-q.Dequeue())
+	}
+	require.Equal(t, 20, total)
+}

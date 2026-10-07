@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+const (
+	// batchingQueueBufferedBatches is how many full batches can wait for the consumer before
+	// Enqueue blocks. Callers of Enqueue are request handlers (publishes), so a briefly slow
+	// consumer must not stall them; a consumer that stays slow still pushes back eventually.
+	batchingQueueBufferedBatches = 100
+)
+
 // BatchingQueue is a queue that creates batches of the enqueued elements based on a
 // max batch size and a batch timeout.
 //
@@ -40,7 +47,7 @@ func NewBatchingQueue[T any](batchSize int, timeout time.Duration) *BatchingQueu
 		batchSize: batchSize,
 		timeout:   timeout,
 		in:        make([]T, 0),
-		out:       make(chan []T),
+		out:       make(chan []T, batchingQueueBufferedBatches),
 		done:      make(chan struct{}),
 	}
 	go q.timeoutTicker()

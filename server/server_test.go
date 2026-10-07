@@ -4906,6 +4906,31 @@ func TestServer_UpdateScheduledMessage(t *testing.T) {
 	})
 }
 
+func TestServer_PublishWithoutSequenceID_NoDatabaseRoundTrip(t *testing.T) {
+	// A message without a client-provided sequence ID gets its own fresh ID as sequence ID, so no
+	// scheduled message can share it; publishing it must not wait for the database. Each round
+	// trip costs latency here, like against a remote database.
+	const latency = 50 * time.Millisecond
+	conf := newTestConfig(t, dbtest.WithLatency(t, dbtest.CreateTestPostgresSchema(t), latency))
+	conf.CacheBatchSize = 10
+	conf.CacheBatchTimeout = 100 * time.Millisecond
+	conf.AuthAccessCacheEnabled = true // Like on high-volume servers; otherwise the ACL check is a round trip
+	s := newTestServer(t, conf)
+	request(t, s, "PUT", "/mytopic", "warm up", nil)
+
+	start := time.Now()
+	response := request(t, s, "PUT", "/mytopic", "hi", nil)
+	took := time.Since(start)
+	require.Equal(t, 200, response.Code)
+	require.Less(t, took, latency, "publish took %v", took)
+
+	// The message still reaches the database
+	require.Eventually(t, func() bool {
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		return strings.Contains(response.Body.String(), `"message":"hi"`)
+	}, 5*time.Second, 100*time.Millisecond)
+}
+
 func TestServer_DeleteScheduledMessage(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()

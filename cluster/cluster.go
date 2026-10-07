@@ -84,8 +84,10 @@ type Cluster interface {
 	// BroadcastState pushes a state delta (first-subscriber hints, subscriber cancels) to all
 	// peers. Nop single-node.
 	BroadcastState(state *State)
-	// IsLeader reports whether this node holds the cluster leader lock. Singleton background
-	// jobs (e.g. the Firebase keepaliver) are gated on the leader.
+	// IsLeader reports whether this node is the one that should run the cluster's singleton jobs
+	// (e.g. the Firebase keepaliver). It is derived from membership, not held as a lock, and it is
+	// a belief with a lease rather than a fence: see registry.IsLeader for what it does and does
+	// not promise. Always true single-node.
 	IsLeader() bool
 	// Members lists the live cluster members (this node plus its live peers); served on
 	// MembersPath for the load balancers' agents.

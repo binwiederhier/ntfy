@@ -29,9 +29,9 @@ const (
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
-// PostgreSQL only as a control plane: the node_registry table for membership/discovery, and a
-// Postgres advisory lock for singleton-job leader election. The message path never touches the
-// database (not even for membership: see registry.Peers).
+// PostgreSQL only as a control plane: the node_registry table is both the membership mechanism
+// and, read as "the live node with the lowest id", the leader election (see registry.IsLeader).
+// The message path never touches the database, not even for membership: see registry.Peers.
 //
 // A published message goes to EVERY live peer, which then drops it unless it has a subscriber
 // for the topic. Routing by subscription knowledge was tried and removed: it made delivery
@@ -232,8 +232,9 @@ func (c *meshCluster) peerHealthy(url string) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// heartbeat is one control-plane tick: refresh this node's registry row, retry/confirm the
-// leader lock, prune long-dead registry rows (as leader), and reconcile the per-peer queues.
+// heartbeat is one control-plane tick: refresh this node's registry row, read the live set back
+// (which is also what updates this node's leadership standing), prune long-dead rows if this node
+// leads, and reconcile the per-peer queues.
 //
 // A node that cannot even register itself aborts the tick: the remaining database work would
 // fail against the same database, and everything downstream degrades safely without it --

@@ -596,6 +596,39 @@ func TestStore_MessagesDue_ClaimExactlyOnce(t *testing.T) {
 	}
 }
 
+func TestStore_MessagesDue_AbandonedClaimIsReclaimed(t *testing.T) {
+	// A node that dies between claiming and delivering leaves its rows claimed but unpublished.
+	// Nothing would ever deliver them again if the claim were permanent, so it expires: until it
+	// does, no other node sees the message; after it does, any node may claim it afresh.
+	s := newTestPostgresStore(t) // skips if NTFY_TEST_DATABASE_URL is unset
+	m := model.NewDefaultMessage("mytopic", "scheduled")
+	m.Time = time.Now().Add(time.Hour).Unix() // future -> stored unpublished
+	require.Nil(t, s.AddMessage(m))
+	require.Nil(t, s.UpdateMessageTime(m.ID, time.Now().Add(-time.Minute).Unix()))
+
+	// The claim takes it, and nothing else can have it while the claim holds
+	due, err := s.MessagesDue()
+	require.Nil(t, err)
+	require.Len(t, due, 1)
+	require.Equal(t, m.ID, due[0].ID)
+	due, err = s.MessagesDue()
+	require.Nil(t, err)
+	require.Empty(t, due, "a claimed message was handed out again while the claim still held")
+
+	// The claimer never published it (it died); past the timeout the message is claimable again
+	s.SetClaimTimeoutForTest(0)
+	due, err = s.MessagesDue()
+	require.Nil(t, err)
+	require.Len(t, due, 1, "an abandoned claim was never reclaimed")
+	require.Equal(t, m.ID, due[0].ID)
+
+	// Once it is actually delivered, no timeout brings it back
+	require.Nil(t, s.MarkPublished(due[0]))
+	due, err = s.MessagesDue()
+	require.Nil(t, err)
+	require.Empty(t, due, "a published message was handed out again")
+}
+
 func TestStore_ExpireMessages(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, s *message.Cache) {
 		// Add messages to two topics

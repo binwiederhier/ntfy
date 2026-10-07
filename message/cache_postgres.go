@@ -74,13 +74,20 @@ const (
 	postgresSelectAttachmentsSizeByUserIDQuery = `SELECT COALESCE(SUM(attachment_size), 0) FROM message WHERE user_id = $1 AND attachment_expires >= $2`
 	postgresSelectAttachmentsWithSizesQuery    = `SELECT mid, attachment_size FROM message WHERE attachment_expires > $1 AND attachment_deleted = FALSE`
 
-	postgresSelectStatsQuery                = `SELECT value FROM message_stats WHERE key = 'messages'`
-	postgresSelectMessagesDueForUpdateQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
-		FROM message
-		WHERE time <= $1 AND published = FALSE
-		ORDER BY time, id
-		FOR UPDATE SKIP LOCKED
+	postgresSelectStatsQuery = `SELECT value FROM message_stats WHERE key = 'messages'`
+	// Claims due rows and stamps them in one statement: the CTE locks the rows it picks and
+	// skips rows another node is already claiming, so concurrent senders get disjoint sets.
+	// claimed_at is 0 until claimed, which is why the cutoff ($2) also matches unclaimed rows.
+	postgresClaimMessagesDueQuery = `
+		WITH due AS (
+			SELECT id FROM message
+			WHERE time <= $1 AND published = FALSE AND claimed_at <= $2
+			ORDER BY time, id
+			LIMIT $3
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE message SET claimed_at = $4 WHERE id IN (SELECT id FROM due)
+		RETURNING mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 	`
 
 	postgresUpdateStatsQuery       = `UPDATE message_stats SET value = $1 WHERE key = 'messages'`
@@ -100,7 +107,7 @@ var postgresQueries = queries{
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,
 	selectMessagesDue:                postgresSelectMessagesDueQuery,
-	selectMessagesDueForUpdate:       postgresSelectMessagesDueForUpdateQuery,
+	claimMessagesDue:                 postgresClaimMessagesDueQuery,
 	deleteExpiredMessages:            postgresDeleteExpiredMessagesQuery,
 	updateMessagePublished:           postgresUpdateMessagePublishedQuery,
 	selectMessagesCount:              postgresSelectMessagesCountQuery,

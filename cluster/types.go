@@ -19,7 +19,6 @@ type Config struct {
 	MaxMessageBytes   int64           // Upper bound for a single message on the wire (batch limits derive from this)
 	CancelFunc        CancelFunc      // Applies a peer's subscriber-cancel request to local connections; may be nil
 	TopicsAddedFunc   TopicsAddedFunc // Told about topics that just gained their first subscriber on a peer; may be nil
-	GapFunc           GapFunc         // Told that a peer could not deliver messages for these topics; may be nil
 	IsolatedFunc      func()          // Called while this node lost its registration but a peer is healthy; may be nil
 }
 
@@ -49,17 +48,6 @@ type SubscriberCancel struct {
 // re-broadcast (loop prevention).
 type CancelFunc func(cancel *SubscriberCancel)
 
-// GapFunc is called with topics for which a peer could not deliver one or more messages to this
-// node (its queue overflowed, or the request failed), plus the unix time of the oldest message
-// the peer lost (0 if it did not report one). The server replays that range for those topics,
-// or closes their subscribers so their clients replay with since=. GapAllTopics means "every
-// topic": too many topics to enumerate.
-type GapFunc func(topics []string, since int64)
-
-// GapAllTopics is the GapFunc marker for "gaps in so many topics that they are not worth
-// enumerating; treat every local subscriber as having missed something".
-const GapAllTopics = "*"
-
 // TopicsAddedFunc is called with topics a peer announced as having just gained their first
 // subscriber there. The server supplies it to drop cached negative rate-visitor lookups for
 // those topics; it must not re-broadcast (loop prevention). It is a cache hint only: a lost
@@ -74,11 +62,4 @@ type apiMessage struct {
 	Sender  string         `json:"sender,omitempty"`
 	User    string         `json:"user,omitempty"`
 	Message *model.Message `json:"message"`
-}
-
-// fragment is one pre-marshaled apiMessage line plus the topic it belongs to: a batch that is
-// dropped or rejected turns into a delivery gap, which is reported per topic (see GapFunc).
-type fragment struct {
-	topic string
-	data  []byte
 }

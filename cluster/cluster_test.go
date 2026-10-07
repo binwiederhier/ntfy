@@ -22,7 +22,7 @@ func TestDeliver_RoundTrip(t *testing.T) {
 	require.Nil(t, err)
 	frag2, err := marshalMessage(m2)
 	require.Nil(t, err)
-	messages, err := unmarshalMessageBody(assembleMessageBody([]*fragment{{topic: m1.Topic, data: frag1}, {topic: m2.Topic, data: frag2}}), 1<<20)
+	messages, err := unmarshalMessageBody(assembleMessageBody([][]byte{frag1, frag2}), 1<<20)
 	require.Nil(t, err)
 	require.Len(t, messages, 2)
 	require.Equal(t, "mytopic", messages[0].Topic)
@@ -38,7 +38,7 @@ func TestDeliver_SingleMessage(t *testing.T) {
 	// A single message is just a one-line body; there is no separate single-message format
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
-	messages, err := unmarshalMessageBody(assembleMessageBody([]*fragment{{topic: "mytopic", data: frag}}), 1<<20)
+	messages, err := unmarshalMessageBody(assembleMessageBody([][]byte{frag}), 1<<20)
 	require.Nil(t, err)
 	require.Len(t, messages, 1)
 }

@@ -2098,6 +2098,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Support a timezone for delayed notifications via the `X-Timezone` header, `timezone` query parameter or JSON field, e.g. `At: tomorrow, 10am` with `Timezone: Asia/Tokyo`; the web app sends the browser's timezone automatically ([#1967](https://github.com/binwiederhier/ntfy/pull/1967)/[#1924](https://github.com/binwiederhier/ntfy/issues/1924), thanks to [@beemines](https://github.com/beemines) for the contribution)
+* Support RFC 3339 timestamps for delayed notifications, e.g. `Delay: 2026-09-02T10:00:00Z` or `At: 2021-12-10T11:00:00-05:00`, to schedule a message at a precise point in time ([#1931](https://github.com/binwiederhier/ntfy/pull/1931), thanks to [@ALPHACOM-Brehmer](https://github.com/ALPHACOM-Brehmer) for the contribution)
 * Support [iOS critical alerts](publish.md#ios-critical-alerts) via the `X-Apple-(Critical|Sound|Volume)` headers: the publisher decides whether a message breaks through Focus, Do Not Disturb and the mute switch; without the header, max priority (5) messages are delivered as critical alerts ([#1235](https://github.com/binwiederhier/ntfy/issues/1235))
 
 **Bug fixes + maintenance:**
@@ -2108,6 +2109,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Fix `since=<message-id>` replays flooding a client with a topic's entire retained history when the ID was not on the read replica yet (a client reconnecting right after receiving a message); the ID is now resolved on the primary in that case
 * Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
 * Detect Markdown when the `Content-Type` header has parameters or is uppercase, e.g. `text/markdown; charset=utf-8` ([#1995](https://github.com/binwiederhier/ntfy/pull/1995), thanks to [@cipherprofessor](https://github.com/cipherprofessor) for the contribution)
+* Fix the built-in Alertmanager template showing a bogus `0001-01-01` end time for firing alerts and joining a resolved alert's start and end times onto one line ([#1946](https://github.com/binwiederhier/ntfy/pull/1946)/[#1940](https://github.com/binwiederhier/ntfy/issues/1940), thanks to [@justadityaraj](https://github.com/justadityaraj) for the contribution and [@deferred](https://github.com/deferred) for reporting)
+* Groundwork for horizontal scaling: merged the first building blocks for running multiple ntfy servers as a cluster (node registry, util primitives, reserved experimental config options); clustering is not usable yet ([#1991](https://github.com/binwiederhier/ntfy/pull/1991), [#1997](https://github.com/binwiederhier/ntfy/pull/1997), [#2001](https://github.com/binwiederhier/ntfy/pull/2001), [#2003](https://github.com/binwiederhier/ntfy/pull/2003))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

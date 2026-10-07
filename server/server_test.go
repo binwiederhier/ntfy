@@ -4484,12 +4484,29 @@ bar`, m.Title)
 }
 
 var (
+	//go:embed testdata/webhook_alertmanager_firing.json
+	alertmanagerFiringJSON string
+
 	//go:embed testdata/webhook_github_comment_created.json
 	githubCommentCreatedJSON string
 
 	//go:embed testdata/webhook_github_issue_opened.json
 	githubIssueOpenedJSON string
 )
+
+func TestServer_MessageTemplate_FromNamedTemplate_Alertmanager(t *testing.T) {
+	s := &Server{config: NewConfig()}
+	s.config.TemplateDir = "templates"
+	m := &model.Message{}
+	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", alertmanagerFiringJSON))
+	require.NotContains(t, m.Message, "Ends at:")
+
+	resolvedJSON := strings.ReplaceAll(alertmanagerFiringJSON, `"status": "firing"`, `"status": "resolved"`)
+	resolvedJSON = strings.Replace(resolvedJSON, "0001-01-01T00:00:00Z", "2025-07-17T07:30:00Z", 1)
+	m = &model.Message{}
+	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", resolvedJSON))
+	require.Contains(t, m.Message, "Starts at: 2025-07-17T07:00:00Z\nEnds at: 2025-07-17T07:30:00Z")
+}
 
 func TestServer_MessageTemplate_FromNamedTemplate_GitHubCommentCreated(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {

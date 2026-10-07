@@ -49,6 +49,9 @@ ADD ./attachment ./attachment
 ADD ./mail ./mail
 ADD ./s3 ./s3
 ADD ./action ./action
+ADD ./ban ./ban
+ADD ./metrics ./metrics
+ADD ./twilio ./twilio
 ADD ./template/gotext ./template/gotext
 
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server

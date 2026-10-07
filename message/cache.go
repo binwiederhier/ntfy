@@ -339,6 +339,19 @@ func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
 	return readMessages(rows)
 }
 
+// MessagesDue returns all messages that are due for publishing. On Postgres it CLAIMS them, so
+// every node may call it, leader or not: each row is handed to exactly one caller.
+func (c *Cache) MessagesDue() ([]*model.Message, error) {
+	if c.queries.selectMessagesDueForUpdate != "" {
+		return c.claimMessagesDue()
+	}
+	rows, err := c.db.Query(c.queries.selectMessagesDue, time.Now().Unix())
+	if err != nil {
+		return nil, err
+	}
+	return readMessages(rows)
+}
+
 // claimMessagesDue claims due rows with FOR UPDATE SKIP LOCKED and marks them published in the
 // same transaction, so concurrent senders on other nodes get disjoint sets rather than all
 // delivering the same message. Marking at claim time rather than after delivery keeps the row
@@ -368,19 +381,6 @@ func (c *Cache) claimMessagesDue() ([]*model.Message, error) {
 		return nil, err
 	}
 	return messages, nil
-}
-
-// MessagesDue returns all messages that are due for publishing. On Postgres it CLAIMS them, so
-// every node may call it, leader or not: each row is handed to exactly one caller.
-func (c *Cache) MessagesDue() ([]*model.Message, error) {
-	if c.queries.selectMessagesDueForUpdate != "" {
-		return c.claimMessagesDue()
-	}
-	rows, err := c.db.Query(c.queries.selectMessagesDue, time.Now().Unix())
-	if err != nil {
-		return nil, err
-	}
-	return readMessages(rows)
 }
 
 // DeleteExpiredMessages deletes up to `limit` expired messages in a single query

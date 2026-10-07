@@ -120,7 +120,7 @@ func TestMesh_PeerAPI_Auth(t *testing.T) {
 	defer mesh.Close()
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "hi"))
 	require.Nil(t, err)
-	payload := assembleMessageBody([]*fragment{{topic: "mytopic", data: frag}})
+	payload := assembleMessageBody([][]byte{frag})
 
 	// Wrong secret -> 401, not delivered
 	rr := httptest.NewRecorder()
@@ -167,7 +167,7 @@ func TestMesh_PeerAPI_SelfOrigin(t *testing.T) {
 	// A request that carries this node's own broadcasts must not be re-delivered (loop prevention)
 	frag, err := marshalMessage(model.NewDefaultMessage("mytopic", "loop"))
 	require.Nil(t, err)
-	payload := assembleMessageBody([]*fragment{{topic: "mytopic", data: frag}})
+	payload := assembleMessageBody([][]byte{frag})
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", MessagePath, strings.NewReader(string(payload)))
 	req.Header.Set(secretHeader, testSecret)

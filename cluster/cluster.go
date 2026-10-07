@@ -56,6 +56,10 @@ const (
 	contentTypeJSON   = "application/json"
 )
 
+// tag is the log tag for everything cluster-related, so "tag=cluster -> trace" turns on
+// per-message decisions without raising the level anywhere else
+const tag = "cluster"
+
 const (
 	defaultHeartbeatInterval = 3 * time.Second  // How often a node refreshes its registry heartbeat
 	defaultNodeTTL           = 30 * time.Second // A node counts as live if its heartbeat is newer than this; generous to avoid false-dead flapping (see plans)

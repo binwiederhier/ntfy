@@ -28,7 +28,6 @@ const (
 	batchMaxMessages  = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes     = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes     = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
-	tag               = "cluster"
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -364,7 +363,11 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	defer c.wg.Done()
 	for frags := range q.queue.Dequeue() {
-		body := assembleMessageBody(frags)
+		lines := make([][]byte, len(frags))
+		for i, f := range frags {
+			lines[i] = f.data
+		}
+		body := assembleMessageBody(lines)
 		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(frags), len(body), nodeID)
 		if err := c.postToPeer(nodeID, messageURL(q.advertiseURL), contentTypeNDJSON, body); err != nil {
 			c.recordGap(nodeID, fragmentTopics(frags), fragmentOldest(frags))

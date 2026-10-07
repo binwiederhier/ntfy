@@ -783,10 +783,9 @@ func TestStore_AddMessages_AllFields(t *testing.T) {
 }
 
 func TestPostgresStore_AddMessages_OneRoundTripPerBatch(t *testing.T) {
-	// The batch writer is the only writer, so its speed caps the publish rate on cron bursts. With
-	// one INSERT per row, a batch of 100 against a remote database costs 100+ round trips.
-	const latency = 10 * time.Millisecond
-	testDB := dbtest.CreateTestPostgresWithLatency(t, latency)
+	// The batch writer is the only writer, so its round trips cap the publish rate on cron bursts.
+	// With one INSERT per row, a batch of 100 against a remote database costs 100+ round trips.
+	testDB, proxy := dbtest.CreateTestPostgresWithLatency(t, time.Millisecond)
 	s, err := message.NewPostgresStore(testDB, 0, 0)
 	require.Nil(t, err)
 	msgs := make([]*model.Message, 0)
@@ -794,10 +793,10 @@ func TestPostgresStore_AddMessages_OneRoundTripPerBatch(t *testing.T) {
 		msgs = append(msgs, model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i)))
 	}
 	require.Nil(t, s.AddMessages(msgs[:1])) // Warm up the pool connection
-	start := time.Now()
+	before := proxy.Requests()
 	require.Nil(t, s.AddMessages(msgs[1:]))
-	took := time.Since(start)
-	require.Less(t, took, 10*latency, "writing 99 messages took %v", took)
+	roundTrips := proxy.Requests() - before
+	require.Less(t, roundTrips, int64(10), "writing 99 messages took %d round trips", roundTrips)
 
 	messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
 	require.Nil(t, err)

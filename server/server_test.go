@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -4934,21 +4935,21 @@ func TestServer_UpdateScheduledMessage_SequenceIDParam(t *testing.T) {
 
 func TestServer_PublishWithoutSequenceID_NoDatabaseRoundTrip(t *testing.T) {
 	// A message without a client-provided sequence ID gets its own fresh ID as sequence ID, so no
-	// scheduled message can share it; publishing it must not wait for the database. Each round
-	// trip costs latency here, like against a remote database.
-	const latency = 50 * time.Millisecond
-	conf := newTestConfig(t, dbtest.WithLatency(t, dbtest.CreateTestPostgresSchema(t), latency))
+	// scheduled message can share it; publishing it must not wait for the database. The proxy
+	// counts database requests, so the assertion does not depend on the speed of the test host.
+	proxy := dbtest.NewLatencyProxy(t, dbtest.CreateTestPostgresSchema(t), time.Millisecond)
+	conf := newTestConfig(t, proxy.DSN())
 	conf.CacheBatchSize = 10
 	conf.CacheBatchTimeout = 100 * time.Millisecond
 	conf.AuthAccessCacheEnabled = true // Like on high-volume servers; otherwise the ACL check is a round trip
 	s := newTestServer(t, conf)
 	request(t, s, "PUT", "/mytopic", "warm up", nil)
+	time.Sleep(300 * time.Millisecond) // Let the warm-up batch and its ACL cache reload settle
 
-	start := time.Now()
+	before := proxy.Requests()
 	response := request(t, s, "PUT", "/mytopic", "hi", nil)
-	took := time.Since(start)
 	require.Equal(t, 200, response.Code)
-	require.Less(t, took, latency, "publish took %v", took)
+	require.Equal(t, int64(0), proxy.Requests()-before, "publish made database round trips")
 
 	// The message still reaches the database
 	require.Eventually(t, func() bool {
@@ -5663,4 +5664,79 @@ func TestServer_StopIsBoundedWhenAStoreBlocks(t *testing.T) {
 	case <-time.After(60 * time.Second):
 		t.Fatal("Stop did not return while a store was stuck")
 	}
+}
+
+func TestServer_PublishTimezone(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		for _, zone := range []string{"Asia/Tokyo", "America/New_York", "UTC"} {
+			for _, transport := range []string{"header", "x-header", "query", "json"} {
+				t.Run(zone+"/"+transport, func(t *testing.T) {
+					s := newTestServer(t, newTestConfig(t, databaseURL))
+					location, err := time.LoadLocation(zone)
+					require.NoError(t, err)
+					tomorrow := func() int64 {
+						now := time.Now().In(location)
+						return time.Date(now.Year(), now.Month(), now.Day()+1, 10, 0, 0, 0, location).Unix()
+					}
+					path, body := "/mytopic", "a message"
+					headers := map[string]string{"Delay": "tomorrow 10am"}
+					switch transport {
+					case "header":
+						headers["Timezone"] = zone
+					case "x-header":
+						headers["X-Timezone"] = zone
+					case "query":
+						path += "?timezone=" + url.QueryEscape(zone)
+					case "json":
+						path = "/"
+						body = fmt.Sprintf(`{"topic":"mytopic","message":"a message","delay":"tomorrow 10am","timezone":%q}`, zone)
+						headers = nil
+					}
+					before := tomorrow()
+					response := request(t, s, "POST", path, body, headers)
+					require.Equal(t, 200, response.Code, response.Body.String())
+					message := toMessage(t, response.Body.String())
+					require.Contains(t, []int64{before, tomorrow()}, message.Time)
+				})
+			}
+		}
+	})
+}
+
+func TestServer_PublishTimezoneRelativeAndUnix(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for _, delay := range []string{"1h", fmt.Sprint(time.Now().Add(time.Hour).Unix())} {
+			before := time.Now().Add(time.Hour).Unix()
+			response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+				"Delay": delay, "Timezone": "Asia/Tokyo",
+			})
+			require.Equal(t, 200, response.Code, response.Body.String())
+			require.InDelta(t, before, toMessage(t, response.Body.String()).Time, 2)
+		}
+	})
+}
+
+func TestServer_PublishTimezoneInvalid(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for _, zone := range []string{"Unknown/Timezone", "../etc/passwd", "+09:00"} {
+			response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+				"Delay": "1h", "Timezone": zone,
+			})
+			require.Equal(t, 400, response.Code)
+			require.Equal(t, errHTTPBadRequestTimezoneInvalid, toHTTPError(t, response.Body.String()))
+		}
+	})
+}
+
+func TestServer_PublishTimezoneWithoutDelay(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+			"Timezone": "Unknown/Timezone",
+		})
+		require.Equal(t, 200, response.Code)
+		require.InDelta(t, time.Now().Unix(), toMessage(t, response.Body.String()).Time, 2)
+	})
 }

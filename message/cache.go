@@ -33,8 +33,8 @@ const (
 	// Every buffered batch must be written within closeFlushTimeout on shutdown.
 	queueBufferedBatches = 100
 
-	// insertMessagesMaxRows caps the rows per multi-row INSERT, keeping the parameter count well
-	// below PostgreSQL's 65535 and SQLite's 32766
+	// insertMessagesMaxRows caps the rows per multi-row SQLite INSERT, keeping the parameter count
+	// well below SQLite's 32766. PostgreSQL takes the whole batch as arrays in one statement.
 	insertMessagesMaxRows = 1000
 )
 
@@ -42,7 +42,7 @@ var errNoRows = errors.New("no rows found")
 
 // queries holds the database-specific SQL queries
 type queries struct {
-	insertMessages                   func(rows int) string // Multi-row INSERT for the given number of rows
+	insertMessages                   func(tx *sql.Tx, rows [][]any) error // Writes message rows (insertMessageArgs order) in as few statements as possible
 	selectScheduledMessageIDsBySeqID string
 	deleteScheduledBySequenceID      string
 	updateMessagesForTopicExpiry     string
@@ -147,25 +147,18 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 	return nil
 }
 
-// insertMessages writes the messages with as few statements as possible: against a remote
+// insertMessages writes the messages through the backend's batch insert: against a remote
 // database, every statement is a round trip, and the batch writer is the only writer
-func insertMessages(tx *sql.Tx, query func(rows int) string, ms []*model.Message) error {
-	for len(ms) > 0 {
-		chunk := ms[:min(len(ms), insertMessagesMaxRows)]
-		ms = ms[len(chunk):]
-		args := make([]any, 0)
-		for _, m := range chunk {
-			rowArgs, err := insertMessageArgs(m)
-			if err != nil {
-				return err
-			}
-			args = append(args, rowArgs...)
-		}
-		if _, err := tx.Exec(query(len(chunk)), args...); err != nil {
+func insertMessages(tx *sql.Tx, insert func(tx *sql.Tx, rows [][]any) error, ms []*model.Message) error {
+	rows := make([][]any, 0, len(ms))
+	for _, m := range ms {
+		row, err := insertMessageArgs(m)
+		if err != nil {
 			return err
 		}
+		rows = append(rows, row)
 	}
-	return nil
+	return insert(tx, rows)
 }
 
 // insertMessagesQuery builds a multi-row INSERT into table for rows rows of columns, with

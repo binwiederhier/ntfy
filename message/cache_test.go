@@ -766,6 +766,30 @@ func TestPostgresStore_AddMessages_OneRoundTripPerBatch(t *testing.T) {
 	require.Equal(t, 100, len(messages))
 }
 
+func TestPostgresStore_AddMessages_OnePreparedStatementForAnyBatchSize(t *testing.T) {
+	// pgx prepares every distinct statement text server-side and keeps up to 512 per connection.
+	// A multi-row INSERT whose text depends on the batch size leaves hundreds of multi-MB plans
+	// in every pooled backend (ntfy.sh primary memory crept from 50% to 65% in 3h after 2.29.0).
+	testDB := dbtest.CreateTestPostgres(t)
+	testDB.Primary().SetMaxOpenConns(1) // Every statement lands on the same backend
+	s, err := message.NewPostgresStore(testDB, 0, 0)
+	require.Nil(t, err)
+	for _, size := range []int{1, 2, 50, 300} {
+		msgs := make([]*model.Message, 0)
+		for i := 0; i < size; i++ {
+			msgs = append(msgs, model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i)))
+		}
+		require.Nil(t, s.AddMessages(msgs))
+	}
+	var prepared int
+	require.Nil(t, testDB.Primary().QueryRow("SELECT COUNT(*) FROM pg_prepared_statements WHERE statement LIKE 'INSERT INTO message %'").Scan(&prepared))
+	require.Equal(t, 1, prepared, "one INSERT shape regardless of batch size")
+
+	messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 353, len(messages))
+}
+
 func TestStore_MessagesDue(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, s *message.Cache) {
 		// Add a message scheduled in the past (i.e. it's due now)

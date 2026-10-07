@@ -1,7 +1,9 @@
 package message
 
 import (
+	"database/sql"
 	"strconv"
+	"strings"
 	"time"
 
 	"heckel.io/ntfy/v2/db"
@@ -113,12 +115,44 @@ func NewPostgresStore(d *db.DB, batchSize int, batchTimeout time.Duration) (*Cac
 	return newCache(d, postgresQueries, nil, batchSize, batchTimeout, false), nil
 }
 
-// postgresInsertMessageColumns lists the message columns in the order insertMessageArgs fills them
-var postgresInsertMessageColumns = []string{"mid", "sequence_id", "time", "event", "expires", "topic", "message", "title", "priority", "tags", "click", "icon", "actions", "attachment_name", "attachment_type", "attachment_size", "attachment_expires", "attachment_url", "attachment_deleted", "sender", "user_id", "content_type", "encoding", "published"}
+// postgresInsertMessageColumns lists the message columns, with their SQL type, in the order
+// insertMessageArgs fills them
+var postgresInsertMessageColumns = []postgresColumn{
+	{"mid", "TEXT"}, {"sequence_id", "TEXT"}, {"time", "BIGINT"}, {"event", "TEXT"}, {"expires", "BIGINT"},
+	{"topic", "TEXT"}, {"message", "TEXT"}, {"title", "TEXT"}, {"priority", "INT"}, {"tags", "TEXT"},
+	{"click", "TEXT"}, {"icon", "TEXT"}, {"actions", "TEXT"}, {"attachment_name", "TEXT"}, {"attachment_type", "TEXT"},
+	{"attachment_size", "BIGINT"}, {"attachment_expires", "BIGINT"}, {"attachment_url", "TEXT"}, {"attachment_deleted", "BOOLEAN"},
+	{"sender", "TEXT"}, {"user_id", "TEXT"}, {"content_type", "TEXT"}, {"encoding", "TEXT"}, {"published", "BOOLEAN"},
+}
 
-// postgresInsertMessages returns a multi-row INSERT for the given number of message rows
-func postgresInsertMessages(rows int) string {
-	return insertMessagesQuery("message", postgresInsertMessageColumns, rows, func(i int) string {
-		return "$" + strconv.Itoa(i)
-	})
+// postgresInsertMessagesQuery inserts any number of rows from one array parameter per column. The
+// statement text is the same for every batch size: pgx prepares each distinct text server-side
+// and keeps up to 512 per connection, and a multi-row INSERT per size left hundreds of multi-MB
+// plans in every pooled backend.
+var postgresInsertMessagesQuery = func() string {
+	names, arrays := make([]string, 0, len(postgresInsertMessageColumns)), make([]string, 0, len(postgresInsertMessageColumns))
+	for i, c := range postgresInsertMessageColumns {
+		names = append(names, c.name)
+		arrays = append(arrays, "$"+strconv.Itoa(i+1)+"::"+c.sqlType+"[]")
+	}
+	return "INSERT INTO message (" + strings.Join(names, ", ") + ") SELECT * FROM unnest(" + strings.Join(arrays, ", ") + ")"
+}()
+
+type postgresColumn struct {
+	name    string
+	sqlType string
+}
+
+// postgresInsertMessages writes all rows in one statement, transposed into one array per column
+func postgresInsertMessages(tx *sql.Tx, rows [][]any) error {
+	args := make([]any, len(postgresInsertMessageColumns))
+	for i := range postgresInsertMessageColumns {
+		column := make([]any, 0, len(rows))
+		for _, row := range rows {
+			column = append(column, row[i])
+		}
+		args[i] = column
+	}
+	_, err := tx.Exec(postgresInsertMessagesQuery, args...)
+	return err
 }

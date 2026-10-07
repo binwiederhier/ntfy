@@ -2122,6 +2122,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.29.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Fix PostgreSQL backend memory growing after v2.29.0: the batch `INSERT` had a different statement text for every batch size, and the driver prepares each distinct text server-side (up to 512 per connection), so long-lived pool connections accumulated hundreds of multi-MB plans. Batches are now written with one fixed statement (`unnest` of one array per column) regardless of size
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

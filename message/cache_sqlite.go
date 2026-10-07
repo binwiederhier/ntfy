@@ -145,9 +145,21 @@ func createMemoryFilename() string {
 // sqliteInsertMessageColumns lists the message columns in the order insertMessageArgs fills them
 var sqliteInsertMessageColumns = []string{"mid", "sequence_id", "time", "event", "expires", "topic", "message", "title", "priority", "tags", "click", "icon", "actions", "attachment_name", "attachment_type", "attachment_size", "attachment_expires", "attachment_url", "attachment_deleted", "sender", "user", "content_type", "encoding", "published"}
 
-// sqliteInsertMessages returns a multi-row INSERT for the given number of message rows
-func sqliteInsertMessages(rows int) string {
-	return insertMessagesQuery("messages", sqliteInsertMessageColumns, rows, func(int) string {
-		return "?"
-	})
+// sqliteInsertMessages writes the rows as multi-row INSERTs of at most insertMessagesMaxRows each
+func sqliteInsertMessages(tx *sql.Tx, rows [][]any) error {
+	for len(rows) > 0 {
+		chunk := rows[:min(len(rows), insertMessagesMaxRows)]
+		rows = rows[len(chunk):]
+		args := make([]any, 0, len(chunk)*len(sqliteInsertMessageColumns))
+		for _, row := range chunk {
+			args = append(args, row...)
+		}
+		query := insertMessagesQuery("messages", sqliteInsertMessageColumns, len(chunk), func(int) string {
+			return "?"
+		})
+		if _, err := tx.Exec(query, args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }

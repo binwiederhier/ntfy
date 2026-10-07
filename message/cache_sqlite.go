@@ -142,19 +142,29 @@ func createMemoryFilename() string {
 	return fmt.Sprintf("file:%s?mode=memory&cache=shared", util.RandomString(10))
 }
 
-// sqliteInsertMessageColumns lists the message columns in the order insertMessageArgs fills them
-var sqliteInsertMessageColumns = []string{"mid", "sequence_id", "time", "event", "expires", "topic", "message", "title", "priority", "tags", "click", "icon", "actions", "attachment_name", "attachment_type", "attachment_size", "attachment_expires", "attachment_url", "attachment_deleted", "sender", "user", "content_type", "encoding", "published"}
+// sqliteInsertColumnNames maps the row's column names to the SQLite table's where they differ
+var sqliteInsertColumnNames = map[string]string{"user_id": "user"}
 
 // sqliteInsertMessages writes the rows as multi-row INSERTs of at most insertMessagesMaxRows each
-func sqliteInsertMessages(tx *sql.Tx, rows [][]any) error {
+func sqliteInsertMessages(tx *sql.Tx, rows [][]insertValue) error {
+	columns := make([]string, 0, len(rows[0]))
+	for _, v := range rows[0] {
+		if name, ok := sqliteInsertColumnNames[v.column]; ok {
+			columns = append(columns, name)
+		} else {
+			columns = append(columns, v.column)
+		}
+	}
 	for len(rows) > 0 {
 		chunk := rows[:min(len(rows), insertMessagesMaxRows)]
 		rows = rows[len(chunk):]
-		args := make([]any, 0, len(chunk)*len(sqliteInsertMessageColumns))
+		args := make([]any, 0, len(chunk)*len(columns))
 		for _, row := range chunk {
-			args = append(args, row...)
+			for _, v := range row {
+				args = append(args, v.value)
+			}
 		}
-		query := insertMessagesQuery("messages", sqliteInsertMessageColumns, len(chunk), func(int) string {
+		query := insertMessagesQuery("messages", columns, len(chunk), func(int) string {
 			return "?"
 		})
 		if _, err := tx.Exec(query, args...); err != nil {

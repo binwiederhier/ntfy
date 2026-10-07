@@ -42,7 +42,7 @@ var errNoRows = errors.New("no rows found")
 
 // queries holds the database-specific SQL queries
 type queries struct {
-	insertMessages                   func(tx *sql.Tx, rows [][]any) error // Writes message rows (insertMessageArgs order) in as few statements as possible
+	insertMessages                   func(tx *sql.Tx, rows [][]insertValue) error // Writes message rows in as few statements as possible
 	selectScheduledMessageIDsBySeqID string
 	deleteScheduledBySequenceID      string
 	updateMessagesForTopicExpiry     string
@@ -65,6 +65,16 @@ type queries struct {
 	selectStats                      string
 	updateStats                      string
 	updateMessageTime                string
+}
+
+// insertValue is one column of a message row to insert: the column name, its PostgreSQL type
+// (for the array casts in the batch insert) and the value. A row carries its own column names,
+// so the backends build their statements from the row and there is no column order to keep in
+// sync with the values.
+type insertValue struct {
+	column  string
+	sqlType string
+	value   any
 }
 
 // Cache stores published messages
@@ -149,14 +159,17 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 
 // insertMessages writes the messages through the backend's batch insert: against a remote
 // database, every statement is a round trip, and the batch writer is the only writer
-func insertMessages(tx *sql.Tx, insert func(tx *sql.Tx, rows [][]any) error, ms []*model.Message) error {
-	rows := make([][]any, 0, len(ms))
+func insertMessages(tx *sql.Tx, insert func(tx *sql.Tx, rows [][]insertValue) error, ms []*model.Message) error {
+	rows := make([][]insertValue, 0, len(ms))
 	for _, m := range ms {
-		row, err := insertMessageArgs(m)
+		row, err := insertMessageValues(m)
 		if err != nil {
 			return err
 		}
 		rows = append(rows, row)
+	}
+	if len(rows) == 0 {
+		return nil
 	}
 	return insert(tx, rows)
 }
@@ -182,8 +195,8 @@ func insertMessagesQuery(table string, columns []string, rows int, placeholder f
 	return b.String()
 }
 
-// insertMessageArgs returns the values of one message row, in the order of the backend's insert columns
-func insertMessageArgs(m *model.Message) ([]any, error) {
+// insertMessageValues returns one message as a row of column names, types and values
+func insertMessageValues(m *model.Message) ([]insertValue, error) {
 	if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
 		return nil, model.ErrUnexpectedMessageType
 	}
@@ -211,31 +224,31 @@ func insertMessageArgs(m *model.Message) ([]any, error) {
 	if m.Sender.IsValid() {
 		sender = m.Sender.String()
 	}
-	return []any{
-		m.ID,
-		m.SequenceID,
-		m.Time,
-		m.Event,
-		m.Expires,
-		util.SanitizeUTF8(m.Topic),
-		util.SanitizeUTF8(m.Message),
-		util.SanitizeUTF8(m.Title),
-		m.Priority,
-		tags,
-		util.SanitizeUTF8(m.Click),
-		util.SanitizeUTF8(m.Icon),
-		actionsStr,
-		attachmentName,
-		attachmentType,
-		attachmentSize,
-		attachmentExpires,
-		attachmentURL,
-		attachmentDeleted, // Always zero
-		sender,
-		m.User,
-		util.SanitizeUTF8(m.ContentType),
-		m.Encoding,
-		published,
+	return []insertValue{
+		{"mid", "TEXT", m.ID},
+		{"sequence_id", "TEXT", m.SequenceID},
+		{"time", "BIGINT", m.Time},
+		{"event", "TEXT", m.Event},
+		{"expires", "BIGINT", m.Expires},
+		{"topic", "TEXT", util.SanitizeUTF8(m.Topic)},
+		{"message", "TEXT", util.SanitizeUTF8(m.Message)},
+		{"title", "TEXT", util.SanitizeUTF8(m.Title)},
+		{"priority", "INT", m.Priority},
+		{"tags", "TEXT", tags},
+		{"click", "TEXT", util.SanitizeUTF8(m.Click)},
+		{"icon", "TEXT", util.SanitizeUTF8(m.Icon)},
+		{"actions", "TEXT", actionsStr},
+		{"attachment_name", "TEXT", attachmentName},
+		{"attachment_type", "TEXT", attachmentType},
+		{"attachment_size", "BIGINT", attachmentSize},
+		{"attachment_expires", "BIGINT", attachmentExpires},
+		{"attachment_url", "TEXT", attachmentURL},
+		{"attachment_deleted", "BOOLEAN", attachmentDeleted}, // Always zero
+		{"sender", "TEXT", sender},
+		{"user_id", "TEXT", m.User},
+		{"content_type", "TEXT", util.SanitizeUTF8(m.ContentType)},
+		{"encoding", "TEXT", m.Encoding},
+		{"published", "BOOLEAN", published},
 	}, nil
 }
 

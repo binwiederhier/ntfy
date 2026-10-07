@@ -115,44 +115,23 @@ func NewPostgresStore(d *db.DB, batchSize int, batchTimeout time.Duration) (*Cac
 	return newCache(d, postgresQueries, nil, batchSize, batchTimeout, false), nil
 }
 
-// postgresInsertMessageColumns lists the message columns, with their SQL type, in the order
-// insertMessageArgs fills them
-var postgresInsertMessageColumns = []postgresColumn{
-	{"mid", "TEXT"}, {"sequence_id", "TEXT"}, {"time", "BIGINT"}, {"event", "TEXT"}, {"expires", "BIGINT"},
-	{"topic", "TEXT"}, {"message", "TEXT"}, {"title", "TEXT"}, {"priority", "INT"}, {"tags", "TEXT"},
-	{"click", "TEXT"}, {"icon", "TEXT"}, {"actions", "TEXT"}, {"attachment_name", "TEXT"}, {"attachment_type", "TEXT"},
-	{"attachment_size", "BIGINT"}, {"attachment_expires", "BIGINT"}, {"attachment_url", "TEXT"}, {"attachment_deleted", "BOOLEAN"},
-	{"sender", "TEXT"}, {"user_id", "TEXT"}, {"content_type", "TEXT"}, {"encoding", "TEXT"}, {"published", "BOOLEAN"},
-}
-
-// postgresInsertMessagesQuery inserts any number of rows from one array parameter per column. The
-// statement text is the same for every batch size: pgx prepares each distinct text server-side
-// and keeps up to 512 per connection, and a multi-row INSERT per size left hundreds of multi-MB
-// plans in every pooled backend.
-var postgresInsertMessagesQuery = func() string {
-	names, arrays := make([]string, 0, len(postgresInsertMessageColumns)), make([]string, 0, len(postgresInsertMessageColumns))
-	for i, c := range postgresInsertMessageColumns {
-		names = append(names, c.name)
-		arrays = append(arrays, "$"+strconv.Itoa(i+1)+"::"+c.sqlType+"[]")
-	}
-	return "INSERT INTO message (" + strings.Join(names, ", ") + ") SELECT * FROM unnest(" + strings.Join(arrays, ", ") + ")"
-}()
-
-type postgresColumn struct {
-	name    string
-	sqlType string
-}
-
-// postgresInsertMessages writes all rows in one statement, transposed into one array per column
-func postgresInsertMessages(tx *sql.Tx, rows [][]any) error {
-	args := make([]any, len(postgresInsertMessageColumns))
-	for i := range postgresInsertMessageColumns {
+// postgresInsertMessages writes all rows in one statement, transposed into one array parameter
+// per column: INSERT INTO message (c1, ...) SELECT * FROM unnest($1::T1[], ...). The statement
+// text is the same for every batch size: pgx prepares each distinct text server-side and keeps up
+// to 512 per connection, and a multi-row INSERT per size left hundreds of multi-MB plans in every
+// pooled backend. Building the text per batch is a few string joins, nothing next to the round trip.
+func postgresInsertMessages(tx *sql.Tx, rows [][]insertValue) error {
+	columns, arrays, args := make([]string, 0, len(rows[0])), make([]string, 0, len(rows[0])), make([]any, 0, len(rows[0]))
+	for i, v := range rows[0] {
 		column := make([]any, 0, len(rows))
 		for _, row := range rows {
-			column = append(column, row[i])
+			column = append(column, row[i].value)
 		}
-		args[i] = column
+		columns = append(columns, v.column)
+		arrays = append(arrays, "$"+strconv.Itoa(i+1)+"::"+v.sqlType+"[]")
+		args = append(args, column)
 	}
-	_, err := tx.Exec(postgresInsertMessagesQuery, args...)
+	query := "INSERT INTO message (" + strings.Join(columns, ", ") + ") SELECT * FROM unnest(" + strings.Join(arrays, ", ") + ")"
+	_, err := tx.Exec(query, args...)
 	return err
 }

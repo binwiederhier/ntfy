@@ -559,6 +559,43 @@ func TestStore_MarkPublished(t *testing.T) {
 	})
 }
 
+func TestStore_MessagesDue_ClaimExactlyOnce(t *testing.T) {
+	// Postgres-only: exercises "FOR UPDATE SKIP LOCKED" claiming so that concurrent delayed
+	// senders running on different cluster nodes never pick up (and deliver) the same due
+	// message twice. With the non-claiming implementation, every concurrent caller sees every
+	// due row, so this test fails; with claiming, each row is returned to exactly one caller.
+	s := newTestPostgresStore(t) // skips if NTFY_TEST_DATABASE_URL is unset
+	const n = 40
+	for i := 0; i < n; i++ {
+		m := model.NewDefaultMessage("mytopic", fmt.Sprintf("scheduled %d", i))
+		m.Time = time.Now().Add(time.Hour).Unix() // future -> stored as published=FALSE
+		require.Nil(t, s.AddMessage(m))
+		// Move the time into the past so the message is due now (but still unpublished)
+		require.Nil(t, s.UpdateMessageTime(m.ID, time.Now().Add(-time.Minute).Unix()))
+	}
+	var mu sync.Mutex
+	seen := make(map[string]int)
+	var wg sync.WaitGroup
+	for c := 0; c < 6; c++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			due, err := s.MessagesDue()
+			require.Nil(t, err)
+			mu.Lock()
+			defer mu.Unlock()
+			for _, m := range due {
+				seen[m.ID]++
+			}
+		}()
+	}
+	wg.Wait()
+	require.Len(t, seen, n) // every due message was claimed
+	for id, count := range seen {
+		require.Equalf(t, 1, count, "message %s was claimed %d times, want exactly 1", id, count)
+	}
+}
+
 func TestStore_ExpireMessages(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, s *message.Cache) {
 		// Add messages to two topics

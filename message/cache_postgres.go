@@ -74,7 +74,15 @@ const (
 	postgresSelectAttachmentsSizeByUserIDQuery = `SELECT COALESCE(SUM(attachment_size), 0) FROM message WHERE user_id = $1 AND attachment_expires >= $2`
 	postgresSelectAttachmentsWithSizesQuery    = `SELECT mid, attachment_size FROM message WHERE attachment_expires > $1 AND attachment_deleted = FALSE`
 
-	postgresSelectStatsQuery       = `SELECT value FROM message_stats WHERE key = 'messages'`
+	postgresSelectStatsQuery                = `SELECT value FROM message_stats WHERE key = 'messages'`
+	postgresSelectMessagesDueForUpdateQuery = `
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		FROM message
+		WHERE time <= $1 AND published = FALSE
+		ORDER BY time, id
+		FOR UPDATE SKIP LOCKED
+	`
+
 	postgresUpdateStatsQuery       = `UPDATE message_stats SET value = $1 WHERE key = 'messages'`
 	postgresUpdateMessageTimeQuery = `UPDATE message SET time = $1 WHERE mid = $2`
 )
@@ -92,6 +100,7 @@ var postgresQueries = queries{
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,
 	selectMessagesDue:                postgresSelectMessagesDueQuery,
+	selectMessagesDueForUpdate:       postgresSelectMessagesDueForUpdateQuery,
 	deleteExpiredMessages:            postgresDeleteExpiredMessagesQuery,
 	updateMessagePublished:           postgresUpdateMessagePublishedQuery,
 	selectMessagesCount:              postgresSelectMessagesCountQuery,

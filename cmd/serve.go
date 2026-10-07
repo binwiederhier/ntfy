@@ -43,6 +43,11 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-node-id", Aliases: []string{"experimental_cluster_node_id"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (required in cluster mode)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-listen", Aliases: []string{"experimental_cluster_listen"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_LISTEN"}, Usage: "ip:port for the dedicated cluster fan-out listener; bind it to the private network (e.g. 10.0.0.5:2587)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-advertise-url", Aliases: []string{"experimental_cluster_advertise_url"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out listener (defaults to http://<experimental-cluster-listen>)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-secret", Aliases: []string{"experimental_cluster_secret"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-batch-linger", Aliases: []string{"experimental_cluster_batch_linger"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER"}, Value: util.FormatDuration(server.DefaultClusterBatchLinger), Usage: "how long fan-out messages wait to form a batch per peer node (0 = send immediately)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
@@ -157,6 +162,11 @@ func execServe(c *cli.Context) error {
 	firebaseKeyFile := c.String("firebase-key-file")
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
+	clusterNodeID := c.String("experimental-cluster-node-id")
+	clusterListen := c.String("experimental-cluster-listen")
+	clusterAdvertiseURL := c.String("experimental-cluster-advertise-url")
+	clusterSecret := c.String("experimental-cluster-secret")
+	clusterBatchLingerStr := c.String("experimental-cluster-batch-linger")
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
 	webPushFile := c.String("web-push-file")
@@ -252,6 +262,10 @@ func execServe(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("invalid keepalive interval: %s", keepaliveIntervalStr)
 	}
+	clusterBatchLinger, err := util.ParseDuration(clusterBatchLingerStr)
+	if err != nil || clusterBatchLinger < 0 {
+		return fmt.Errorf("invalid cluster batch linger: %s", clusterBatchLingerStr)
+	}
 	managerInterval, err := util.ParseDuration(managerIntervalStr)
 	if err != nil {
 		return fmt.Errorf("invalid manager interval: %s", managerIntervalStr)
@@ -322,6 +336,20 @@ func execServe(c *cli.Context) error {
 		return errors.New("if database-url is set, auth-file, cache-file, and web-push-file must not be set")
 	} else if len(databaseReplicaURLs) > 0 && databaseURL == "" {
 		return errors.New("database-replica-urls can only be used if database-url is also set")
+	} else if clusterListen != "" && databaseURL == "" {
+		return errors.New("experimental-cluster-listen requires database-url to be set")
+	} else if clusterListen != "" && clusterSecret == "" {
+		return errors.New("experimental-cluster-listen requires experimental-cluster-secret to be set")
+	} else if clusterListen != "" && clusterNodeID == "" {
+		return errors.New("experimental-cluster-listen requires experimental-cluster-node-id to be set")
+	} else if clusterListen == "" && clusterSecret != "" {
+		return errors.New("experimental-cluster-secret can only be used if experimental-cluster-listen is set")
+	} else if clusterListen != "" && clusterAdvertiseURL == "" && wildcardAddr(clusterListen) {
+		return errors.New("experimental-cluster-advertise-url must be set if experimental-cluster-listen binds a wildcard address")
+	} else if clusterListen != "" {
+		// The options are reserved and validated, but no node-to-node implementation ships yet.
+		// Starting single-node with a cluster config would look like clustering is working.
+		return errors.New("experimental clustering is not available in this build yet; unset experimental-cluster-listen")
 	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if firebaseKeyFile != "" && !server.FirebaseAvailable {
@@ -559,6 +587,11 @@ func execServe(c *cli.Context) error {
 	conf.ProfileListenHTTP = profileListenHTTP
 	conf.DatabaseURL = databaseURL
 	conf.DatabaseReplicaURLs = databaseReplicaURLs
+	conf.ClusterNodeID = clusterNodeID
+	conf.ClusterListen = clusterListen
+	conf.ClusterAdvertiseURL = clusterAdvertiseURL
+	conf.ClusterSecret = clusterSecret
+	conf.ClusterBatchLinger = clusterBatchLinger
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey
 	conf.WebPushFile = webPushFile
@@ -747,4 +780,14 @@ func maybeFromMetadata(m map[string]any, key string) string {
 		return ""
 	}
 	return s
+}
+
+// wildcardAddr reports whether the given listen address binds all interfaces (e.g. ":2587",
+// "0.0.0.0:2587", "[::]:2587"), in which case peers cannot derive a reachable URL from it.
+func wildcardAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return true // Unparseable -> cannot derive a URL either
+	}
+	return host == "" || host == "0.0.0.0" || host == "::"
 }

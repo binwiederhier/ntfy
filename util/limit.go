@@ -4,6 +4,7 @@ import (
 	"errors"
 	"golang.org/x/time/rate"
 	"io"
+	"math"
 	"sync"
 	"time"
 )
@@ -240,4 +241,57 @@ func (w *LimitWriter) Write(p []byte) (n int, err error) {
 	n, err = w.w.Write(p)
 	w.written += int64(n)
 	return
+}
+
+// Burn forcibly consumes up to n tokens from the bucket, regardless of availability: the bucket
+// may go into debt (up to one burst), delaying future Allow calls until it replenishes. It
+// reflects consumption that happened elsewhere (on another cluster node), so it does not count
+// toward the limiter's own Value. This is the serialized way to burn: it holds the mutex, which
+// is what BurnTokens asks of its callers.
+func (l *RateLimiter) Burn(n int64) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	BurnTokens(l.limiter, n)
+}
+
+// BurnTokens forcibly consumes up to n tokens from the limiter, driving the bucket into debt
+// (future Allow calls fail until it replenishes). The debt is capped at one burst, so external
+// usage can drain the bucket but not lock a visitor out for an unbounded time. Reservations are
+// made in burst-sized chunks because ReserveN rejects requests larger than the burst.
+//
+// The cap is enforced per reservation rather than from a prior read of the available tokens,
+// because a read and a reservation are two operations: anything consuming the same limiter in
+// between makes the read stale, and the burn then lands deeper than one burst. A reservation's
+// delay is computed inside the limiter, atomically with the consumption, so cancelling the chunk
+// whose delay runs past one burst of replenishment holds the cap against any amount of ordinary
+// concurrent consumption.
+//
+// It does NOT make concurrent burns of the same limiter safe: two burners can each reserve a
+// chunk that looked acceptable, and the cap is then exceeded by about a chunk per racing burner
+// (measured roughly three bursts with 32 of them). Callers that burn one limiter from several
+// goroutines must serialize; RateLimiter.Burn does it with its own mutex, and ntfy burns peer
+// usage from a single flush loop.
+func BurnTokens(l *rate.Limiter, n int64) {
+	now := time.Now()
+	burst := int64(l.Burst())
+	limit := float64(l.Limit())
+	if burst <= 0 || limit <= 0 || math.IsInf(limit, 1) {
+		return // No bucket to burn, or an unlimited one that debt could not slow down anyway
+	}
+	maxDelay := time.Duration(float64(burst) / limit * float64(time.Second)) // One burst of debt
+	for n > 0 {
+		chunk := n
+		if chunk > burst {
+			chunk = burst
+		}
+		r := l.ReserveN(now, int(chunk))
+		if !r.OK() {
+			return
+		}
+		if r.DelayFrom(now) > maxDelay {
+			r.CancelAt(now) // This chunk would push the bucket past one burst of debt
+			return
+		}
+		n -= chunk
+	}
 }

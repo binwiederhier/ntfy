@@ -61,6 +61,37 @@
 #
 # database-url: <connection-string>
 
+# EXPERIMENTAL: Clustering options. These names are reserved and validated, but no node-to-node
+# implementation ships yet: a server started with "experimental-cluster-listen" set refuses to
+# start, rather than running single-node and looking like a cluster. The "experimental-" prefix
+# means these option names may still change.
+#
+# - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes
+#   talk to. Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners
+#   never serve the fan-out endpoint. Setting it is what enables clustering.
+# - experimental-cluster-node-id is a stable per-node identifier (e.g. the hostname); required.
+# - experimental-cluster-advertise-url is the base URL peer nodes use to reach this node's
+#   fan-out listener; it defaults to "http://<experimental-cluster-listen>". It must be set
+#   explicitly if the listen address binds a wildcard address (e.g. ":2587").
+# - experimental-cluster-secret authenticates node-to-node fan-out requests; it must be
+#   identical on all nodes.
+# - experimental-cluster-batch-linger is how long fan-out messages may wait to form a batch per
+#   peer node, trading up to that much cross-node delivery latency for a bounded request rate
+#   between nodes. Set to 0 to send each message immediately.
+#
+# Clustering also requires "database-url": the shared PostgreSQL database carries the durable
+# state and the cluster's own coordination tables.
+#
+# SECURITY: The fan-out endpoint injects messages into arbitrary topics. The shared secret
+# protects it, and it is only served on the dedicated cluster listener -- but you should still
+# make sure that listener is reachable only from the private network (firewall/VPC rules).
+#
+# experimental-cluster-listen: <ip:port>
+# experimental-cluster-node-id: <hostname>
+# experimental-cluster-advertise-url: "http://<ip:port>"
+# experimental-cluster-secret: <secret>
+# experimental-cluster-batch-linger: 500ms
+
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.
 # Not required if "database-url" is set (messages are stored in PostgreSQL instead).

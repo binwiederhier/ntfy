@@ -72,9 +72,19 @@ func fragmentOldest(frags []*fragment) int64 {
 // are skipped and logged, not fatal: fan-out is fire-and-forget, so the valid remainder of a
 // request is still delivered. It returns an error only for stream-level failures (e.g. a line
 // exceeding maxLineBytes).
+// initialScanBuffer is how much the NDJSON decoder allocates up front per batch; lines over it
+// grow the buffer up to the caller's limit.
+const initialScanBuffer = 64 * 1024
+
 func decodeMessageBody(r io.Reader, maxLineBytes int, deliver DeliverFunc) error {
 	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 64*1024), maxLineBytes)
+	// Two bufio details decide what actually gets enforced here. Its token limit is the LARGER
+	// of the max and the initial buffer, so a buffer bigger than the limit quietly raises it:
+	// with a 64KB buffer, a 17KB limit (what ntfy's default message size implies) accepted lines
+	// of up to 64KB. And the max is exclusive, so it takes one more byte to accept a line of
+	// exactly maxLineBytes, which is what the name promises.
+	maxToken := maxLineBytes + 1
+	scanner.Buffer(make([]byte, min(maxToken, initialScanBuffer)), maxToken)
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
 		if len(line) == 0 {

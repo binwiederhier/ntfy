@@ -2,9 +2,12 @@ package dbtest
 
 import (
 	"fmt"
+	"io"
+	"net"
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/db"
@@ -61,4 +64,72 @@ func CreateTestPostgres(t testing.TB) *db.DB {
 		d.Close()
 	})
 	return d
+}
+
+// CreateTestPostgresWithLatency is CreateTestPostgres, but every request the client sends reaches
+// the database latency later, so each database round trip costs at least latency (as it does
+// against a remote managed database). Use it to test how many round trips a code path makes.
+func CreateTestPostgresWithLatency(t *testing.T, latency time.Duration) *db.DB {
+	t.Helper()
+	testHost, err := pg.Open(WithLatency(t, CreateTestPostgresSchema(t), latency))
+	require.Nil(t, err)
+	d := db.New(testHost, nil)
+	t.Cleanup(func() {
+		d.Close()
+	})
+	return d
+}
+
+// WithLatency starts a local TCP proxy to the database in dsn that delays everything the client
+// sends by latency, and returns dsn pointing at the proxy. The proxy stops when the test ends.
+func WithLatency(t *testing.T, dsn string, latency time.Duration) string {
+	t.Helper()
+	u, err := url.Parse(dsn)
+	require.Nil(t, err)
+	upstream := u.Host
+	if u.Port() == "" {
+		upstream = net.JoinHostPort(u.Hostname(), "5432")
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	t.Cleanup(func() {
+		listener.Close()
+	})
+	go func() {
+		for {
+			client, err := listener.Accept()
+			if err != nil {
+				return // Listener closed
+			}
+			go proxyWithLatency(client, upstream, latency)
+		}
+	}()
+	u.Host = listener.Addr().String()
+	return u.String()
+}
+
+func proxyWithLatency(client net.Conn, upstream string, latency time.Duration) {
+	defer client.Close()
+	server, err := net.Dial("tcp", upstream)
+	if err != nil {
+		return
+	}
+	defer server.Close()
+	go func() {
+		io.Copy(client, server)
+		client.Close()
+	}()
+	buf := make([]byte, 64*1024)
+	for {
+		n, err := client.Read(buf)
+		if n > 0 {
+			time.Sleep(latency)
+			if _, err := server.Write(buf[:n]); err != nil {
+				return
+			}
+		}
+		if err != nil {
+			return
+		}
+	}
 }

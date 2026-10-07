@@ -15,10 +15,6 @@ import (
 
 // SQLite runtime query constants
 const (
-	sqliteInsertMessageQuery = `
-		INSERT INTO messages (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, published)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
 	sqliteSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM messages WHERE topic = ? AND sequence_id = ? AND published = 0`
 	sqliteDeleteScheduledBySequenceIDQuery      = `DELETE FROM messages WHERE topic = ? AND sequence_id = ? AND published = 0`
 	sqliteUpdateMessagesForTopicExpiryQuery     = `UPDATE messages SET expires = ? WHERE topic = ?`
@@ -81,7 +77,7 @@ const (
 )
 
 var sqliteQueries = queries{
-	insertMessage:                    sqliteInsertMessageQuery,
+	insertMessages:                   sqliteInsertMessages,
 	selectScheduledMessageIDsBySeqID: sqliteSelectScheduledMessageIDsBySeqIDQuery,
 	deleteScheduledBySequenceID:      sqliteDeleteScheduledBySequenceIDQuery,
 	updateMessagesForTopicExpiry:     sqliteUpdateMessagesForTopicExpiryQuery,
@@ -144,4 +140,14 @@ func NewNopStore() (*Cache, error) {
 // Every connection to this string will point to the same in-memory database."
 func createMemoryFilename() string {
 	return fmt.Sprintf("file:%s?mode=memory&cache=shared", util.RandomString(10))
+}
+
+// sqliteInsertMessageColumns lists the message columns in the order insertMessageArgs fills them
+var sqliteInsertMessageColumns = []string{"mid", "sequence_id", "time", "event", "expires", "topic", "message", "title", "priority", "tags", "click", "icon", "actions", "attachment_name", "attachment_type", "attachment_size", "attachment_expires", "attachment_url", "attachment_deleted", "sender", "user", "content_type", "encoding", "published"}
+
+// sqliteInsertMessages returns a multi-row INSERT for the given number of message rows
+func sqliteInsertMessages(rows int) string {
+	return insertMessagesQuery("messages", sqliteInsertMessageColumns, rows, func(int) string {
+		return "?"
+	})
 }

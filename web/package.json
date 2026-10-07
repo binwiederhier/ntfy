@@ -10,7 +10,8 @@
     "format:check": "prettier . --check",
     "lint": "eslint --report-unused-disable-directives --ext .js,.jsx ./src/",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@emotion/cache": "^11.11.0",
@@ -33,6 +34,7 @@
     "stylis-plugin-rtl": "^2.1.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^8.41.0",
     "eslint-config-airbnb": "^19.0.4",

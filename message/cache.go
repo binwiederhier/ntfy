@@ -28,6 +28,9 @@ const (
 	// shutdown must still finish well inside systemd's stop timeout.
 	closeFlushTimeout = 5 * time.Second
 
+	claimTimeout   = 2 * time.Minute // How long a claim hides a due message from other nodes; must exceed dispatching one claim
+	claimBatchSize = 1000            // Rows per claim, so the dispatch time that claimTimeout must cover is bounded
+
 	// queueBufferedBatches is how many full batches can wait for the batch writer before publishes
 	// block. 100 batches of the default 100 messages are ~10 MB typical, ~60 MB at the 4 KB limit.
 	// Every buffered batch must be written within closeFlushTimeout on shutdown.
@@ -54,7 +57,7 @@ type queries struct {
 	selectMessagesSinceIDScheduled   string
 	selectMessagesLatest             string
 	selectMessagesDue                string
-	selectMessagesDueForUpdate       string // Postgres-only: claims due rows via FOR UPDATE SKIP LOCKED; empty for SQLite/mem
+	claimMessagesDue                 string // Postgres-only: claims due rows and stamps claimed_at; empty for SQLite/mem
 	deleteExpiredMessages            string
 	updateMessagePublished           string
 	selectMessagesCount              string
@@ -76,6 +79,9 @@ type Cache struct {
 	nop     bool
 	mu      *sync.Mutex // nil for PostgreSQL (concurrent writes supported), set for SQLite (single writer)
 	queries queries
+	// claimTimeout is how long this node's claim on a due message holds off the others; it is a
+	// field only so tests can shorten it
+	claimTimeout time.Duration
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
@@ -84,12 +90,13 @@ func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTi
 		queue = util.NewBatchingQueue[*model.Message](batchSize, batchTimeout, queueBufferedBatches)
 	}
 	c := &Cache{
-		db:      db,
-		queue:   queue,
-		written: make(chan struct{}),
-		nop:     nop,
-		mu:      mu,
-		queries: queries,
+		db:           db,
+		queue:        queue,
+		written:      make(chan struct{}),
+		nop:          nop,
+		mu:           mu,
+		queries:      queries,
+		claimTimeout: claimTimeout,
 	}
 	go c.processMessageBatches()
 	return c
@@ -342,7 +349,7 @@ func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
 // MessagesDue returns all messages that are due for publishing. On Postgres it CLAIMS them, so
 // every node may call it, leader or not: each row is handed to exactly one caller.
 func (c *Cache) MessagesDue() ([]*model.Message, error) {
-	if c.queries.selectMessagesDueForUpdate != "" {
+	if c.queries.claimMessagesDue != "" {
 		return c.claimMessagesDue()
 	}
 	rows, err := c.db.Query(c.queries.selectMessagesDue, time.Now().Unix())
@@ -352,35 +359,21 @@ func (c *Cache) MessagesDue() ([]*model.Message, error) {
 	return readMessages(rows)
 }
 
-// claimMessagesDue claims due rows with FOR UPDATE SKIP LOCKED and marks them published in the
-// same transaction, so concurrent senders on other nodes get disjoint sets rather than all
-// delivering the same message. Marking at claim time rather than after delivery keeps the row
-// lock short: holding a transaction open across Firebase, web push and email delivery would
-// block every node behind one stuck delivery, which is worse than losing a message if this node
-// dies between the claim and the delivery.
+// claimMessagesDue stamps the due rows it takes, so concurrent senders on other nodes get
+// disjoint sets. The rows stay unpublished: MarkPublished still runs after delivery.
 func (c *Cache) claimMessagesDue() ([]*model.Message, error) {
-	tx, err := c.db.Begin()
+	now := time.Now().Unix()
+	rows, err := c.db.Query(c.queries.claimMessagesDue, now, now-int64(c.claimTimeout.Seconds()), claimBatchSize, now)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
-	rows, err := tx.Query(c.queries.selectMessagesDueForUpdate, time.Now().Unix())
-	if err != nil {
-		return nil, err
-	}
-	messages, err := readMessages(rows) // reads all rows and closes them
-	if err != nil {
-		return nil, err
-	}
-	for _, m := range messages {
-		if _, err := tx.Exec(c.queries.updateMessagePublished, m.ID); err != nil {
-			return nil, err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return messages, nil
+	return readMessages(rows) // Reads all rows and closes them
+}
+
+// SetClaimTimeoutForTest shortens the claim hold-off, so a test can see an abandoned claim
+// become claimable again without waiting out the real timeout.
+func (c *Cache) SetClaimTimeoutForTest(timeout time.Duration) {
+	c.claimTimeout = timeout
 }
 
 // DeleteExpiredMessages deletes up to `limit` expired messages in a single query

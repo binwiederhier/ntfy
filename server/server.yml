@@ -118,7 +118,7 @@
 #
 # Check your permissions:
 #   If you are running ntfy with systemd, make sure this cache file is owned by the
-#   ntfy user and group by running: chown ntfy.ntfy <filename>.
+#   ntfy user and group by running: chown ntfy:ntfy <filename>.
 #
 # cache-file: <filename>
 # cache-duration: "12h"
@@ -153,7 +153,7 @@
 #
 # Check your permissions:
 #   If you are running ntfy with systemd, make sure this user database file is owned by the
-#   ntfy user and group by running: chown ntfy.ntfy <filename>.
+#   ntfy user and group by running: chown ntfy:ntfy <filename>.
 #
 # auth-file: <filename>
 # auth-default-access: "read-write"
@@ -522,7 +522,7 @@
 #
 # Check your permissions:
 #   If you are running ntfy with systemd, make sure this log file is owned by the
-#   ntfy user and group by running: chown ntfy.ntfy <filename>.
+#   ntfy user and group by running: chown ntfy:ntfy <filename>.
 #
 # Example (good for production):
 #   log-level: info

@@ -25,11 +25,11 @@ v2.28.0, plus timezone and RFC 3339 support for delayed notifications.
 **Features:**
 
 * Support a timezone for delayed notifications via the `X-Timezone` header, `timezone` query parameter or JSON field, e.g. `At: tomorrow, 10am` with `Timezone: Asia/Tokyo`; the web app sends the browser's timezone automatically ([#1967](https://github.com/binwiederhier/ntfy/pull/1967)/[#1924](https://github.com/binwiederhier/ntfy/issues/1924), thanks to [@beemines](https://github.com/beemines) for the contribution)
-* Support RFC 3339 timestamps for delayed notifications, e.g. `Delay: 2026-09-02T10:00:00Z` or `At: 2021-12-10T11:00:00-05:00`, to schedule a message at a precise point in time ([#1931](https://github.com/binwiederhier/ntfy/pull/1931), thanks to [@ALPHACOM-Brehmer](https://github.com/ALPHACOM-Brehmer) for the contribution)
+* Support RFC 3339 timestamps for delayed notifications, e.g. `Delay: 2026-12-02T10:00:00Z` or `At: 2026-12-10T11:00:00-05:00`, to schedule a message at a precise point in time ([#1931](https://github.com/binwiederhier/ntfy/pull/1931), thanks to [@ALPHACOM-Brehmer](https://github.com/ALPHACOM-Brehmer) for the contribution)
 
 **Bug fixes + maintenance:**
 
-* Fix messages becoming visible to pollers only seconds later (and publishes stalling) under publish bursts: the message cache writer now stores each batch with a single multi-row `INSERT` instead of one statement per message (on PostgreSQL and SQLite), publishes no longer block while the writer is busy, and the per-publish lookup for a scheduled message with the same sequence ID is skipped when the client did not set one ([#2006](https://github.com/binwiederhier/ntfy/pull/2006))
+* Fix messages becoming visible to pollers only seconds later (and publishes stalling) under publish bursts: the message cache writer now stores each batch with a single multi-row `INSERT` instead of one statement per message (on PostgreSQL and SQLite), publishes no longer wait behind each batch write (up to 100 batches are buffered before the writer applies backpressure), and the per-publish lookup for a scheduled message with the same sequence ID is skipped when the client did not set one ([#2006](https://github.com/binwiederhier/ntfy/pull/2006))
 * Fix a recurring panic in the account token-update endpoint when a concurrent anonymous request from the same IP raced the authenticated request on the shared visitor (nil-user dereference); the request now fails with HTTP 401
 * Fix accepted messages being dropped from the cache on shutdown: the batched-write queue is now flushed, and `ntfy serve` shuts down gracefully on `SIGTERM`/`SIGINT` instead of dying mid-batch
 * Keep PostgreSQL pool connections idle instead of re-opening them: `pool_max_idle_conns` now defaults to `pool_max_conns`, so bursts no longer pay a DNS lookup, TCP/TLS handshake and authentication per query
@@ -37,6 +37,8 @@ v2.28.0, plus timezone and RFC 3339 support for delayed notifications.
 * Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
 * Detect Markdown when the `Content-Type` header has parameters or is uppercase, e.g. `text/markdown; charset=utf-8` ([#1995](https://github.com/binwiederhier/ntfy/pull/1995), thanks to [@cipherprofessor](https://github.com/cipherprofessor) for the contribution)
 * Fix the built-in Alertmanager template showing a bogus `0001-01-01` end time for firing alerts and joining a resolved alert's start and end times onto one line ([#1946](https://github.com/binwiederhier/ntfy/pull/1946)/[#1940](https://github.com/binwiederhier/ntfy/issues/1940), thanks to [@justadityaraj](https://github.com/justadityaraj) for the contribution and [@deferred](https://github.com/deferred) for reporting)
+* Ship the time zone database with the server (`time/tzdata`), so named time zones for delayed notifications work on the ARM Docker images and other minimal runtimes without system zone files
+* Build with Go 1.27; the minimum Go version to build from source is now 1.26
 * Groundwork for horizontal scaling: merged the first building blocks for running multiple ntfy servers as a cluster (node registry, util primitives, reserved experimental config options); clustering is not usable yet ([#1991](https://github.com/binwiederhier/ntfy/pull/1991), [#1997](https://github.com/binwiederhier/ntfy/pull/1997), [#2001](https://github.com/binwiederhier/ntfy/pull/2001), [#2003](https://github.com/binwiederhier/ntfy/pull/2003))
 
 ### ntfy server v2.28.0

@@ -192,7 +192,7 @@ func (c *meshCluster) heartbeatLoop() {
 // leads, and reconcile the per-peer queues.
 //
 // A node that cannot even register itself aborts the tick: the remaining database work would
-// fail against the same database, and everything downstream degrades safely without it --
+// fail against the same database, and everything downstream degrades safely without it:
 // ForwardMessage keeps serving the last peer snapshot.
 func (c *meshCluster) heartbeat() error {
 	if err := c.registry.Register(); err != nil {
@@ -271,8 +271,14 @@ func (c *meshCluster) isolationLoop() {
 }
 
 // maybeIsolated calls IsolatedFunc while this node's registration is stale (peers no longer
-// forward to it) but at least one known peer is healthy. With no healthy peer (e.g. a full
-// database outage) nothing happens: the mesh keeps delivering on its cached peer view.
+// forward to it) but at least one known peer is healthy.
+//
+// The peer probe is what makes this safe, and it answers one question: is there somewhere better
+// for these clients to go? Closing them only helps if their reconnect lands on a node that still
+// receives fan-out. Without the probe, a shared-database outage would make every node decide it
+// is unhealthy and disconnect everyone, in a loop, every tick, while the mesh is in fact still
+// delivering, because Peers serves the last snapshot and never queries. So with no healthy peer
+// this does nothing: here is as good as anywhere, and the alternative is a reconnect storm.
 func (c *meshCluster) maybeIsolated() {
 	if c.conf.IsolatedFunc == nil || c.Healthy() {
 		return

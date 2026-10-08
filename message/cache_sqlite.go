@@ -4,17 +4,26 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/util"
 )
 
 // SQLite runtime query constants
 const (
+	// sqliteInsertMessagesQuery is the head of the multi-row INSERT; one sqliteInsertMessagesRow per
+	// message follows, with the values in the order of insertMessageArgs. sqliteInsertMessagesMaxRows
+	// caps the rows per statement, keeping the parameter count well below SQLite's 32766.
+	sqliteInsertMessagesQuery   = `INSERT INTO messages (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, published) VALUES `
+	sqliteInsertMessagesRow     = `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sqliteInsertMessagesMaxRows = 1000
+
 	sqliteSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM messages WHERE topic = ? AND sequence_id = ? AND published = 0`
 	sqliteDeleteScheduledBySequenceIDQuery      = `DELETE FROM messages WHERE topic = ? AND sequence_id = ? AND published = 0`
 	sqliteUpdateMessagesForTopicExpiryQuery     = `UPDATE messages SET expires = ? WHERE topic = ?`
@@ -142,31 +151,21 @@ func createMemoryFilename() string {
 	return fmt.Sprintf("file:%s?mode=memory&cache=shared", util.RandomString(10))
 }
 
-// sqliteInsertColumnNames maps the row's column names to the SQLite table's where they differ
-var sqliteInsertColumnNames = map[string]string{"user_id": "user"}
-
-// sqliteInsertMessages writes the rows as multi-row INSERTs of at most insertMessagesMaxRows each
-func sqliteInsertMessages(tx *sql.Tx, rows [][]insertValue) error {
-	columns := make([]string, 0, len(rows[0]))
-	for _, v := range rows[0] {
-		if name, ok := sqliteInsertColumnNames[v.column]; ok {
-			columns = append(columns, name)
-		} else {
-			columns = append(columns, v.column)
-		}
-	}
-	for len(rows) > 0 {
-		chunk := rows[:min(len(rows), insertMessagesMaxRows)]
-		rows = rows[len(chunk):]
-		args := make([]any, 0, len(chunk)*len(columns))
-		for _, row := range chunk {
-			for _, v := range row {
-				args = append(args, v.value)
+// sqliteInsertMessages writes the batch as multi-row INSERTs of at most sqliteInsertMessagesMaxRows
+// messages each
+func sqliteInsertMessages(tx *sql.Tx, ms []*model.Message) error {
+	for len(ms) > 0 {
+		chunk := ms[:min(len(ms), sqliteInsertMessagesMaxRows)]
+		ms = ms[len(chunk):]
+		args := make([]any, 0, len(chunk)*insertMessageColumns)
+		for _, m := range chunk {
+			rowArgs, err := insertMessageArgs(m)
+			if err != nil {
+				return err
 			}
+			args = append(args, rowArgs...)
 		}
-		query := insertMessagesQuery("messages", columns, len(chunk), func(int) string {
-			return "?"
-		})
+		query := sqliteInsertMessagesQuery + strings.Repeat(sqliteInsertMessagesRow+", ", len(chunk)-1) + sqliteInsertMessagesRow
 		if _, err := tx.Exec(query, args...); err != nil {
 			return err
 		}

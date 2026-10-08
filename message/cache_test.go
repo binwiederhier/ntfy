@@ -782,7 +782,7 @@ func TestPostgresStore_AddMessages_OnePreparedStatementForAnyBatchSize(t *testin
 		require.Nil(t, s.AddMessages(msgs))
 	}
 	var prepared int
-	require.Nil(t, testDB.Primary().QueryRow("SELECT COUNT(*) FROM pg_prepared_statements WHERE statement LIKE 'INSERT INTO message %'").Scan(&prepared))
+	require.Nil(t, testDB.Primary().QueryRow("SELECT COUNT(*) FROM pg_prepared_statements WHERE statement ~ '^\\s*INSERT INTO message '").Scan(&prepared)) // Anchored, so this SELECT does not count itself
 	require.Equal(t, 1, prepared, "one INSERT shape regardless of batch size")
 
 	messages, err := s.Messages("mytopic", model.SinceAllMessages, false)

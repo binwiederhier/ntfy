@@ -168,6 +168,7 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 		Payload: &messaging.APNSPayload{
 			Aps: &messaging.Aps{
 				MutableContent: true,
+				Sound:          "default",
 				Alert: &messaging.ApsAlert{
 					Title: "some title",
 					Body:  "this is a message",
@@ -217,6 +218,50 @@ func TestToFirebaseMessage_Message_Normal_Allowed(t *testing.T) {
 		"attachment_expires": "98765543",
 		"attachment_url":     "https://example.com/file.jpg",
 	}, fbm.Data)
+}
+
+func TestToFirebaseMessage_Message_Critical_Allowed(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "this is a critical message")
+	m.Priority = 5
+	m.Title = "critical title"
+
+	fbm, err := toFirebaseMessage(m, &testAuther{Allow: true})
+	require.Nil(t, err)
+	require.Equal(t, "mytopic", fbm.Topic)
+	require.Equal(t, &messaging.AndroidConfig{
+		Priority: "high",
+	}, fbm.Android)
+	require.Equal(t, &messaging.APNSConfig{
+		Payload: &messaging.APNSPayload{
+			Aps: &messaging.Aps{
+				MutableContent: true,
+				CriticalSound: &messaging.CriticalSound{
+					Critical: true,
+					Name:     "default",
+					Volume:   1.0,
+				},
+				Alert: &messaging.ApsAlert{
+					Title: "critical title",
+					Body:  "this is a critical message",
+				},
+			},
+			CustomData: map[string]any{
+				"id":           m.ID,
+				"time":         fmt.Sprintf("%d", m.Time),
+				"event":        "message",
+				"topic":        "mytopic",
+				"sequence_id":  "",
+				"priority":     "5",
+				"tags":         "",
+				"click":        "",
+				"icon":         "",
+				"title":        "critical title",
+				"message":      "this is a critical message",
+				"content_type": "",
+				"encoding":     "",
+			},
+		},
+	}, fbm.APNS)
 }
 
 func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {

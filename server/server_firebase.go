@@ -241,16 +241,28 @@ func createAPNSAlertConfig(m *model.Message, data map[string]string) *messaging.
 	for k, v := range data {
 		apnsData[k] = v
 	}
+	aps := &messaging.Aps{
+		MutableContent: true,
+		Alert: &messaging.ApsAlert{
+			Title: m.Title,
+			Body:  maybeTruncateAPNSBodyMessage(m.Message),
+		},
+	}
+	if m.Event == model.MessageEvent {
+		if m.Priority == 5 {
+			aps.CriticalSound = &messaging.CriticalSound{
+				Critical: true,
+				Name:     "default",
+				Volume:   1.0,
+			}
+		} else {
+			aps.Sound = "default"
+		}
+	}
 	return &messaging.APNSConfig{
 		Payload: &messaging.APNSPayload{
 			CustomData: apnsData,
-			Aps: &messaging.Aps{
-				MutableContent: true,
-				Alert: &messaging.ApsAlert{
-					Title: m.Title,
-					Body:  maybeTruncateAPNSBodyMessage(m.Message),
-				},
-			},
+			Aps:        aps,
 		},
 	}
 }

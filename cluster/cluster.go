@@ -25,9 +25,10 @@ const (
 	// MembersPath lists the live cluster members (this node plus its live peers), for the
 	// load balancers' agents: each LB maintains its own upstream list from it.
 	MembersPath = "/v1/cluster/members"
-	// HealthPath reports a node's cluster health (200 healthy, 503 not); served on the cluster
-	// listener too, where isolated nodes probe their peers.
-	HealthPath = "/v1/health"
+	// HealthPath reports a node's cluster health to its PEERS (200 healthy, 503 not): a node
+	// that lost its registration probes it to find out whether anywhere better exists for its
+	// subscribers. The server's public /v1/health is a separate endpoint for load balancers.
+	HealthPath = "/v1/cluster/health"
 )
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer
@@ -84,8 +85,10 @@ type Cluster interface {
 	// BroadcastState pushes a state delta (first-subscriber hints, subscriber cancels) to all
 	// peers. Nop single-node.
 	BroadcastState(state *State)
-	// IsLeader reports whether this node holds the cluster leader lock. Singleton background
-	// jobs (e.g. the Firebase keepaliver) are gated on the leader.
+	// IsLeader reports whether this node is the cluster leader, which is derived from
+	// membership (the lowest live node id, with a lease and a hold-off), not a lock. Singleton
+	// background jobs (e.g. the Firebase keepaliver) are gated on it, and must re-check it per
+	// unit of work: it is a belief with a lease, not a fence.
 	IsLeader() bool
 	// Members lists the live cluster members (this node plus its live peers); served on
 	// MembersPath for the load balancers' agents.

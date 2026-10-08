@@ -67,6 +67,14 @@ const GapAllTopics = "*"
 // announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
 
+// apiHealth is the answer on HealthPath: written by handleHealth, read by peerHealthy, so this
+// package owns both ends of it. The status code carries the same answer for anything that only
+// looks at that, but a peer reads the field, since a 200 from something that is not an ntfy
+// cluster node (a proxy on a misconfigured advertise URL) says nothing.
+type apiHealth struct {
+	Healthy bool `json:"healthy"`
+}
+
 // apiMessage is one line of a message request body (NDJSON: one message per line; a single
 // message is just a one-line body). It carries the two fields that model.Message does not
 // serialize to JSON (Sender and User), which are needed to reconstruct the visitor on the

@@ -53,7 +53,7 @@ func newTestCluster(t *testing.T, n int, configure func(i int, conf *Config)) []
 			configure(i, conf)
 		}
 		s := newTestServer(t, conf)
-		srv := &http.Server{Handler: s.clusterHandler()}
+		srv := &http.Server{Handler: s.cluster}
 		listener := listeners[i]
 		go srv.Serve(listener)
 		t.Cleanup(func() { srv.Close() })

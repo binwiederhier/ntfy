@@ -392,25 +392,6 @@ func New(conf *Config) (*Server, error) {
 	return s, nil
 }
 
-// clusterHandler returns the handler served on the dedicated cluster listener (experimental-cluster-listen).
-// It serves the internal peer API (owned and routed by the cluster itself, including auth) plus
-// a health endpoint; the public listeners never expose these paths, so internal traffic cannot
-// be reached from the outside even before any firewalling.
-func (s *Server) clusterHandler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc(cluster.HealthPath, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if s.cluster.Healthy() {
-			io.WriteString(w, `{"healthy":true}`+"\n")
-		} else {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			io.WriteString(w, `{"healthy":false}`+"\n")
-		}
-	})
-	mux.Handle("/", s.cluster)
-	return mux
-}
-
 // topicAnnouncer returns the first-subscriber hook for a topic: it tells peer nodes that this
 // node now has a subscriber for it, so they can drop a cached rate-visitor miss (see
 // Cluster.BroadcastState). Delivery does not depend on it; every message goes to every peer.
@@ -642,7 +623,9 @@ func (s *Server) Run() error {
 		s.metricsHandler = promhttp.Handler()
 	}
 	if s.config.ClusterListen != "" {
-		s.httpClusterServer = &http.Server{Addr: s.config.ClusterListen, Handler: s.clusterHandler()}
+		// The cluster serves the whole private listener: every path on it is the peer API, which
+		// the cluster owns and authenticates itself
+		s.httpClusterServer = &http.Server{Addr: s.config.ClusterListen, Handler: s.cluster}
 		go func() {
 			errChan <- s.httpClusterServer.ListenAndServe()
 		}()

@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -152,7 +153,7 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 	require.Nil(t, err)
 	req.Header.Set("X-Cluster-Secret", "s3cret")
 	req.Header.Set("X-Cluster-Origin", "node-b")
-	s.clusterHandler().ServeHTTP(rr, req)
+	s.cluster.ServeHTTP(rr, req)
 	require.Equal(t, 200, rr.Code)
 	waitFor(t, func() bool {
 		mu.Lock()
@@ -174,7 +175,7 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	confB.ClusterSecret = "s3cret"
 	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
 	sB := newTestServer(t, confB)
-	srvB := &http.Server{Handler: sB.clusterHandler()}
+	srvB := &http.Server{Handler: sB.cluster}
 	go srvB.Serve(listenerB)
 	defer srvB.Close()
 	// Node A: publish-only in this test, so its advertise URL is never called
@@ -371,12 +372,6 @@ func TestServer_Cluster_HealthReflectsCluster(t *testing.T) {
 	rr = request(t, s, "GET", "/v1/health", "", nil)
 	require.Equal(t, 503, rr.Code)
 	require.Contains(t, rr.Body.String(), `"healthy":false`)
-	// The cluster listener's health endpoint reflects the same state
-	rr2 := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/v1/health", nil)
-	require.Nil(t, err)
-	s.clusterHandler().ServeHTTP(rr2, req)
-	require.Equal(t, 503, rr2.Code)
 }
 
 func TestServer_Cluster_MessageQuotaEnforcedAcrossNodes(t *testing.T) {
@@ -494,7 +489,7 @@ func TestServer_Cluster_ReservationTakeoverCancelsAcrossNodes(t *testing.T) {
 	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
 	confB.AuthDefault = user.PermissionReadWrite
 	sB := newTestServer(t, confB)
-	srvB := &http.Server{Handler: sB.clusterHandler()}
+	srvB := &http.Server{Handler: sB.cluster}
 	go srvB.Serve(listenerB)
 	defer srvB.Close()
 	// Node A takes the reservation
@@ -868,7 +863,7 @@ func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) 
 	// A peer that answers the health probe, so this node considers itself isolated rather than
 	// looking at a cluster-wide outage
 	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, `{"healthy":true}`) // The isolation probe requires the health answer, not just a 200
 	}))
 	defer peer.Close()
 	entered, release := make(chan struct{}), make(chan struct{})

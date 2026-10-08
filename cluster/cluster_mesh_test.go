@@ -280,7 +280,7 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	}))
 	defer srv.Close()
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.NodeTTL = 300 * time.Millisecond // Fast expiry so the test observes TTL-based removal
+	conf.NodeTTL = time.Second // The floor: a shorter TTL truncates the SQL liveness cutoff to zero
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
@@ -535,20 +535,29 @@ func TestMesh_IsolatedFuncWhenPeersHealthy(t *testing.T) {
 	// A node that lost its database (registration goes stale) while a peer is still healthy
 	// is isolated: peers stop forwarding to it, so its subscribers would silently receive
 	// nothing. IsolatedFunc tells the server to close them so clients reconnect elsewhere.
-	isolatedTest(t, http.StatusOK, true)
+	isolatedTest(t, http.StatusOK, `{"healthy":true}`, true)
 }
 
 func TestMesh_NoIsolatedFuncWhenNoPeerHealthy(t *testing.T) {
 	// Full database outage: every node is unhealthy, the mesh keeps delivering on its cached
 	// peer view, so subscribers must be kept (fail open)
-	isolatedTest(t, http.StatusServiceUnavailable, false)
+	isolatedTest(t, http.StatusServiceUnavailable, `{"healthy":false}`, false)
 }
 
-func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
+func TestMesh_NoIsolatedFuncWhenAPeerAnswers200WithoutBeingNtfy(t *testing.T) {
+	// A 200 is not evidence that the peer is a healthy ntfy: a misconfigured advertise URL can
+	// point at a proxy or an unrelated service that answers 200 for any path. Believing that
+	// would close this node's subscribers while nothing else can serve them, which is the one
+	// thing the isolation check must not do.
+	isolatedTest(t, http.StatusOK, "<html>hello from some proxy</html>", false)
+}
+
+func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wantIsolated bool) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/health" {
+		if r.URL.Path == HealthPath {
 			w.WriteHeader(peerHealthStatus)
+			io.WriteString(w, peerHealthBody)
 		}
 	}))
 	defer peer.Close()
@@ -558,7 +567,7 @@ func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
 	pool := db.New(host, nil)
 	var isolated atomic.Int32
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.NodeTTL = 300 * time.Millisecond
+	conf.NodeTTL = time.Second // The floor: a shorter TTL truncates the SQL liveness cutoff to zero
 	conf.IsolatedFunc = func() { isolated.Add(1) }
 	// Registered last: the fake peer never heartbeats again, so its row must still be fresh
 	// when the mesh takes its first peer snapshot
@@ -574,8 +583,8 @@ func isolatedTest(t *testing.T, peerHealthStatus int, wantIsolated bool) {
 	require.Equal(t, int32(0), isolated.Load()) // Healthy node: never isolated
 
 	pool.Close() // Database lost: registration fails from now on
-	time.Sleep(time.Second)
-	require.False(t, mesh.Healthy())
+	waitFor(t, func() bool { return !mesh.Healthy() })
+	time.Sleep(2 * conf.HeartbeatInterval) // Give the isolation loop its chance to decide
 	require.Equal(t, wantIsolated, isolated.Load() > 0)
 }
 
@@ -583,13 +592,15 @@ func TestMesh_IsolatedFuncWhenDatabaseHangs(t *testing.T) {
 	// A network partition makes database calls hang (dropped packets) instead of failing, which
 	// blocks the heartbeat loop. Isolation must still be detected (Healthy is time-based).
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, `{"healthy":true}`) // Answers like a healthy ntfy, which is what the probe requires
+	}))
 	defer peer.Close()
 
 	proxy := newFreezableProxy(t, schemaDSN)
 	var isolated atomic.Int32
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.NodeTTL = 300 * time.Millisecond
+	conf.NodeTTL = time.Second // The floor: a shorter TTL truncates the SQL liveness cutoff to zero
 	conf.IsolatedFunc = func() { isolated.Add(1) }
 	// Registered last, and through its own pool: the fake peer never heartbeats again, so its
 	// row must still be fresh when the mesh takes its first peer snapshot
@@ -888,4 +899,36 @@ func TestMesh_MembersOfAnIsolatedNodeAreNotReportedHealthy(t *testing.T) {
 	for _, m := range mesh.Members() {
 		require.False(t, m.Healthy, "an isolated node reported %s as healthy", m.NodeID)
 	}
+}
+
+func TestMesh_HealthEndpoint(t *testing.T) {
+	// Peers probe this to decide whether a node that lost its registration has somewhere better
+	// to send its subscribers, so it answers this node's own registration freshness, and it is
+	// secret-authenticated like the rest of the peer API
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	rr := httptest.NewRecorder()
+	mesh.ServeHTTP(rr, httptest.NewRequest("GET", HealthPath, nil))
+	require.Equal(t, http.StatusUnauthorized, rr.Code) // No secret: rejected like every peer path
+
+	probe := func() *httptest.ResponseRecorder {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", HealthPath, nil)
+		req.Header.Set(secretHeader, testSecret)
+		mesh.ServeHTTP(rr, req)
+		return rr
+	}
+	rr = probe()
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.Contains(t, rr.Body.String(), `"healthy":true`)
+
+	// Registration goes stale once the database is gone, and the answer follows it
+	require.Nil(t, pool.Close())
+	waitFor(t, func() bool { return !mesh.Healthy() })
+	rr = probe()
+	require.Equal(t, http.StatusServiceUnavailable, rr.Code)
+	require.Contains(t, rr.Body.String(), `"healthy":false`)
 }

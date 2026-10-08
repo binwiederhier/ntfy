@@ -28,12 +28,13 @@ const (
 	batchMaxMessages  = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes     = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes     = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
+	healthMaxBytes    = 4 * 1024        // Upper bound for a peer's health response
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
-// PostgreSQL only as a control plane: the node_registry table for membership/discovery, and a
-// Postgres advisory lock for singleton-job leader election. The message path never touches the
-// database (not even for membership: see registry.Peers).
+// PostgreSQL only as a control plane: the node_registry table for membership/discovery, which is
+// also what leadership is derived from (the lowest live node id). The message path never touches
+// the database (not even for membership: see registry.Peers).
 //
 // A published message goes to EVERY live peer, which then drops it unless it has a subscriber
 // for the topic. Routing by subscription knowledge was tried and removed: it made delivery
@@ -93,6 +94,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
 	c.mux.HandleFunc("POST "+StatePath, c.authenticated(c.handleState))
 	c.mux.HandleFunc("GET "+MembersPath, c.secretAuthenticated(c.handleMembers))
+	c.mux.HandleFunc("GET "+HealthPath, c.secretAuthenticated(c.handleHealth))
 	c.wg.Add(2)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
@@ -136,6 +138,19 @@ func (c *meshCluster) secretAuthenticated(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		h(w, r)
+	}
+}
+
+// handleHealth answers a peer's health probe: whether this node's registration is fresh enough
+// that peers still forward to it (see maybeIsolated for what a peer does with the answer).
+func (c *meshCluster) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	healthy := c.Healthy()
+	w.Header().Set("Content-Type", contentTypeJSON)
+	if !healthy {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	if err := json.NewEncoder(w).Encode(&apiHealth{Healthy: healthy}); err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot write health response")
 	}
 }
 
@@ -224,16 +239,24 @@ func (c *meshCluster) maybeIsolated() {
 func (c *meshCluster) peerHealthy(url string) bool {
 	ctx, cancel := context.WithTimeout(c.ctx, peerHealthTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+HealthPath, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL(url), nil)
 	if err != nil {
 		return false
 	}
+	req.Header.Set(secretHeader, c.conf.Secret)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return false
 	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	var health apiHealth
+	if err := json.NewDecoder(io.LimitReader(resp.Body, healthMaxBytes)).Decode(&health); err != nil {
+		return false
+	}
+	return health.Healthy
 }
 
 // heartbeat is one control-plane tick: refresh this node's registry row, retry/confirm the
@@ -303,9 +326,9 @@ func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
 	c.mu.Unlock()
 }
 
-// queueFor returns the send queue for the given peer, creating it (and its delivery worker) if it
-// does not exist yet. The caller must hold c.mu.
-func (c *meshCluster) queueFor(p *registry.Peer) *peerQueue {
+// queueForNoLock returns the send queue for the given peer, creating it (and its delivery
+// worker) if it does not exist yet. The caller must hold c.mu.
+func (c *meshCluster) queueForNoLock(p *registry.Peer) *peerQueue {
 	nodeID := NodeID(p.NodeID)
 	q, ok := c.queues[nodeID]
 	if ok {
@@ -343,7 +366,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 		return nil // Shutting down; the message is dropped like any other in-flight fan-out
 	}
 	for _, p := range peers {
-		if !c.queueFor(p).queue.TryEnqueue(frag) {
+		if !c.queueForNoLock(p).queue.TryEnqueue(frag) {
 			metrics.ClusterQueueDropped.Inc()
 			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
 			c.recordGapLocked(NodeID(p.NodeID), []string{msg.Topic}, msg.Time)

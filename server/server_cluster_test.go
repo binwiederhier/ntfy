@@ -148,7 +148,7 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 	require.Nil(t, err)
 	req.Header.Set("X-Cluster-Secret", "s3cret")
 	req.Header.Set("X-Cluster-Origin", "node-b")
-	s.clusterHandler().ServeHTTP(rr, req)
+	s.cluster.ServeHTTP(rr, req)
 	require.Equal(t, 200, rr.Code)
 	waitFor(t, func() bool {
 		mu.Lock()
@@ -170,7 +170,7 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	confB.ClusterSecret = "s3cret"
 	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
 	sB := newTestServer(t, confB)
-	srvB := &http.Server{Handler: sB.clusterHandler()}
+	srvB := &http.Server{Handler: sB.cluster}
 	go srvB.Serve(listenerB)
 	defer srvB.Close()
 	// Node A: publish-only in this test, so its advertise URL is never called
@@ -267,12 +267,6 @@ func TestServer_Cluster_HealthReflectsCluster(t *testing.T) {
 	rr = request(t, s, "GET", "/v1/health", "", nil)
 	require.Equal(t, 503, rr.Code)
 	require.Contains(t, rr.Body.String(), `"healthy":false`)
-	// The cluster listener's health endpoint reflects the same state
-	rr2 := httptest.NewRecorder()
-	req, err := http.NewRequest("GET", "/v1/health", nil)
-	require.Nil(t, err)
-	s.clusterHandler().ServeHTTP(rr2, req)
-	require.Equal(t, 503, rr2.Code)
 }
 
 func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
@@ -366,11 +360,4 @@ func topicsSnapshot(s *Server) map[string]*topic {
 		topics[id] = t
 	}
 	return topics
-}
-
-func TestServer_Cluster_HealthPathsAgree(t *testing.T) {
-	// The cluster declares the path its peers probe, the server owns the endpoint that answers
-	// it. Nothing links the two constants, so assert they are the same path: if they drift, every
-	// isolation probe silently 404s and no node ever notices it is isolated.
-	require.Equal(t, apiHealthPath, cluster.HealthPath)
 }

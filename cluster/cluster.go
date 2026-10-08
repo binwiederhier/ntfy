@@ -2,10 +2,6 @@
 // register themselves in a PostgreSQL node registry (control plane) and fan published messages
 // out to each other directly over HTTP (data plane); PostgreSQL is never on the message path.
 // The single-node default is the nop cluster, which does nothing.
-//
-// This is the seam only: the interface the server talks to, the single-node default behind it,
-// and the message wire format. The peer mesh that implements the interface for real is the next
-// piece, so on a single node this package is the nop and nothing else.
 package cluster
 
 import (
@@ -29,9 +25,10 @@ const (
 	// MembersPath lists the live cluster members (this node plus its live peers), for the
 	// load balancers' agents: each LB maintains its own upstream list from it.
 	MembersPath = "/v1/cluster/members"
-	// HealthPath reports a node's cluster health (200 healthy, 503 not); served on the cluster
-	// listener too, where isolated nodes probe their peers.
-	HealthPath = "/v1/health"
+	// HealthPath reports a node's cluster health to its PEERS (200 healthy, 503 not): a node
+	// that lost its registration probes it to find out whether anywhere better exists for its
+	// subscribers. The server's public /v1/health is a separate endpoint for load balancers.
+	HealthPath = "/v1/cluster/health"
 )
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer
@@ -41,6 +38,24 @@ const (
 // config); a "peer" is another node as seen from this one (Peers, peerQueue, peerState). A peer
 // IS a node, which is why peer values carry a NodeID.
 type NodeID string
+
+const (
+	// secretHeader carries the shared secret authenticating node-to-node fan-out requests.
+	secretHeader = "X-Cluster-Secret"
+
+	// originHeader carries the sending node's ID on fan-out requests, so a node can skip
+	// requests that carry its own broadcasts (loop prevention).
+	originHeader = "X-Cluster-Origin"
+)
+
+// Content types of the peer API: message bodies are NDJSON (one JSON message per line, matching
+// the framing of ntfy's own /topic/json subscribe stream), state bodies are plain JSON. Future
+// node-to-node request types get their own paths on the cluster listener; an old node answering
+// 404 on an unknown path keeps mixed-version clusters working during rolling deploys.
+const (
+	contentTypeNDJSON = "application/x-ndjson"
+	contentTypeJSON   = "application/json"
+)
 
 // tag is the log tag for everything cluster-related, so "tag=cluster -> trace" turns on
 // per-message decisions without raising the level anywhere else
@@ -70,8 +85,10 @@ type Cluster interface {
 	// BroadcastState pushes a state delta (first-subscriber hints, subscriber cancels) to all
 	// peers. Nop single-node.
 	BroadcastState(state *State)
-	// IsLeader reports whether this node holds the cluster leader lock. Singleton background
-	// jobs (e.g. the Firebase keepaliver) are gated on the leader.
+	// IsLeader reports whether this node is the one that should run the cluster's singleton jobs
+	// (e.g. the Firebase keepaliver). It is derived from membership, not held as a lock, and it is
+	// a belief with a lease rather than a fence: see registry.IsLeader for what it does and does
+	// not promise. Always true single-node.
 	IsLeader() bool
 	// Members lists the live cluster members (this node plus its live peers); served on
 	// MembersPath for the load balancers' agents.
@@ -108,8 +125,5 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 	if conf.NodeTTL == 0 {
 		conf.NodeTTL = defaultNodeTTL
 	}
-	// Everything above is the config contract the mesh relies on. The mesh itself is the next
-	// piece, and cmd refuses to start a server with experimental-cluster-listen set, so nothing
-	// but a test reaches this line.
-	return nil, errors.New("clustering is not implemented in this build")
+	return newMeshCluster(conf, pool, deliver)
 }

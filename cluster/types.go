@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/util"
 )
 
 // Config configures the cluster. It is assembled by the server from its own config, which keeps
@@ -53,6 +54,34 @@ type CancelFunc func(cancel *SubscriberCancel)
 // those topics; it must not re-broadcast (loop prevention). It is a cache hint only: a lost
 // announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
+
+// apiHealth is the answer on HealthPath: written by handleHealth, read by peerHealthy, so this
+// package owns both ends of it. The status code carries the same answer for anything that only
+// looks at that, but a peer reads the field, since a 200 from something that is not an ntfy
+// cluster node (a proxy on a misconfigured advertise URL) says nothing.
+type apiHealth struct {
+	Healthy bool `json:"healthy"`
+}
+
+// apiState is the peer state-exchange envelope. Each concern is an optional section; future
+// concerns (rate limit counters, stats) become siblings of Topics.
+type apiState struct {
+	Topics  *apiStateTopics     `json:"topics,omitempty"`
+	Cancels []*SubscriberCancel `json:"cancels,omitempty"`
+}
+
+// apiStateTopics carries topics that just gained their first subscriber on the sending node.
+type apiStateTopics struct {
+	Added []string `json:"added,omitempty"`
+}
+
+// peerQueue is the bounded, batching send queue for a single peer, pinned to the advertise URL
+// the peer was created with: a peer re-registering under a different advertise URL is treated
+// as a replacement (reconcile retires the old queue; ForwardMessage creates a fresh one on demand).
+type peerQueue struct {
+	advertiseURL string
+	queue        *util.LingerQueue[[]byte]
+}
 
 // apiMessage is one line of a message request body (NDJSON: one message per line; a single
 // message is just a one-line body). It carries the two fields that model.Message does not

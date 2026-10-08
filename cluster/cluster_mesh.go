@@ -144,7 +144,6 @@ func (c *meshCluster) secretAuthenticated(h http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// handleMembers lists the live cluster members for the load balancers' agents
 // handleHealth answers a peer's health probe: whether this node's registration is fresh enough
 // that peers still forward to it (see maybeIsolated for what a peer does with the answer).
 func (c *meshCluster) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -158,6 +157,7 @@ func (c *meshCluster) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+// handleMembers lists the live cluster members for the load balancers' agents
 func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(c.Members()); err != nil {

@@ -3,7 +3,6 @@ package cluster
 import (
 	"bytes"
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -104,64 +103,59 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	return c, nil
 }
 
-// ServeHTTP serves the internal peer API. Auth lives in the authenticated middleware, so every
-// endpoint gets the same shared-secret and origin handling.
-func (c *meshCluster) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c.mux.ServeHTTP(w, r)
+// ForwardMessage enqueues the message for delivery to every live peer node; a peer without
+// subscribers for the topic drops it on arrival. Delivery is fire-and-forget via each peer's
+// bounded batching queue; if a peer's queue is full the message is dropped for that peer
+// (subscribers reconnect and re-poll history from the database).
+func (c *meshCluster) ForwardMessage(msg *model.Message) error {
+	peers := c.registry.Peers() // The heartbeat's snapshot; never a database call on the publish path
+	if len(peers) == 0 {
+		return nil // Cluster of one; skip the marshal
+	}
+	data, err := marshalMessage(msg)
+	if err != nil {
+		return err
+	}
+
+	metrics.ClusterMessagesForwarded.Inc()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return nil // Shutting down; the message is dropped like any other in-flight fan-out
+	}
+	for _, p := range peers {
+		if !c.queueForNoLock(p).queue.TryEnqueue(data) {
+			metrics.ClusterQueueDropped.Inc()
+			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
+		} else if ev := log.Tag(tag); ev.IsTrace() {
+			ev.Trace("Enqueued message %s (topic %s) for peer %s", msg.ID, msg.Topic, p.NodeID)
+		}
+	}
+	return nil
 }
 
-// authenticated wraps a peer API handler with the checks every endpoint needs: the shared
-// secret (constant-time compare, rejected before any body is read), a present origin, and the
-// origin self-skip (a request carrying this node's own traffic is acknowledged but ignored).
-func (c *meshCluster) authenticated(h func(origin NodeID, w http.ResponseWriter, r *http.Request)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if c.conf.Secret == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get(secretHeader)), []byte(c.conf.Secret)) != 1 {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		origin := NodeID(r.Header.Get(originHeader))
-		if origin == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if origin == c.conf.NodeID {
-			w.WriteHeader(http.StatusOK) // Our own traffic; nothing to do
-			return
-		}
-		h(origin, w, r)
+// BroadcastState tells all live peers about state changes that must not wait: topics that
+// gained their first local subscriber (a hint for peers' cached rate-visitor lookups, never
+// used for routing) and subscriber cancels.
+func (c *meshCluster) BroadcastState(state *State) {
+	if len(state.AddedTopics) == 0 && len(state.SubscriberCancels) == 0 {
+		return
 	}
-}
-
-// secretAuthenticated wraps a handler with the shared-secret check only. Unlike authenticated
-// it expects no origin node, because the callers are the load balancers' agents, not peers.
-func (c *meshCluster) secretAuthenticated(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if c.conf.Secret == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get(secretHeader)), []byte(c.conf.Secret)) != 1 {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		h(w, r)
+	peers := c.registry.Peers()
+	if len(peers) == 0 {
+		return
 	}
-}
-
-// handleHealth answers a peer's health probe: whether this node's registration is fresh enough
-// that peers still forward to it (see maybeIsolated for what a peer does with the answer).
-func (c *meshCluster) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	healthy := c.Healthy()
-	w.Header().Set("Content-Type", contentTypeJSON)
-	if !healthy {
-		w.WriteHeader(http.StatusServiceUnavailable)
+	envelope := &apiState{Cancels: state.SubscriberCancels}
+	if len(state.AddedTopics) > 0 {
+		envelope.Topics = &apiStateTopics{Added: state.AddedTopics}
 	}
-	if err := json.NewEncoder(w).Encode(&apiHealth{Healthy: healthy}); err != nil {
-		log.Tag(tag).Err(err).Warn("Cannot write health response")
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		return
 	}
-}
-
-// handleMembers lists the live cluster members for the load balancers' agents
-func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", contentTypeJSON)
-	if err := json.NewEncoder(w).Encode(c.Members()); err != nil {
-		log.Tag(tag).Err(err).Warn("Cannot write member list")
+	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), len(peers))
+	for _, p := range peers {
+		go c.postToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), contentTypeJSON, body)
 	}
 }
 
@@ -177,6 +171,42 @@ func (c *meshCluster) Members() []Member {
 		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Healthy: fresh})
 	}
 	return members
+}
+
+// IsLeader reports whether this node currently holds singleton-job leadership.
+func (c *meshCluster) IsLeader() bool {
+	return c.registry.IsLeader()
+}
+
+// Healthy reports whether this node's registry heartbeat is fresh enough that peers still
+// forward messages to it (see the Cluster interface for the checker's fail-open duty).
+func (c *meshCluster) Healthy() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return time.Since(c.lastRegistered) < c.conf.NodeTTL
+}
+
+// Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,
+// and waits for them to exit.
+func (c *meshCluster) Close() error {
+	c.cancel() // Stops the heartbeat loop and aborts in-flight peer deliveries
+	// Close the peer queues so their workers flush and exit; final sends are best-effort since
+	// the context is already canceled (parity with fire-and-forget delivery)
+	c.mu.Lock()
+	c.closed = true
+	for nodeID, q := range c.queues {
+		q.queue.Close()
+		delete(c.queues, nodeID)
+	}
+	c.mu.Unlock()
+	// Wait for the loops BEFORE deregistering: an in-flight heartbeat's Register would otherwise
+	// re-insert our row right after Deregister deleted it
+	c.wg.Wait()
+	if err := c.registry.Deregister(); err != nil {
+		log.Tag(tag).Err(err).Warn("Failed to deregister node") // Its row goes stale on its own
+	}
+	metrics.ClusterLeader.Set(0)
+	return nil
 }
 
 // heartbeatLoop runs one heartbeat immediately (the ticker first fires a full interval after
@@ -311,7 +341,6 @@ func (c *meshCluster) maybeIsolated() {
 		}
 	}
 }
-
 func (c *meshCluster) peerHealthy(url string) bool {
 	ctx, cancel := context.WithTimeout(c.ctx, peerHealthTimeout)
 	defer cancel()
@@ -333,37 +362,6 @@ func (c *meshCluster) peerHealthy(url string) bool {
 		return false
 	}
 	return health.Healthy
-}
-
-// ForwardMessage enqueues the message for delivery to every live peer node; a peer without
-// subscribers for the topic drops it on arrival. Delivery is fire-and-forget via each peer's
-// bounded batching queue; if a peer's queue is full the message is dropped for that peer
-// (subscribers reconnect and re-poll history from the database).
-func (c *meshCluster) ForwardMessage(msg *model.Message) error {
-	peers := c.registry.Peers() // The heartbeat's snapshot; never a database call on the publish path
-	if len(peers) == 0 {
-		return nil // Cluster of one; skip the marshal
-	}
-	data, err := marshalMessage(msg)
-	if err != nil {
-		return err
-	}
-
-	metrics.ClusterMessagesForwarded.Inc()
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.closed {
-		return nil // Shutting down; the message is dropped like any other in-flight fan-out
-	}
-	for _, p := range peers {
-		if !c.queueForNoLock(p).queue.TryEnqueue(data) {
-			metrics.ClusterQueueDropped.Inc()
-			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
-		} else if ev := log.Tag(tag); ev.IsTrace() {
-			ev.Trace("Enqueued message %s (topic %s) for peer %s", msg.ID, msg.Topic, p.NodeID)
-		}
-	}
-	return nil
 }
 
 // queueForNoLock returns the send queue for the given peer, creating it (and its delivery
@@ -430,112 +428,5 @@ func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload
 		log.Tag(tag).Warn("Peer %s (%s) rejected request with HTTP %d", nodeID, url, resp.StatusCode)
 		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, resp.StatusCode)
 	}
-	return nil
-}
-
-// handleMessage receives a batch of peer messages (NDJSON) and streams them to local
-// subscribers line by line, delivering each message as it is decoded.
-func (c *meshCluster) handleMessage(origin NodeID, w http.ResponseWriter, r *http.Request) {
-	// A batch can exceed its byte cap by one message, plus framing overhead
-	maxBodyBytes := int64(batchMaxBytes) + c.conf.MaxMessageBytes + 1024
-	received := 0
-	deliver := func(m *model.Message) {
-		received++
-		if ev := log.Tag(tag); ev.IsTrace() {
-			ev.Trace("Delivering message %s (topic %s) from peer %s", m.ID, m.Topic, origin)
-		}
-		c.deliver(m)
-	}
-	if err := decodeMessageBody(io.LimitReader(r.Body, maxBodyBytes), int(c.conf.MaxMessageBytes), deliver); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	log.Tag(tag).Debug("Received batch of %d message(s) from peer %s", received, origin)
-	w.WriteHeader(http.StatusOK)
-}
-
-// handleState receives a peer's state envelope and applies each section it carries.
-func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(io.LimitReader(r.Body, stateMaxBytes))
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	var state apiState
-	if err := json.Unmarshal(body, &state); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if state.Topics != nil && len(state.Topics.Added) > 0 && c.conf.TopicsAddedFunc != nil {
-		log.Tag(tag).Debug("Received %d announced topic(s) from peer %s", len(state.Topics.Added), origin)
-		c.conf.TopicsAddedFunc(state.Topics.Added)
-	}
-	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
-		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)
-		for _, cancel := range state.Cancels {
-			c.conf.CancelFunc(cancel)
-		}
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-// BroadcastState tells all live peers about state changes that must not wait: topics that
-// gained their first local subscriber (a hint for peers' cached rate-visitor lookups, never
-// used for routing) and subscriber cancels.
-func (c *meshCluster) BroadcastState(state *State) {
-	if len(state.AddedTopics) == 0 && len(state.SubscriberCancels) == 0 {
-		return
-	}
-	peers := c.registry.Peers()
-	if len(peers) == 0 {
-		return
-	}
-	envelope := &apiState{Cancels: state.SubscriberCancels}
-	if len(state.AddedTopics) > 0 {
-		envelope.Topics = &apiStateTopics{Added: state.AddedTopics}
-	}
-	body, err := json.Marshal(envelope)
-	if err != nil {
-		return
-	}
-	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), len(peers))
-	for _, p := range peers {
-		go c.postToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), contentTypeJSON, body)
-	}
-}
-
-// IsLeader reports whether this node currently holds singleton-job leadership.
-func (c *meshCluster) IsLeader() bool {
-	return c.registry.IsLeader()
-}
-
-// Healthy reports whether this node's registry heartbeat is fresh enough that peers still
-// forward messages to it (see the Cluster interface for the checker's fail-open duty).
-func (c *meshCluster) Healthy() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return time.Since(c.lastRegistered) < c.conf.NodeTTL
-}
-
-// Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,
-// and waits for them to exit.
-func (c *meshCluster) Close() error {
-	c.cancel() // Stops the heartbeat loop and aborts in-flight peer deliveries
-	// Close the peer queues so their workers flush and exit; final sends are best-effort since
-	// the context is already canceled (parity with fire-and-forget delivery)
-	c.mu.Lock()
-	c.closed = true
-	for nodeID, q := range c.queues {
-		q.queue.Close()
-		delete(c.queues, nodeID)
-	}
-	c.mu.Unlock()
-	// Wait for the loops BEFORE deregistering: an in-flight heartbeat's Register would otherwise
-	// re-insert our row right after Deregister deleted it
-	c.wg.Wait()
-	if err := c.registry.Deregister(); err != nil {
-		log.Tag(tag).Err(err).Warn("Failed to deregister node") // Its row goes stale on its own
-	}
-	metrics.ClusterLeader.Set(0)
 	return nil
 }

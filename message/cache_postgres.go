@@ -1,15 +1,24 @@
 package message
 
 import (
-	"strconv"
+	"database/sql"
 	"time"
 
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
+	"heckel.io/ntfy/v2/model"
 )
 
 // PostgreSQL runtime query constants
 const (
+	// postgresInsertMessagesQuery writes a whole batch in one statement with one array parameter
+	// per column, in the order of insertMessageArgs. The statement text is the same for every batch
+	// size: pgx prepares each distinct text server-side and keeps up to 512 per connection, and a
+	// multi-row INSERT per batch size left hundreds of multi-MB plans in every pooled backend.
+	postgresInsertMessagesQuery = `
+		INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user_id, content_type, encoding, published)
+		SELECT * FROM unnest($1::TEXT[], $2::TEXT[], $3::BIGINT[], $4::TEXT[], $5::BIGINT[], $6::TEXT[], $7::TEXT[], $8::TEXT[], $9::INT[], $10::TEXT[], $11::TEXT[], $12::TEXT[], $13::TEXT[], $14::TEXT[], $15::TEXT[], $16::BIGINT[], $17::BIGINT[], $18::TEXT[], $19::BOOLEAN[], $20::TEXT[], $21::TEXT[], $22::TEXT[], $23::TEXT[], $24::BOOLEAN[])
+	`
 	postgresSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
 	postgresDeleteScheduledBySequenceIDQuery      = `DELETE FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
 	postgresUpdateMessagesForTopicExpiryQuery     = `UPDATE message SET expires = $1 WHERE topic = $2`
@@ -136,12 +145,23 @@ func NewPostgresStore(d *db.DB, batchSize int, batchTimeout time.Duration) (*Cac
 	return newCache(d, postgresQueries, nil, batchSize, batchTimeout, false), nil
 }
 
-// postgresInsertMessageColumns lists the message columns in the order insertMessageArgs fills them
-var postgresInsertMessageColumns = []string{"mid", "sequence_id", "time", "event", "expires", "topic", "message", "title", "priority", "tags", "click", "icon", "actions", "attachment_name", "attachment_type", "attachment_size", "attachment_expires", "attachment_url", "attachment_deleted", "sender", "user_id", "content_type", "encoding", "published"}
-
-// postgresInsertMessages returns a multi-row INSERT for the given number of message rows
-func postgresInsertMessages(rows int) string {
-	return insertMessagesQuery("message", postgresInsertMessageColumns, rows, func(i int) string {
-		return "$" + strconv.Itoa(i)
-	})
+// postgresInsertMessages transposes the batch into one array per column and writes it with
+// postgresInsertMessagesQuery in a single round trip
+func postgresInsertMessages(tx *sql.Tx, ms []*model.Message) error {
+	columns := make([][]any, insertMessageColumns)
+	for _, m := range ms {
+		args, err := insertMessageArgs(m)
+		if err != nil {
+			return err
+		}
+		for i, arg := range args {
+			columns[i] = append(columns[i], arg)
+		}
+	}
+	params := make([]any, 0, len(columns))
+	for _, column := range columns {
+		params = append(params, column)
+	}
+	_, err := tx.Exec(postgresInsertMessagesQuery, params...)
+	return err
 }

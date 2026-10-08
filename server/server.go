@@ -314,6 +314,11 @@ func New(conf *Config) (*Server, error) {
 			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
 		})
 	}
+	// Peers reach this node on the dedicated cluster listener, never on the public ones
+	advertiseURL := conf.ClusterAdvertiseURL
+	if advertiseURL == "" && conf.ClusterListen != "" {
+		advertiseURL = "http://" + conf.ClusterListen
+	}
 	s := &Server{
 		config:          conf,
 		db:              pool,
@@ -331,14 +336,10 @@ func New(conf *Config) (*Server, error) {
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
 	}
+	// Everything from here on needs the server itself: the price cache calls a method on it, and
+	// the cluster delivers peer messages through callbacks into it (which is how the cluster
+	// package stays independent of the server)
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
-	// Cross-node cluster; delivery of peer messages to local subscribers is injected as a
-	// callback, so the cluster package never depends on the server. Peers talk to each other only
-	// via the dedicated cluster listener, never via the public listeners.
-	advertiseURL := conf.ClusterAdvertiseURL
-	if advertiseURL == "" && conf.ClusterListen != "" {
-		advertiseURL = "http://" + conf.ClusterListen
-	}
 	s.cluster, err = cluster.New(&cluster.Config{
 		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
 		NodeID:          cluster.NodeID(conf.ClusterNodeID),
@@ -352,35 +353,6 @@ func New(conf *Config) (*Server, error) {
 		return nil, err
 	}
 	return s, nil
-}
-
-// closeLocalSubscribers closes every subscriber connection on this node. The cluster calls it
-// while this node is isolated (lost its registration, peers healthy): peers no longer forward
-// to it, so its subscribers would silently receive nothing; they reconnect to a healthy node.
-func (s *Server) closeLocalSubscribers() {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for _, t := range s.topics {
-		t.CancelAllSubscribers()
-	}
-}
-
-// deliverFromBus delivers a message received from a peer node (via the cluster) to this
-// node's local subscribers. It is the receive-side counterpart to Cluster.ForwardMessage: local
-// delivery and all global side effects (Firebase, email, web push, upstream) already ran on the
-// origin node, so this only publishes to the local topic, and never re-relays.
-func (s *Server) deliverFromBus(m *model.Message) {
-	s.mu.RLock()
-	t, ok := s.topics[m.Topic]
-	s.mu.RUnlock()
-	if !ok {
-		metrics.ClusterMessagesWasted.Inc() // Relayed here needlessly: this node had no use for the message
-		return
-	}
-	v := s.visitor(m.Sender, nil)
-	if err := t.Publish(v, m); err != nil {
-		logvm(v, m).Err(err).Warn("Cluster: unable to deliver fan-out message to local subscribers")
-	}
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -2094,8 +2066,8 @@ func (s *Server) runFirebaseKeepaliver() {
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
-			// Leader only: every FCM keepalive wakes all subscribed phones, so a cluster must
-			// send it exactly once, not once per node (checked per tick to survive failover)
+			// Leader only: a keepalive wakes every subscribed phone, so the cluster sends it
+			// once rather than once per node. Per tick, to survive a failover.
 			if !s.cluster.IsLeader() {
 				continue
 			}
@@ -2118,10 +2090,8 @@ func (s *Server) runDelayedSender() {
 	for {
 		select {
 		case <-time.After(s.config.DelayedSenderInterval):
-			// Leader only, to keep delayed sends on one node. This is a preference, not what
-			// makes delivery safe: MessagesDue claims each row, so a non-leader calling it is
-			// harmless, and the claim is what must survive if this gate is ever removed. Checked
-			// per tick to survive failover; always true single-node.
+			// Leader only, to keep delayed sends on one node. A preference, not what makes
+			// delivery safe: MessagesDue claims each row, so a non-leader is harmless.
 			if !s.cluster.IsLeader() {
 				continue
 			}

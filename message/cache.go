@@ -27,13 +27,25 @@ const (
 	// write takes milliseconds, so this only ever trips when the database is wedged, and then
 	// shutdown must still finish well inside systemd's stop timeout.
 	closeFlushTimeout = 5 * time.Second
+
+	claimTimeout   = 2 * time.Minute // How long a claim hides a due message from other nodes; must exceed dispatching one claim
+	claimBatchSize = 1000            // Rows per claim, so the dispatch time that claimTimeout must cover is bounded
+
+	// queueBufferedBatches is how many full batches can wait for the batch writer before publishes
+	// block. 100 batches of the default 100 messages are ~10 MB typical, ~60 MB at the 4 KB limit.
+	// Every buffered batch must be written within closeFlushTimeout on shutdown.
+	queueBufferedBatches = 100
+
+	// insertMessageColumns is the number of values insertMessageArgs returns per message, which is
+	// the number of columns in each backend's INSERT statement
+	insertMessageColumns = 25
 )
 
 var errNoRows = errors.New("no rows found")
 
 // queries holds the database-specific SQL queries
 type queries struct {
-	insertMessage                    string
+	insertMessages                   func(tx *sql.Tx, ms []*model.Message) error // Writes a batch of messages in as few statements as possible
 	selectScheduledMessageIDsBySeqID string
 	deleteScheduledBySequenceID      string
 	updateMessagesForTopicExpiry     string
@@ -45,6 +57,7 @@ type queries struct {
 	selectMessagesSinceIDScheduled   string
 	selectMessagesLatest             string
 	selectMessagesDue                string
+	claimMessagesDue                 string // Postgres-only: claims due rows and stamps claimed_at; empty for SQLite/mem
 	deleteExpiredMessages            string
 	updateMessagePublished           string
 	selectMessagesCount              string
@@ -66,20 +79,24 @@ type Cache struct {
 	nop     bool
 	mu      *sync.Mutex // nil for PostgreSQL (concurrent writes supported), set for SQLite (single writer)
 	queries queries
+	// claimTimeout is how long this node's claim on a due message holds off the others; it is a
+	// field only so tests can shorten it
+	claimTimeout time.Duration
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
 	var queue *util.BatchingQueue[*model.Message]
 	if batchSize > 0 || batchTimeout > 0 {
-		queue = util.NewBatchingQueue[*model.Message](batchSize, batchTimeout)
+		queue = util.NewBatchingQueue[*model.Message](batchSize, batchTimeout, queueBufferedBatches)
 	}
 	c := &Cache{
-		db:      db,
-		queue:   queue,
-		written: make(chan struct{}),
-		nop:     nop,
-		mu:      mu,
-		queries: queries,
+		db:           db,
+		queue:        queue,
+		written:      make(chan struct{}),
+		nop:          nop,
+		mu:           mu,
+		queries:      queries,
+		claimTimeout: claimTimeout,
 	}
 	go c.processMessageBatches()
 	return c
@@ -127,77 +144,8 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 		return err
 	}
 	defer tx.Rollback()
-	stmt, err := tx.Prepare(c.queries.insertMessage)
-	if err != nil {
+	if err := c.queries.insertMessages(tx, ms); err != nil {
 		return err
-	}
-	defer stmt.Close()
-	for _, m := range ms {
-		if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
-			return model.ErrUnexpectedMessageType
-		}
-		published := m.Time <= time.Now().Unix()
-		tags := util.SanitizeUTF8(strings.Join(m.Tags, ","))
-		var attachmentName, attachmentType, attachmentURL string
-		var attachmentSize, attachmentExpires int64
-		var attachmentDeleted bool
-		if m.Attachment != nil {
-			attachmentName = util.SanitizeUTF8(m.Attachment.Name)
-			attachmentType = util.SanitizeUTF8(m.Attachment.Type)
-			attachmentSize = m.Attachment.Size
-			attachmentExpires = m.Attachment.Expires
-			attachmentURL = util.SanitizeUTF8(m.Attachment.URL)
-		}
-		var actionsStr string
-		if len(m.Actions) > 0 {
-			actionsBytes, err := json.Marshal(m.Actions)
-			if err != nil {
-				return err
-			}
-			actionsStr = string(actionsBytes)
-		}
-		var appleStr string
-		if m.Apple != nil {
-			appleBytes, err := json.Marshal(m.Apple)
-			if err != nil {
-				return err
-			}
-			appleStr = string(appleBytes)
-		}
-		var sender string
-		if m.Sender.IsValid() {
-			sender = m.Sender.String()
-		}
-		_, err := stmt.Exec(
-			m.ID,
-			m.SequenceID,
-			m.Time,
-			m.Event,
-			m.Expires,
-			util.SanitizeUTF8(m.Topic),
-			util.SanitizeUTF8(m.Message),
-			util.SanitizeUTF8(m.Title),
-			m.Priority,
-			tags,
-			util.SanitizeUTF8(m.Click),
-			util.SanitizeUTF8(m.Icon),
-			actionsStr,
-			attachmentName,
-			attachmentType,
-			attachmentSize,
-			attachmentExpires,
-			attachmentURL,
-			attachmentDeleted, // Always zero
-			sender,
-			m.User,
-			util.SanitizeUTF8(m.ContentType),
-			m.Encoding,
-			appleStr,
-			published,
-		)
-		if err != nil {
-			return err
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		log.Tag(tagMessageCache).Err(err).Error("Writing %d message(s) failed (took %v)", len(ms), time.Since(start))
@@ -205,6 +153,73 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 	}
 	log.Tag(tagMessageCache).Debug("Wrote %d message(s) in %v", len(ms), time.Since(start))
 	return nil
+}
+
+// insertMessageArgs returns the values of one message row, in the order of the columns in the
+// backends' INSERT statements (postgresInsertMessagesQuery, sqliteInsertMessagesQuery)
+func insertMessageArgs(m *model.Message) ([]any, error) {
+	if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
+		return nil, model.ErrUnexpectedMessageType
+	}
+	published := m.Time <= time.Now().Unix()
+	tags := util.SanitizeUTF8(strings.Join(m.Tags, ","))
+	var attachmentName, attachmentType, attachmentURL string
+	var attachmentSize, attachmentExpires int64
+	var attachmentDeleted bool
+	if m.Attachment != nil {
+		attachmentName = util.SanitizeUTF8(m.Attachment.Name)
+		attachmentType = util.SanitizeUTF8(m.Attachment.Type)
+		attachmentSize = m.Attachment.Size
+		attachmentExpires = m.Attachment.Expires
+		attachmentURL = util.SanitizeUTF8(m.Attachment.URL)
+	}
+	var actionsStr string
+	if len(m.Actions) > 0 {
+		actionsBytes, err := json.Marshal(m.Actions)
+		if err != nil {
+			return nil, err
+		}
+		actionsStr = string(actionsBytes)
+	}
+	var appleStr string
+	if m.Apple != nil {
+		appleBytes, err := json.Marshal(m.Apple)
+		if err != nil {
+			return nil, err
+		}
+		appleStr = string(appleBytes)
+	}
+	var sender string
+	if m.Sender.IsValid() {
+		sender = m.Sender.String()
+	}
+	return []any{
+		m.ID,
+		m.SequenceID,
+		m.Time,
+		m.Event,
+		m.Expires,
+		util.SanitizeUTF8(m.Topic),
+		util.SanitizeUTF8(m.Message),
+		util.SanitizeUTF8(m.Title),
+		m.Priority,
+		tags,
+		util.SanitizeUTF8(m.Click),
+		util.SanitizeUTF8(m.Icon),
+		actionsStr,
+		attachmentName,
+		attachmentType,
+		attachmentSize,
+		attachmentExpires,
+		attachmentURL,
+		attachmentDeleted, // Always zero
+		sender,
+		m.User,
+		util.SanitizeUTF8(m.ContentType),
+		m.Encoding,
+		appleStr,
+		published,
+	}, nil
 }
 
 // Messages returns all cached messages for a topic, oldest first. Prefer MessagesCapped on
@@ -299,13 +314,34 @@ func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
 	return readMessages(rows)
 }
 
-// MessagesDue returns all messages that are due for publishing
+// MessagesDue returns all messages that are due for publishing. On Postgres it CLAIMS them, so
+// every node may call it, leader or not: each row is handed to exactly one caller.
 func (c *Cache) MessagesDue() ([]*model.Message, error) {
+	if c.queries.claimMessagesDue != "" {
+		return c.claimMessagesDue()
+	}
 	rows, err := c.db.Query(c.queries.selectMessagesDue, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}
 	return readMessages(rows)
+}
+
+// claimMessagesDue stamps the due rows it takes, so concurrent senders on other nodes get
+// disjoint sets. The rows stay unpublished: MarkPublished still runs after delivery.
+func (c *Cache) claimMessagesDue() ([]*model.Message, error) {
+	now := time.Now().Unix()
+	rows, err := c.db.Query(c.queries.claimMessagesDue, now, now-int64(c.claimTimeout.Seconds()), claimBatchSize, now)
+	if err != nil {
+		return nil, err
+	}
+	return readMessages(rows) // Reads all rows and closes them
+}
+
+// SetClaimTimeoutForTest shortens the claim hold-off, so a test can see an abandoned claim
+// become claimable again without waiting out the real timeout.
+func (c *Cache) SetClaimTimeoutForTest(timeout time.Duration) {
+	c.claimTimeout = timeout
 }
 
 // DeleteExpiredMessages deletes up to `limit` expired messages in a single query

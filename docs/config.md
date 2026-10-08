@@ -477,6 +477,20 @@ the primary and replica URLs):
 | `pool_conn_max_lifetime`  | -       | Maximum amount of time a connection may be reused (Go duration, e.g. `5m`, `1h`) |
 | `pool_conn_max_idle_time` | -       | Maximum amount of time a connection may be idle (Go duration, e.g. `30s`, `5m`)  |
 
+For a busy server, the recommended settings are `pool_max_conns=30&pool_conn_max_lifetime=15m&pool_conn_max_idle_time=5m`
+on the primary and on every replica (this is what ntfy.sh runs). The reasoning:
+
+* `pool_max_conns`: the message writer uses one connection per batch, and every other query (polls, access checks,
+  stats) uses one for a few milliseconds, so 30 covers publish bursts of hundreds of messages per second. Make sure the
+  PostgreSQL `max_connections` setting covers the pool size times the number of ntfy instances, plus other clients.
+* `pool_max_idle_conns`: leave it at the default (equal to `pool_max_conns`). A smaller value closes connections after
+  every burst, so the next burst pays a DNS lookup, a TCP/TLS handshake and authentication per query.
+* `pool_conn_max_lifetime`: a long-lived PostgreSQL backend keeps growing (statement and catalog caches are never given
+  back), and a managed database may move to a new address on failover; recycling connections every 15 minutes bounds
+  both without noticeable churn.
+* `pool_conn_max_idle_time`: releases connections the server does not need overnight; under steady traffic the pool
+  rotates through all connections, so the limit never triggers.
+
 
 ## Message cache
 If desired, ntfy can temporarily keep notifications in an in-memory or an on-disk cache. Caching messages for a short period

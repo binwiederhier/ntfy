@@ -46,6 +46,7 @@ help:
 	@echo "  make web-build                  - Actually build the web app"
 	@echo "  make web-lint                   - Run eslint on the web app"
 	@echo "  make web-test                   - Run vitest unit tests for the web app"
+	@echo "  make web-e2e                    - Run Playwright e2e tests against a fresh local server"
 	@echo "  make web-fmt                    - Run prettier on the web app"
 	@echo "  make web-fmt-check              - Run prettier on the web app, but don't change anything"
 	@echo
@@ -171,6 +172,12 @@ web-lint:
 web-test:
 	cd web && $(NPM) run test
 
+# The e2e server must embed the real web app, so this builds the web app and a server binary
+# (build/ntfy-e2e) first; see web/e2e/server.mjs for how it is started
+web-e2e: web cli-deps-static-sites
+	CGO_ENABLED=1 go build -tags sqlite_omit_load_extension,osusergo,netgo -o build/ntfy-e2e .
+	cd web && npx playwright install chromium && $(NPM) run test:e2e
+
 # Main server/client build
 
 cli: cli-deps
@@ -282,22 +289,22 @@ test: cli-test web-test
 testv: cli-testv web-test
 
 cli-test: FORCE
-	go test $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
+	go test $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 cli-testv: FORCE
-	go test -v $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
+	go test -v $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 race: FORCE
-	go test -v -race $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
+	go test -v -race $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 coverage:
 	mkdir -p build/coverage
-	go test -v -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools|web)')
+	go test -v -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools|web)')
 	go tool cover -func build/coverage/coverage.txt
 
 coverage-html:
 	mkdir -p build/coverage
-	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
+	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 	go tool cover -html build/coverage/coverage.txt
 
 coverage-upload:

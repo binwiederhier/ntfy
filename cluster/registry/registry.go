@@ -136,6 +136,16 @@ func (r *Registry) Peers() []*Peer {
 	return r.peers
 }
 
+// Fresh reports whether the snapshot Peers serves is recent enough to act on. Peers keeps
+// serving the last known list when the database is unreachable, which is what keeps fan-out
+// alive through a hiccup, but a view that old must not be reported outwards as the current
+// membership (see cluster.Member).
+func (r *Registry) Fresh() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return !r.refreshedAt.IsZero() && time.Since(r.refreshedAt) < r.ttl
+}
+
 // Prune deletes registry rows whose heartbeat is long expired. Only the leader calls this; the
 // grace period of 3x the TTL avoids deleting rows of nodes that are merely slow to heartbeat.
 func (r *Registry) Prune() error {

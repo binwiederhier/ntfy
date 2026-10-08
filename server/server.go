@@ -992,15 +992,18 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
 	}
 	if cache {
-		// Delete any existing scheduled message with the same sequence ID
-		deletedIDs, err := s.messageCache.DeleteScheduledBySequenceID(t.ID, m.SequenceID)
-		if err != nil {
-			return nil, err
-		}
-		// Delete attachment files for deleted scheduled messages
-		if s.attachment != nil && len(deletedIDs) > 0 {
-			if err := s.attachment.Remove(deletedIDs...); err != nil {
-				logvrm(v, r, m).Tag(tagPublish).Err(err).Warn("Error removing attachments for deleted scheduled messages")
+		// Delete any existing scheduled message with the same sequence ID. Without a client-provided
+		// sequence ID, it is the message's own fresh ID and nothing can match, so skip the round trip.
+		if m.SequenceID != m.ID {
+			deletedIDs, err := s.messageCache.DeleteScheduledBySequenceID(t.ID, m.SequenceID)
+			if err != nil {
+				return nil, err
+			}
+			// Delete attachment files for deleted scheduled messages
+			if s.attachment != nil && len(deletedIDs) > 0 {
+				if err := s.attachment.Remove(deletedIDs...); err != nil {
+					logvrm(v, r, m).Tag(tagPublish).Err(err).Warn("Error removing attachments for deleted scheduled messages")
+				}
 			}
 		}
 		logvrm(v, r, m).Tag(tagPublish).Debug("Adding message to cache")

@@ -190,20 +190,29 @@ export class SubscriptionManager {
 
   /** Adds notification, or returns false if it already exists */
   async addNotification(subscriptionId, notification) {
-    const exists = await this.db.notifications.get(notification.id);
-    if (exists || notification.event === EVENT_MESSAGE_DELETE || notification.event === EVENT_MESSAGE_CLEAR) {
+    if (notification.event === EVENT_MESSAGE_DELETE || notification.event === EVENT_MESSAGE_CLEAR) {
       return false;
     }
     try {
       // Note: Service worker (sw.js) and addNotifications() duplicates this logic,
       // so if you change it here, change it there too.
 
-      // Add notification to database
-      await this.db.notifications.add({
-        ...messageWithSequenceId(notification),
-        subscriptionId,
-        new: 1, // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+      // Add notification to database; check and add in one transaction, so a poll storing the
+      // same message concurrently (see addNotifications) can't slip in between
+      const added = await this.db.transaction("rw", this.db.notifications, async () => {
+        if (await this.db.notifications.get(notification.id)) {
+          return false;
+        }
+        await this.db.notifications.add({
+          ...messageWithSequenceId(notification),
+          subscriptionId,
+          new: 1, // New marker (used for bubble indicator); cannot be boolean; Dexie index limitation
+        });
+        return true;
       });
+      if (!added) {
+        return false;
+      }
 
       // FIXME consider put() for double tab
       // Update subscription last message id (for ?since=... queries)
@@ -216,14 +225,21 @@ export class SubscriptionManager {
     return true;
   }
 
-  /** Adds/replaces notifications, will not throw if they exist */
+  /** Adds notifications, skipping ones that already exist; will not throw if they exist */
   async addNotifications(subscriptionId, notifications) {
-    const notificationsWithSubscriptionId = notifications.map((notification) => ({
-      ...messageWithSequenceId(notification),
-      subscriptionId,
-    }));
+    // Skip notifications that are already stored (e.g. delivered via WebSocket while this poll
+    // was in flight), so overwriting them doesn't drop their "new" marker
+    await this.db.transaction("rw", this.db.notifications, async () => {
+      const existing = await this.db.notifications.bulkGet(notifications.map((n) => n.id));
+      const notificationsWithSubscriptionId = notifications
+        .filter((_, i) => !existing[i])
+        .map((notification) => ({
+          ...messageWithSequenceId(notification),
+          subscriptionId,
+        }));
+      await this.db.notifications.bulkPut(notificationsWithSubscriptionId);
+    });
     const lastNotificationId = notifications.at(-1).id;
-    await this.db.notifications.bulkPut(notificationsWithSubscriptionId);
     await this.db.subscriptions.update(subscriptionId, {
       last: lastNotificationId,
     });

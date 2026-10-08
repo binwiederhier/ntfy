@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -5065,6 +5066,57 @@ func TestServer_UpdateScheduledMessage(t *testing.T) {
 	})
 }
 
+func TestServer_UpdateScheduledMessage_SequenceIDParam(t *testing.T) {
+	// Same as TestServer_UpdateScheduledMessage, but with the sequence ID passed as a query
+	// parameter instead of in the path; the scheduled message must still be replaced
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic?sid=sched-seq&delay=1h", "original scheduled message", nil)
+		require.Equal(t, 200, response.Code)
+		msg1 := toMessage(t, response.Body.String())
+		require.Equal(t, "sched-seq", msg1.SequenceID)
+
+		response = request(t, s, "PUT", "/mytopic?sid=sched-seq&delay=2h", "updated scheduled message", nil)
+		require.Equal(t, 200, response.Code)
+		msg2 := toMessage(t, response.Body.String())
+		require.Equal(t, "sched-seq", msg2.SequenceID)
+		require.NotEqual(t, msg1.ID, msg2.ID)
+
+		response = request(t, s, "GET", "/mytopic/json?poll=1&scheduled=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		messages := toMessages(t, response.Body.String())
+		require.Equal(t, 1, len(messages))
+		require.Equal(t, msg2.ID, messages[0].ID)
+		require.Equal(t, "updated scheduled message", messages[0].Message)
+	})
+}
+
+func TestServer_PublishWithoutSequenceID_NoDatabaseRoundTrip(t *testing.T) {
+	// A message without a client-provided sequence ID gets its own fresh ID as sequence ID, so no
+	// scheduled message can share it; publishing it must not wait for the database. The proxy
+	// counts database requests, so the assertion does not depend on the speed of the test host.
+	proxy := dbtest.NewLatencyProxy(t, dbtest.CreateTestPostgresSchema(t), time.Millisecond)
+	conf := newTestConfig(t, proxy.DSN())
+	conf.CacheBatchSize = 10
+	conf.CacheBatchTimeout = 100 * time.Millisecond
+	conf.AuthAccessCacheEnabled = true // Like on high-volume servers; otherwise the ACL check is a round trip
+	s := newTestServer(t, conf)
+	request(t, s, "PUT", "/mytopic", "warm up", nil)
+	time.Sleep(300 * time.Millisecond) // Let the warm-up batch and its ACL cache reload settle
+
+	before := proxy.Requests()
+	response := request(t, s, "PUT", "/mytopic", "hi", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, int64(0), proxy.Requests()-before, "publish made database round trips")
+
+	// The message still reaches the database
+	require.Eventually(t, func() bool {
+		response := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		return strings.Contains(response.Body.String(), `"message":"hi"`)
+	}, 5*time.Second, 100*time.Millisecond)
+}
+
 func TestServer_DeleteScheduledMessage(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()
@@ -5771,4 +5823,79 @@ func TestServer_StopIsBoundedWhenAStoreBlocks(t *testing.T) {
 	case <-time.After(60 * time.Second):
 		t.Fatal("Stop did not return while a store was stuck")
 	}
+}
+
+func TestServer_PublishTimezone(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		for _, zone := range []string{"Asia/Tokyo", "America/New_York", "UTC"} {
+			for _, transport := range []string{"header", "x-header", "query", "json"} {
+				t.Run(zone+"/"+transport, func(t *testing.T) {
+					s := newTestServer(t, newTestConfig(t, databaseURL))
+					location, err := time.LoadLocation(zone)
+					require.NoError(t, err)
+					tomorrow := func() int64 {
+						now := time.Now().In(location)
+						return time.Date(now.Year(), now.Month(), now.Day()+1, 10, 0, 0, 0, location).Unix()
+					}
+					path, body := "/mytopic", "a message"
+					headers := map[string]string{"Delay": "tomorrow 10am"}
+					switch transport {
+					case "header":
+						headers["Timezone"] = zone
+					case "x-header":
+						headers["X-Timezone"] = zone
+					case "query":
+						path += "?timezone=" + url.QueryEscape(zone)
+					case "json":
+						path = "/"
+						body = fmt.Sprintf(`{"topic":"mytopic","message":"a message","delay":"tomorrow 10am","timezone":%q}`, zone)
+						headers = nil
+					}
+					before := tomorrow()
+					response := request(t, s, "POST", path, body, headers)
+					require.Equal(t, 200, response.Code, response.Body.String())
+					message := toMessage(t, response.Body.String())
+					require.Contains(t, []int64{before, tomorrow()}, message.Time)
+				})
+			}
+		}
+	})
+}
+
+func TestServer_PublishTimezoneRelativeAndUnix(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for _, delay := range []string{"1h", fmt.Sprint(time.Now().Add(time.Hour).Unix())} {
+			before := time.Now().Add(time.Hour).Unix()
+			response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+				"Delay": delay, "Timezone": "Asia/Tokyo",
+			})
+			require.Equal(t, 200, response.Code, response.Body.String())
+			require.InDelta(t, before, toMessage(t, response.Body.String()).Time, 2)
+		}
+	})
+}
+
+func TestServer_PublishTimezoneInvalid(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for _, zone := range []string{"Unknown/Timezone", "../etc/passwd", "+09:00"} {
+			response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+				"Delay": "1h", "Timezone": zone,
+			})
+			require.Equal(t, 400, response.Code)
+			require.Equal(t, errHTTPBadRequestTimezoneInvalid, toHTTPError(t, response.Body.String()))
+		}
+	})
+}
+
+func TestServer_PublishTimezoneWithoutDelay(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+			"Timezone": "Unknown/Timezone",
+		})
+		require.Equal(t, 200, response.Code)
+		require.InDelta(t, time.Now().Unix(), toMessage(t, response.Body.String()).Time, 2)
+	})
 }

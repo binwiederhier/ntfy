@@ -2766,7 +2766,7 @@ Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Tim
     <tr><td><code>1 day</code></td><td>12/<b>11</b>/2021, 9am</td><td>24 hours from now</td></tr>
     <tr><td><code>10am</code></td><td>12/10/2021, <b>10am</b></td><td>Today at 10am (same day, because it's only 9am)</td></tr>
     <tr><td><code>8am</code></td><td>12/<b>11</b>/2021, <b>8am</b></td><td>Tomorrow at 8am (because it's 9am already)</td></tr>
-    <tr><td><code>2021-12-10T11:00:00-05:00</code></td><td>12/10/2021, <b>11am</b> (EST)</td><td>Absolute RFC3339 timestamp with timezone offset</td></tr>
+    <tr><td><code>2026-12-10T11:00:00-05:00</code></td><td>12/10/2026, <b>11am</b> (EST)</td><td>Absolute RFC3339 timestamp with timezone offset</td></tr>
     <tr><td><code>1639152000</code></td><td>12/10/2021, 11am (EST)</td><td> Today at 11am (EST)</td></tr>
     </tbody></table>
 </td>

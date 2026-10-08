@@ -187,72 +187,6 @@ func (c *meshCluster) heartbeatLoop() {
 	}
 }
 
-// isolationLoop runs the isolation check on its own ticker: a partitioned database can make
-// heartbeat calls hang for a while, and Healthy is time-based, so this still notices
-func (c *meshCluster) isolationLoop() {
-	defer c.wg.Done()
-	ticker := time.NewTicker(c.conf.HeartbeatInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-c.ctx.Done():
-			return
-		case <-ticker.C:
-			c.maybeIsolated()
-		}
-	}
-}
-
-// maybeIsolated calls IsolatedFunc while this node's registration is stale (peers no longer
-// forward to it) but at least one known peer is healthy. With no healthy peer (e.g. a full
-// database outage) nothing happens: the mesh keeps delivering on its cached peer view.
-func (c *meshCluster) maybeIsolated() {
-	if c.conf.IsolatedFunc == nil || c.Healthy() {
-		return
-	}
-	c.mu.Lock()
-	urls := make([]string, 0, len(c.knownPeers))
-	for _, url := range c.knownPeers {
-		urls = append(urls, url)
-	}
-	c.mu.Unlock()
-	for _, url := range urls {
-		if c.peerHealthy(url) {
-			log.Tag(tag).Warn("This node lost its cluster registration while peer %s is healthy; closing local subscribers so they reconnect elsewhere", url)
-			c.conf.IsolatedFunc()
-			return
-		}
-	}
-}
-
-func (c *meshCluster) peerHealthy(url string) bool {
-	ctx, cancel := context.WithTimeout(c.ctx, peerHealthTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+HealthPath, nil)
-	if err != nil {
-		return false
-	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return false
-	}
-	// A 200 is not evidence of a healthy ntfy. An advertise URL that points at a proxy, a load
-	// balancer or an unrelated service can answer 200 for any path, and believing it would close
-	// this node's subscribers while nothing else can serve them, which is the one thing this
-	// check must not do. Require the health answer itself.
-	var health struct {
-		Healthy bool `json:"healthy"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, healthMaxBytes)).Decode(&health); err != nil {
-		return false
-	}
-	return health.Healthy
-}
-
 // heartbeat is one control-plane tick: refresh this node's registry row, read the live set back
 // (which is also what updates this node's leadership standing), prune long-dead rows if this node
 // leads, and reconcile the per-peer queues.
@@ -318,6 +252,72 @@ func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
 		}
 	}
 	c.mu.Unlock()
+}
+
+// isolationLoop runs the isolation check on its own ticker: a partitioned database can make
+// heartbeat calls hang for a while, and Healthy is time-based, so this still notices
+func (c *meshCluster) isolationLoop() {
+	defer c.wg.Done()
+	ticker := time.NewTicker(c.conf.HeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
+			c.maybeIsolated()
+		}
+	}
+}
+
+// maybeIsolated calls IsolatedFunc while this node's registration is stale (peers no longer
+// forward to it) but at least one known peer is healthy. With no healthy peer (e.g. a full
+// database outage) nothing happens: the mesh keeps delivering on its cached peer view.
+func (c *meshCluster) maybeIsolated() {
+	if c.conf.IsolatedFunc == nil || c.Healthy() {
+		return
+	}
+	c.mu.Lock()
+	urls := make([]string, 0, len(c.knownPeers))
+	for _, url := range c.knownPeers {
+		urls = append(urls, url)
+	}
+	c.mu.Unlock()
+	for _, url := range urls {
+		if c.peerHealthy(url) {
+			log.Tag(tag).Warn("This node lost its cluster registration while peer %s is healthy; closing local subscribers so they reconnect elsewhere", url)
+			c.conf.IsolatedFunc()
+			return
+		}
+	}
+}
+
+func (c *meshCluster) peerHealthy(url string) bool {
+	ctx, cancel := context.WithTimeout(c.ctx, peerHealthTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+HealthPath, nil)
+	if err != nil {
+		return false
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+	// A 200 is not evidence of a healthy ntfy. An advertise URL that points at a proxy, a load
+	// balancer or an unrelated service can answer 200 for any path, and believing it would close
+	// this node's subscribers while nothing else can serve them, which is the one thing this
+	// check must not do. Require the health answer itself.
+	var health struct {
+		Healthy bool `json:"healthy"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, healthMaxBytes)).Decode(&health); err != nil {
+		return false
+	}
+	return health.Healthy
 }
 
 // queueFor returns the send queue for the given peer, creating it (and its delivery worker) if it

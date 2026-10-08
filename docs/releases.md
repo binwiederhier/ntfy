@@ -2126,7 +2126,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
-* Fix PostgreSQL backend memory growing after v2.29.0: the batch `INSERT` had a different statement text for every batch size, and the driver prepares each distinct text server-side (up to 512 per connection), so long-lived pool connections accumulated hundreds of multi-MB plans. Batches are now written with one fixed statement (`unnest` of one array per column) regardless of size
+* Fix PostgreSQL backend memory growing after v2.29.0: the batch `INSERT` had a different statement text for every batch size, and the driver prepares each distinct text server-side (up to 512 per connection), so long-lived pool connections accumulated hundreds of multi-MB plans. Batches are now written with one fixed statement (`unnest` of one array per column) regardless of size ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
+
+**Documentation:**
+
+* Recommended PostgreSQL pool settings for a busy server (`pool_max_conns`, `pool_conn_max_lifetime`, `pool_conn_max_idle_time`) in the [config docs](config.md#postgresql) ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

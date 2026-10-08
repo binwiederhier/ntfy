@@ -335,25 +335,6 @@ func (c *meshCluster) peerHealthy(url string) bool {
 	return health.Healthy
 }
 
-// queueFor returns the send queue for the given peer, creating it (and its delivery worker) if it
-// does not exist yet. The caller must hold c.mu.
-func (c *meshCluster) queueFor(p *registry.Peer) *peerQueue {
-	nodeID := NodeID(p.NodeID)
-	q, ok := c.queues[nodeID]
-	if ok {
-		return q
-	}
-	q = &peerQueue{
-		advertiseURL: p.AdvertiseURL,
-		queue: util.NewLingerQueue(peerQueueSize, batchMaxMessages, batchMaxBytes,
-			func(line []byte) int { return len(line) }, c.conf.BatchLinger),
-	}
-	c.queues[nodeID] = q
-	c.wg.Add(1)
-	go c.peerWorker(nodeID, q)
-	return q
-}
-
 // ForwardMessage enqueues the message for delivery to every live peer node; a peer without
 // subscribers for the topic drops it on arrival. Delivery is fire-and-forget via each peer's
 // bounded batching queue; if a peer's queue is full the message is dropped for that peer
@@ -383,6 +364,25 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 		}
 	}
 	return nil
+}
+
+// queueFor returns the send queue for the given peer, creating it (and its delivery worker) if it
+// does not exist yet. The caller must hold c.mu.
+func (c *meshCluster) queueFor(p *registry.Peer) *peerQueue {
+	nodeID := NodeID(p.NodeID)
+	q, ok := c.queues[nodeID]
+	if ok {
+		return q
+	}
+	q = &peerQueue{
+		advertiseURL: p.AdvertiseURL,
+		queue: util.NewLingerQueue(peerQueueSize, batchMaxMessages, batchMaxBytes,
+			func(line []byte) int { return len(line) }, c.conf.BatchLinger),
+	}
+	c.queues[nodeID] = q
+	c.wg.Add(1)
+	go c.peerWorker(nodeID, q)
+	return q
 }
 
 // peerWorker delivers batches of queued fan-out messages to a single peer. Batches form in the

@@ -279,7 +279,7 @@ func TestMesh_DeadPeerRemovedAndRejoin(t *testing.T) {
 	}))
 	defer srv.Close()
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.NodeTTL = 300 * time.Millisecond // Fast expiry so the test observes TTL-based removal
+	conf.NodeTTL = time.Second // The floor: a shorter TTL truncates the SQL liveness cutoff to zero
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
@@ -552,7 +552,7 @@ func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wan
 	pool := db.New(host, nil)
 	var isolated atomic.Int32
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.NodeTTL = 300 * time.Millisecond
+	conf.NodeTTL = time.Second // The floor: a shorter TTL truncates the SQL liveness cutoff to zero
 	conf.IsolatedFunc = func() { isolated.Add(1) }
 	// Registered last: the fake peer never heartbeats again, so its row must still be fresh
 	// when the mesh takes its first peer snapshot
@@ -568,8 +568,8 @@ func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wan
 	require.Equal(t, int32(0), isolated.Load()) // Healthy node: never isolated
 
 	pool.Close() // Database lost: registration fails from now on
-	time.Sleep(time.Second)
-	require.False(t, mesh.Healthy())
+	waitFor(t, func() bool { return !mesh.Healthy() })
+	time.Sleep(2 * conf.HeartbeatInterval) // Give the isolation loop its chance to decide
 	require.Equal(t, wantIsolated, isolated.Load() > 0)
 }
 
@@ -585,7 +585,7 @@ func TestMesh_IsolatedFuncWhenDatabaseHangs(t *testing.T) {
 	proxy := newFreezableProxy(t, schemaDSN)
 	var isolated atomic.Int32
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.NodeTTL = 300 * time.Millisecond
+	conf.NodeTTL = time.Second // The floor: a shorter TTL truncates the SQL liveness cutoff to zero
 	conf.IsolatedFunc = func() { isolated.Add(1) }
 	// Registered last, and through its own pool: the fake peer never heartbeats again, so its
 	// row must still be fresh when the mesh takes its first peer snapshot

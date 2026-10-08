@@ -1052,7 +1052,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	}
 	u := v.User()
 	if s.userManager != nil && u != nil && u.Tier != nil {
-		go s.userManager.EnqueueUserStats(u.ID, v.Stats())
+		go v.EnqueueUserStatsDelta()
 	}
 	s.mu.Lock()
 	s.messages++

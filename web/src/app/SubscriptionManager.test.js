@@ -109,3 +109,35 @@ describe("SubscriptionManager.syncFromRemote", () => {
     expect(db.rows.get("https://ntfy.sh/mytopic").displayName).toBe("My Topic");
   });
 });
+
+describe("SubscriptionManager.notificationStateFromBackend", () => {
+  it("reads notification state through native IndexedDB requests", async () => {
+    const request = (value) => {
+      const indexedDbRequest = {};
+      queueMicrotask(() => {
+        indexedDbRequest.result = value;
+        indexedDbRequest.onsuccess();
+      });
+      return indexedDbRequest;
+    };
+    const notifications = {
+      count: () => request(4),
+      index: (name) => {
+        if (name === "new") {
+          return { count: () => request(2) };
+        }
+        return { openCursor: () => request({ value: { id: "newest" } }) };
+      },
+    };
+    const db = {
+      open: vi.fn(),
+      backendDB: () => ({
+        transaction: () => ({ objectStore: () => notifications }),
+      }),
+    };
+    const manager = new SubscriptionManager(db);
+
+    await expect(manager.notificationStateFromBackend()).resolves.toEqual({ count: 4, unreadCount: 2, latestId: "newest" });
+    expect(db.open).toHaveBeenCalledOnce();
+  });
+});

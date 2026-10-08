@@ -25,9 +25,10 @@ const (
 	// MembersPath lists the live cluster members (this node plus its live peers), for the
 	// load balancers' agents: each LB maintains its own upstream list from it.
 	MembersPath = "/v1/cluster/members"
-	// HealthPath reports a node's cluster health (200 healthy, 503 not); served on the cluster
-	// listener too, where isolated nodes probe their peers.
-	HealthPath = "/v1/health"
+	// HealthPath reports a node's cluster health to its PEERS (200 healthy, 503 not): a node
+	// that lost its registration probes it to find out whether anywhere better exists for its
+	// subscribers. The server's public /v1/health is a separate endpoint for load balancers.
+	HealthPath = "/v1/cluster/health"
 )
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer

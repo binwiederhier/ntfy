@@ -22,6 +22,11 @@ func stateURL(advertiseURL string) string {
 	return strings.TrimRight(advertiseURL, "/") + StatePath
 }
 
+// healthURL derives the peer's health endpoint URL from its advertise URL.
+func healthURL(advertiseURL string) string {
+	return strings.TrimRight(advertiseURL, "/") + HealthPath
+}
+
 // marshalMessage serializes one message and its non-JSON fields (Sender, User) as an
 // apiMessage line. Lines are marshaled once per publish and shared across all per-peer
 // queues; assembleMessageBody joins them without re-marshaling.

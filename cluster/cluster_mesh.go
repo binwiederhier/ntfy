@@ -97,6 +97,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
 	c.mux.HandleFunc("POST "+StatePath, c.authenticated(c.handleState))
 	c.mux.HandleFunc("GET "+MembersPath, c.secretAuthenticated(c.handleMembers))
+	c.mux.HandleFunc("GET "+HealthPath, c.secretAuthenticated(c.handleHealth))
 	c.wg.Add(2)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
@@ -144,6 +145,19 @@ func (c *meshCluster) secretAuthenticated(h http.HandlerFunc) http.HandlerFunc {
 }
 
 // handleMembers lists the live cluster members for the load balancers' agents
+// handleHealth answers a peer's health probe: whether this node's registration is fresh enough
+// that peers still forward to it (see maybeIsolated for what a peer does with the answer).
+func (c *meshCluster) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	healthy := c.Healthy()
+	w.Header().Set("Content-Type", contentTypeJSON)
+	if !healthy {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	if err := json.NewEncoder(w).Encode(&apiHealth{Healthy: healthy}); err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot write health response")
+	}
+}
+
 func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(c.Members()); err != nil {
@@ -301,10 +315,11 @@ func (c *meshCluster) maybeIsolated() {
 func (c *meshCluster) peerHealthy(url string) bool {
 	ctx, cancel := context.WithTimeout(c.ctx, peerHealthTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+HealthPath, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL(url), nil)
 	if err != nil {
 		return false
 	}
+	req.Header.Set(secretHeader, c.conf.Secret)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return false

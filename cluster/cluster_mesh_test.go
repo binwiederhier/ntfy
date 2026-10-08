@@ -540,7 +540,7 @@ func TestMesh_NoIsolatedFuncWhenAPeerAnswers200WithoutBeingNtfy(t *testing.T) {
 func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wantIsolated bool) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/health" {
+		if r.URL.Path == HealthPath {
 			w.WriteHeader(peerHealthStatus)
 			io.WriteString(w, peerHealthBody)
 		}
@@ -656,6 +656,38 @@ func newFreezableProxy(t *testing.T, dsn string) *freezableProxy {
 
 func (p *freezableProxy) freeze() {
 	p.frozen.Store(true)
+}
+
+func TestMesh_HealthEndpoint(t *testing.T) {
+	// Peers probe this to decide whether a node that lost its registration has somewhere better
+	// to send its subscribers, so it answers this node's own registration freshness, and it is
+	// secret-authenticated like the rest of the peer API
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	rr := httptest.NewRecorder()
+	mesh.ServeHTTP(rr, httptest.NewRequest("GET", HealthPath, nil))
+	require.Equal(t, http.StatusUnauthorized, rr.Code) // No secret: rejected like every peer path
+
+	probe := func() *httptest.ResponseRecorder {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", HealthPath, nil)
+		req.Header.Set(secretHeader, testSecret)
+		mesh.ServeHTTP(rr, req)
+		return rr
+	}
+	rr = probe()
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.Contains(t, rr.Body.String(), `"healthy":true`)
+
+	// Registration goes stale once the database is gone, and the answer follows it
+	require.Nil(t, pool.Close())
+	waitFor(t, func() bool { return !mesh.Healthy() })
+	rr = probe()
+	require.Equal(t, http.StatusServiceUnavailable, rr.Code)
+	require.Contains(t, rr.Body.String(), `"healthy":false`)
 }
 
 func TestMesh_MembersEndpoint(t *testing.T) {

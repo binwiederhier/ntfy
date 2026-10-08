@@ -55,10 +55,10 @@ type CancelFunc func(cancel *SubscriberCancel)
 // announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
 
-// apiHealth is the one field this package needs from the health endpoint the SERVER owns and
-// serves (HealthPath). It is declared here, rather than shared with the server's own response
-// type, because this package must not import the server; it reads tolerantly, ignoring whatever
-// else that response carries.
+// apiHealth is the answer on HealthPath: written by handleHealth, read by peerHealthy, so this
+// package owns both ends of it. The status code carries the same answer for anything that only
+// looks at that, but a peer reads the field, since a 200 from something that is not an ntfy
+// cluster node (a proxy on a misconfigured advertise URL) says nothing.
 type apiHealth struct {
 	Healthy bool `json:"healthy"`
 }

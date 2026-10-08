@@ -55,6 +55,14 @@ type CancelFunc func(cancel *SubscriberCancel)
 // announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
 
+// apiHealth is the one field this package needs from the health endpoint the SERVER owns and
+// serves (HealthPath). It is declared here, rather than shared with the server's own response
+// type, because this package must not import the server; it reads tolerantly, ignoring whatever
+// else that response carries.
+type apiHealth struct {
+	Healthy bool `json:"healthy"`
+}
+
 // apiState is the peer state-exchange envelope. Each concern is an optional section; future
 // concerns (rate limit counters, stats) become siblings of Topics.
 type apiState struct {

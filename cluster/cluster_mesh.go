@@ -317,9 +317,7 @@ func (c *meshCluster) peerHealthy(url string) bool {
 	// balancer or an unrelated service can answer 200 for any path, and believing it would close
 	// this node's subscribers while nothing else can serve them, which is the one thing this
 	// check must not do. Require the health answer itself.
-	var health struct {
-		Healthy bool `json:"healthy"`
-	}
+	var health apiHealth
 	if err := json.NewDecoder(io.LimitReader(resp.Body, healthMaxBytes)).Decode(&health); err != nil {
 		return false
 	}

@@ -367,3 +367,10 @@ func topicsSnapshot(s *Server) map[string]*topic {
 	}
 	return topics
 }
+
+func TestServer_Cluster_HealthPathsAgree(t *testing.T) {
+	// The cluster declares the path its peers probe, the server owns the endpoint that answers
+	// it. Nothing links the two constants, so assert they are the same path: if they drift, every
+	// isolation probe silently 404s and no node ever notices it is isolated.
+	require.Equal(t, apiHealthPath, cluster.HealthPath)
+}

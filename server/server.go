@@ -360,13 +360,12 @@ func New(conf *Config) (*Server, error) {
 // traffic cannot be reached from the outside even before any firewalling.
 func (s *Server) clusterHandler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc(cluster.HealthPath, func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if s.cluster.Healthy() {
-			io.WriteString(w, `{"healthy":true}`+"\n")
-		} else {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			io.WriteString(w, `{"healthy":false}`+"\n")
+	// The same handler as the public listener's, so the two cannot answer differently: the peers'
+	// isolation probe and a load balancer's check read the same thing (cluster.HealthPath is
+	// apiHealthPath; healthPathsAgree asserts it)
+	mux.HandleFunc(cluster.HealthPath, func(w http.ResponseWriter, r *http.Request) {
+		if err := s.handleHealth(w, r, nil); err != nil {
+			log.Tag(tagCluster).Err(err).Warn("Cannot write health response")
 		}
 	})
 	mux.Handle("/", s.cluster)

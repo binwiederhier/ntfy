@@ -36,16 +36,16 @@ const (
 	// Every buffered batch must be written within closeFlushTimeout on shutdown.
 	queueBufferedBatches = 100
 
-	// insertMessagesMaxRows caps the rows per multi-row INSERT, keeping the parameter count well
-	// below PostgreSQL's 65535 and SQLite's 32766
-	insertMessagesMaxRows = 1000
+	// insertMessageColumns is the number of values insertMessageArgs returns per message, which is
+	// the number of columns in each backend's INSERT statement
+	insertMessageColumns = 24
 )
 
 var errNoRows = errors.New("no rows found")
 
 // queries holds the database-specific SQL queries
 type queries struct {
-	insertMessages                   func(rows int) string // Multi-row INSERT for the given number of rows
+	insertMessages                   func(tx *sql.Tx, ms []*model.Message) error // Writes a batch of messages in as few statements as possible
 	selectScheduledMessageIDsBySeqID string
 	deleteScheduledBySequenceID      string
 	updateMessagesForTopicExpiry     string
@@ -144,7 +144,7 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 		return err
 	}
 	defer tx.Rollback()
-	if err := insertMessages(tx, c.queries.insertMessages, ms); err != nil {
+	if err := c.queries.insertMessages(tx, ms); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -155,49 +155,8 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 	return nil
 }
 
-// insertMessages writes the messages with as few statements as possible: against a remote
-// database, every statement is a round trip, and the batch writer is the only writer
-func insertMessages(tx *sql.Tx, query func(rows int) string, ms []*model.Message) error {
-	for len(ms) > 0 {
-		chunk := ms[:min(len(ms), insertMessagesMaxRows)]
-		ms = ms[len(chunk):]
-		args := make([]any, 0)
-		for _, m := range chunk {
-			rowArgs, err := insertMessageArgs(m)
-			if err != nil {
-				return err
-			}
-			args = append(args, rowArgs...)
-		}
-		if _, err := tx.Exec(query(len(chunk)), args...); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// insertMessagesQuery builds a multi-row INSERT into table for rows rows of columns, with
-// placeholder producing the parameter marker for the i-th (1-based) value
-func insertMessagesQuery(table string, columns []string, rows int, placeholder func(i int) string) string {
-	var b strings.Builder
-	b.WriteString("INSERT INTO " + table + " (" + strings.Join(columns, ", ") + ") VALUES ")
-	for r := 0; r < rows; r++ {
-		if r > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString("(")
-		for c := range columns {
-			if c > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(placeholder(r*len(columns) + c + 1))
-		}
-		b.WriteString(")")
-	}
-	return b.String()
-}
-
-// insertMessageArgs returns the values of one message row, in the order of the backend's insert columns
+// insertMessageArgs returns the values of one message row, in the order of the columns in the
+// backends' INSERT statements (postgresInsertMessagesQuery, sqliteInsertMessagesQuery)
 func insertMessageArgs(m *model.Message) ([]any, error) {
 	if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
 		return nil, model.ErrUnexpectedMessageType

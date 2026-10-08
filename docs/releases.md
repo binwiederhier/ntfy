@@ -2122,6 +2122,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.29.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Fix PostgreSQL memory growth after v2.29.0: write message batches with one fixed `INSERT` for any batch size ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
+
+**Documentation:**
+
+* Document recommended PostgreSQL pool settings for busy servers ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

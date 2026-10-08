@@ -356,7 +356,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 		return nil // Shutting down; the message is dropped like any other in-flight fan-out
 	}
 	for _, p := range peers {
-		if !c.queueFor(p).queue.TryEnqueue(data) {
+		if !c.queueForNoLock(p).queue.TryEnqueue(data) {
 			metrics.ClusterQueueDropped.Inc()
 			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
 		} else if ev := log.Tag(tag); ev.IsTrace() {
@@ -366,9 +366,9 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 	return nil
 }
 
-// queueFor returns the send queue for the given peer, creating it (and its delivery worker) if it
-// does not exist yet. The caller must hold c.mu.
-func (c *meshCluster) queueFor(p *registry.Peer) *peerQueue {
+// queueForNoLock returns the send queue for the given peer, creating it (and its delivery
+// worker) if it does not exist yet. The caller must hold c.mu.
+func (c *meshCluster) queueForNoLock(p *registry.Peer) *peerQueue {
 	nodeID := NodeID(p.NodeID)
 	q, ok := c.queues[nodeID]
 	if ok {

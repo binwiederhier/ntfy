@@ -427,6 +427,9 @@ func execServe(c *cli.Context) error {
 	} else if runtime.GOOS == "windows" && listenUnix != "" {
 		return errors.New("listen-unix is not supported on Windows")
 	}
+	if cacheDuration > 0 && attachmentExpiryDuration > cacheDuration {
+		log.Warn("attachment-expiry-duration (%s) is longer than cache-duration (%s); attachments never outlive their message, so they will be deleted after %s", attachmentExpiryDurationStr, cacheDurationStr, cacheDurationStr)
+	}
 
 	// Backwards compatibility
 	if webRoot == "app" {

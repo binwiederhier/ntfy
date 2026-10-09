@@ -104,6 +104,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfyexec](https://github.com/alecthomas/ntfyexec) - Send a notification through ntfy.sh if a command fails
 - [Ntfy Desktop](https://github.com/emmaexe/ntfyDesktop) - Fully featured desktop client for Linux, built with Qt and C++.
 - [Ntfy App](https://github.com/rubix-studios-pty-ltd/ntfy-app) - Tauri/Rust desktop client for Windows, Linux and MacOS with push notifications.
+- [mac_ntfy](https://github.com/wangty163/mac_ntfy) - Native macOS client for ntfy (Swift)
 
 ## Projects + scripts 
 

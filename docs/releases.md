@@ -2124,6 +2124,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.29.1 (UNRELEASED)
 
+**Features:**
+
+* Link attachments in email notifications, including the file name and when the link expires ([#672](https://github.com/binwiederhier/ntfy/issues/672), thanks to [@merspieler](https://github.com/merspieler) for suggesting)
+
 **Bug fixes + maintenance:**
 
 * Fix `Dockerfile-build` failing to build: use Go 1.26 and add the `cluster` package ([#1962](https://github.com/binwiederhier/ntfy/issues/1962), thanks to [@ElectricTea](https://github.com/ElectricTea) for reporting)

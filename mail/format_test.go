@@ -147,3 +147,63 @@ Priority: max
 This message was sent by 1.2.3.4 at Fri, 24 Dec 2021 21:43:24 UTC via https://ntfy.sh/alerts`
 	require.Equal(t, expected, actual)
 }
+
+func TestFormatMail_WithAttachment(t *testing.T) {
+	actual, _ := formatMail("https://ntfy.sh", "1.2.3.4", "ntfy@ntfy.sh", "phil@example.com", &model.Message{
+		ID:       "abc",
+		Time:     1640382204,
+		Event:    "message",
+		Topic:    "alerts",
+		Priority: 4,
+		Message:  "You received a file: backup.log",
+		Attachment: &model.Attachment{
+			Name:    "backup.log",
+			Type:    "text/plain; charset=utf-8",
+			Size:    1234,
+			Expires: 1640393004,
+			URL:     "https://ntfy.sh/file/abc.txt",
+		},
+	})
+	expected := `From: "ntfy.sh/alerts" <ntfy@ntfy.sh>
+To: phil@example.com
+Date: Fri, 24 Dec 2021 21:43:24 +0000
+Subject: You received a file: backup.log
+Content-Type: text/plain; charset="utf-8"
+
+You received a file: backup.log
+
+Priority: high
+Attachment: https://ntfy.sh/file/abc.txt (backup.log, expires Sat, 25 Dec 2021 00:43:24 UTC)
+
+--
+This message was sent by 1.2.3.4 at Fri, 24 Dec 2021 21:43:24 UTC via https://ntfy.sh/alerts`
+	require.Equal(t, expected, actual)
+}
+
+func TestFormatMail_WithExternalAttachment(t *testing.T) {
+	// Attachments passed via attach= are hosted elsewhere and never expire
+	actual, _ := formatMail("https://ntfy.sh", "1.2.3.4", "ntfy@ntfy.sh", "phil@example.com", &model.Message{
+		ID:      "abc",
+		Time:    1640382204,
+		Event:   "message",
+		Topic:   "alerts",
+		Message: "Look at this",
+		Attachment: &model.Attachment{
+			Name: "cat.jpg",
+			URL:  "https://example.com/cat.jpg",
+		},
+	})
+	expected := `From: "ntfy.sh/alerts" <ntfy@ntfy.sh>
+To: phil@example.com
+Date: Fri, 24 Dec 2021 21:43:24 +0000
+Subject: Look at this
+Content-Type: text/plain; charset="utf-8"
+
+Look at this
+
+Attachment: https://example.com/cat.jpg (cat.jpg)
+
+--
+This message was sent by 1.2.3.4 at Fri, 24 Dec 2021 21:43:24 UTC via https://ntfy.sh/alerts`
+	require.Equal(t, expected, actual)
+}

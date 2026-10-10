@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@playwright/test": "^1.62.1",
+    "@playwright/test": "^1.63.0",
     "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",

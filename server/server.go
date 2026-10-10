@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -18,6 +19,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +36,8 @@ import (
 	"heckel.io/ntfy/v2/attachment"
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/cluster"
+	"heckel.io/ntfy/v2/cluster/quota"
+	topicstore "heckel.io/ntfy/v2/cluster/topics"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -67,7 +71,8 @@ type Server struct {
 	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
-	messages          int64                               // Total number of messages (persisted if messageCache enabled)
+	messages          int64                               // Total number of messages, cluster-wide (persisted if messageCache enabled)
+	messagesFlushed   int64                               // Value of the messages counter at the last stats flush; the difference is written as a delta
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
 	userManager       *user.Manager                       // Might be nil!
 	messageCache      *message.Cache                      // Database that stores the messages
@@ -76,8 +81,11 @@ type Server struct {
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
+	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
+	topicStore        *topicstore.Store                   // Shared per-topic state (rate visitors, liveness); nil when not clustered
+	catchUpDelay      time.Duration                       // When the catch-up replay runs after a since= subscribe (see server_catchup.go)
 	closeChan         chan bool
-	stopOnce          sync.Once
+	stopOnce          sync.Once   // Makes Stop idempotent (double close panics otherwise)
 	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex
 }
@@ -169,6 +177,8 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+	rateVisitorMissTTL       = 30 * time.Second          // How long a failed shared-store rate-visitor lookup is cached on the topic
+	rateVisitorResolvedTTL   = 30 * time.Second          // How long a rate visitor resolved from the shared store is trusted before it is re-resolved
 
 	// stopTimeout bounds the entire shutdown. The stores wait for their own background work
 	// (the attachment sync loop queries the database), and none of those waits has a deadline,
@@ -332,6 +342,8 @@ func New(conf *Config) (*Server, error) {
 		topics:          topics,
 		userManager:     userManager,
 		messages:        messages,
+		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
+		catchUpDelay:    conf.CacheBatchTimeout + conf.ClusterBatchLinger + catchUpMargin,
 		messagesHistory: []int64{messages},
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
@@ -346,11 +358,37 @@ func New(conf *Config) (*Server, error) {
 		AdvertiseURL:    advertiseURL,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
+		CancelFunc:      s.applySubscriberCancel,
+		TopicsAddedFunc: s.clearRateVisitorMisses,
+		GapFunc:         s.handleDeliveryGap,
 		IsolatedFunc:    s.closeLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
 		return nil, err
+	}
+	// Cluster-wide visitor usage: nodes count locally and converge via the shared database, so
+	// daily quotas hold across the cluster instead of multiplying by node count. Single-node
+	// setups (no experimental-cluster-listen) keep their purely local limiters (s.quota stays nil).
+	if conf.ClusterListen != "" && pool != nil {
+		s.quota, err = quota.New(&quota.Config{
+			FlushInterval:  conf.VisitorUsageFlushInterval,
+			StatsResetTime: conf.VisitorStatsResetTime,
+			PeerUsageFunc:  s.applyPeerUsage,
+		}, pool)
+		if err != nil {
+			return nil, err
+		}
+		s.topicStore, err = topicstore.New(pool)
+		if err != nil {
+			return nil, err
+		}
+		s.seedTopicsLastAccess()
+	}
+	// Peers are told about a topic's first subscriber here (the hook below; also set in
+	// topicsFromIDs for topics created later), which lets them drop a cached rate-visitor miss
+	for _, t := range s.topics {
+		t.onFirstSubscriber = s.topicAnnouncer(t.ID)
 	}
 	return s, nil
 }
@@ -396,6 +434,9 @@ func (s *Server) Run() error {
 	}
 	if s.config.ProfileListenHTTP != "" {
 		listenStr += fmt.Sprintf(" %s[http/profile]", s.config.ProfileListenHTTP)
+	}
+	if s.config.ClusterListen != "" {
+		listenStr += fmt.Sprintf(" %s[http/cluster]", s.config.ClusterListen)
 	}
 	log.Tag(tagStartup).Info("Listening on%s, ntfy %s, log level is %s", listenStr, s.config.BuildVersion, log.CurrentLevel().String())
 	if log.IsFile() {
@@ -519,6 +560,19 @@ func (s *Server) stopBounded() {
 }
 
 func (s *Server) stop() {
+	// Close the services that call back into the server BEFORE taking the server lock: the
+	// usage tracker's flush loop calls applyPeerUsage, the mesh's isolation loop calls
+	// closeLocalSubscribers, and all of those take s.mu. Closing them under the
+	// lock deadlocks with a tick that is already waiting for it (Close waits for the loop, the
+	// loop waits for s.mu, Stop holds s.mu). Usage counted during the remaining shutdown is
+	// discarded, which is fine: the final flush below the lock would race the closing databases
+	// anyway, and fan-out stops with the listeners.
+	if s.quota != nil {
+		s.quota.Close()
+	}
+	if s.cluster != nil {
+		s.cluster.Close()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.httpServer != nil {
@@ -899,9 +953,13 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 	return writeMatrixDiscoveryResponse(w)
 }
 
-// dispatch delivers m to local subscribers and fires the requested side-effect targets. It is
-// the single choke point through which every published message must pass; t may be nil when
-// the topic has no local subscribers (delayed sender).
+// dispatch delivers m to local subscribers, forwards it to peer cluster nodes, and fires the
+// requested side-effect targets. It is the single choke point through which every published
+// message must pass; t may be nil when the topic has no local subscribers (delayed sender).
+//
+// The side-effect targets (Firebase, email, calls, upstream, web push) are global, not per-node:
+// they fire only here on the origin node, and never again when a peer node receives the message
+// via the cluster (see deliverFromBus).
 func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchOpts) error {
 	// Hand the message to the other cluster nodes: fire-and-forget, so a slow or dead peer never
 	// delays the publisher. Nop single-node.
@@ -958,7 +1016,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && s.rateVisitor(t) == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
@@ -1052,11 +1110,12 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	}
 	u := v.User()
 	if s.userManager != nil && u != nil && u.Tier != nil {
-		go s.userManager.EnqueueUserStats(u.ID, v.Stats())
+		go v.EnqueueUserStatsDelta()
 	}
 	s.mu.Lock()
 	s.messages++
 	s.mu.Unlock()
+	s.recordTopicPublish(v, t)
 	if unifiedpush {
 		metrics.UnifiedPushPublishedSuccess.Inc()
 	}
@@ -1074,6 +1133,103 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 	return s.writeJSON(w, m.ForJSON())
 }
 
+// matrixPushkeyRejectable decides whether a UnifiedPush publish without a rate visitor should
+// reject the Matrix pushkey (the homeserver then permanently removes the pusher) or stay a
+// transient 507. Clustered, the decision comes from the shared topic table: the local topic
+// object is often freshly created on this node while the subscriber history lives elsewhere.
+// Without a shared record (or when not clustered), the node-local topic age decides, as before.
+// recordTopicSubscriber writes the shared subscriber-liveness record for the topic, at most
+// once per TopicStoreUpdateInterval per topic (asynchronously; failures are logged only and
+// retried at the next slot). Keepalive ticks call this, so a long-held connection keeps the
+// topic -- and its rate-visitor assignment -- alive in the shared record.
+func (s *Server) recordTopicSubscriber(v *visitor, t *topic) {
+	if s.topicStore == nil || !t.TakeSubscriberRecordSlot(s.config.TopicStoreUpdateInterval) {
+		return
+	}
+	visitorKey := string(v.QuotaKey())
+	go func() {
+		if err := s.topicStore.RecordSubscriber(t.ID, visitorKey); err != nil {
+			log.Tag(tagSubscribe).Err(err).Warn("Cannot record subscriber liveness for topic %s", t.ID)
+		}
+	}()
+}
+
+// recordTopicPublish is recordTopicSubscriber for successful publishes (the "last sender")
+func (s *Server) recordTopicPublish(v *visitor, t *topic) {
+	if s.topicStore == nil || t == nil || !t.TakePublishRecordSlot(s.config.TopicStoreUpdateInterval) {
+		return
+	}
+	visitorKey := string(v.QuotaKey())
+	go func() {
+		if err := s.topicStore.RecordPublish(t.ID, visitorKey); err != nil {
+			log.Tag(tagPublish).Err(err).Warn("Cannot record publish liveness for topic %s", t.ID)
+		}
+	}()
+}
+
+// seedTopicsLastAccess sets the last access of the topics restored at boot to the activity
+// recorded in the shared topic table, so topics idle cluster-wide are expunged at the next
+// manager run instead of lingering for topicExpungeAfter. Topics without a record keep "now".
+func (s *Server) seedTopicsLastAccess() {
+	ids := make([]string, 0, len(s.topics))
+	for id := range s.topics {
+		ids = append(ids, id)
+	}
+	activity, err := s.topicStore.LastActivity(ids)
+	if err != nil {
+		log.Tag(tagManager).Err(err).Warn("Cannot seed topic last access from shared topic state")
+		return
+	}
+	for id, lastActivity := range activity {
+		s.topics[id].SeedLastAccess(lastActivity)
+	}
+	log.Tag(tagManager).Debug("Seeded last access of %d/%d topic(s) from shared topic state", len(activity), len(ids))
+}
+
+// keepSharedActiveTopics keeps topics that are stale on this node but recently active on
+// another one (per the shared topic table) from being expunged, by adopting the shared last
+// activity. Database errors leave the node-local rule in charge.
+func (s *Server) keepSharedActiveTopics() {
+	if s.topicStore == nil {
+		return
+	}
+	s.mu.RLock()
+	stale := make(map[string]*topic)
+	for id, t := range s.topics {
+		if t.Stale() {
+			stale[id] = t
+		}
+	}
+	s.mu.RUnlock()
+	if len(stale) == 0 {
+		return
+	}
+	activity, err := s.topicStore.LastActivity(slices.Collect(maps.Keys(stale)))
+	if err != nil {
+		log.Tag(tagManager).Err(err).Warn("Cannot check shared topic activity, expunging by local rule")
+		return
+	}
+	for id, lastActivity := range activity {
+		if time.Since(lastActivity) <= topicExpungeAfter {
+			stale[id].KeepaliveAt(lastActivity)
+		}
+	}
+}
+
+func (s *Server) matrixPushkeyRejectable(t *topic) bool {
+	if s.topicStore != nil {
+		info, err := s.topicStore.Get(t.ID)
+		if err == nil {
+			lastActivity := util.MaxTime(info.CreatedAt, info.LastSubscribedAt, info.LastPublishedAt, info.RateVisitorSeenAt)
+			return time.Since(lastActivity) > matrixRejectClusterAfter
+		} else if !errors.Is(err, topicstore.ErrNotFound) {
+			return false // Database trouble: never reject on missing information (fail safe)
+		}
+		// No shared record: fall through to the node-local rule
+	}
+	return time.Since(t.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter
+}
+
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	_, err := s.handlePublishInternal(r, v)
 	if err != nil {
@@ -1088,7 +1244,7 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 			if err != nil {
 				return err
 			}
-			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
+			if s.matrixPushkeyRejectable(topic) {
 				return writeMatrixResponse(w, pushKey)
 			}
 		}
@@ -1128,7 +1284,7 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 	m.Sender = v.IP()
 	m.User = v.MaybeUserID()
 	m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
-	// Publish to subscribers, Firebase (for Android clients), and web push endpoints
+	// Publish to subscribers, peer nodes, Firebase (for Android clients), and web push endpoints
 	if err := s.dispatch(v, t, m, dispatchOpts{firebase: true, webPush: true}); err != nil {
 		return err
 	}
@@ -1585,9 +1741,12 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	deduper := newReplayDeduper(since.ID())
+	sub = deduper.wrap(sub) // Before subscribing, so live messages are remembered too
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
+		s.recordTopicSubscriber(v, t)
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1600,12 +1759,25 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
+	var catchUp <-chan time.Time
+	if needsCatchUp(since) {
+		catchUp = time.After(s.catchUpDelay)
+	} else {
+		deduper.stop()
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-r.Context().Done():
 			return nil
+		case <-catchUp:
+			catchUp = nil
+			err := s.sendOldMessages(w, topics, s.catchUpSince(since), scheduled, v, sub)
+			deduper.stop()
+			if err != nil {
+				return err
+			}
 		case <-time.After(s.config.KeepaliveInterval):
 			ev := logvr(v, r).Tag(tagSubscribe)
 			if len(topics) == 1 {
@@ -1616,6 +1788,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			v.Keepalive()
 			for _, t := range topics {
 				t.Keepalive()
+				s.recordTopicSubscriber(v, t)
 			}
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
@@ -1706,6 +1879,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				v.Keepalive()
 				for _, t := range topics {
 					t.Keepalive()
+					s.recordTopicSubscriber(v, t)
 				}
 				if err := ping(); err != nil {
 					return err
@@ -1734,9 +1908,12 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
+	deduper := newReplayDeduper(since.ID())
+	sub = deduper.wrap(sub) // Before subscribing, so live messages are remembered too
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
+		s.recordTopicSubscriber(v, t)
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1748,6 +1925,19 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
+	}
+	if needsCatchUp(since) {
+		g.Go(func() error {
+			defer deduper.stop()
+			select {
+			case <-gctx.Done():
+				return nil
+			case <-time.After(s.catchUpDelay):
+				return s.sendOldMessages(w, topics, s.catchUpSince(since), scheduled, v, sub)
+			}
+		})
+	} else {
+		deduper.stop()
 	}
 	err = g.Wait()
 	if err != nil && websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNoStatusReceived) {
@@ -1792,7 +1982,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	// Make a list of topics that we'll actually set the RateVisitor on
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
+		if isUnifiedPushTopic(t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
@@ -1835,8 +2025,22 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
 		t.SetRateVisitor(v)
+		// Cluster: persist the assignment so publishes on other nodes bill this subscriber too.
+		// Liveness is refreshed by the subscriber's (throttled) keepalives, so the assignment
+		// stays valid for as long as the subscriber is connected anywhere; failures are logged
+		// only, the local assignment still works (fail open).
+		if s.topicStore != nil {
+			if err := s.topicStore.SetRateVisitor(t.ID, string(v.QuotaKey()), v.MaybeUserID()); err != nil {
+				logvr(v, r).Tag(tagSubscribe).Err(err).With(t).Warn("Cannot persist rate visitor for topic %s", t.ID)
+			}
+		}
 	}
 	return nil
+}
+
+// isUnifiedPushTopic reports whether the topic ID has the UnifiedPush shape ("up" + 12 chars)
+func isUnifiedPushTopic(id string) bool {
+	return strings.HasPrefix(id, unifiedPushTopicPrefix) && len(id) == unifiedPushTopicLength
 }
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the
@@ -1964,7 +2168,9 @@ func (s *Server) topicsFromIDs(v *visitor, ids ...string) ([]*topic, error) {
 			if v != nil && !v.TopicCreationAllowed() {
 				return nil, errHTTPTooManyRequestsLimitTopicCreation
 			}
-			s.topics[id] = newTopic(id)
+			t := newTopic(id)
+			t.onFirstSubscriber = s.topicAnnouncer(id)
+			s.topics[id] = t
 		}
 		topics = append(topics, s.topics[id])
 	}
@@ -2044,6 +2250,11 @@ func (s *Server) runStatsResetter() {
 	}
 }
 
+// resetStats resets this node's in-memory visitor stats at the configured reset time. The
+// shared user stats in the database are NOT reset here in cluster mode: that is one job for the
+// whole cluster, and tying it to this instant means a leaderless moment (a failover around
+// midnight, where the hold-off is by design) skips it for the entire day. maybeResetSharedStats
+// runs it on a durable claim instead.
 func (s *Server) resetStats() {
 	log.Info("Resetting all visitor stats (daily task)")
 	s.mu.Lock()
@@ -2051,9 +2262,39 @@ func (s *Server) resetStats() {
 	for _, v := range s.visitors {
 		v.ResetStats()
 	}
-	if s.userManager != nil {
-		if err := s.userManager.ResetStats(); err != nil {
-			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
+	if s.userManager == nil {
+		return
+	}
+	if s.quota != nil {
+		// Clustered: drop this node's queued stats deltas, so increments counted before the
+		// rollover cannot land on top of the freshly zeroed rows
+		s.userManager.ResetStatsQueue()
+		return
+	}
+	if err := s.userManager.ResetStats(); err != nil {
+		log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
+	}
+}
+
+// maybeResetSharedStats resets the shared user stats if this node claims the current usage
+// day's reset. Called from the manager on the leader, so a leader that only appears after
+// midnight still runs it; the claim is durable, so exactly one node per day does.
+func (s *Server) maybeResetSharedStats() {
+	if s.quota == nil || s.userManager == nil {
+		return
+	}
+	claimed, err := s.quota.ClaimDailyReset()
+	if err != nil {
+		log.Tag(tagResetter).Err(err).Warn("Cannot claim the daily stats reset")
+		return
+	} else if !claimed {
+		return
+	}
+	log.Tag(tagResetter).Info("Resetting shared user stats for the new usage day")
+	if err := s.userManager.ResetStats(); err != nil {
+		log.Tag(tagResetter).Err(err).Warn("Failed to reset shared user stats; releasing the claim for a retry")
+		if err := s.quota.ReleaseDailyReset(); err != nil {
+			log.Tag(tagResetter).Err(err).Warn("Cannot release the daily reset claim")
 		}
 	}
 }
@@ -2062,7 +2303,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
+	v := newVisitor(s.config, s.messageCache, s.userManager, s.quota, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -2238,14 +2479,98 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	}
 }
 
+// rateVisitor returns the topic's rate visitor: the in-memory one if present, otherwise (in
+// cluster mode) resolved from the shared assignment store, so a UnifiedPush subscriber on one
+// node bills publishes arriving on any node. A successful resolution is cached on the topic for
+// rateVisitorResolvedTTL (the subscriber may move to another node, and identity); misses are
+// cached briefly too, to keep the database off the publish path.
+func (s *Server) rateVisitor(t *topic) *visitor {
+	if v := t.RateVisitor(rateVisitorResolvedTTL); v != nil {
+		return v
+	}
+	if s.topicStore == nil || !s.config.VisitorSubscriberRateLimiting || !isUnifiedPushTopic(t.ID) || t.RateVisitorMissedRecently(rateVisitorMissTTL) {
+		return nil
+	}
+	visitorKey, userID, err := s.topicStore.RateVisitor(t.ID)
+	if err != nil {
+		if !errors.Is(err, topicstore.ErrNotFound) {
+			log.Tag(tagSubscribe).Err(err).With(t).Warn("Cannot resolve rate visitor for topic %s", t.ID)
+		}
+		t.SetRateVisitorMiss()
+		return nil
+	}
+	v, err := s.visitorFromKey(visitorKey, userID)
+	if err != nil {
+		log.Tag(tagSubscribe).Err(err).With(t).Warn("Cannot reconstruct rate visitor %s for topic %s", visitorKey, t.ID)
+		t.SetRateVisitorMiss()
+		return nil
+	}
+	t.SetResolvedRateVisitor(v)
+	return v
+}
+
+// visitorFromKey rebuilds a visitor from its identity key ("ip:<addr>" or "user:<id>"), used
+// when another cluster node registered the visitor (e.g. as a rate visitor). The key decides
+// the identity, not the presence of a user: authenticated users without a tier are IP-keyed
+// (see visitorID), and the user is only attached to them.
+func (s *Server) visitorFromKey(visitorKey, userID string) (*visitor, error) {
+	var u *user.User
+	if userID != "" {
+		if s.userManager == nil {
+			return nil, errors.New("visitor with a user but no user manager")
+		}
+		var err error
+		if u, err = s.userManager.UserByID(userID); err != nil {
+			return nil, err
+		}
+	}
+	switch {
+	case strings.HasPrefix(visitorKey, visitorKeyUserPrefix):
+		if u == nil || u.ID != strings.TrimPrefix(visitorKey, visitorKeyUserPrefix) {
+			return nil, fmt.Errorf("user-keyed visitor %s without a matching user", visitorKey)
+		}
+		// The IP is not part of a user-keyed visitor's identity; it is only informational
+		return s.visitor(netip.IPv4Unspecified(), u), nil
+	case strings.HasPrefix(visitorKey, visitorKeyIPPrefix):
+		ip, err := netip.ParseAddr(strings.TrimPrefix(visitorKey, visitorKeyIPPrefix))
+		if err != nil {
+			return nil, err
+		}
+		return s.visitor(ip, u), nil
+	default:
+		return nil, fmt.Errorf("unknown visitor key format: %s", visitorKey)
+	}
+}
+
+// applyPeerUsage burns request and bandwidth tokens that a visitor consumed on other cluster
+// nodes from this node's local buckets (see visitor.BurnPeerUsage). Called by the usage
+// tracker after each pull. Usage for visitors this node has not seen yet is remembered
+// briefly and burned when the visitor first appears, so a client rotating across nodes
+// cannot collect a fresh burst on every node; entries expire because old consumption would
+// have been replenished by now anyway (token buckets, not daily quotas).
+// applyPeerUsage burns usage that peer nodes consumed for a visitor this node knows. Usage for
+// a visitor that does not exist here is dropped: newVisitor seeds its buckets from the
+// tracker's cluster totals, which already include what peers consumed that day.
+func (s *Server) applyPeerUsage(key quota.Key, delta quota.Counters) {
+	s.mu.Lock()
+	v, ok := s.visitors[string(key)]
+	s.mu.Unlock()
+	if ok {
+		v.BurnPeerUsage(delta)
+	}
+}
+
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := visitorID(ip, user, s.config)
 	v, exists := s.visitors[id]
 	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, ip, user)
-		return s.visitors[id]
+		// newVisitor reseeds the buckets from the tracker's cluster totals, which already
+		// include what peers consumed for this visitor today
+		v = newVisitor(s.config, s.messageCache, s.userManager, s.quota, ip, user)
+		s.visitors[id] = v
+		return v
 	}
 	v.Keepalive()
 	v.SetUser(user) // Always update with the latest user, may be nil!
@@ -2268,8 +2593,23 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 	if len(s.messagesHistory) > messagesHistoryMax {
 		s.messagesHistory = s.messagesHistory[1:]
 	}
+	snapshot, delta := s.messages, s.messages-s.messagesFlushed
 	s.mu.Unlock()
-	if err := s.messageCache.UpdateStats(messagesCount); err != nil {
+	// Write this node's delta and fold the cluster-wide total back in, so every node's counter
+	// (and /v1/stats) converges on the shared sum instead of overwriting it
+	if err := s.messageCache.AddStats(delta); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
+		return // Delta remains unflushed; retried on the next tick
 	}
+	total, err := s.messageCache.Stats()
+	if err != nil {
+		log.Tag(tagManager).Err(err).Warn("Cannot read messages stats")
+		total = snapshot // Keep the local view; only the flush marker moves
+	}
+	s.mu.Lock()
+	// The marker is the folded total (everything the database already has, incl. peer counts),
+	// so the next delta is only this node's new publishes; peer counts must never be re-added
+	s.messagesFlushed = total
+	s.messages = total + (s.messages - snapshot) // Publishes that arrived while flushing stay counted
+	s.mu.Unlock()
 }

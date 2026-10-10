@@ -509,11 +509,12 @@ func (c *Cache) readAttachmentBytesUsed(rows *sql.Rows) (int64, error) {
 	return size, nil
 }
 
-// UpdateStats updates the total message count statistic
-func (c *Cache) UpdateStats(messages int64) error {
+// AddStats adds the given delta to the total message count statistic. Increments (rather than
+// absolute writes) let multiple cluster nodes contribute to one shared counter.
+func (c *Cache) AddStats(delta int64) error {
 	c.maybeLock()
 	defer c.maybeUnlock()
-	_, err := c.db.Exec(c.queries.updateStats, messages)
+	_, err := c.db.Exec(c.queries.updateStats, delta)
 	return err
 }
 

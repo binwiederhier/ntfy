@@ -81,17 +81,29 @@ var (
 	ClusterMessagesForwarded = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_messages_forwarded_total",
 	})
-	ClusterBatchesSent = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "ntfy_cluster_batches_sent_total",
-	})
 	ClusterSendErrors = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_send_errors_total",
 	})
 	ClusterQueueDropped = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_queue_dropped_total",
 	})
+	ClusterBatchesSent = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_batches_sent_total",
+	})
 	ClusterMessagesWasted = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_messages_wasted_total",
+	})
+	ClusterGapsReported = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_gaps_reported_total",
+		Help: "Number of delivery-gap reports sent to peer nodes (messages we could not deliver to them)",
+	})
+	ClusterGapsReceived = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_gaps_received_total",
+		Help: "Number of delivery-gap reports received from peer nodes",
+	})
+	ClusterGapsReplayed = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_gap_messages_replayed_total",
+		Help: "Number of messages re-published to local subscribers to fill a peer's reported delivery gap",
 	})
 	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_leader",
@@ -125,6 +137,9 @@ func init() {
 		ClusterSendErrors,
 		ClusterQueueDropped,
 		ClusterMessagesWasted,
+		ClusterGapsReported,
+		ClusterGapsReceived,
+		ClusterGapsReplayed,
 		ClusterLeader,
 		Visitors,
 		Users,

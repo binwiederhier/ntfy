@@ -1,13 +1,13 @@
 package server
 
 import (
-	"fmt"
 	"math"
 	"net/netip"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
+	"heckel.io/ntfy/v2/cluster/quota"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/user"
@@ -57,6 +57,8 @@ type visitor struct {
 	config               *Config
 	messageCache         *message.Cache
 	userManager          *user.Manager      // May be nil
+	quota                *quota.Tracker     // Cluster-wide usage counters; nil when not clustered (see quotaAllowedNoLock)
+	quotaKey             quota.Key          // This visitor's usage key, same identity as the visitor ID; updated on SetUser
 	ip                   netip.Addr         // Visitor IP address
 	user                 *user.User         // Only set if authenticated user, otherwise nil
 	requestLimiter       *rate.Limiter      // Rate limiter for (almost) all requests (including messages)
@@ -70,6 +72,7 @@ type visitor struct {
 	authLimiter          *rate.Limiter      // Limiter for incorrect login attempts, may be nil
 	firebase             time.Time          // Next allowed Firebase message
 	seen                 time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
+	statsPersisted       user.Stats         // Counter values already handed to the user manager's write queue; deltas against it are enqueued (see enqueueUserStatsDeltaNoLock)
 	mu                   sync.RWMutex
 }
 
@@ -117,7 +120,7 @@ const (
 	visitorLimitBasisTier = visitorLimitBasis("tier")
 )
 
-func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
+func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Manager, tracker *quota.Tracker, ip netip.Addr, user *user.User) *visitor {
 	var messages, emails, calls int64
 	if user != nil {
 		messages = user.Stats.Messages
@@ -128,6 +131,8 @@ func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Man
 		config:               conf,
 		messageCache:         messageCache,
 		userManager:          userManager, // May be nil
+		quota:                tracker,     // May be nil (not clustered)
+		quotaKey:             quota.Key(visitorID(ip, user, conf)),
 		ip:                   ip,
 		user:                 user,
 		firebase:             time.Unix(0, 0),
@@ -211,7 +216,13 @@ func visitorExtendedInfoContext(info *visitorInfo) log.Context {
 func (v *visitor) RequestAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.requestLimiter.Allow()
+	if !v.requestLimiter.Allow() {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{Requests: 1})
+	}
+	return true
 }
 
 func (v *visitor) FirebaseAllowed() bool {
@@ -229,19 +240,81 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 func (v *visitor) MessageAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.messagesLimiter.Allow()
+	if !v.quotaAllowedNoLock(v.limitsNoLock().MessageLimit, func(c quota.Counters) int64 { return c.Messages }) {
+		return false
+	}
+	if !v.messagesLimiter.Allow() {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{Messages: 1})
+	}
+	return true
 }
 
 func (v *visitor) EmailAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.emailsLimiter.Allow()
+	if !v.quotaAllowedNoLock(v.limitsNoLock().EmailLimit, func(c quota.Counters) int64 { return c.Emails }) {
+		return false
+	}
+	if !v.emailsLimiter.Allow() {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{Emails: 1})
+	}
+	return true
 }
 
 func (v *visitor) CallAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.callsLimiter.Allow()
+	if !v.quotaAllowedNoLock(v.limitsNoLock().CallLimit, func(c quota.Counters) int64 { return c.Calls }) {
+		return false
+	}
+	if !v.callsLimiter.Allow() {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{Calls: 1})
+	}
+	return true
+}
+
+// reseedBucketsNoLock burns today's already-consumed usage (from the cluster usage tracker)
+// into the freshly built request and bandwidth buckets, so a restart or visitor eviction does
+// not hand back a full burst (restart amnesty). The burn is capped at the burst -- a reseeded
+// bucket starts at worst EMPTY, never in debt: a day total says nothing about how much the
+// bucket would have replenished since, so debt would over-punish long-lived visitors. Nop when
+// not clustered. (Rehydration piece 1, plans/260829-topic-visitor-tables.md.)
+func (v *visitor) reseedBucketsNoLock(limits *visitorLimits) {
+	if v.quota == nil {
+		return
+	}
+	totals := v.quota.Totals(v.quotaKey)
+	if n := totals.Requests; n > 0 {
+		if burst := int64(limits.RequestLimitBurst); n > burst {
+			n = burst
+		}
+		util.BurnTokens(v.requestLimiter, n)
+	}
+	if n := totals.BandwidthBytes; n > 0 {
+		if limit := limits.AttachmentBandwidthLimit; n > limit {
+			n = limit
+		}
+		v.bandwidthLimiter.Burn(n)
+	}
+}
+
+// quotaAllowedNoLock reports whether the cluster-wide usage for this visitor is still below the
+// given daily limit. Always true when not clustered, or when the limit is zero (zero limits are
+// enforced by the local limiters, which know whether zero means "none allowed" or "unlimited").
+func (v *visitor) quotaAllowedNoLock(limit int64, counter func(quota.Counters) int64) bool {
+	if v.quota == nil || limit <= 0 {
+		return true
+	}
+	return counter(v.quota.Totals(v.quotaKey)) < limit
 }
 
 func (v *visitor) SubscriptionAllowed() bool {
@@ -304,7 +377,13 @@ func (v *visitor) AccountActionPerformed() {
 func (v *visitor) BandwidthAllowed(bytes int64) bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.bandwidthLimiter.AllowN(bytes)
+	if !v.bandwidthLimiter.AllowN(bytes) {
+		return false
+	}
+	if v.quota != nil {
+		v.quota.Inc(v.quotaKey, quota.Counters{BandwidthBytes: bytes})
+	}
+	return true
 }
 
 func (v *visitor) RemoveSubscription() {
@@ -322,7 +401,25 @@ func (v *visitor) Keepalive() {
 func (v *visitor) BandwidthLimiter() util.Limiter {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
-	return v.bandwidthLimiter
+	if v.quota == nil {
+		return v.bandwidthLimiter
+	}
+	return &meteredBandwidthLimiter{v}
+}
+
+// BurnPeerUsage reflects request and bandwidth usage this visitor consumed on OTHER cluster
+// nodes into the local token buckets, so N nodes do not hand out N times the burst. Only the
+// time-replenished buckets need this; the daily quotas are enforced directly against cluster
+// totals (see quotaAllowedNoLock).
+func (v *visitor) BurnPeerUsage(delta quota.Counters) {
+	v.mu.RLock() // limiters could be replaced!
+	defer v.mu.RUnlock()
+	if delta.Requests > 0 {
+		util.BurnTokens(v.requestLimiter, delta.Requests)
+	}
+	if delta.BandwidthBytes > 0 {
+		v.bandwidthLimiter.Burn(delta.BandwidthBytes)
+	}
 }
 
 func (v *visitor) Stale() bool {
@@ -342,11 +439,48 @@ func (v *visitor) Stats() *user.Stats {
 }
 
 func (v *visitor) ResetStats() {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
+	v.mu.Lock() // Also protects statsPersisted
+	defer v.mu.Unlock()
 	v.emailsLimiter.Reset()
 	v.messagesLimiter.Reset()
 	v.callsLimiter.Reset()
+	v.statsPersisted = user.Stats{} // The database row is zeroed by the (leader's) daily reset
+}
+
+// EnqueueUserStatsDelta enqueues the visitor's not-yet-persisted stats increments to the user
+// manager's write queue. Deltas add up across cluster nodes (see Manager.EnqueueUserStats).
+func (v *visitor) EnqueueUserStatsDelta() {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.enqueueUserStatsDeltaNoLock()
+}
+
+func (v *visitor) enqueueUserStatsDeltaNoLock() {
+	if v.userManager == nil || v.user == nil {
+		return
+	}
+	current := user.Stats{
+		Messages: v.messagesLimiter.Value(),
+		Emails:   v.emailsLimiter.Value(),
+		Calls:    v.callsLimiter.Value(),
+	}
+	delta := user.Stats{
+		Messages: current.Messages - v.statsPersisted.Messages,
+		Emails:   current.Emails - v.statsPersisted.Emails,
+		Calls:    current.Calls - v.statsPersisted.Calls,
+	}
+	if delta == (user.Stats{}) {
+		return
+	}
+	v.statsPersisted = current
+	v.userManager.EnqueueUserStats(v.user.ID, &delta)
+}
+
+// QuotaKey returns the visitor's usage-tracking identity key ("ip:<addr>" or "user:<id>")
+func (v *visitor) QuotaKey() quota.Key {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.quotaKey
 }
 
 // User returns the visitor user, or nil if there is none
@@ -376,6 +510,7 @@ func (v *visitor) SetUser(u *user.User) {
 	defer v.mu.Unlock()
 	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
 	v.user = u                                           // u may be nil!
+	v.quotaKey = quota.Key(visitorID(v.ip, u, v.config))
 	if shouldResetLimiters {
 		var messages, emails, calls int64
 		if u != nil {
@@ -397,6 +532,11 @@ func (v *visitor) MaybeUserID() string {
 }
 
 func (v *visitor) resetLimitersNoLock(messages, emails, calls int64, enqueueUpdate bool) {
+	if enqueueUpdate {
+		// Flush increments counted against the old limiters before they are replaced below;
+		// the rebuilt limiters are re-seeded from the user's persisted stats
+		v.enqueueUserStatsDeltaNoLock()
+	}
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
 	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)
@@ -415,13 +555,8 @@ func (v *visitor) resetLimitersNoLock(messages, emails, calls int64, enqueueUpda
 		v.accountLimiter = nil // Users cannot create accounts when logged in
 		v.authLimiter = nil    // Users are already logged in, no need to limit requests
 	}
-	if enqueueUpdate && v.user != nil {
-		go v.userManager.EnqueueUserStats(v.user.ID, &user.Stats{
-			Messages: messages,
-			Emails:   emails,
-			Calls:    calls,
-		})
-	}
+	v.statsPersisted = user.Stats{Messages: messages, Emails: emails, Calls: calls} // Seeds come from the persisted user stats, so nothing is owed to the queue
+	v.reseedBucketsNoLock(limits)
 	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor") // Must be after function, because contextNoLock() describes rate limiters
 }
 
@@ -522,6 +657,13 @@ func (v *visitor) infoLightNoLock() *visitorInfo {
 	messages := v.messagesLimiter.Value()
 	emails := v.emailsLimiter.Value()
 	calls := v.callsLimiter.Value()
+	if v.quota != nil {
+		// Clustered: display the cluster-wide usage (what enforcement actually uses), not
+		// this node's local slice -- behind a load balancer, per-node numbers would differ
+		// between page loads
+		totals := v.quota.Totals(v.quotaKey)
+		messages, emails, calls = totals.Messages, totals.Emails, totals.Calls
+	}
 	limits := v.limitsNoLock()
 	stats := &visitorStats{
 		Messages:          messages,
@@ -551,15 +693,60 @@ func dailyLimitToRate(limit int64) rate.Limit {
 	return rate.Limit(limit) * rate.Every(oneDay)
 }
 
+// Visitor identity key prefixes (see visitorID); the keys are shared cluster-wide, so they are
+// parsed back by visitorFromKey
+const (
+	visitorKeyUserPrefix = "user:"
+	visitorKeyIPPrefix   = "ip:"
+)
+
 // visitorID returns a unique identifier for a visitor based on user or IP, using configurable prefix bits for IPv4/IPv6
 func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
 	if u != nil && u.Tier != nil {
-		return fmt.Sprintf("user:%s", u.ID)
+		return visitorKeyUserPrefix + u.ID
 	}
 	if ip.Is4() {
 		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv4).Masked().Addr()
 	} else if ip.Is6() {
 		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv6).Masked().Addr()
 	}
-	return fmt.Sprintf("ip:%s", ip.String())
+	return visitorKeyIPPrefix + ip.String()
+}
+
+// meteredBandwidthLimiter forwards to the visitor's bandwidth limiter and mirrors successfully
+// consumed bytes into the cluster-wide usage tracker. Refunds (negative n, from LimitWriter
+// reverts) are no-ops on the underlying RateLimiter and are not mirrored.
+type meteredBandwidthLimiter struct {
+	v *visitor
+}
+
+var _ util.Limiter = (*meteredBandwidthLimiter)(nil)
+
+func (l *meteredBandwidthLimiter) Allow() bool {
+	return l.AllowN(1)
+}
+
+func (l *meteredBandwidthLimiter) AllowN(n int64) bool {
+	l.v.mu.RLock() // limiters could be replaced!
+	limiter, key := l.v.bandwidthLimiter, l.v.quotaKey
+	l.v.mu.RUnlock()
+	if !limiter.AllowN(n) {
+		return false
+	}
+	if n > 0 {
+		l.v.quota.Inc(key, quota.Counters{BandwidthBytes: n})
+	}
+	return true
+}
+
+func (l *meteredBandwidthLimiter) Value() int64 {
+	l.v.mu.RLock() // limiters could be replaced!
+	defer l.v.mu.RUnlock()
+	return l.v.bandwidthLimiter.Value()
+}
+
+func (l *meteredBandwidthLimiter) Reset() {
+	l.v.mu.RLock() // limiters could be replaced!
+	defer l.v.mu.RUnlock()
+	l.v.bandwidthLimiter.Reset()
 }

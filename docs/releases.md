@@ -2122,6 +2122,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.30.0 (UNRELEASED)
+
+**Features:**
+
+* **Experimental clustering:** ntfy can now run as a cluster of stateless nodes behind a shared PostgreSQL database. Nodes discover each other via a node registry, deliver published messages to subscribers on any node over a private peer mesh (`experimental-cluster-listen`, `experimental-cluster-node-id`, `experimental-cluster-advertise-url`, `experimental-cluster-secret`), and elect a leader for singleton background jobs. A message a node cannot deliver to a peer is reported to it, dated with the oldest message lost, and that peer replays exactly that range to the affected subscribers (or disconnects them, so their clients replay with `since=`, when the gap is too old or too broad to replay). Scheduled (delayed) messages are claimed by exactly one node, daily visitor quotas (messages, emails, calls) and the request/bandwidth budgets are enforced cluster-wide, UnifiedPush subscriber-based rate limiting works across nodes, and reservation takeover / access revocation disconnect subscribers on all nodes
+
 ### ntfy server v2.29.1 (UNRELEASED)
 
 **Features:**

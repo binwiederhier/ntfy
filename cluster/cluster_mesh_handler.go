@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -86,6 +87,11 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 	if state.Topics != nil && len(state.Topics.Added) > 0 && c.conf.TopicsAddedFunc != nil {
 		log.Tag(tag).Debug("Received %d announced topic(s) from peer %s", len(state.Topics.Added), origin)
 		c.conf.TopicsAddedFunc(state.Topics.Added)
+	}
+	if len(state.Gaps) > 0 && c.conf.GapFunc != nil {
+		log.Tag(tag).Warn("Peer %s could not deliver messages for %d topic(s) since %d", origin, len(state.Gaps), state.GapSince)
+		metrics.ClusterGapsReceived.Inc()
+		c.conf.GapFunc(state.Gaps, state.GapSince)
 	}
 	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
 		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)

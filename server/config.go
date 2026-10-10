@@ -10,6 +10,8 @@ import (
 	"text/template"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster/quota"
+
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/user"
 )
@@ -30,6 +32,7 @@ const (
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute       // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 	DefaultStripePriceCacheDuration             = 3 * time.Hour          // Time to keep Stripe prices cached in memory before a refresh is needed
 	DefaultClusterBatchLinger                   = 500 * time.Millisecond // How long fan-out messages wait to form a per-peer batch (experimental clustering)
+	DefaultTopicStoreUpdateInterval             = 5 * time.Minute        // Per-topic throttle for shared liveness records (cluster mode; keeps the topic table off the hot path)
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -134,7 +137,7 @@ type Config struct {
 	DatabaseReplicaURLs                  []string      // PostgreSQL read replica connection strings
 	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; required in cluster mode
 	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
-	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
+	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<experimental-cluster-listen>")
 	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	FirebaseKeyFile                      string
@@ -209,6 +212,8 @@ type Config struct {
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
 	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
+	VisitorUsageFlushInterval            time.Duration  // Cadence for flushing/pulling cluster-wide visitor usage (cluster mode only; no CLI flag, tests override it)
+	TopicStoreUpdateInterval             time.Duration  // Per-topic throttle for shared liveness records (cluster mode only; no CLI flag, tests override it)
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
@@ -326,6 +331,8 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
+		VisitorUsageFlushInterval:            quota.DefaultFlushInterval,
+		TopicStoreUpdateInterval:             DefaultTopicStoreUpdateInterval,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address

@@ -98,6 +98,10 @@ type Registry struct {
 // New creates or migrates the registry schema and returns this node's membership handle. It
 // does NOT register the node: joining the cluster is an explicit Register call, owned by the
 // caller, so read-only uses of the registry stay side-effect free.
+//
+// The TTL is the liveness window, and it must be at least a second: last_heartbeat is stored in
+// whole seconds, so a sub-second TTL truncates the SQL cutoff to zero, which makes a node live
+// only within the wall-clock second it heartbeated in.
 func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry, error) {
 	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, createTable, nil); err != nil {
 		return nil, err

@@ -5447,7 +5447,7 @@ func TestServer_SubscribeHTTP_NoWriteAfterHandlerReturn(t *testing.T) {
 		// that copied the subscriber list before Unsubscribe ran. In production, this is exactly
 		// how the panic occurs: the goroutine spawned by topic.Publish calls sub() after the
 		// handler has already returned and Go has cleaned up the response writer.
-		v := newVisitor(s.config, s.messageCache, s.userManager, netip.MustParseAddr("9.9.9.9"), nil)
+		v := newVisitor(s.config, s.messageCache, s.userManager, s.quota, netip.MustParseAddr("9.9.9.9"), nil)
 		msg := model.NewDefaultMessage("mytopic", "straggler message")
 		_ = copiedSub(v, msg)
 
@@ -5467,7 +5467,7 @@ func TestServer_HandleError_SkipsWriteHeaderOnHijackedConnection(t *testing.T) {
 		r, _ := http.NewRequest("GET", "/mytopic/ws", nil)
 		r.Header.Set("Upgrade", "websocket")
 		r.Header.Set("Connection", "Upgrade")
-		v := newVisitor(s.config, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
+		v := newVisitor(s.config, s.messageCache, s.userManager, s.quota, netip.MustParseAddr("1.2.3.4"), nil)
 
 		// Test post-upgrade errors wrapped with errWebSocketPostUpgrade (should NOT call WriteHeader)
 		postUpgradeErr := &errWebSocketPostUpgrade{errors.New("websocket: close 1000 (normal)")}

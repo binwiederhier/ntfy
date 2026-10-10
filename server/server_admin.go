@@ -2,8 +2,11 @@ package server
 
 import (
 	"errors"
-	"heckel.io/ntfy/v2/user"
 	"net/http"
+
+	"heckel.io/ntfy/v2/cluster"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/user"
 )
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -192,12 +195,49 @@ func (s *Server) handleAccessReset(w http.ResponseWriter, r *http.Request, v *vi
 }
 
 func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
+	if err := s.cancelSubscriberUserLocal(u.ID, topicPattern); err != nil {
+		return err
+	}
+	// The topic/subscriber registry is per-node; ask peer nodes to kick the user too
+	s.cluster.BroadcastState(&cluster.State{SubscriberCancels: []*cluster.SubscriberCancel{{Topic: topicPattern, UserID: u.ID}}})
+	return nil
+}
+
+func (s *Server) cancelSubscriberUserLocal(userID, topicPattern string) error {
 	topics, err := s.topicsFromPattern(topicPattern)
 	if err != nil {
 		return err
 	}
 	for _, t := range topics {
-		t.CancelSubscriberUser(u.ID)
+		t.CancelSubscriberUser(userID)
 	}
 	return nil
+}
+
+// applySubscriberCancel applies a peer node's subscriber-cancel request to local connections
+// only; it never re-broadcasts (loop prevention, see cluster.CancelFunc).
+//
+// A revocation also invalidates this node's ACL cache for that user: without it the cancelled
+// subscriber could reconnect immediately and be authorized from the stale cache (its periodic
+// reload is minutes away). Cancelling without the refresh would be theater.
+func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
+	if cancel.UserID != "" && s.userManager != nil {
+		if u, err := s.userManager.UserByID(cancel.UserID); err != nil {
+			log.Tag(tagSubscribe).Err(err).Warn("Cannot look up user %s for a peer's revocation", cancel.UserID)
+		} else if err := s.userManager.ReloadAccessCache(u.Name); err != nil {
+			log.Tag(tagSubscribe).Err(err).Warn("Cannot reload the access cache for user %s", u.Name)
+		}
+	}
+	if cancel.ExceptUserID != "" {
+		s.mu.RLock()
+		t, ok := s.topics[cancel.Topic]
+		s.mu.RUnlock()
+		if ok {
+			t.CancelSubscribersExceptUser(cancel.ExceptUserID)
+		}
+		return
+	}
+	if err := s.cancelSubscriberUserLocal(cancel.UserID, cancel.Topic); err != nil {
+		log.Tag(tagSubscribe).Err(err).Warn("Cannot apply peer subscriber cancel for topic %s", cancel.Topic)
+	}
 }

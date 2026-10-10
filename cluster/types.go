@@ -20,6 +20,7 @@ type Config struct {
 	MaxMessageBytes   int64           // Upper bound for a single message on the wire (batch limits derive from this)
 	CancelFunc        CancelFunc      // Applies a peer's subscriber-cancel request to local connections; may be nil
 	TopicsAddedFunc   TopicsAddedFunc // Told about topics that just gained their first subscriber on a peer; may be nil
+	GapFunc           GapFunc         // Told that a peer could not deliver messages for these topics; may be nil
 	IsolatedFunc      func()          // Called while this node lost its registration but a peer is healthy; may be nil
 }
 
@@ -49,6 +50,17 @@ type SubscriberCancel struct {
 // re-broadcast (loop prevention).
 type CancelFunc func(cancel *SubscriberCancel)
 
+// GapFunc is called with topics for which a peer could not deliver one or more messages to this
+// node (its queue overflowed, or the request failed), plus the unix time of the oldest message
+// the peer lost (0 if it did not report one). The server replays that range for those topics,
+// or closes their subscribers so their clients replay with since=. GapAllTopics means "every
+// topic": too many topics to enumerate.
+type GapFunc func(topics []string, since int64)
+
+// GapAllTopics is the GapFunc marker for "gaps in so many topics that they are not worth
+// enumerating; treat every local subscriber as having missed something".
+const GapAllTopics = "*"
+
 // TopicsAddedFunc is called with topics a peer announced as having just gained their first
 // subscriber there. The server supplies it to drop cached negative rate-visitor lookups for
 // those topics; it must not re-broadcast (loop prevention). It is a cache hint only: a lost
@@ -63,26 +75,6 @@ type apiHealth struct {
 	Healthy bool `json:"healthy"`
 }
 
-// apiState is the peer state-exchange envelope. Each concern is an optional section; future
-// concerns (rate limit counters, stats) become siblings of Topics.
-type apiState struct {
-	Topics  *apiStateTopics     `json:"topics,omitempty"`
-	Cancels []*SubscriberCancel `json:"cancels,omitempty"`
-}
-
-// apiStateTopics carries topics that just gained their first subscriber on the sending node.
-type apiStateTopics struct {
-	Added []string `json:"added,omitempty"`
-}
-
-// peerQueue is the bounded, batching send queue for a single peer, pinned to the advertise URL
-// the peer was created with: a peer re-registering under a different advertise URL is treated
-// as a replacement (reconcile retires the old queue; ForwardMessage creates a fresh one on demand).
-type peerQueue struct {
-	advertiseURL string
-	queue        *util.LingerQueue[[]byte]
-}
-
 // apiMessage is one line of a message request body (NDJSON: one message per line; a single
 // message is just a one-line body). It carries the two fields that model.Message does not
 // serialize to JSON (Sender and User), which are needed to reconstruct the visitor on the
@@ -91,4 +83,45 @@ type apiMessage struct {
 	Sender  string         `json:"sender,omitempty"`
 	User    string         `json:"user,omitempty"`
 	Message *model.Message `json:"message"`
+}
+
+// apiState is the peer state-exchange envelope. Each concern is an optional section; future
+// concerns (rate limit counters, stats) become siblings of Topics.
+type apiState struct {
+	Topics  *apiStateTopics     `json:"topics,omitempty"`
+	Cancels []*SubscriberCancel `json:"cancels,omitempty"`
+	Gaps    []string            `json:"gaps,omitempty"`
+	// GapSince is the unix time of the oldest message in Gaps the sender could not deliver, so
+	// the receiver can replay exactly that range instead of trusting its clients' markers. Zero
+	// from a peer that predates it, which means "close the subscribers" as before.
+	GapSince int64 `json:"gapSince,omitempty"`
+}
+
+// apiStateTopics carries topics that just gained their first subscriber on the sending node.
+type apiStateTopics struct {
+	Added []string `json:"added,omitempty"`
+}
+
+// peerGap is what could not be delivered to one peer since the last report: the topics, and the
+// time of the oldest message among them, which is what the peer replays from (see GapFunc).
+type peerGap struct {
+	topics []string
+	since  int64
+}
+
+// peerQueue is the bounded, batching send queue for a single peer, pinned to the advertise URL
+// the peer was created with: a peer re-registering under a different advertise URL is treated
+// as a replacement (reconcile retires the old queue; ForwardMessage creates a fresh one on demand).
+type peerQueue struct {
+	advertiseURL string
+	queue        *util.LingerQueue[*fragment]
+}
+
+// fragment is one pre-marshaled apiMessage line plus the topic and publish time it belongs to:
+// a batch that is dropped or rejected turns into a delivery gap, reported per topic and dated
+// with the oldest message in it (see GapFunc).
+type fragment struct {
+	topic string
+	time  int64
+	data  []byte
 }

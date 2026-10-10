@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ const (
 	meshHTTPTimeout   = 5 * time.Second
 	peerHealthTimeout = 2 * time.Second // Per-peer health probe while this node is unhealthy
 	peerQueueSize     = 1024            // Bounded per-peer fan-out queue (drop on overflow)
+	gapMaxTopics      = 256             // Beyond this many gapped topics for one peer, report GapAllTopics instead
 	batchMaxMessages  = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes     = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes     = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
@@ -48,8 +50,9 @@ type meshCluster struct {
 	mux            *http.ServeMux        // The internal peer API; Cluster is an http.Handler
 	queues         map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
 	closed         bool                  // Guards against ForwardMessage spawning new workers after Close
-	knownPeers     map[NodeID]string     // Peers seen in the last reconcile, for join/leave logging
-	lastRegistered time.Time             // Last successful registry heartbeat, for Healthy
+	knownPeers     map[NodeID]string
+	gaps           map[NodeID]*peerGap // Peers seen in the last reconcile, for join/leave logging
+	lastRegistered time.Time           // Last successful registry heartbeat, for Healthy
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
@@ -89,6 +92,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		queues:         make(map[NodeID]*peerQueue),
 		lastRegistered: time.Now(), // The synchronous Register above just succeeded
 		knownPeers:     make(map[NodeID]string),
+		gaps:           make(map[NodeID]*peerGap),
 		ctx:            ctx,
 		cancel:         cancel,
 	}
@@ -105,8 +109,8 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 
 // ForwardMessage enqueues the message for delivery to every live peer node; a peer without
 // subscribers for the topic drops it on arrival. Delivery is fire-and-forget via each peer's
-// bounded batching queue; if a peer's queue is full the message is dropped for that peer
-// (subscribers reconnect and re-poll history from the database).
+// bounded batching queue; if a peer's queue is full the message becomes a delivery gap for that
+// peer, which is reported on the next heartbeat (see recordGap).
 func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 	peers := c.registry.Peers() // The heartbeat's snapshot; never a database call on the publish path
 	if len(peers) == 0 {
@@ -116,6 +120,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 	if err != nil {
 		return err
 	}
+	frag := &fragment{topic: msg.Topic, time: msg.Time, data: data}
 
 	metrics.ClusterMessagesForwarded.Inc()
 	c.mu.Lock()
@@ -124,9 +129,10 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 		return nil // Shutting down; the message is dropped like any other in-flight fan-out
 	}
 	for _, p := range peers {
-		if !c.queueForNoLock(p).queue.TryEnqueue(data) {
+		if !c.queueForNoLock(p).queue.TryEnqueue(frag) {
 			metrics.ClusterQueueDropped.Inc()
 			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
+			c.recordGapNoLock(NodeID(p.NodeID), []string{msg.Topic}, msg.Time)
 		} else if ev := log.Tag(tag); ev.IsTrace() {
 			ev.Trace("Enqueued message %s (topic %s) for peer %s", msg.ID, msg.Topic, p.NodeID)
 		}
@@ -233,7 +239,7 @@ func (c *meshCluster) heartbeatLoop() {
 
 // heartbeat is one control-plane tick: refresh this node's registry row, read the live set back
 // (which is also what updates this node's leadership standing), prune long-dead rows if this node
-// leads, and reconcile the per-peer queues.
+// leads, reconcile the per-peer queues, and report any delivery gaps to their peers.
 //
 // A node that cannot even register itself aborts the tick: the remaining database work would
 // fail against the same database, and everything downstream degrades safely without it:
@@ -262,6 +268,7 @@ func (c *meshCluster) heartbeat() error {
 		return err
 	}
 	c.reconcilePeers(peers)
+	c.reportGaps(peers)
 	return nil
 }
 
@@ -375,7 +382,7 @@ func (c *meshCluster) queueForNoLock(p *registry.Peer) *peerQueue {
 	q = &peerQueue{
 		advertiseURL: p.AdvertiseURL,
 		queue: util.NewLingerQueue(peerQueueSize, batchMaxMessages, batchMaxBytes,
-			func(line []byte) int { return len(line) }, c.conf.BatchLinger),
+			func(f *fragment) int { return len(f.data) }, c.conf.BatchLinger),
 	}
 	c.queues[nodeID] = q
 	c.wg.Add(1)
@@ -387,15 +394,19 @@ func (c *meshCluster) queueForNoLock(p *registry.Peer) *peerQueue {
 // peer's LingerQueue (up to BatchLinger delay, flushed early on size/count caps); the worker
 // exits when the queue is closed (peer left the registry, or mesh shutdown) and drained.
 //
-// A batch that cannot be delivered is dropped: recovering it is the delivery-gap mechanism, which
-// is not in this piece yet, so a failed batch is counted and logged and nothing else.
+// A batch that cannot be delivered becomes a delivery gap for its topics: the peer is told, and
+// replays that range for them (or closes their subscribers so their clients replay via since=).
 func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	defer c.wg.Done()
-	for lines := range q.queue.Dequeue() {
+	for frags := range q.queue.Dequeue() {
+		lines := make([][]byte, len(frags))
+		for i, f := range frags {
+			lines[i] = f.data
+		}
 		body := assembleMessageBody(lines)
-		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(lines), len(body), nodeID)
+		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(frags), len(body), nodeID)
 		if err := c.postToPeer(nodeID, messageURL(q.advertiseURL), contentTypeNDJSON, body); err != nil {
-			log.Tag(tag).Err(err).Warn("Batch to peer %s was lost", nodeID)
+			c.recordGap(nodeID, fragmentTopics(frags), fragmentOldest(frags))
 		}
 		metrics.ClusterBatchesSent.Inc()
 	}
@@ -403,7 +414,7 @@ func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 
 // postToPeer POSTs a peer API payload, authenticated with the shared cluster secret. Failures
 // are logged, counted and returned; the caller decides what a failure means (a message batch
-// is dropped, state is retried on the next heartbeat).
+// becomes a delivery gap, state is retried on the next heartbeat).
 func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload []byte) error {
 	req, err := http.NewRequestWithContext(c.ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
@@ -429,4 +440,75 @@ func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload
 		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, resp.StatusCode)
 	}
 	return nil
+}
+
+// recordGap remembers that messages for these topics did not reach the peer. The heartbeat
+// reports them; until then they accumulate, and a peer with more than gapMaxTopics gapped
+// topics is reported as GapAllTopics rather than a list.
+func (c *meshCluster) recordGap(nodeID NodeID, topics []string, since int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.recordGapNoLock(nodeID, topics, since)
+}
+
+// recordGapNoLock is recordGap for callers already holding c.mu
+func (c *meshCluster) recordGapNoLock(nodeID NodeID, topics []string, since int64) {
+	gap := c.gaps[nodeID]
+	if gap == nil {
+		gap = &peerGap{}
+		c.gaps[nodeID] = gap
+	}
+	if gap.since == 0 || (since > 0 && since < gap.since) {
+		gap.since = since // The report dates the whole accumulation at its oldest message
+	}
+	if slices.Contains(gap.topics, GapAllTopics) {
+		return
+	}
+	for _, topic := range topics {
+		if !slices.Contains(gap.topics, topic) {
+			gap.topics = append(gap.topics, topic)
+		}
+	}
+	if len(gap.topics) > gapMaxTopics {
+		gap.topics = []string{GapAllTopics}
+	}
+}
+
+// reportGaps tells each live peer which topics we failed to deliver to it, so it can make the
+// affected clients replay. A failed report is kept for the next heartbeat: a gap must not be
+// forgotten because the peer was briefly unreachable (which is usually why there is a gap).
+func (c *meshCluster) reportGaps(peers []*registry.Peer) {
+	c.mu.Lock()
+	pending := make(map[NodeID]*peerGap, len(c.gaps))
+	for nodeID, gap := range c.gaps {
+		pending[nodeID] = &peerGap{topics: gap.topics, since: gap.since}
+	}
+	c.mu.Unlock()
+	if len(pending) == 0 {
+		return
+	}
+	for _, p := range peers {
+		nodeID := NodeID(p.NodeID)
+		gap, ok := pending[nodeID]
+		if !ok || len(gap.topics) == 0 {
+			continue
+		}
+		topics := gap.topics
+		body, err := json.Marshal(&apiState{Gaps: topics, GapSince: gap.since})
+		if err != nil {
+			continue
+		}
+		log.Tag(tag).Info("Reporting %d undelivered topic(s) to peer %s", len(topics), nodeID)
+		if err := c.postToPeer(nodeID, stateURL(p.AdvertiseURL), contentTypeJSON, body); err != nil {
+			continue // Keep them; the next heartbeat tries again
+		}
+		metrics.ClusterGapsReported.Inc()
+		c.mu.Lock()
+		if slices.Equal(c.gaps[nodeID].topics, topics) { // Nothing new while we were sending
+			delete(c.gaps, nodeID)
+		} else {
+			c.gaps[nodeID].topics = subtractTopics(c.gaps[nodeID].topics, topics)
+		}
+		c.mu.Unlock()
+	}
 }

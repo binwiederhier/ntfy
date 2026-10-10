@@ -56,7 +56,7 @@ type Manager struct {
 	config      *Config
 	db          *db.DB
 	queries     queries
-	statsQueue  map[string]*Stats       // "Queue" to asynchronously write user stats to the database (UserID -> Stats)
+	statsQueue  map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
 	tokenQueue  map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
 	accessCache *accessCache            // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
 	quit        chan struct{}           // Closed by Close() to signal background goroutines to stop
@@ -99,6 +99,14 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 	go manager.asyncQueueWriteLoop(manager.config.QueueWriterInterval)
 	go manager.asyncExpiredMagicLinkReapLoop(manager.config.ExpiredMagicLinkReapInterval)
 	return manager, nil
+}
+
+// ReloadAccessCache refreshes the in-memory access cache for the given users (all users when
+// none are named) from the primary database. No-op when the cache is disabled. Callers that
+// learn about an ACL change made elsewhere (another cluster node revoking access) use it to
+// avoid serving a stale permission until the periodic reload.
+func (a *Manager) ReloadAccessCache(usernames ...string) error {
+	return a.maybeReloadAccessCache(usernames...)
 }
 
 // maybeReloadAccessCache refreshes the in-memory access cache from the
@@ -443,12 +451,29 @@ func (a *Manager) ResetStats() error {
 	return nil
 }
 
-// EnqueueUserStats adds the user to a queue which writes out user stats (messages, emails, ..) in
-// batches at a regular interval
-func (a *Manager) EnqueueUserStats(userID string, stats *Stats) {
+// ResetStatsQueue drops the queued stats deltas without touching the database. Nodes that do
+// not run the shared daily reset (only one node in a cluster does) use it so yesterday's
+// increments cannot be added on top of the freshly zeroed rows.
+func (a *Manager) ResetStatsQueue() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.statsQueue[userID] = stats
+	a.statsQueue = make(map[string]*Stats)
+}
+
+// EnqueueUserStats adds the given stats *delta* to a queue which writes out user stats
+// (messages, emails, ..) in batches at a regular interval. Deltas accumulate in the queue and
+// are flushed as SQL increments, so concurrent flushes from multiple nodes add up instead of
+// overwriting each other.
+func (a *Manager) EnqueueUserStats(userID string, delta *Stats) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if queued, ok := a.statsQueue[userID]; ok {
+		queued.Messages += delta.Messages
+		queued.Emails += delta.Emails
+		queued.Calls += delta.Calls
+	} else {
+		a.statsQueue[userID] = &Stats{Messages: delta.Messages, Emails: delta.Emails, Calls: delta.Calls}
+	}
 }
 
 func (a *Manager) asyncQueueWriteLoop(interval time.Duration) {

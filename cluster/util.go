@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/netip"
+	"slices"
 	"strings"
 
 	"heckel.io/ntfy/v2/log"
@@ -44,6 +45,29 @@ func assembleMessageBody(lines [][]byte) []byte {
 	return append(bytes.Join(lines, []byte("\n")), '\n')
 }
 
+// fragmentTopics returns the distinct topics of a batch, for reporting a delivery gap
+func fragmentTopics(frags []*fragment) []string {
+	topics := make([]string, 0, len(frags))
+	for _, f := range frags {
+		if !slices.Contains(topics, f.topic) {
+			topics = append(topics, f.topic)
+		}
+	}
+	return topics
+}
+
+// fragmentOldest returns the publish time of the oldest message in a batch, which dates the
+// delivery gap a failed batch leaves behind (see GapFunc).
+func fragmentOldest(frags []*fragment) int64 {
+	var oldest int64
+	for _, f := range frags {
+		if oldest == 0 || f.time < oldest {
+			oldest = f.time
+		}
+	}
+	return oldest
+}
+
 // decodeMessageBody reads NDJSON apiMessage lines from r, reattaches the non-JSON fields
 // (Sender, User) onto each message, and hands them to deliver. Malformed or message-less lines
 // are skipped and logged, not fatal: fan-out is fire-and-forget, so the valid remainder of a
@@ -76,4 +100,15 @@ func decodeMessageBody(r io.Reader, maxLineBytes int, deliver DeliverFunc) error
 		deliver(apiMsg.Message)
 	}
 	return scanner.Err()
+}
+
+// subtractTopics returns the topics in a that are not in b
+func subtractTopics(a, b []string) []string {
+	out := make([]string, 0, len(a))
+	for _, topic := range a {
+		if !slices.Contains(b, topic) {
+			out = append(out, topic)
+		}
+	}
+	return out
 }

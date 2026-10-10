@@ -307,7 +307,7 @@ func recentAfter(recent []*model.Message, markerID string, since int64) []*model
 	}
 	var out []*model.Message
 	for _, m := range recent[from:] {
-		if m.Time >= since && m.Expires > now { // Expired here means expired in the database too
+		if m.Time >= since && m.Expires > now && m.ID != markerID { // Expired here means expired in the database too
 			out = append(out, m)
 		}
 	}

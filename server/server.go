@@ -77,6 +77,7 @@ type Server struct {
 	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
+	replayDelay       time.Duration                       // How long until a just-published message can be read back (see server_cluster.go)
 	closeChan         chan bool
 	stopOnce          sync.Once
 	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
@@ -341,6 +342,7 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		recentWindow:    recentWindow,
+		replayDelay:     conf.CacheBatchTimeout + conf.ClusterBatchLinger + replayMargin,
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
 	}
@@ -354,6 +356,7 @@ func New(conf *Config) (*Server, error) {
 		AdvertiseURL:    advertiseURL,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
+		GapFunc:         s.handleDeliveryGap,
 		IsolatedFunc:    s.closeLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
@@ -1855,16 +1858,21 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	}
 	messages := make([]*model.Message, 0)
 	truncated := false
+	marker := since.ID()
+	since = s.lagSince(since)
 	for _, t := range topics {
 		recent := t.Recent() // Before the database read: a row written while it runs is in its result or in here
 		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
 		if err != nil {
 			return err
 		}
+		if !since.IsID() && marker != "" {
+			topicMessages = withoutMessage(topicMessages, marker) // A lagged replay overlaps the marker, which the client has by definition
+		}
 		truncated = truncated || topicTruncated
 		messages = append(messages, topicMessages...)
 		if !scheduled {
-			messages = append(messages, s.recentSince(recent, since, topicMessages)...)
+			messages = append(messages, s.recentSince(recent, since, marker, topicMessages)...)
 		}
 	}
 	// Stable: Time has second granularity, so a multi-topic replay has many equal keys. An unstable
@@ -1889,8 +1897,10 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 // replay could not see yet, because the rows have not been written (see recentAfter).
 // Everything up to the newest message the database did return is the database's business,
 // including what it deliberately left out (the poll size cap), so only what the topic delivered
-// after that is added; with nothing returned, the marker decides.
-func (s *Server) recentSince(recent []*model.Message, since model.SinceMarker, replayed []*model.Message) []*model.Message {
+// after that is added; with nothing returned, the marker decides. marker is the client's own
+// marker id, kept apart from since because a cluster replays since=<id> by time (see lagSince):
+// the client has that message by definition and must not get it again.
+func (s *Server) recentSince(recent []*model.Message, since model.SinceMarker, marker string, replayed []*model.Message) []*model.Message {
 	if since.IsLatest() {
 		return nil // The newest stored message only, by definition
 	}
@@ -1899,15 +1909,26 @@ func (s *Server) recentSince(recent []*model.Message, since model.SinceMarker, r
 		return recentAfter(recent, newest.ID, newest.Time+1)
 	}
 	sinceTime := since.Time().Unix()
-	if since.IsID() {
-		m, err := s.messageCache.Message(since.ID())
+	if marker != "" {
+		m, err := s.messageCache.Message(marker)
 		if err != nil {
 			sinceTime = 0 // Unknown marker: the replay fell back to the topic's history, so does this
 		} else {
 			sinceTime = m.Time
 		}
 	}
-	return recentAfter(recent, since.ID(), sinceTime)
+	return recentAfter(recent, marker, sinceTime)
+}
+
+// withoutMessage drops the message with the given id, in place
+func withoutMessage(messages []*model.Message, id string) []*model.Message {
+	out := messages[:0]
+	for _, m := range messages {
+		if m.ID != id {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // parseSince returns a timestamp identifying the time span from which cached messages should be received.

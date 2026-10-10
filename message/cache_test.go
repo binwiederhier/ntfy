@@ -1143,6 +1143,31 @@ func TestStore_CloseGivesUpOnAStuckBatchWrite(t *testing.T) {
 	}
 }
 
+func TestStore_UnwrittenUntilTheBatchIsWritten(t *testing.T) {
+	// A slow database keeps a queued message out of the table for as long as it likes; the
+	// server keeps such a message in its topic's window until it is in (see server.topic)
+	testDB := dbtest.CreateTestPostgres(t)
+	s, err := message.NewPostgresStore(testDB, 100, 10*time.Millisecond)
+	require.Nil(t, err)
+	t.Cleanup(func() { s.Close() })
+
+	tx, err := testDB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE")
+	require.Nil(t, err)
+
+	m := model.NewDefaultMessage("mytopic", "stalled")
+	require.Nil(t, s.AddMessage(m))
+	time.Sleep(200 * time.Millisecond) // Many batch timeouts: the batch is with the writer, stuck on the lock
+	require.True(t, s.Unwritten(m.ID))
+
+	require.Nil(t, tx.Rollback())
+	require.Eventually(t, func() bool { return !s.Unwritten(m.ID) }, 5*time.Second, 10*time.Millisecond)
+	_, err = s.Message(m.ID)
+	require.Nil(t, err)
+}
+
 func TestStore_CloseGivesUpOnAnInFlightBatchWrite(t *testing.T) {
 	// Same as TestStore_CloseGivesUpOnAStuckBatchWrite, but with a batch already handed to the
 	// batch writer, so Close cannot even hand over the messages that are still pending

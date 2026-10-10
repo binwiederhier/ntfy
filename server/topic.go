@@ -28,8 +28,9 @@ type topic struct {
 	subscribers  map[int]*topicSubscriber
 	rateVisitor  *visitor
 	lastAccess   time.Time
-	recent       []*model.Message // Messages published in the last recentWindow, oldest first (see RecentAfter)
+	recent       []*model.Message // Messages published in the last recentWindow, oldest first (see recentAfter)
 	recentWindow time.Duration
+	unwritten    func(id string) bool // Reports whether a message's row is still waiting to be written (see pruneRecentNoLock)
 	mu           sync.RWMutex
 }
 
@@ -43,12 +44,13 @@ type topicSubscriber struct {
 type subscriber func(v *visitor, msg *model.Message) error
 
 // newTopic creates a new topic
-func newTopic(id string, recentWindow time.Duration) *topic {
+func newTopic(id string, recentWindow time.Duration, unwritten func(id string) bool) *topic {
 	return &topic{
 		ID:           id,
 		subscribers:  make(map[int]*topicSubscriber),
 		lastAccess:   time.Now(),
 		recentWindow: recentWindow,
+		unwritten:    unwritten,
 	}
 }
 
@@ -176,17 +178,22 @@ func (t *topic) PruneRecent() {
 
 // pruneRecentNoLock is PruneRecent for callers already holding t.mu. Message times are whole
 // seconds, so a message stays up to a second longer than the window; erring that way is fine.
+// A message whose row is still waiting for a slow database stays until it is written, however
+// long that takes, since the window is the only place a reconnect can find it until then.
 func (t *topic) pruneRecentNoLock() {
 	cutoff := time.Now().Add(-t.recentWindow).Unix()
-	kept := 0
-	for kept < len(t.recent) && t.recent[kept].Time < cutoff {
-		kept++
+	kept := t.recent[:0]
+	for _, m := range t.recent {
+		if m.Time >= cutoff || (t.unwritten != nil && t.unwritten(m.ID)) {
+			kept = append(kept, m)
+		}
 	}
-	if kept == len(t.recent) {
+	clear(t.recent[len(kept):]) // Drop the references to what was pruned
+	if len(kept) == 0 {
 		t.recent = nil // Release the backing array, not just the entries
 		return
 	}
-	t.recent = t.recent[kept:]
+	t.recent = kept
 }
 
 // subscribersCopy returns a shallow copy of the subscribers, so delivery never holds the lock
@@ -209,31 +216,11 @@ func (t *topic) subscribersCopyNoLock() map[int]*topicSubscriber {
 	return subscribers
 }
 
-// RecentAfter returns the recently published messages a reconnecting subscriber may not find in
-// the database yet: a message is pushed live before its row is written (it sits in a cache write
-// batch for up to cache-batch-timeout, here or on the node that accepted it), so a replay from
-// the database alone has a hole exactly as wide as that batch. Every message passes through
-// Publish on every node moments after it was accepted, so the topic keeps the last recentWindow
-// of them. If the marker id is in the window the messages after it are returned, otherwise those
-// published at or after since.
-func (t *topic) RecentAfter(markerID string, since int64) []*model.Message {
+// Recent returns a copy of what the topic remembers from the last recentWindow (see recentAfter)
+func (t *topic) Recent() []*model.Message {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	now := time.Now().Unix()
-	from := 0
-	for i, m := range t.recent {
-		if m.ID == markerID {
-			from, since = i+1, 0
-			break
-		}
-	}
-	var out []*model.Message
-	for _, m := range t.recent[from:] {
-		if m.Time >= since && m.Expires > now { // Expired here means expired in the database too
-			out = append(out, m)
-		}
-	}
-	return out
+	return append([]*model.Message(nil), t.recent...)
 }
 
 // SubscribersCount returns the number of subscribers currently attached to this topic
@@ -300,4 +287,29 @@ func (t *topic) Context() log.Context {
 		}
 	}
 	return fields
+}
+
+// recentAfter returns the recently published messages a reconnecting subscriber may not find in
+// the database yet: a message is pushed live before its row is written (it sits in a cache write
+// batch for up to cache-batch-timeout, here or on the node that accepted it), so a replay from
+// the database alone has a hole exactly as wide as that batch. Every message passes through
+// Publish on every node moments after it was accepted, so the topic keeps the last recentWindow
+// of them, and longer while a row is waiting for a slow database. If the marker id is in the window the messages after it are returned, otherwise those
+// published at or after since.
+func recentAfter(recent []*model.Message, markerID string, since int64) []*model.Message {
+	now := time.Now().Unix()
+	from := 0
+	for i, m := range recent {
+		if m.ID == markerID {
+			from, since = i+1, 0
+			break
+		}
+	}
+	var out []*model.Message
+	for _, m := range recent[from:] {
+		if m.Time >= since && m.Expires > now { // Expired here means expired in the database too
+			out = append(out, m)
+		}
+	}
+	return out
 }

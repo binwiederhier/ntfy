@@ -43,9 +43,9 @@ func TestServer_ManagerPrunesTopicWindows(t *testing.T) {
 	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "remembered", nil).Code)
 	topics, err := s.topicsFromIDs(nil, "mytopic")
 	require.Nil(t, err)
-	require.Len(t, topics[0].RecentAfter("", 0), 1)
+	require.Len(t, recentAfter(topics[0].Recent(), "", 0), 1)
 
 	time.Sleep(2100 * time.Millisecond) // The window, plus the second that whole-second message times can add
 	s.execManager()
-	require.Empty(t, topics[0].RecentAfter("", 0))
+	require.Empty(t, recentAfter(topics[0].Recent(), "", 0))
 }

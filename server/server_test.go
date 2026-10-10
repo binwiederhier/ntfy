@@ -5888,3 +5888,40 @@ func TestServer_SubscribeReconnect_WebSocket(t *testing.T) {
 	}
 	require.Equal(t, map[string]int{"in flight": 1, "live": 1}, countByBody(received))
 }
+
+func TestServer_SubscribeReconnect_MessageStillUnwrittenAfterTheWindow(t *testing.T) {
+	// A database under load can take longer than the window to write a batch. A client that
+	// reconnects then finds the message neither in the database nor, if the window had let go
+	// of it on time alone, in the topic: it is lost for that client, for good.
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, dsn)
+	conf.CacheBatchTimeout = 10 * time.Millisecond
+	conf.ClusterBatchLinger = 0
+	s := newTestServer(t, conf) // Window: 10ms + 0 + the 1s margin
+	last := toMessage(t, request(t, s, "PUT", "/mytopic", "stored", nil).Body.String())
+	waitFor(t, func() bool {
+		_, err := s.messageCache.Message(last.ID)
+		return err == nil
+	})
+
+	host, err := pg.Open(dsn)
+	require.Nil(t, err)
+	defer host.DB.Close()
+	tx, err := host.DB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE") // Reads go through, writes wait
+	require.Nil(t, err)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "stalled", nil).Code)
+
+	time.Sleep(2100 * time.Millisecond) // The window, plus the second that whole-second message times can add
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	topics[0].PruneRecent() // What the manager does every minute
+
+	rr := httptest.NewRecorder()
+	cancel := subscribe(t, s, "/mytopic/json?since="+last.ID, rr)
+	time.Sleep(500 * time.Millisecond)
+	cancel()
+	require.Equal(t, map[string]int{"stalled": 1}, countByBody(toMessages(t, rr.Body.String())))
+}

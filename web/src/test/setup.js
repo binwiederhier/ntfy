@@ -1,4 +1,3 @@
-/* eslint-env node, es2021 */
 // Minimal browser-global stubs so the pure-logic and API modules import + run under the node
 // environment, without pulling in jsdom. utils.js -> config.js does `const { config } = window;`
 // at import time, and config.js falls back to window.location.origin when base_url is empty.

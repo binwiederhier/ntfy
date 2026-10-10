@@ -38,7 +38,7 @@ const (
 
 	// insertMessageColumns is the number of values insertMessageArgs returns per message, which is
 	// the number of columns in each backend's INSERT statement
-	insertMessageColumns = 24
+	insertMessageColumns = 25
 )
 
 var errNoRows = errors.New("no rows found")
@@ -181,6 +181,14 @@ func insertMessageArgs(m *model.Message) ([]any, error) {
 		}
 		actionsStr = string(actionsBytes)
 	}
+	var appleStr string
+	if m.Apple != nil {
+		appleBytes, err := json.Marshal(m.Apple)
+		if err != nil {
+			return nil, err
+		}
+		appleStr = string(appleBytes)
+	}
 	var sender string
 	if m.Sender.IsValid() {
 		sender = m.Sender.String()
@@ -209,6 +217,7 @@ func insertMessageArgs(m *model.Message) ([]any, error) {
 		m.User,
 		util.SanitizeUTF8(m.ContentType),
 		m.Encoding,
+		appleStr,
 		published,
 	}, nil
 }
@@ -620,7 +629,7 @@ func readMessages(rows *sql.Rows) ([]*model.Message, error) {
 func readMessage(rows *sql.Rows) (*model.Message, error) {
 	var timestamp, expires, attachmentSize, attachmentExpires int64
 	var priority int
-	var id, sequenceID, event, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, contentType, encoding string
+	var id, sequenceID, event, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, contentType, encoding, appleStr string
 	err := rows.Scan(
 		&id,
 		&sequenceID,
@@ -644,6 +653,7 @@ func readMessage(rows *sql.Rows) (*model.Message, error) {
 		&user,
 		&contentType,
 		&encoding,
+		&appleStr,
 	)
 	if err != nil {
 		return nil, err
@@ -655,6 +665,12 @@ func readMessage(rows *sql.Rows) (*model.Message, error) {
 	var actions []*model.Action
 	if actionsStr != "" {
 		if err := json.Unmarshal([]byte(actionsStr), &actions); err != nil {
+			return nil, err
+		}
+	}
+	var apple *model.AppleOptions
+	if appleStr != "" {
+		if err := json.Unmarshal([]byte(appleStr), &apple); err != nil {
 			return nil, err
 		}
 	}
@@ -691,6 +707,7 @@ func readMessage(rows *sql.Rows) (*model.Message, error) {
 		User:        user,
 		ContentType: contentType,
 		Encoding:    encoding,
+		Apple:       apple,
 	}, nil
 }
 

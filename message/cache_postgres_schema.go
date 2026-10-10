@@ -6,7 +6,7 @@ import (
 
 // Initial PostgreSQL schema
 const (
-	postgresCurrentSchemaVersion = 16
+	postgresCurrentSchemaVersion = 17
 	postgresCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
@@ -33,6 +33,7 @@ const (
 			user_id TEXT NOT NULL,
 			content_type TEXT NOT NULL,
 			encoding TEXT NOT NULL,
+			apple TEXT NOT NULL,
 			published BOOLEAN NOT NULL DEFAULT FALSE,
 			claimed_at BIGINT NOT NULL DEFAULT 0
 		);
@@ -62,6 +63,11 @@ const (
 	postgresMigrate15To16AddClaimedAtQuery = `
 		ALTER TABLE message ADD COLUMN IF NOT EXISTS claimed_at BIGINT NOT NULL DEFAULT 0;
 	`
+
+	// 16 -> 17
+	postgresMigrate16To17AddAppleQuery = `
+		ALTER TABLE message ADD COLUMN IF NOT EXISTS apple TEXT NOT NULL DEFAULT('');
+	`
 )
 
 var (
@@ -72,5 +78,6 @@ var (
 	postgresMigrations = map[int]schema.MigrateFunc{
 		14: schema.AsMigrateFunc(postgresMigrate14To15CreateIndexQuery),
 		15: schema.AsMigrateFunc(postgresMigrate15To16AddClaimedAtQuery),
+		16: schema.AsMigrateFunc(postgresMigrate16To17AddAppleQuery),
 	}
 )

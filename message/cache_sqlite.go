@@ -20,52 +20,52 @@ const (
 	// sqliteInsertMessagesQuery is the head of the multi-row INSERT; one sqliteInsertMessagesRow per
 	// message follows, with the values in the order of insertMessageArgs. sqliteInsertMessagesMaxRows
 	// caps the rows per statement, keeping the parameter count well below SQLite's 32766.
-	sqliteInsertMessagesQuery   = `INSERT INTO messages (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, published) VALUES `
-	sqliteInsertMessagesRow     = `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sqliteInsertMessagesQuery   = `INSERT INTO messages (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, apple, published) VALUES `
+	sqliteInsertMessagesRow     = `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	sqliteInsertMessagesMaxRows = 1000
 
 	sqliteSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM messages WHERE topic = ? AND sequence_id = ? AND published = 0`
 	sqliteDeleteScheduledBySequenceIDQuery      = `DELETE FROM messages WHERE topic = ? AND sequence_id = ? AND published = 0`
 	sqliteUpdateMessagesForTopicExpiryQuery     = `UPDATE messages SET expires = ? WHERE topic = ?`
 	sqliteSelectMessagesByIDQuery               = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, apple
 		FROM messages
 		WHERE mid = ?
 	`
 	sqliteSelectMessagesSinceTimeQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, apple
 		FROM messages
 		WHERE topic = ? AND time >= ? AND published = 1
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, apple
 		FROM messages
 		WHERE topic = ? AND time >= ?
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessageRowIDQuery    = `SELECT id FROM messages WHERE mid = ? LIMIT 1`
 	sqliteSelectMessagesSinceIDQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, apple
 		FROM messages
 		WHERE topic = ? AND id > ? AND published = 1
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDIncludeScheduledQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, apple
 		FROM messages
 		WHERE topic = ? AND (id > ? OR published = 0)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesLatestQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, apple
 		FROM messages
 		WHERE topic = ? AND published = 1
 		ORDER BY time DESC, id DESC
 		LIMIT 1
 	`
 	sqliteSelectMessagesDueQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, apple
 		FROM messages
 		WHERE time <= ? AND published = 0
 		ORDER BY time, id

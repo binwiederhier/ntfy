@@ -104,6 +104,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfyexec](https://github.com/alecthomas/ntfyexec) - Send a notification through ntfy.sh if a command fails
 - [Ntfy Desktop](https://github.com/emmaexe/ntfyDesktop) - Fully featured desktop client for Linux, built with Qt and C++.
 - [Ntfy App](https://github.com/rubix-studios-pty-ltd/ntfy-app) - Tauri/Rust desktop client for Windows, Linux and MacOS with push notifications.
+- [mac_ntfy](https://github.com/wangty163/mac_ntfy) - Native macOS client for ntfy (Swift)
 
 ## Projects + scripts 
 
@@ -324,6 +325,7 @@ ntfy community. Thanks to everyone running a public server. **You guys rock!**
 | [ntfy.mzte.de](https://ntfy.mzte.de/)             | 🇩🇪 Germany       |
 | [ntfy.hostux.net](https://ntfy.hostux.net/)       | 🇫🇷 France        |
 | [ntfy.fossman.de](https://ntfy.fossman.de/)       | 🇩🇪 Germany       |
+| [notify.utilibre.org](https://notify.utilibre.org/) | 🇩🇪 Germany |
 
 Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
 and uptime of third party servers, so use of each server is **at your own discretion**.

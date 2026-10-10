@@ -34,6 +34,7 @@ import (
 	"heckel.io/ntfy/v2/action"
 	"heckel.io/ntfy/v2/attachment"
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -51,11 +52,13 @@ import (
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config            *Config
-	db                *db.DB // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
+	db                *db.DB          // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
+	cluster           cluster.Cluster // Fans messages out to peer cluster nodes (nop when not clustered)
 	httpServer        *http.Server
 	httpsServer       *http.Server
 	httpMetricsServer *http.Server
 	httpProfileServer *http.Server
+	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	unixListener      net.Listener
 	smtpServer        *smtp.Server
 	smtpServerBackend *smtpBackend
@@ -312,6 +315,11 @@ func New(conf *Config) (*Server, error) {
 			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
 		})
 	}
+	// Peers reach this node on the dedicated cluster listener, never on the public ones
+	advertiseURL := conf.ClusterAdvertiseURL
+	if advertiseURL == "" && conf.ClusterListen != "" {
+		advertiseURL = "http://" + conf.ClusterListen
+	}
 	s := &Server{
 		config:          conf,
 		db:              pool,
@@ -329,7 +337,22 @@ func New(conf *Config) (*Server, error) {
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
 	}
+	// Everything from here on needs the server itself: the price cache calls a method on it, and
+	// the cluster delivers peer messages through callbacks into it (which is how the cluster
+	// package stays independent of the server)
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
+	s.cluster, err = cluster.New(&cluster.Config{
+		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
+		NodeID:          cluster.NodeID(conf.ClusterNodeID),
+		AdvertiseURL:    advertiseURL,
+		Secret:          conf.ClusterSecret,
+		BatchLinger:     conf.ClusterBatchLinger,
+		IsolatedFunc:    s.closeLocalSubscribers,
+		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
+	}, pool, s.deliverFromBus)
+	if err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -440,6 +463,14 @@ func (s *Server) Run() error {
 	} else if s.config.EnableMetrics {
 		s.metricsHandler = promhttp.Handler()
 	}
+	if s.config.ClusterListen != "" {
+		// The cluster serves the whole private listener: every path on it is the peer API, which
+		// the cluster owns and authenticates itself
+		s.httpClusterServer = &http.Server{Addr: s.config.ClusterListen, Handler: s.cluster}
+		go func() {
+			errChan <- s.httpClusterServer.ListenAndServe()
+		}()
+	}
 	if s.config.ProfileListenHTTP != "" {
 		profileMux := http.NewServeMux()
 		profileMux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -505,6 +536,9 @@ func (s *Server) stop() {
 	}
 	if s.attachment != nil {
 		s.attachment.Close()
+	}
+	if s.httpClusterServer != nil {
+		s.httpClusterServer.Close()
 	}
 	s.closeDatabases()
 	if s.ban != nil {
@@ -760,10 +794,13 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	response := &apiHealthResponse{
-		Healthy: true,
+	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node;
+	// 503 lets status-code LB checks pull it (checkers must fail open, see cluster.Cluster)
+	healthy := s.cluster.Healthy()
+	if !healthy {
+		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, response)
+	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -867,6 +904,11 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 // the single choke point through which every published message must pass; t may be nil when
 // the topic has no local subscribers (delayed sender).
 func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchOpts) error {
+	// Hand the message to the other cluster nodes: fire-and-forget, so a slow or dead peer never
+	// delays the publisher. Nop single-node.
+	if err := s.cluster.ForwardMessage(m); err != nil {
+		logvm(v, m).Err(err).Warn("Unable to forward message to cluster peers")
+	}
 	// Deliver to local subscribers
 	if t != nil {
 		if opts.async {
@@ -2076,6 +2118,11 @@ func (s *Server) runFirebaseKeepaliver() {
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
+			// Leader only: a keepalive wakes every subscribed phone, so the cluster sends it
+			// once rather than once per node. Per tick, to survive a failover.
+			if !s.cluster.IsLeader() {
+				continue
+			}
 			s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
 		/*
 			FIXME: Disable iOS polling entirely for now due to thundering herd problem (see #677)
@@ -2095,6 +2142,11 @@ func (s *Server) runDelayedSender() {
 	for {
 		select {
 		case <-time.After(s.config.DelayedSenderInterval):
+			// Leader only, to keep delayed sends on one node. A preference, not what makes
+			// delivery safe: MessagesDue claims each row, so a non-leader is harmless.
+			if !s.cluster.IsLeader() {
+				continue
+			}
 			if err := s.sendDelayedMessages(); err != nil {
 				log.Tag(tagPublish).Err(err).Warn("Error sending delayed messages")
 			}

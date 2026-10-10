@@ -1476,9 +1476,10 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 }
 
 type testMailer struct {
-	count  int
-	lastTo string
-	mu     sync.Mutex
+	count       int
+	lastTo      string
+	lastMessage *model.Message
+	mu          sync.Mutex
 }
 
 func (t *testMailer) SendNotification(to string, m *model.Message, senderIP string) error {
@@ -1486,6 +1487,7 @@ func (t *testMailer) SendNotification(to string, m *model.Message, senderIP stri
 	defer t.mu.Unlock()
 	t.count++
 	t.lastTo = to
+	t.lastMessage = m
 	return nil
 }
 
@@ -1503,6 +1505,12 @@ func (t *testMailer) LastTo() string {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.lastTo
+}
+
+func (t *testMailer) LastMessage() *model.Message {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.lastMessage
 }
 
 func (t *testMailer) SendEmailVerification(to, link string) error { return nil }
@@ -2564,6 +2572,43 @@ func TestServer_PublishWithTierBasedMessageLimitAndExpiry(t *testing.T) {
 		})
 		require.Equal(t, 200, response.Code)
 		require.Empty(t, response.Body)
+	})
+}
+
+func TestServer_PublishAttachmentWithEmail(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		mailer := &testMailer{}
+		s.mailer = mailer
+
+		// Uploaded attachment: the mailer gets the stored attachment, so the email can link it
+		content := "text file!" + util.RandomString(4990) // > 4096
+		response := request(t, s, "PUT", "/mytopic", content, map[string]string{
+			"E-Mail":   "test@example.com",
+			"Filename": "backup.log",
+		})
+		require.Equal(t, 200, response.Code)
+		msg := toMessage(t, response.Body.String())
+		waitFor(t, func() bool { return mailer.LastMessage() != nil }) // E-Mail publishing happens in a Go routine
+		sent := mailer.LastMessage()
+		require.NotNil(t, sent.Attachment)
+		require.Equal(t, "backup.log", sent.Attachment.Name)
+		require.Equal(t, msg.Attachment.URL, sent.Attachment.URL)
+		require.Equal(t, msg.Attachment.Expires, sent.Attachment.Expires)
+		require.Contains(t, sent.Attachment.URL, "http://127.0.0.1:12345/file/")
+
+		// External attachment: linked as-is, never expires
+		response = request(t, s, "PUT", "/mytopic", "Look at this", map[string]string{
+			"E-Mail": "test@example.com",
+			"Attach": "https://example.com/cat.jpg",
+		})
+		require.Equal(t, 200, response.Code)
+		waitFor(t, func() bool { return mailer.Count() == 2 })
+		sent = mailer.LastMessage()
+		require.NotNil(t, sent.Attachment)
+		require.Equal(t, "cat.jpg", sent.Attachment.Name)
+		require.Equal(t, "https://example.com/cat.jpg", sent.Attachment.URL)
+		require.Equal(t, int64(0), sent.Attachment.Expires)
 	})
 }
 

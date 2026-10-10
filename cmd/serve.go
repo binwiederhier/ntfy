@@ -346,10 +346,6 @@ func execServe(c *cli.Context) error {
 		return errors.New("experimental-cluster-secret can only be used if experimental-cluster-listen is set")
 	} else if clusterListen != "" && clusterAdvertiseURL == "" && wildcardAddr(clusterListen) {
 		return errors.New("experimental-cluster-advertise-url must be set if experimental-cluster-listen binds a wildcard address")
-	} else if clusterListen != "" {
-		// The options are reserved and validated, but no node-to-node implementation ships yet.
-		// Starting single-node with a cluster config would look like clustering is working.
-		return errors.New("experimental clustering is not available in this build yet; unset experimental-cluster-listen")
 	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if firebaseKeyFile != "" && !server.FirebaseAvailable {
@@ -430,6 +426,9 @@ func execServe(c *cli.Context) error {
 		return fmt.Errorf("if ban-file is set, its directory (%s) must exist", filepath.Dir(banFile))
 	} else if runtime.GOOS == "windows" && listenUnix != "" {
 		return errors.New("listen-unix is not supported on Windows")
+	}
+	if cacheDuration > 0 && attachmentExpiryDuration > cacheDuration {
+		log.Warn("attachment-expiry-duration (%s) is longer than cache-duration (%s); attachments never outlive their message, so they will be deleted after %s", attachmentExpiryDurationStr, cacheDurationStr, cacheDurationStr)
 	}
 
 	// Backwards compatibility

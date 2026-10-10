@@ -35,21 +35,27 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*http.Request, *visitor, er
 	header, err := readAuthHeader(r)
 	if err != nil {
 		return r, vip, err
-	} else if !supportedAuthHeader(header) {
-		return r, vip, nil
+	} else if supportedAuthHeader(header) {
+		// If we're trying to auth, check the rate limiter first
+		if !vip.AuthAllowed() {
+			return r, vip, errHTTPTooManyRequestsLimitAuthFailure // Always return visitor, even when error occurs!
+		}
+		u, err := s.authenticate(r, header)
+		if err != nil {
+			vip.AuthFailed()
+			logr(r).Err(err).Debug("Authentication failed")
+			return r, vip, errHTTPUnauthorized // Always return visitor, even when error occurs!
+		}
+		// Authentication with user was successful
+		return r, s.visitor(ip, u), nil
 	}
-	// If we're trying to auth, check the rate limiter first
-	if !vip.AuthAllowed() {
-		return r, vip, errHTTPTooManyRequestsLimitAuthFailure // Always return visitor, even when error occurs!
+	if u, ok, err := s.authenticateHeaderUser(r); err != nil {
+		logr(r).Err(err).Debug("Header-based authentication failed")
+		return r, vip, errHTTPUnauthorized
+	} else if ok {
+		return r, s.visitor(ip, u), nil
 	}
-	u, err := s.authenticate(r, header)
-	if err != nil {
-		vip.AuthFailed()
-		logr(r).Err(err).Debug("Authentication failed")
-		return r, vip, errHTTPUnauthorized // Always return visitor, even when error occurs!
-	}
-	// Authentication with user was successful
-	return r, s.visitor(ip, u), nil
+	return r, vip, nil
 }
 
 // authenticate a user based on basic auth username/password (Authorization: Basic ...), or token auth (Authorization: Bearer ...).
@@ -108,4 +114,39 @@ func (s *Server) authenticateBearerAuth(r *http.Request, token string) (*user.Us
 		LastOrigin: ip,
 	})
 	return u, nil
+}
+
+func (s *Server) authenticateHeaderUser(r *http.Request) (*user.User, bool, error) {
+	if s.config.AuthHeaderUser == "" || !s.config.BehindProxy {
+		return nil, false, nil
+	}
+	username := strings.TrimSpace(r.Header.Get(s.config.AuthHeaderUser))
+	if username == "" {
+		return nil, false, nil
+	} else if !user.AllowedUsername(username) {
+		return nil, false, errors.New("invalid auth header username")
+	}
+	return &user.User{
+		Name: username,
+		Role: s.headerUserRole(r),
+	}, true, nil
+}
+
+func (s *Server) headerUserRole(r *http.Request) user.Role {
+	role := user.RoleUser
+	if s.config.AuthHeaderRole == "" || len(s.config.AuthHeaderMappings) == 0 {
+		return role
+	}
+	for _, value := range r.Header.Values(s.config.AuthHeaderRole) {
+		for _, candidate := range strings.Split(value, ",") {
+			mappedRole, ok := s.config.AuthHeaderMappings[strings.TrimSpace(candidate)]
+			if !ok {
+				continue
+			} else if mappedRole == user.RoleAdmin {
+				return user.RoleAdmin
+			}
+			role = mappedRole
+		}
+	}
+	return role
 }

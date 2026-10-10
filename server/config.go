@@ -149,6 +149,9 @@ type Config struct {
 	AuthUsers                            []*user.User `hash:"-"`
 	AuthAccess                           map[string][]*user.Grant
 	AuthTokens                           map[string][]*user.Token `hash:"-"`
+	AuthHeaderUser                       string
+	AuthHeaderRole                       string
+	AuthHeaderMappings                   map[string]user.Role
 	AuthBcryptCost                       int
 	AuthStatsQueueWriterInterval         time.Duration
 	AuthAccessCacheEnabled               bool          // Enables the in-memory ACL cache (high volume servers only)
@@ -267,6 +270,9 @@ func NewConfig() *Config {
 		AuthFile:                             "",
 		AuthStartupQueries:                   "",
 		AuthDefault:                          user.PermissionReadWrite,
+		AuthHeaderUser:                       "",
+		AuthHeaderRole:                       "",
+		AuthHeaderMappings:                   make(map[string]user.Role),
 		AuthBcryptCost:                       user.DefaultUserPasswordBcryptCost,
 		AuthStatsQueueWriterInterval:         user.DefaultUserStatsQueueWriterInterval,
 		AuthAccessCacheEnabled:               user.DefaultAccessCacheEnabled,

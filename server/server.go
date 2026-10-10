@@ -275,6 +275,7 @@ func New(conf *Config) (*Server, error) {
 			Users:                     conf.AuthUsers,
 			Access:                    conf.AuthAccess,
 			Tokens:                    conf.AuthTokens,
+			AccessAllowUnknownUsers:   conf.AuthHeaderUser != "" && conf.BehindProxy,
 			BcryptCost:                conf.AuthBcryptCost,
 			QueueWriterInterval:       conf.AuthStatsQueueWriterInterval,
 			AccessCacheEnabled:        conf.AuthAccessCacheEnabled,

@@ -650,6 +650,49 @@ and topic patterns, and
 These commands **directly edit the auth database** (as defined in `auth-file`), so they only work on the server, 
 and only if the user accessing them has the right permissions.
 
+### Reverse-proxy header auth
+
+If your reverse proxy already authenticates users, ntfy can trust proxy-provided headers instead of requiring a local
+ntfy password or access token for every request. This is intended for **trusted reverse-proxy deployments only**, such
+as OAuth2 Proxy, Authelia, or Traefik ForwardAuth.
+
+!!! warning
+    Only enable header auth if ntfy is reachable **only through a trusted reverse proxy** that strips and re-sets the
+    configured headers. Direct clients must never be able to inject these headers themselves.
+
+The relevant options are:
+
+* `behind-proxy`: Must be enabled so ntfy only accepts these auth headers in reverse-proxy mode
+* `auth-header-user`: Header name containing the authenticated username, e.g. `X-Forwarded-User`
+* `auth-header-role`: Optional header name containing one or more upstream roles/groups
+* `auth-header-mappings`: Optional list of role/group mappings in the format `<value>:<role>`, where `<role>` is
+  `admin` or `user`
+
+When `auth-header-user` is set and the header is present, ntfy authenticates the request as that username without
+requiring a local ntfy password or access token. Topic ACLs still use the username from the header, so you can keep
+managing permissions via `ntfy access` or `auth-access`. If you create per-user ACLs for a proxied username, ntfy
+stores an internal placeholder auth record for that username so the ACL can be persisted, but that record is not used
+for password or token authentication. If `auth-header-role` is also configured, ntfy reads comma-separated role/group values
+from that header (or repeated header values), applies `auth-header-mappings`, and uses the mapped ntfy role for
+authorization decisions. If any mapped value resolves to `admin`, the proxied user is treated as an ntfy admin;
+otherwise the user is treated as a regular ntfy `user`.
+
+Example:
+
+``` yaml
+auth-file: "/var/lib/ntfy/user.db"
+auth-default-access: "deny-all"
+behind-proxy: true
+auth-header-user: "X-Forwarded-User"
+auth-header-role: "X-Forwarded-Groups"
+auth-header-mappings:
+  - "ntfy-admins:admin"
+  - "ntfy-users:user"
+auth-access:
+  - "alice@example.com:alerts:rw"
+  - "everyone:announcements:read"
+```
+
 ### Users and roles
 Users can be added to the ntfy user database in two different ways
 
@@ -2376,6 +2419,9 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cache-batch-timeout`                      | `NTFY_CACHE_BATCH_TIMEOUT`                      | *duration*                                          | 0s                | Timeout for batched async writes to the message cache (if zero, writes are synchronous)                                                                                                                                                 |
 | `auth-file`                                | `NTFY_AUTH_FILE`                                | *filename*                                          | -                 | Auth database file used for access control (SQLite). If set, enables authentication and access control. Not required if `database-url` is set. See [access control](#access-control).                                                   |
 | `auth-default-access`                      | `NTFY_AUTH_DEFAULT_ACCESS`                      | `read-write`, `read-only`, `write-only`, `deny-all` | `read-write`      | Default permissions if no matching entries in the auth database are found. Default is `read-write`.                                                                                                                                     |
+| `auth-header-user`                         | `NTFY_AUTH_HEADER_USER`                         | *string*                                            | -                 | Trusted reverse-proxy header containing the authenticated username. Requires `behind-proxy`. Only use in trusted reverse-proxy deployments.                                                                                             |
+| `auth-header-role`                         | `NTFY_AUTH_HEADER_ROLE`                         | *string*                                            | -                 | Trusted reverse-proxy header containing roles/groups. Supports repeated headers and comma-separated values. Requires `auth-header-user`.                                                                                                |
+| `auth-header-mappings`                     | `NTFY_AUTH_HEADER_MAPPINGS`                     | *list of `value:role` mappings*                     | -                 | Reverse-proxy role/group to ntfy role mappings. If any mapped value resolves to `admin`, the request is authorized as an ntfy admin. Requires `auth-header-role`.                                                                       |
 | `auth-access-cache`                        | `NTFY_AUTH_ACCESS_CACHE`                        | *bool*                                              | false             | Enables an in-memory ACL cache so authorization checks no longer hit the database. Only worth enabling on high-volume servers.                                                                                                          |
 | `behind-proxy`                             | `NTFY_BEHIND_PROXY`                             | *bool*                                              | false             | If set, use forwarded header (e.g. X-Forwarded-For, X-Client-IP) to determine visitor IP address (for rate limiting)                                                                                                                    |
 | `proxy-forwarded-header`                   | `NTFY_PROXY_FORWARDED_HEADER`                   | *string*                                            | `X-Forwarded-For` | Use specified header to determine visitor IP address (for rate limiting)                                                                                                                                                                |
@@ -2489,6 +2535,9 @@ OPTIONS:
    --auth-file value, --auth_file value, -H value                                                                         auth database file used for access control [$NTFY_AUTH_FILE]
    --auth-startup-queries value, --auth_startup_queries value                                                             queries run when the auth database is initialized [$NTFY_AUTH_STARTUP_QUERIES]
    --auth-default-access value, --auth_default_access value, -p value                                                     default permissions if no matching entries in the auth database are found (default: "read-write") [$NTFY_AUTH_DEFAULT_ACCESS]
+   --auth-header-user value, --auth_header_user value                                                                      trusted reverse-proxy header containing the authenticated username [$NTFY_AUTH_HEADER_USER]
+   --auth-header-role value, --auth_header_role value                                                                      trusted reverse-proxy header containing roles/groups [$NTFY_AUTH_HEADER_ROLE]
+   --auth-header-mappings value, --auth_header_mappings value [ --auth-header-mappings value, --auth_header_mappings value ]  reverse-proxy role/group mappings in the format '<value>:<role>' [$NTFY_AUTH_HEADER_MAPPINGS]
    --auth-access-cache, --auth_access_cache                                                                                enables the in-memory ACL cache (high-volume servers only) (default: false) [$NTFY_AUTH_ACCESS_CACHE]
    --attachment-cache-dir value, --attachment_cache_dir value                                                             cache directory for attached files, or S3 URL (s3://ACCESS_KEY:SECRET_KEY@BUCKET[/PREFIX]?region=REGION[&endpoint=ENDPOINT][&disable_http2=true]) [$NTFY_ATTACHMENT_CACHE_DIR]
    --attachment-total-size-limit value, --attachment_total_size_limit value, -A value                                     limit of the on-disk attachment cache (default: "5G") [$NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT]

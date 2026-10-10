@@ -82,6 +82,8 @@ type Cache struct {
 	// claimTimeout is how long this node's claim on a due message holds off the others; it is a
 	// field only so tests can shorten it
 	claimTimeout time.Duration
+	unwritten    map[string]struct{} // IDs of queued messages whose batch write has not finished (see Unwritten)
+	unwrittenMu  sync.Mutex          // Protects unwritten
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
@@ -97,6 +99,7 @@ func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTi
 		mu:           mu,
 		queries:      queries,
 		claimTimeout: claimTimeout,
+		unwritten:    make(map[string]struct{}),
 	}
 	go c.processMessageBatches()
 	return c
@@ -118,10 +121,21 @@ func (c *Cache) maybeUnlock() {
 // The message is queued only if "batchSize" or "batchTimeout" are passed to the constructor.
 func (c *Cache) AddMessage(m *model.Message) error {
 	if c.queue != nil {
+		c.unwrittenMu.Lock()
+		c.unwritten[m.ID] = struct{}{}
+		c.unwrittenMu.Unlock()
 		c.queue.Enqueue(m)
 		return nil
 	}
 	return c.addMessages([]*model.Message{m})
+}
+
+// Unwritten reports whether the message was queued for a batch write that has not finished yet
+func (c *Cache) Unwritten(id string) bool {
+	c.unwrittenMu.Lock()
+	defer c.unwrittenMu.Unlock()
+	_, ok := c.unwritten[id]
+	return ok
 }
 
 // AddMessages synchronously stores a batch of messages to the message cache
@@ -562,6 +576,11 @@ func (c *Cache) processMessageBatches() {
 		if err := c.addMessages(messages); err != nil {
 			log.Tag(tagMessageCache).Err(err).Error("Cannot write message batch")
 		}
+		c.unwrittenMu.Lock()
+		for _, m := range messages {
+			delete(c.unwritten, m.ID) // Written, or never will be
+		}
+		c.unwrittenMu.Unlock()
 	}
 }
 

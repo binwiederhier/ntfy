@@ -69,6 +69,7 @@ type Server struct {
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
+	recentWindow      time.Duration                       // How long a topic remembers its messages for reconnect replays (see recentAfter)
 	userManager       *user.Manager                       // Might be nil!
 	messageCache      *message.Cache                      // Database that stores the messages
 	webPush           *webpush.Store                      // Database that stores web push subscriptions
@@ -242,9 +243,15 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A message is in a cache write batch for up to the batch timeout, and in a peer's fan-out
+	// queue for up to the linger before that, so a topic remembers that much (see recentAfter)
+	recentWindow := conf.CacheBatchTimeout + conf.ClusterBatchLinger + recentMargin
+	if conf.CacheDuration == 0 {
+		recentWindow = 0 // Nothing is ever stored, so there is nothing to bridge
+	}
 	topics := make(map[string]*topic, len(topicIDs))
 	for _, id := range topicIDs {
-		topics[id] = newTopic(id)
+		topics[id] = newTopic(id, recentWindow, messageCache.Unwritten)
 	}
 	messages, err := messageCache.Stats()
 	if err != nil {
@@ -333,6 +340,7 @@ func New(conf *Config) (*Server, error) {
 		userManager:     userManager,
 		messages:        messages,
 		messagesHistory: []int64{messages},
+		recentWindow:    recentWindow,
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
 	}
@@ -1848,12 +1856,16 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
+		recent := t.Recent() // Before the database read: a row written while it runs is in its result or in here
 		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
 		if err != nil {
 			return err
 		}
 		truncated = truncated || topicTruncated
 		messages = append(messages, topicMessages...)
+		if !scheduled {
+			messages = append(messages, s.recentSince(recent, since, topicMessages)...)
+		}
 	}
 	// Stable: Time has second granularity, so a multi-topic replay has many equal keys. An unstable
 	// sort reorders them and a topic's own messages come back out of publish order (#1297).
@@ -1871,6 +1883,31 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 		}
 	}
 	return nil
+}
+
+// recentSince returns what the topic remembers from the last few seconds that the database
+// replay could not see yet, because the rows have not been written (see recentAfter).
+// Everything up to the newest message the database did return is the database's business,
+// including what it deliberately left out (the poll size cap), so only what the topic delivered
+// after that is added; with nothing returned, the marker decides.
+func (s *Server) recentSince(recent []*model.Message, since model.SinceMarker, replayed []*model.Message) []*model.Message {
+	if since.IsLatest() {
+		return nil // The newest stored message only, by definition
+	}
+	if len(replayed) > 0 {
+		newest := replayed[len(replayed)-1] // Oldest first
+		return recentAfter(recent, newest.ID, newest.Time+1)
+	}
+	sinceTime := since.Time().Unix()
+	if since.IsID() {
+		m, err := s.messageCache.Message(since.ID())
+		if err != nil {
+			sinceTime = 0 // Unknown marker: the replay fell back to the topic's history, so does this
+		} else {
+			sinceTime = m.Time
+		}
+	}
+	return recentAfter(recent, since.ID(), sinceTime)
 }
 
 // parseSince returns a timestamp identifying the time span from which cached messages should be received.
@@ -1964,7 +2001,7 @@ func (s *Server) topicsFromIDs(v *visitor, ids ...string) ([]*topic, error) {
 			if v != nil && !v.TopicCreationAllowed() {
 				return nil, errHTTPTooManyRequestsLimitTopicCreation
 			}
-			s.topics[id] = newTopic(id)
+			s.topics[id] = newTopic(id, s.recentWindow, s.messageCache.Unwritten)
 		}
 		topics = append(topics, s.topics[id])
 	}

@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -5784,4 +5785,143 @@ func TestServer_PublishTimezoneWithoutDelay(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 		require.InDelta(t, time.Now().Unix(), toMessage(t, response.Body.String()).Time, 2)
 	})
+}
+
+// newReconnectTestServer returns a server whose cache writes in batches of two, so a test controls
+// exactly when a message reaches the database (the second publish flushes the pair)
+func newReconnectTestServer(t *testing.T) *Server {
+	conf := newTestConfig(t, "")
+	conf.CacheBatchSize = 2
+	conf.CacheBatchTimeout = time.Hour
+	s := newTestServer(t, conf)
+	return s
+}
+
+// publishStored publishes two messages (one full batch) and waits until both are in the cache
+func publishStored(t *testing.T, s *Server, topic string) (*model.Message, *model.Message) {
+	m1 := toMessage(t, request(t, s, "PUT", "/"+topic, "stored 1", nil).Body.String())
+	m2 := toMessage(t, request(t, s, "PUT", "/"+topic, "stored 2", nil).Body.String())
+	waitFor(t, func() bool {
+		_, err := s.messageCache.Message(m2.ID)
+		return err == nil
+	})
+	return m1, m2
+}
+
+func countByBody(messages []*model.Message) map[string]int {
+	counts := make(map[string]int)
+	for _, m := range messages {
+		if m.Event == model.MessageEvent {
+			counts[m.Message]++
+		}
+	}
+	return counts
+}
+
+func TestServer_SubscribeReconnect_MessageNotYetStoredAtReconnect(t *testing.T) {
+	// The reconnect gap: a message published while the client was away is fanned out live (to
+	// nobody) but still sits in the cache write batch when the client re-subscribes with
+	// since=<last id>, so the database replay cannot see it. The topic remembers it.
+	s := newReconnectTestServer(t)
+	_, last := publishStored(t, s, "mytopic")
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "in flight", nil).Code) // Queued, not stored
+
+	rr := httptest.NewRecorder()
+	cancel := subscribe(t, s, "/mytopic/json?since="+last.ID, rr)
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "live", nil).Code) // Flushes the batch
+	time.Sleep(time.Second)
+	cancel()
+
+	counts := countByBody(toMessages(t, rr.Body.String()))
+	require.Equal(t, map[string]int{"in flight": 1, "live": 1}, counts) // Nothing twice, nothing missing
+}
+
+func TestServer_SubscribeReconnect_MessageStoredWithLowerRowID(t *testing.T) {
+	// Cluster nodes flush their batches independently, so a message that reached this node
+	// AFTER the marker (its fan-out lingered on the node that accepted it) can be stored with a
+	// LOWER row id than the marker, where id > marker never finds it. The topic remembers the
+	// order it delivered in, which is the order the client saw.
+	s := newReconnectTestServer(t)
+	now := time.Now().Unix()
+	early := model.NewDefaultMessage("mytopic", "stored first")
+	early.Time = now - 1
+	marker := model.NewDefaultMessage("mytopic", "marker")
+	marker.Time = now
+	early.Expires, marker.Expires = now+3600, now+3600                          // Cached, so the topic remembers them
+	require.Nil(t, s.messageCache.AddMessages([]*model.Message{early, marker})) // early gets the lower row id
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	require.Nil(t, topics[0].Publish(nil, marker)) // Delivered here first, so the client's marker is marker
+	require.Nil(t, topics[0].Publish(nil, early))  // Arrived from the peer after it; the client had dropped off
+
+	rr := httptest.NewRecorder()
+	cancel := subscribe(t, s, "/mytopic/json?since="+marker.ID, rr)
+	time.Sleep(time.Second)
+	cancel()
+
+	counts := countByBody(toMessages(t, rr.Body.String()))
+	require.Equal(t, map[string]int{"stored first": 1}, counts)
+}
+
+func TestServer_SubscribeReconnect_WebSocket(t *testing.T) {
+	s := newReconnectTestServer(t)
+	_, last := publishStored(t, s, "mytopic")
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "in flight", nil).Code)
+
+	public := httptest.NewServer(http.HandlerFunc(s.handle))
+	defer public.Close()
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(public.URL, "http")+"/mytopic/ws?since="+last.ID, nil)
+	require.Nil(t, err)
+	defer conn.Close()
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "live", nil).Code)
+
+	var received []*model.Message
+	conn.SetReadDeadline(time.Now().Add(1500 * time.Millisecond))
+	for {
+		_, frame, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+		received = append(received, toMessage(t, string(frame)))
+	}
+	require.Equal(t, map[string]int{"in flight": 1, "live": 1}, countByBody(received))
+}
+
+func TestServer_SubscribeReconnect_MessageStillUnwrittenAfterTheWindow(t *testing.T) {
+	// A database under load can take longer than the window to write a batch. A client that
+	// reconnects then finds the message neither in the database nor, if the window had let go
+	// of it on time alone, in the topic: it is lost for that client, for good.
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, dsn)
+	conf.CacheBatchTimeout = 10 * time.Millisecond
+	conf.ClusterBatchLinger = 0
+	s := newTestServer(t, conf) // Window: 10ms + 0 + the 1s margin
+	last := toMessage(t, request(t, s, "PUT", "/mytopic", "stored", nil).Body.String())
+	waitFor(t, func() bool {
+		_, err := s.messageCache.Message(last.ID)
+		return err == nil
+	})
+
+	host, err := pg.Open(dsn)
+	require.Nil(t, err)
+	defer host.DB.Close()
+	tx, err := host.DB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE") // Reads go through, writes wait
+	require.Nil(t, err)
+	require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "stalled", nil).Code)
+
+	time.Sleep(2100 * time.Millisecond) // The window, plus the second that whole-second message times can add
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	topics[0].PruneRecent() // What the manager does every minute
+
+	rr := httptest.NewRecorder()
+	cancel := subscribe(t, s, "/mytopic/json?since="+last.ID, rr)
+	time.Sleep(500 * time.Millisecond)
+	cancel()
+	require.Equal(t, map[string]int{"stalled": 1}, countByBody(toMessages(t, rr.Body.String())))
 }

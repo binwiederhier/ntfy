@@ -31,6 +31,7 @@ func (s *Server) execManager() {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			for _, t := range s.topics {
+				t.PruneRecent()
 				subs, lastAccess := t.Stats()
 				ev := log.Tag(tagManager).With(t)
 				if t.Stale() {

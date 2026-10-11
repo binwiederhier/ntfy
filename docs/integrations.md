@@ -197,6 +197,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [zabbix-ntfy](https://github.com/torgrimt/zabbix-ntfy) - Zabbix server Mediatype to add support for ntfy.sh services
 - [Rubix Notify](https://wordpress.org/plugins/rubix-notify) - WordPress Integration with ntfy (PHP + React).
 - [NotiFerry](https://notiferry.com/) - macOS menu bar app that forwards Notification Center alerts from other Mac apps to an ntfy topic on ntfy.sh or a self-hosted server (commercial, Swift)
+- [Flock](https://github.com/HNF-FRN/flock) - Runs several Claude Desktop accounts side by side on Windows; its phone app starts and continues Claude Code sessions on the PC through end-to-end encrypted ntfy messages (JS)
 
 ## Blog + forum posts
 

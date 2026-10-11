@@ -1,10 +1,12 @@
 package mail
 
 import (
+	"errors"
 	"fmt"
 	"mime"
 	"net"
 	"net/smtp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -124,7 +126,7 @@ func (s *realSender) sendRaw(to string, message []byte) error {
 	}
 	var auth smtp.Auth
 	if s.config.SMTPUser != "" {
-		auth = smtp.PlainAuth("", s.config.SMTPUser, s.config.SMTPPass, host)
+		auth = newPlainOrLoginAuth(s.config.SMTPUser, s.config.SMTPPass, host)
 	}
 	return smtp.SendMail(s.config.SMTPAddr, auth, s.config.From, []string{to}, message)
 }
@@ -136,5 +138,51 @@ func (s *realSender) count(ok bool) {
 		s.success++
 	} else {
 		s.failure++
+	}
+}
+
+// plainOrLoginAuth uses PLAIN auth, or LOGIN auth if the server only supports that (e.g. OVH, Outlook).
+// The stdlib net/smtp only implements PLAIN, so LOGIN is implemented here, see #930.
+type plainOrLoginAuth struct {
+	plain    smtp.Auth
+	username string
+	password string
+	login    bool
+	step     int
+}
+
+func newPlainOrLoginAuth(username, password, host string) smtp.Auth {
+	return &plainOrLoginAuth{
+		plain:    smtp.PlainAuth("", username, password, host),
+		username: username,
+		password: password,
+	}
+}
+
+// Start lets PLAIN auth do the TLS and host name checks, so the password is never sent in the clear
+func (a *plainOrLoginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	mechanism, resp, err := a.plain.Start(server)
+	if err != nil || slices.Contains(server.Auth, "PLAIN") || !slices.Contains(server.Auth, "LOGIN") {
+		return mechanism, resp, err
+	}
+	a.login = true
+	return "LOGIN", nil, nil
+}
+
+// Next answers the LOGIN challenges in order (username, then password), since the prompt texts vary by server
+func (a *plainOrLoginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !a.login {
+		return a.plain.Next(fromServer, more)
+	} else if !more {
+		return nil, nil
+	}
+	a.step++
+	switch a.step {
+	case 1:
+		return []byte(a.username), nil
+	case 2:
+		return []byte(a.password), nil
+	default:
+		return nil, errors.New("unexpected server challenge")
 	}
 }

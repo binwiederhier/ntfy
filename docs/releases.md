@@ -2122,6 +2122,22 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.29.1 (UNRELEASED)
+
+**Features:**
+
+* Link attachments in email notifications, including the file name and when the link expires ([#672](https://github.com/binwiederhier/ntfy/issues/672), thanks to [@merspieler](https://github.com/merspieler) for suggesting)
+
+**Bug fixes + maintenance:**
+
+* Fix `Dockerfile-build` failing to build: use Go 1.26 and add the `cluster` package ([#1962](https://github.com/binwiederhier/ntfy/issues/1962), thanks to [@ElectricTea](https://github.com/ElectricTea) for reporting)
+* Warn at startup if `attachment-expiry-duration` is longer than `cache-duration`, since attachments never outlive their message ([#1053](https://github.com/binwiederhier/ntfy/issues/1053), thanks to [@ctschach](https://github.com/ctschach) for reporting)
+* Fix PostgreSQL memory growth after v2.29.0: write message batches with one fixed `INSERT` for any batch size ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
+
+**Documentation:**
+
+* Document recommended PostgreSQL pool settings for busy servers ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

@@ -1,5 +1,3 @@
-/* eslint-env node, es2021 */
-/* eslint-disable import/no-extraneous-dependencies */
 import { indexedDB, IDBKeyRange } from "fake-indexeddb";
 
 // Minimal browser-global stubs so the pure-logic and API modules import + run under the node

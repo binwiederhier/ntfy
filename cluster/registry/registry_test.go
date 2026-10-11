@@ -471,3 +471,26 @@ func TestRegistry_LeaseLapsesBeforeAnySuccessorBegins(t *testing.T) {
 	// short that it ends before peers would even notice this node is gone
 	require.GreaterOrEqual(t, leaseFactor, 1, "the lease must cover the liveness window")
 }
+
+func TestRegistry_ViewIsOnlyFreshAfterARecentRefresh(t *testing.T) {
+	// Peers serves the last known list when the database is unreachable, which keeps fan-out
+	// alive but must not be mistaken for the current membership: anything that reports
+	// membership outwards (the member list the LB agents read) needs to know the difference.
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	r, err := New(pool, "node-a", "http://127.0.0.1:1", leaderTestTTL)
+	require.Nil(t, err)
+	require.False(t, r.Fresh(), "a registry that has never read the database is not fresh")
+
+	require.Nil(t, r.Register())
+	_, err = r.Refresh()
+	require.Nil(t, err)
+	require.True(t, r.Fresh())
+
+	// The view ages out on its own, without any failed call
+	deadline := time.Now().Add(leaderTestWait)
+	for r.Fresh() && time.Now().Before(deadline) {
+		time.Sleep(leaderTestPoll)
+	}
+	require.False(t, r.Fresh(), "the view never went stale")
+}

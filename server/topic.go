@@ -142,6 +142,22 @@ func (t *topic) Keepalive() {
 	t.lastAccess = time.Now()
 }
 
+// SubscribersCount returns the number of subscribers currently attached to this topic
+func (t *topic) SubscribersCount() int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return len(t.subscribers)
+}
+
+// CancelAllSubscribers calls the cancel function of every subscriber, closing their connections
+func (t *topic) CancelAllSubscribers() {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	for _, s := range t.subscribers {
+		s.cancel()
+	}
+}
+
 // CancelSubscribersExceptUser calls the cancel function for all subscribers, forcing
 func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
 	t.mu.Lock()

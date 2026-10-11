@@ -28,21 +28,24 @@ const (
 	// shutdown must still finish well inside systemd's stop timeout.
 	closeFlushTimeout = 5 * time.Second
 
+	claimTimeout   = 2 * time.Minute // How long a claim hides a due message from other nodes; must exceed dispatching one claim
+	claimBatchSize = 1000            // Rows per claim, so the dispatch time that claimTimeout must cover is bounded
+
 	// queueBufferedBatches is how many full batches can wait for the batch writer before publishes
 	// block. 100 batches of the default 100 messages are ~10 MB typical, ~60 MB at the 4 KB limit.
 	// Every buffered batch must be written within closeFlushTimeout on shutdown.
 	queueBufferedBatches = 100
 
-	// insertMessagesMaxRows caps the rows per multi-row INSERT, keeping the parameter count well
-	// below PostgreSQL's 65535 and SQLite's 32766
-	insertMessagesMaxRows = 1000
+	// insertMessageColumns is the number of values insertMessageArgs returns per message, which is
+	// the number of columns in each backend's INSERT statement
+	insertMessageColumns = 24
 )
 
 var errNoRows = errors.New("no rows found")
 
 // queries holds the database-specific SQL queries
 type queries struct {
-	insertMessages                   func(rows int) string // Multi-row INSERT for the given number of rows
+	insertMessages                   func(tx *sql.Tx, ms []*model.Message) error // Writes a batch of messages in as few statements as possible
 	selectScheduledMessageIDsBySeqID string
 	deleteScheduledBySequenceID      string
 	updateMessagesForTopicExpiry     string
@@ -54,6 +57,7 @@ type queries struct {
 	selectMessagesSinceIDScheduled   string
 	selectMessagesLatest             string
 	selectMessagesDue                string
+	claimMessagesDue                 string // Postgres-only: claims due rows and stamps claimed_at; empty for SQLite/mem
 	deleteExpiredMessages            string
 	updateMessagePublished           string
 	selectMessagesCount              string
@@ -75,6 +79,9 @@ type Cache struct {
 	nop     bool
 	mu      *sync.Mutex // nil for PostgreSQL (concurrent writes supported), set for SQLite (single writer)
 	queries queries
+	// claimTimeout is how long this node's claim on a due message holds off the others; it is a
+	// field only so tests can shorten it
+	claimTimeout time.Duration
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
@@ -83,12 +90,13 @@ func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTi
 		queue = util.NewBatchingQueue[*model.Message](batchSize, batchTimeout, queueBufferedBatches)
 	}
 	c := &Cache{
-		db:      db,
-		queue:   queue,
-		written: make(chan struct{}),
-		nop:     nop,
-		mu:      mu,
-		queries: queries,
+		db:           db,
+		queue:        queue,
+		written:      make(chan struct{}),
+		nop:          nop,
+		mu:           mu,
+		queries:      queries,
+		claimTimeout: claimTimeout,
 	}
 	go c.processMessageBatches()
 	return c
@@ -136,7 +144,7 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 		return err
 	}
 	defer tx.Rollback()
-	if err := insertMessages(tx, c.queries.insertMessages, ms); err != nil {
+	if err := c.queries.insertMessages(tx, ms); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
@@ -147,49 +155,8 @@ func (c *Cache) addMessages(ms []*model.Message) error {
 	return nil
 }
 
-// insertMessages writes the messages with as few statements as possible: against a remote
-// database, every statement is a round trip, and the batch writer is the only writer
-func insertMessages(tx *sql.Tx, query func(rows int) string, ms []*model.Message) error {
-	for len(ms) > 0 {
-		chunk := ms[:min(len(ms), insertMessagesMaxRows)]
-		ms = ms[len(chunk):]
-		args := make([]any, 0)
-		for _, m := range chunk {
-			rowArgs, err := insertMessageArgs(m)
-			if err != nil {
-				return err
-			}
-			args = append(args, rowArgs...)
-		}
-		if _, err := tx.Exec(query(len(chunk)), args...); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// insertMessagesQuery builds a multi-row INSERT into table for rows rows of columns, with
-// placeholder producing the parameter marker for the i-th (1-based) value
-func insertMessagesQuery(table string, columns []string, rows int, placeholder func(i int) string) string {
-	var b strings.Builder
-	b.WriteString("INSERT INTO " + table + " (" + strings.Join(columns, ", ") + ") VALUES ")
-	for r := 0; r < rows; r++ {
-		if r > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString("(")
-		for c := range columns {
-			if c > 0 {
-				b.WriteString(", ")
-			}
-			b.WriteString(placeholder(r*len(columns) + c + 1))
-		}
-		b.WriteString(")")
-	}
-	return b.String()
-}
-
-// insertMessageArgs returns the values of one message row, in the order of the backend's insert columns
+// insertMessageArgs returns the values of one message row, in the order of the columns in the
+// backends' INSERT statements (postgresInsertMessagesQuery, sqliteInsertMessagesQuery)
 func insertMessageArgs(m *model.Message) ([]any, error) {
 	if m.Event != model.MessageEvent && m.Event != model.MessageDeleteEvent && m.Event != model.MessageClearEvent {
 		return nil, model.ErrUnexpectedMessageType
@@ -338,13 +305,34 @@ func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
 	return readMessages(rows)
 }
 
-// MessagesDue returns all messages that are due for publishing
+// MessagesDue returns all messages that are due for publishing. On Postgres it CLAIMS them, so
+// every node may call it, leader or not: each row is handed to exactly one caller.
 func (c *Cache) MessagesDue() ([]*model.Message, error) {
+	if c.queries.claimMessagesDue != "" {
+		return c.claimMessagesDue()
+	}
 	rows, err := c.db.Query(c.queries.selectMessagesDue, time.Now().Unix())
 	if err != nil {
 		return nil, err
 	}
 	return readMessages(rows)
+}
+
+// claimMessagesDue stamps the due rows it takes, so concurrent senders on other nodes get
+// disjoint sets. The rows stay unpublished: MarkPublished still runs after delivery.
+func (c *Cache) claimMessagesDue() ([]*model.Message, error) {
+	now := time.Now().Unix()
+	rows, err := c.db.Query(c.queries.claimMessagesDue, now, now-int64(c.claimTimeout.Seconds()), claimBatchSize, now)
+	if err != nil {
+		return nil, err
+	}
+	return readMessages(rows) // Reads all rows and closes them
+}
+
+// SetClaimTimeoutForTest shortens the claim hold-off, so a test can see an abandoned claim
+// become claimable again without waiting out the real timeout.
+func (c *Cache) SetClaimTimeoutForTest(timeout time.Duration) {
+	c.claimTimeout = timeout
 }
 
 // DeleteExpiredMessages deletes up to `limit` expired messages in a single query

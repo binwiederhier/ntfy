@@ -44,6 +44,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Beszel](https://beszel.dev/guide/notifications/ntfy) - Server monitoring platform
 - [Simple Observability](https://simpleobservability.com/docs/alerts/ntfy) - Server monitoring and observability platform
 - [Sifio](https://sifio.net) - Aggregate updates from RSS, social media, and other sources, then deliver them to ntfy, Slack, Notion and more
+- [SolidPing](https://docs.solidping.io/docs/configuration/notifications#ntfy) - Uptime and synthetic monitoring
 
 ## Integration via HTTP/SMTP/etc.
 

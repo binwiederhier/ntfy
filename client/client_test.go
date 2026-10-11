@@ -119,6 +119,19 @@ func TestClient_Publish_HeaderWithNewlines(t *testing.T) {
 	require.Equal(t, "message\n  with\n  newlines", msg.Message)
 	require.Equal(t, "title\nwith newline", msg.Title)
 	require.Equal(t, "test.txt", msg.Attachment.Name)
+
+	// Unicode, and long values that are split into multiple encoded words
+	longMessage := strings.Repeat("Grüße aus Köln 🎉\r\n", 30)
+	msg, err = c.PublishReader("mytopic", strings.NewReader("file contents"),
+		client.WithFilename("über.txt"),
+		client.WithMessage(longMessage),
+		client.WithTitle("Grüße 🎉"),
+		client.WithTags([]string{"tada", "größe"}))
+	require.Nil(t, err)
+	require.Equal(t, strings.TrimSpace(longMessage), msg.Message)
+	require.Equal(t, "Grüße 🎉", msg.Title)
+	require.Equal(t, []string{"tada", "größe"}, msg.Tags)
+	require.Equal(t, "über.txt", msg.Attachment.Name)
 }
 
 func newTestConfig(port int) *client.Config {

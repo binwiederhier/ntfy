@@ -162,8 +162,12 @@ func newPlainOrLoginAuth(username, password, host string) smtp.Auth {
 // Start lets PLAIN auth do the TLS and host name checks, so the password is never sent in the clear
 func (a *plainOrLoginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
 	mechanism, resp, err := a.plain.Start(server)
-	if err != nil || slices.Contains(server.Auth, "PLAIN") || !slices.Contains(server.Auth, "LOGIN") {
-		return mechanism, resp, err
+	if err != nil {
+		return "", nil, err
+	}
+	// Only switch to LOGIN if the server offers it but not PLAIN; otherwise behave like before
+	if !slices.Contains(server.Auth, "LOGIN") || slices.Contains(server.Auth, "PLAIN") {
+		return mechanism, resp, nil
 	}
 	a.login = true
 	return "LOGIN", nil, nil

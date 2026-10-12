@@ -199,6 +199,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Rubix Notify](https://wordpress.org/plugins/rubix-notify) - WordPress Integration with ntfy (PHP + React).
 - [NotiFerry](https://notiferry.com/) - macOS menu bar app that forwards Notification Center alerts from other Mac apps to an ntfy topic on ntfy.sh or a self-hosted server (commercial, Swift)
 - [Flock](https://github.com/HNF-FRN/flock) - Runs several Claude Desktop accounts side by side on Windows; its phone app starts and continues Claude Code sessions on the PC through end-to-end encrypted ntfy messages (JS)
+- [epokio](https://github.com/8rulerstar/epokio) - Alerts when an ML training run stalls, hits NaN or finishes, by reading its existing logs (Python)
 
 ## Blog + forum posts
 

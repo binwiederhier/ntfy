@@ -362,6 +362,32 @@ func (c *Cache) Message(id string) (*model.Message, error) {
 	return readMessage(rows)
 }
 
+// Tail returns a tail that starts after the last message written so far. The gaps between the
+// last tailPageSize row ids start out as holes: a row id handed out but not committed yet, below
+// one that already is, must not be skipped.
+func (c *Cache) Tail() (*Tail, error) {
+	rows, err := c.db.Primary().Query(c.queries.selectRecentRowIDs, tailPageSize)
+	if err != nil {
+		return nil, err
+	}
+	rowIDs, err := readRowIDs(rows)
+	if err != nil {
+		return nil, err
+	}
+	t := &Tail{
+		cache: c,
+		holes: make(map[int64]time.Time),
+	}
+	now := time.Now()
+	for i := len(rowIDs) - 1; i >= 0; i-- { // Ascending
+		if t.cursor > 0 {
+			t.addHoles(t.cursor, rowIDs[i], now)
+		}
+		t.cursor = rowIDs[i]
+	}
+	return t, nil
+}
+
 // UpdateMessageTime updates the time column for a message by ID. This is only used for testing.
 func (c *Cache) UpdateMessageTime(messageID string, timestamp int64) error {
 	c.maybeLock()
@@ -695,6 +721,19 @@ func readMessage(rows *sql.Rows, extra ...any) (*model.Message, error) {
 		ContentType: contentType,
 		Encoding:    encoding,
 	}, nil
+}
+
+func readRowIDs(rows *sql.Rows) ([]int64, error) {
+	defer rows.Close()
+	rowIDs := make([]int64, 0)
+	for rows.Next() {
+		var rowID int64
+		if err := rows.Scan(&rowID); err != nil {
+			return nil, err
+		}
+		rowIDs = append(rowIDs, rowID)
+	}
+	return rowIDs, rows.Err()
 }
 
 func readStrings(rows *sql.Rows) ([]string, error) {

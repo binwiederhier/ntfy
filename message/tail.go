@@ -1,7 +1,6 @@
 package message
 
 import (
-	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -22,32 +21,6 @@ type Tail struct {
 	cache  *Cache
 	cursor int64               // Highest row id read so far
 	holes  map[int64]time.Time // Skipped row ids below the cursor, and when they were skipped
-}
-
-// Tail returns a tail that starts after the last message written so far. The gaps between the
-// last tailPageSize row ids start out as holes: a row id handed out but not committed yet, below
-// one that already is, must not be skipped.
-func (c *Cache) Tail() (*Tail, error) {
-	rows, err := c.db.Primary().Query(c.queries.selectRecentRowIDs, tailPageSize)
-	if err != nil {
-		return nil, err
-	}
-	rowIDs, err := readRowIDs(rows)
-	if err != nil {
-		return nil, err
-	}
-	t := &Tail{
-		cache: c,
-		holes: make(map[int64]time.Time),
-	}
-	now := time.Now()
-	for i := len(rowIDs) - 1; i >= 0; i-- { // Ascending
-		if t.cursor > 0 {
-			t.addHoles(t.cursor, rowIDs[i], now)
-		}
-		t.cursor = rowIDs[i]
-	}
-	return t, nil
 }
 
 // Next returns the published messages written since the last call, in write order, at most
@@ -122,17 +95,4 @@ func (t *Tail) expireHoles() {
 			delete(t.holes, id)
 		}
 	}
-}
-
-func readRowIDs(rows *sql.Rows) ([]int64, error) {
-	defer rows.Close()
-	rowIDs := make([]int64, 0)
-	for rows.Next() {
-		var rowID int64
-		if err := rows.Scan(&rowID); err != nil {
-			return nil, err
-		}
-		rowIDs = append(rowIDs, rowID)
-	}
-	return rowIDs, rows.Err()
 }

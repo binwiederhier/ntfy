@@ -11,6 +11,7 @@ import (
 
 var (
 	errInvalidDuration = errors.New("unable to parse duration")
+	errTimeInPast      = errors.New("time is in the past")
 	durationStrRegex   = regexp.MustCompile(`(?i)^(\d+)\s*(d|days?|h|hours?|m|mins?|minutes?|s|secs?|seconds?)$`)
 )
 
@@ -47,11 +48,29 @@ func ParseFutureTime(s string, now time.Time) (time.Time, error) {
 	if err == nil {
 		return t, nil
 	}
+	t, err = parseRFC3339Time(s, now)
+	if err == nil {
+		return t, nil
+	} else if errors.Is(err, errTimeInPast) {
+		return time.Time{}, err // Well-formed but expired; do not let the natural-language parser reinterpret it
+	}
 	t, err = parseNaturalTime(s, now)
 	if err == nil {
 		return t, nil
 	}
 	return time.Time{}, errInvalidDuration
+}
+
+// parseRFC3339Time is a parser for time formated following RFC 3339
+func parseRFC3339Time(s string, now time.Time) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, errInvalidDuration
+	}
+	if !t.After(now) {
+		return time.Time{}, errTimeInPast
+	}
+	return t, nil
 }
 
 // ParseDuration is like time.ParseDuration, except that it also understands days (d), which

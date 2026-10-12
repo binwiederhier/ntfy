@@ -2591,9 +2591,22 @@ You can delay the delivery of messages and let ntfy send them at a later date. T
 reminders or even to execute commands at a later date (if your subscriber acts on messages).
 
 Usage is pretty straight forward. You can set the delivery time using the `X-Delay` header (or any of its aliases: `Delay`, 
-`X-At`, `At`, `X-In` or `In`), either by specifying a Unix timestamp (e.g. `1639194738`), a duration (e.g. `30m`, 
-`3h`, `2 days`), or a natural language time string (e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`, 
-[and more](https://github.com/olebedev/when)). 
+`X-At`, `At`, `X-In` or `In`), either by specifying a Unix timestamp (e.g. `1639194738`), an RFC3339/ISO-8601 absolute
+ timestamp (e.g. `2026-09-02T10:00:00Z`), a duration (e.g. `30m`, `3h`, `2 days`), or a natural language time string 
+(e.g. `10am`, `8:30pm`, `tomorrow, 3pm`, `Tuesday, 7am`, [and more](https://github.com/olebedev/when)). 
+
+To interpret a natural language time in a specific timezone, set the `X-Timezone` header
+(alias: `Timezone`), the `timezone` query parameter, or the `timezone` JSON field to an
+IANA timezone name such as `Asia/Tokyo` or `America/New_York`:
+
+```
+curl -H "At: tomorrow, 10am" -H "Timezone: Asia/Tokyo" -d "Good morning" ntfy.sh/hello
+```
+
+Without a timezone, the server's local timezone is used as before. The web app sends your
+browser's timezone automatically when scheduling a message. Relative durations such as
+`1h` and Unix timestamps still refer to the same instant regardless of timezone. Invalid
+timezone names return HTTP 400 when a delay is supplied; without a delay, the timezone is ignored.
 
 As of today, the minimum delay you can set is **10 seconds** and the maximum delay is **3 days**. This can be configured
 with the `message-delay-limit` option.
@@ -2607,6 +2620,7 @@ to be delivered in 3 days, it'll remain in the cache for 3 days and 12 hours. Al
     ```
     curl -H "At: tomorrow, 10am" -d "Good morning" ntfy.sh/hello
     curl -H "In: 30min" -d "It's 30 minutes later now" ntfy.sh/reminder
+    curl -H "Delay: 2026-09-02T10:00:00Z" -d "RFC3339 timestamps are awesome" ntfy.sh/itsarfc3339system
     curl -H "Delay: 1639194738" -d "Unix timestamps are awesome" ntfy.sh/itsaunixsystem
     ```
 
@@ -2685,6 +2699,7 @@ Here are a few examples (assuming today's date is **12/10/2021, 9am, Eastern Tim
     <tr><td><code>1 day</code></td><td>12/<b>11</b>/2021, 9am</td><td>24 hours from now</td></tr>
     <tr><td><code>10am</code></td><td>12/10/2021, <b>10am</b></td><td>Today at 10am (same day, because it's only 9am)</td></tr>
     <tr><td><code>8am</code></td><td>12/<b>11</b>/2021, <b>8am</b></td><td>Tomorrow at 8am (because it's 9am already)</td></tr>
+    <tr><td><code>2026-12-10T11:00:00-05:00</code></td><td>12/10/2026, <b>11am</b> (EST)</td><td>Absolute RFC3339 timestamp with timezone offset</td></tr>
     <tr><td><code>1639152000</code></td><td>12/10/2021, 11am (EST)</td><td> Today at 11am (EST)</td></tr>
     </tbody></table>
 </td>
@@ -3719,6 +3734,7 @@ all the supported fields:
 | `icon`        | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                                                 |
 | `filename`    | -        | *string*                         | `file.jpg`                                | File name of the attachment                                                               |
 | `delay`       | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                                                |
+| `timezone`    | -        | *string*                         | `Asia/Tokyo`                             | Timezone for natural language delayed delivery times                                      |
 | `email`       | -        | *e-mail address or 'yes'*        | `phil@example.com` or `yes`               | E-mail address for e-mail notifications, or `yes` to use your primary verified address    |
 | `call`        | -        | *phone number or 'yes'*          | `+1222334444` or `yes`                    | Phone number to use for [voice call](#phone-calls)                                        |
 | `sequence_id` | -        | *string*                         | `my-sequence-123`                         | Sequence ID for [updating/deleting notifications](#updating-deleting-notifications)   |
@@ -4945,6 +4961,10 @@ but just in case, let's list them all:
 These limits can be changed on a per-user basis using [tiers](config.md#tiers). If [payments](config.md#payments) are enabled, a user tier can be changed by purchasing
 a higher tier. ntfy.sh offers multiple paid tiers, which allows for much hier limits than the ones listed above. 
 
+!!! tip
+    If you repeatedly exceed the limits on ntfy.sh, or otherwise abuse the service, your IP address may be temporarily
+    banned. You can check if you have been banned at [am-i-banned.ntfy.sh](https://am-i-banned.ntfy.sh/).
+
 ## List of all parameters
 The following is a list of all parameters that can be passed when publishing a message. Parameter names are **case-insensitive**
 when used in **HTTP headers**, and must be **lowercase** when used as **query parameters in the URL**. They are listed in the 
@@ -4964,6 +4984,7 @@ table in their canonical form.
 | `X-Priority`    | `Priority`, `prio`, `p`                    | [Message priority](#message-priority)                                                         |
 | `X-Tags`        | `Tags`, `Tag`, `ta`                        | [Tags and emojis](#tags-emojis)                                                               |
 | `X-Delay`       | `Delay`, `X-At`, `At`, `X-In`, `In`        | Timestamp or duration for [delayed delivery](#scheduled-delivery)                             |
+| `X-Timezone`    | `Timezone`                               | IANA timezone for [delayed delivery](#scheduled-delivery)                                     |
 | `X-Actions`     | `Actions`, `Action`                        | JSON array or short format of [user actions](#action-buttons)                                 |
 | `X-Click`       | `Click`                                    | URL to open when [notification is clicked](#click-action)                                     |
 | `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |

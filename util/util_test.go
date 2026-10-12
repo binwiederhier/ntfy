@@ -307,3 +307,11 @@ func TestEncodeJSON(t *testing.T) {
 	require.Nil(t, EncodeJSON(&buf, map[string]string{"message": "<b>a&b</b>"}))
 	require.Equal(t, `{"message":"<b>a&b</b>"}`+"\n", buf.String())
 }
+
+func TestMaxTime(t *testing.T) {
+	a := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	b := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	require.Equal(t, b, MaxTime(a, b))
+	require.Equal(t, b, MaxTime(b, a, time.Time{}))
+	require.True(t, MaxTime().IsZero())
+}

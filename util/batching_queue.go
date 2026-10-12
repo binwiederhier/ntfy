@@ -10,7 +10,7 @@ import (
 //
 // Example:
 //
-//	q := NewBatchingQueue[int](2, 500 * time.Millisecond)
+//	q := NewBatchingQueue[int](2, 500 * time.Millisecond, 0)
 //	go func() {
 //	  for batch := range q.Dequeue() {
 //	    fmt.Println(batch)
@@ -34,13 +34,14 @@ type BatchingQueue[T any] struct {
 	mu        sync.Mutex // Protects in, closed, and sending.Add
 }
 
-// NewBatchingQueue creates a new BatchingQueue
-func NewBatchingQueue[T any](batchSize int, timeout time.Duration) *BatchingQueue[T] {
+// NewBatchingQueue creates a new BatchingQueue. Up to bufferedBatches full batches can wait for
+// the consumer before Enqueue blocks (0 = Enqueue blocks until the consumer takes the batch).
+func NewBatchingQueue[T any](batchSize int, timeout time.Duration, bufferedBatches int) *BatchingQueue[T] {
 	q := &BatchingQueue[T]{
 		batchSize: batchSize,
 		timeout:   timeout,
 		in:        make([]T, 0),
-		out:       make(chan []T),
+		out:       make(chan []T, bufferedBatches),
 		done:      make(chan struct{}),
 	}
 	go q.timeoutTicker()

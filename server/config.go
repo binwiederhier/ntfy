@@ -25,10 +25,11 @@ const (
 	DefaultDelayedSenderInterval                = 10 * time.Second
 	DefaultMessageDelayMin                      = 10 * time.Second
 	DefaultMessageDelayMax                      = 3 * 24 * time.Hour
-	DefaultFirebaseKeepaliveInterval            = 3 * time.Hour    // ~control topic (Android), not too frequently to save battery
-	DefaultFirebasePollInterval                 = 20 * time.Minute // ~poll topic (iOS), max. 2-3 times per hour (see docs)
-	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute // Time that over-users are locked out of Firebase if it returns "quota exceeded"
-	DefaultStripePriceCacheDuration             = 3 * time.Hour    // Time to keep Stripe prices cached in memory before a refresh is needed
+	DefaultFirebaseKeepaliveInterval            = 3 * time.Hour          // ~control topic (Android), not too frequently to save battery
+	DefaultFirebasePollInterval                 = 20 * time.Minute       // ~poll topic (iOS), max. 2-3 times per hour (see docs)
+	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute       // Time that over-users are locked out of Firebase if it returns "quota exceeded"
+	DefaultStripePriceCacheDuration             = 3 * time.Hour          // Time to keep Stripe prices cached in memory before a refresh is needed
+	DefaultClusterBatchLinger                   = 500 * time.Millisecond // How long fan-out messages wait to form a per-peer batch (experimental clustering)
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -129,8 +130,13 @@ type Config struct {
 	ListenUnixMode                       fs.FileMode
 	KeyFile                              string
 	CertFile                             string
-	DatabaseURL                          string   // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
-	DatabaseReplicaURLs                  []string // PostgreSQL read replica connection strings
+	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
+	DatabaseReplicaURLs                  []string      // PostgreSQL read replica connection strings
+	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; required in cluster mode
+	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
+	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
+	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
+	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
@@ -247,6 +253,11 @@ func NewConfig() *Config {
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",
+		ClusterNodeID:                        "",
+		ClusterListen:                        "",
+		ClusterAdvertiseURL:                  "",
+		ClusterSecret:                        "",
+		ClusterBatchLinger:                   DefaultClusterBatchLinger,
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,

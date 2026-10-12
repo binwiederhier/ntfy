@@ -15,7 +15,7 @@ message: |
   Instance: {{ .labels.instance }}
   Severity: {{ .labels.severity }}
   Starts at: {{ .startsAt }}
-  {{- if .endsAt }}Ends at: {{ .endsAt }}{{ end }}
+  {{ if and .endsAt (ne .endsAt "0001-01-01T00:00:00Z") }}Ends at: {{ .endsAt }}{{ end }}
   {{- if .annotations.summary }}
   Summary: {{ .annotations.summary }}
   {{- end }}

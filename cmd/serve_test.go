@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/client"
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/test"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -534,6 +536,66 @@ func TestIP_Host_Parsing(t *testing.T) {
 		assert.Equal(t, 1, len(ips))
 		assert.Equal(t, expectedAnswer, ips[0].String())
 	}
+}
+
+func TestCLI_Serve_ClusterValidation(t *testing.T) {
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
+	// Setting experimental-cluster-listen implicitly enables clustering, which requires
+	// database-url; all validation must fail before any database connection is attempted
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "database-url")
+	// It also requires a shared secret
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-secret")
+	// ... and an explicit stable node ID
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-node-id")
+	// A secret without a listen address is a config error: clustering would silently be off
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-secret=s3cret"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-listen")
+	// A wildcard bind cannot derive an advertise URL
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-advertise-url")
+	// The linger must not be negative
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-batch-linger=-1s"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster batch linger")
+}
+
+func TestCLI_Serve_AttachmentExpiryLongerThanCacheDurationWarning(t *testing.T) {
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	// An invalid auth-default-access fails right after validation, before the server starts
+	runServe := func(args ...string) {
+		app, _, _, _ := newTestApp()
+		err := app.Run(append([]string{"ntfy", "serve", "--config=" + configFile, "--auth-default-access=invalid"}, args...))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "auth-default-access")
+	}
+
+	// Attachments outliving the message cache are cut short, so warn
+	runServe("--cache-duration=12h", "--attachment-expiry-duration=24h")
+	require.Contains(t, buf.String(), "attachment-expiry-duration (24h) is longer than cache-duration (12h)")
+
+	// No warning if the attachments expire first, or if messages are kept forever
+	buf.Reset()
+	runServe("--cache-duration=12h", "--attachment-expiry-duration=3h")
+	runServe("--cache-duration=0", "--attachment-expiry-duration=24h")
+	require.NotContains(t, buf.String(), "attachment-expiry-duration")
 }
 
 func newEmptyFile(t *testing.T) string {

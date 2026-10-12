@@ -477,6 +477,20 @@ the primary and replica URLs):
 | `pool_conn_max_lifetime`  | -       | Maximum amount of time a connection may be reused (Go duration, e.g. `5m`, `1h`) |
 | `pool_conn_max_idle_time` | -       | Maximum amount of time a connection may be idle (Go duration, e.g. `30s`, `5m`)  |
 
+For a busy server, the recommended settings are `pool_max_conns=30&pool_conn_max_lifetime=15m&pool_conn_max_idle_time=5m`
+on the primary and on every replica (this is what ntfy.sh runs). The reasoning:
+
+* `pool_max_conns`: the message writer uses one connection per batch, and every other query (polls, access checks,
+  stats) uses one for a few milliseconds, so 30 covers publish bursts of hundreds of messages per second. Make sure the
+  PostgreSQL `max_connections` setting covers the pool size times the number of ntfy instances, plus other clients.
+* `pool_max_idle_conns`: leave it at the default (equal to `pool_max_conns`). A smaller value closes connections after
+  every burst, so the next burst pays a DNS lookup, a TCP/TLS handshake and authentication per query.
+* `pool_conn_max_lifetime`: a long-lived PostgreSQL backend keeps growing (statement and catalog caches are never given
+  back), and a managed database may move to a new address on failover; recycling connections every 15 minutes bounds
+  both without noticeable churn.
+* `pool_conn_max_idle_time`: releases connections the server does not need overnight; under steady traffic the pool
+  rotates through all connections, so the limit never triggers.
+
 
 ## Message cache
 If desired, ntfy can temporarily keep notifications in an in-memory or an on-disk cache. Caching messages for a short period
@@ -511,7 +525,8 @@ The following config options are relevant to attachments:
 * `attachment-cache-dir` is the cache directory for attached files, or an S3 URL for object storage
 * `attachment-total-size-limit` is the size limit of the attachment storage (default: 5G)
 * `attachment-file-size-limit` is the per-file attachment size limit (e.g. 300k, 2M, 100M, default: 15M)
-* `attachment-expiry-duration` is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h, default: 3h)
+* `attachment-expiry-duration` is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h, default: 3h). Attachments never outlive
+  their message, so this is capped at `cache-duration`; set `cache-duration` at least as high if you want longer-lived attachments.
 
 !!! warning
     ntfy takes full control over the attachment directory or S3 bucket. Files that match the message ID format without
@@ -1023,7 +1038,7 @@ you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail
     On ntfy.sh, anonymous email sending was disabled due to abuse. To use the email notification feature, 
     you must verify your email in the web app's [Account section](https://ntfy.sh/account). 
 
-As of today, only SMTP servers with PLAIN auth and STARTLS are supported. To enable e-mail sending, you must set the 
+As of today, only SMTP servers with PLAIN or LOGIN auth and STARTTLS are supported. To enable e-mail sending, you must set the
 following settings:
 
 * `base-url` is the root URL for the ntfy server; this is needed for e-mail footer
@@ -2348,6 +2363,11 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
 | `database-url`                             | `NTFY_DATABASE_URL`                             | *string (connection URL)*                           | -                 | PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/ntfy`). If set, uses PostgreSQL for all database-backed stores (message cache, user manager, web push) instead of SQLite. See [database options](#database-options). |
+| `experimental-cluster-node-id`             | `NTFY_EXPERIMENTAL_CLUSTER_NODE_ID`             | *string*                                            | -                 | Experimental, not ready for production. Stable per-node identifier (e.g. the hostname).                                                                                                                                                 |
+| `experimental-cluster-listen`              | `NTFY_EXPERIMENTAL_CLUSTER_LISTEN`              | `[host]:port`                                       | -                 | Experimental, not ready for production. Private listen address for node-to-node traffic; setting it enables clustering (requires `database-url`).                                                                                        |
+| `experimental-cluster-advertise-url`       | `NTFY_EXPERIMENTAL_CLUSTER_ADVERTISE_URL`       | *URL*                                               | `http://<experimental-cluster-listen>` | Experimental, not ready for production. URL under which other nodes reach this node's cluster listener.                                                                                             |
+| `experimental-cluster-secret`              | `NTFY_EXPERIMENTAL_CLUSTER_SECRET`              | *string*                                            | -                 | Experimental, not ready for production. Shared secret authenticating node-to-node traffic; must match on all nodes.                                                                                                                      |
+| `experimental-cluster-batch-linger`        | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |
@@ -2363,7 +2383,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `attachment-cache-dir`                     | `NTFY_ATTACHMENT_CACHE_DIR`                     | *directory or S3 URL*                               | -                 | Cache directory for attached files, or S3 URL for object storage (format: `s3://KEY:SECRET@BUCKET[/PREFIX]?region=REGION[&endpoint=ENDPOINT][&disable_http2=true]`).                                                                    |
 | `attachment-total-size-limit`              | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT`              | *size*                                              | 5G                | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected.                                                                                                                           |
 | `attachment-file-size-limit`               | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT`               | *size*                                              | 15M               | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected.                                                                                                                                               |
-| `attachment-expiry-duration`               | `NTFY_ATTACHMENT_EXPIRY_DURATION`               | *duration*                                          | 3h                | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Strongly affects `visitor-attachment-total-size-limit`.                                                                                                       |
+| `attachment-expiry-duration`               | `NTFY_ATTACHMENT_EXPIRY_DURATION`               | *duration*                                          | 3h                | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Capped at `cache-duration`. Strongly affects `visitor-attachment-total-size-limit`.                                                                                                       |
 | `smtp-sender-addr`                         | `NTFY_SMTP_SENDER_ADDR`                         | `host:port`                                         | -                 | SMTP server address to allow email sending                                                                                                                                                                                              |
 | `smtp-sender-user`                         | `NTFY_SMTP_SENDER_USER`                         | *string*                                            | -                 | SMTP user; only used if e-mail sending is enabled                                                                                                                                                                                       |
 | `smtp-sender-pass`                         | `NTFY_SMTP_SENDER_PASS`                         | *string*                                            | -                 | SMTP password; only used if e-mail sending is enabled                                                                                                                                                                                   |

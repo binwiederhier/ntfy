@@ -149,6 +149,10 @@ const PublishDialog = (props) => {
     }
     if (delay.trim()) {
       url.searchParams.append("delay", delay.trim());
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (timezone) {
+        url.searchParams.append("timezone", timezone);
+      }
     }
     if (attachFile && message.trim()) {
       url.searchParams.append("message", message.replaceAll("\n", "\\n").trim());

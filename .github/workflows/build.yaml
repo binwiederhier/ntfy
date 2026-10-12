@@ -25,3 +25,13 @@ jobs:
         run: make build
       - name: Print build results and checksums
         run: make cli-build-results
+  docker-build:
+    # Dockerfile-build is not used in releases, so build it here to catch it going stale (see #1962)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build Dockerfile-build
+        run: docker build --file Dockerfile-build --tag ntfy-build .
+      - name: Run the image
+        run: docker run --rm ntfy-build --help

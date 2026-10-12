@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	_ "time/tzdata" // Named time zones for delayed messages must work without system zone files (Alpine ARM images)
 
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/v2/cmd"

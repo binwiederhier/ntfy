@@ -96,8 +96,8 @@ var (
 	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_leader",
 	})
-	TailLagSeconds = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "ntfy_tail_lag_seconds", // Age of the newest message of the last read; well above the write delay means it is behind
+	TailMessagesLagSeconds = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_tail_messages_lag_seconds", // Age of the newest message of the last read; well above the write delay means it is behind
 	})
 	TailMessagesRead = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_tail_messages_read_total",
@@ -135,7 +135,7 @@ func init() {
 		ClusterQueueDropped,
 		ClusterMessagesWasted,
 		ClusterLeader,
-		TailLagSeconds,
+		TailMessagesLagSeconds,
 		TailMessagesRead,
 		TailMessagesMissed,
 		Visitors,

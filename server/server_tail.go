@@ -30,7 +30,7 @@ func (s *Server) runTail(tail *message.Tail) {
 			continue
 		}
 		metrics.TailMessagesRead.Add(float64(len(messages)))
-		metrics.TailLagSeconds.Set(tailLag(messages, time.Now()).Seconds())
+		metrics.TailMessagesLagSeconds.Set(tailLag(messages, time.Now()).Seconds())
 		s.publishMissed(messages)
 	}
 }

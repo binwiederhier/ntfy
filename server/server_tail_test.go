@@ -100,7 +100,7 @@ func TestServer_Tail_ClusterMarkerWrittenBeforeAnEarlierMessage(t *testing.T) {
 	cancel := subscribe(t, s, "/mytopic/json?since="+marker.ID, rr)
 	time.Sleep(time.Second)
 	cancel()
-	require.Equal(t, 1, countMessages(t, rr)["early"])
+	require.Equal(t, map[string]int{"early": 1}, countMessages(t, rr)) // Not the marker: the client has it
 }
 
 func newTailTestServer(t *testing.T, conf *Config) *Server {

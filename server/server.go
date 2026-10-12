@@ -1857,6 +1857,7 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	if since.IsNone() {
 		return nil
 	}
+	marker := since
 	since = s.clusterSince(since)
 	messages := make([]*model.Message, 0)
 	truncated := false
@@ -1879,6 +1880,9 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 		w.Header().Set("X-Messages-Truncated", "1")
 	}
 	for _, m := range messages {
+		if marker.IsID() && m.ID == marker.ID() {
+			continue // The client has it; a time-based since (clusterSince) includes it
+		}
 		if err := sub(v, m); err != nil {
 			return err
 		}

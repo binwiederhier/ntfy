@@ -1,6 +1,7 @@
 package message
 
 import (
+	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -23,17 +24,30 @@ type Tail struct {
 	holes  map[int64]time.Time // Skipped row ids below the cursor, and when they were skipped
 }
 
-// Tail returns a tail that starts after the last message written so far
+// Tail returns a tail that starts after the last message written so far. The gaps between the
+// last tailPageSize row ids start out as holes: a row id handed out but not committed yet, below
+// one that already is, must not be skipped.
 func (c *Cache) Tail() (*Tail, error) {
-	var cursor int64
-	if err := c.db.Primary().QueryRow(c.queries.selectMaxRowID).Scan(&cursor); err != nil {
+	rows, err := c.db.Primary().Query(c.queries.selectRecentRowIDs, tailPageSize)
+	if err != nil {
 		return nil, err
 	}
-	return &Tail{
-		cache:  c,
-		cursor: cursor,
-		holes:  make(map[int64]time.Time),
-	}, nil
+	rowIDs, err := readRowIDs(rows)
+	if err != nil {
+		return nil, err
+	}
+	t := &Tail{
+		cache: c,
+		holes: make(map[int64]time.Time),
+	}
+	now := time.Now()
+	for i := len(rowIDs) - 1; i >= 0; i-- { // Ascending
+		if t.cursor > 0 {
+			t.addHoles(t.cursor, rowIDs[i], now)
+		}
+		t.cursor = rowIDs[i]
+	}
+	return t, nil
 }
 
 // Next returns the published messages written since the last call, in write order, at most
@@ -54,7 +68,8 @@ func (t *Tail) Next() ([]*model.Message, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	now := time.Now()
+	cursor := t.cursor
+	filled, skipped := make([]int64, 0), make([]int64, 0)
 	messages := make([]*model.Message, 0)
 	for rows.Next() {
 		var rowID int64
@@ -64,13 +79,13 @@ func (t *Tail) Next() ([]*model.Message, error) {
 			return nil, err
 		}
 		if _, ok := t.holes[rowID]; ok {
-			delete(t.holes, rowID)
-		} else if rowID > t.cursor {
+			filled = append(filled, rowID)
+		} else if rowID > cursor {
 			// Row ids between the cursor and this one are not visible (yet)
-			for id := t.cursor + 1; id < rowID && len(t.holes) < tailMaxHoles; id++ {
-				t.holes[id] = now
+			for id := cursor + 1; id < rowID && len(skipped) < tailMaxHoles; id++ {
+				skipped = append(skipped, id)
 			}
-			t.cursor = rowID
+			cursor = rowID
 		}
 		if published { // Scheduled messages go out through the delayed sender
 			messages = append(messages, m)
@@ -79,7 +94,26 @@ func (t *Tail) Next() ([]*model.Message, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	// Only now: a read that fails part way is retried whole, from the same position
+	now := time.Now()
+	for _, id := range filled {
+		delete(t.holes, id)
+	}
+	for _, id := range skipped {
+		if len(t.holes) >= tailMaxHoles {
+			break
+		}
+		t.holes[id] = now
+	}
+	t.cursor = cursor
 	return messages, nil
+}
+
+// addHoles records the row ids between from and to (both exclusive) as holes
+func (t *Tail) addHoles(from, to int64, now time.Time) {
+	for id := from + 1; id < to && len(t.holes) < tailMaxHoles; id++ {
+		t.holes[id] = now
+	}
 }
 
 func (t *Tail) expireHoles() {
@@ -88,4 +122,17 @@ func (t *Tail) expireHoles() {
 			delete(t.holes, id)
 		}
 	}
+}
+
+func readRowIDs(rows *sql.Rows) ([]int64, error) {
+	defer rows.Close()
+	rowIDs := make([]int64, 0)
+	for rows.Next() {
+		var rowID int64
+		if err := rows.Scan(&rowID); err != nil {
+			return nil, err
+		}
+		rowIDs = append(rowIDs, rowID)
+	}
+	return rowIDs, rows.Err()
 }

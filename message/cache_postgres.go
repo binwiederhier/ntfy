@@ -55,7 +55,7 @@ const (
 		  AND (id > $2 OR published = FALSE)
 		ORDER BY time DESC, id DESC
 	`
-	postgresSelectMaxRowIDQuery = `SELECT COALESCE(MAX(id), 0) FROM message`
+	postgresSelectRecentRowIDsQuery = `SELECT id FROM message ORDER BY id DESC LIMIT $1`
 	// postgresSelectMessagesAfterRowIDQuery reads rows in write order: those after the cursor ($1),
 	// plus the skipped row ids ($2, a JSON array) that were not committed yet when the cursor passed
 	postgresSelectMessagesAfterRowIDQuery = `
@@ -124,7 +124,7 @@ var postgresQueries = queries{
 	selectMessageRowID:               postgresSelectMessageRowIDQuery,
 	selectMessagesSinceID:            postgresSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
-	selectMaxRowID:                   postgresSelectMaxRowIDQuery,
+	selectRecentRowIDs:               postgresSelectRecentRowIDsQuery,
 	selectMessagesAfterRowID:         postgresSelectMessagesAfterRowIDQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,
 	selectMessagesDue:                postgresSelectMessagesDueQuery,

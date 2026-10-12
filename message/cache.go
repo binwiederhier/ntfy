@@ -55,7 +55,7 @@ type queries struct {
 	selectMessageRowID               string
 	selectMessagesSinceID            string
 	selectMessagesSinceIDScheduled   string
-	selectMaxRowID                   string
+	selectRecentRowIDs               string
 	selectMessagesAfterRowID         string
 	selectMessagesLatest             string
 	selectMessagesDue                string

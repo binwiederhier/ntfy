@@ -45,7 +45,7 @@ const (
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessageRowIDQuery       = `SELECT id FROM messages WHERE mid = ? LIMIT 1`
-	sqliteSelectMaxRowIDQuery           = `SELECT COALESCE(MAX(id), 0) FROM messages`
+	sqliteSelectRecentRowIDsQuery       = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
 	sqliteSelectMessagesAfterRowIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, id, published
 		FROM messages
@@ -104,7 +104,7 @@ var sqliteQueries = queries{
 	selectMessageRowID:               sqliteSelectMessageRowIDQuery,
 	selectMessagesSinceID:            sqliteSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   sqliteSelectMessagesSinceIDIncludeScheduledQuery,
-	selectMaxRowID:                   sqliteSelectMaxRowIDQuery,
+	selectRecentRowIDs:               sqliteSelectRecentRowIDsQuery,
 	selectMessagesAfterRowID:         sqliteSelectMessagesAfterRowIDQuery,
 	selectMessagesLatest:             sqliteSelectMessagesLatestQuery,
 	selectMessagesDue:                sqliteSelectMessagesDueQuery,

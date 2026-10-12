@@ -38,7 +38,8 @@ type topicSubscriber struct {
 	userID     string // User ID associated with this subscription, may be empty
 	subscriber subscriber
 	cancel     func()
-	since      time.Time // When it subscribed; what went out before, it missed
+	since      time.Time     // When it subscribed; what went out before, it missed
+	missedDone chan struct{} // Closed when the tail's last batch for this subscriber is sent; the next one waits for it
 }
 
 // subscriber is a function that is called for every new message on a topic
@@ -146,13 +147,18 @@ func (t *topic) PublishMissed(messages []*model.Message) int {
 		}
 		t.rememberDeliveredNoLock(m.ID)
 	}
-	t.mu.Unlock()
 	sends := 0
 	for s, subscriberMessages := range missed {
 		sends += len(subscriberMessages)
-		// One Go routine per subscriber, sending in write order: a reconnect asks for what came
-		// after the last message the client got, so a later one must not overtake an earlier one
+		previous, done := s.missedDone, make(chan struct{})
+		s.missedDone = done
+		// One Go routine per subscriber, sending in write order after the previous batch: a reconnect
+		// asks for what came after the last message the client got, so no later one may overtake
 		go func(s subscriber, subscriberMessages []*model.Message) {
+			defer close(done)
+			if previous != nil {
+				<-previous
+			}
 			for _, m := range subscriberMessages {
 				if err := s(nil, m); err != nil { // No visitor: the tail is not a request
 					log.Tag(tagPublish).With(m).Err(err).Warn("Error forwarding missed message to subscriber")
@@ -161,6 +167,7 @@ func (t *topic) PublishMissed(messages []*model.Message) int {
 			}
 		}(s.subscriber, subscriberMessages)
 	}
+	t.mu.Unlock()
 	return sends
 }
 

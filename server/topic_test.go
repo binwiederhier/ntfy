@@ -157,3 +157,25 @@ func TestTopic_PublishMissed_InWriteOrder(t *testing.T) {
 	defer mu.Unlock()
 	require.Equal(t, expected, received)
 }
+
+func TestTopic_PublishMissed_InWriteOrderAcrossReads(t *testing.T) {
+	// A subscriber still busy with one read's messages must not get the next read's first
+	to := newTopic("mytopic")
+	firstEntered, releaseFirst := make(chan struct{}), make(chan struct{})
+	received := make(chan string, 2)
+	to.Subscribe(func(_ *visitor, m *model.Message) error {
+		if m.Message == "first" {
+			close(firstEntered)
+			<-releaseFirst
+		}
+		received <- m.Message
+		return nil
+	}, "", func() {})
+	to.PublishMissed([]*model.Message{model.NewDefaultMessage("mytopic", "first")})
+	<-firstEntered
+	to.PublishMissed([]*model.Message{model.NewDefaultMessage("mytopic", "second")})
+	time.Sleep(200 * time.Millisecond) // Room for "second" to overtake
+	close(releaseFirst)
+	require.Equal(t, "first", <-received)
+	require.Equal(t, "second", <-received)
+}

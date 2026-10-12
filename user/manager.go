@@ -57,6 +57,7 @@ type Manager struct {
 	db          *db.DB
 	queries     queries
 	statsQueue  map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
+	statsResets int                     // Number of daily resets, so a failed write from before one is not retried after it
 	tokenQueue  map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
 	accessCache *accessCache            // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
 	quit        chan struct{}           // Closed by Close() to signal background goroutines to stop
@@ -440,6 +441,7 @@ func (a *Manager) ResetStats() error {
 		return err
 	}
 	a.statsQueue = make(map[string]*Stats)
+	a.statsResets++
 	return nil
 }
 
@@ -450,6 +452,11 @@ func (a *Manager) ResetStats() error {
 func (a *Manager) EnqueueUserStats(userID string, delta *Stats) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.enqueueUserStatsNoLock(userID, delta)
+}
+
+// enqueueUserStatsNoLock adds the delta to the user's queued stats; a.mu must be held
+func (a *Manager) enqueueUserStatsNoLock(userID string, delta *Stats) {
 	if queued, ok := a.statsQueue[userID]; ok {
 		queued.Messages += delta.Messages
 		queued.Emails += delta.Emails
@@ -484,11 +491,11 @@ func (a *Manager) writeUserStatsQueue() error {
 		log.Tag(tag).Trace("No user stats updates to commit")
 		return nil
 	}
-	statsQueue := a.statsQueue
+	statsQueue, resets := a.statsQueue, a.statsResets
 	a.statsQueue = make(map[string]*Stats)
 	a.mu.Unlock()
 
-	return db.ExecTx(a.db, func(tx *sql.Tx) error {
+	err := db.ExecTx(a.db, func(tx *sql.Tx) error {
 		log.Tag(tag).Debug("Writing user stats queue for %d user(s)", len(statsQueue))
 		for userID, update := range statsQueue {
 			log.
@@ -506,6 +513,23 @@ func (a *Manager) writeUserStatsQueue() error {
 		}
 		return nil
 	})
+	if err != nil {
+		a.requeueUserStats(statsQueue, resets)
+	}
+	return err
+}
+
+// requeueUserStats puts the deltas of a failed write back, to be retried with the next flush: they
+// are increments, so nothing else will write them again. Deltas from before a daily reset are dropped.
+func (a *Manager) requeueUserStats(statsQueue map[string]*Stats, resets int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if resets != a.statsResets {
+		return
+	}
+	for userID, delta := range statsQueue {
+		a.enqueueUserStatsNoLock(userID, delta)
+	}
 }
 
 // User returns the user with the given username if it exists, or ErrUserNotFound otherwise

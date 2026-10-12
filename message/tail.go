@@ -1,6 +1,7 @@
 package message
 
 import (
+	"database/sql"
 	"encoding/json"
 	"time"
 
@@ -65,9 +66,7 @@ func (t *Tail) nextPage() ([]*model.Message, bool, error) {
 	filled, skipped := make([]int64, 0), make([]int64, 0)
 	messages := make([]*model.Message, 0)
 	for rows.Next() {
-		var rowID int64
-		var published bool
-		m, err := readMessage(rows, &rowID, &published)
+		m, rowID, published, err := readTailRow(rows)
 		if err != nil {
 			return nil, false, err
 		}
@@ -101,6 +100,18 @@ func (t *Tail) nextPage() ([]*model.Message, bool, error) {
 	}
 	t.cursor = cursor
 	return messages, count == tailPageSize, nil
+}
+
+// readTailRow reads a row of selectMessagesAfterRowID: the message, then its row id and whether
+// it is published (false for a scheduled message)
+func readTailRow(rows *sql.Rows) (*model.Message, int64, bool, error) {
+	var rowID int64
+	var published bool
+	m, err := readMessage(rows, &rowID, &published)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	return m, rowID, published, nil
 }
 
 // addHoles records the row ids between from and to (both exclusive) as holes

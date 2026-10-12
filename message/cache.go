@@ -385,11 +385,11 @@ func (c *Cache) Tail() (*Tail, error) {
 		holes: make(map[int64]time.Time),
 	}
 	now := time.Now()
-	for i := len(rowIDs) - 1; i >= 0; i-- { // Ascending
+	for _, rowID := range slices.Backward(rowIDs) {
 		if t.cursor > 0 {
-			t.addHoles(t.cursor, rowIDs[i], now)
+			t.addHoles(t.cursor, rowID, now)
 		}
-		t.cursor = rowIDs[i]
+		t.cursor = rowID
 	}
 	return t, nil
 }

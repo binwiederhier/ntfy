@@ -103,9 +103,7 @@ type Cluster interface {
 }
 
 // New creates the cluster for the given config: the nop cluster when clustering is disabled (the
-// single-node default), or the peer-mesh cluster otherwise. The mesh is not in this build yet, so
-// an enabled config is validated and then refused; cmd refuses to start a server with
-// experimental-cluster-listen set, so a running server never reaches that.
+// single-node default), or the peer-mesh cluster otherwise.
 func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 	if !conf.Enabled {
 		return &nopCluster{}, nil

@@ -61,10 +61,10 @@
 #
 # database-url: <connection-string>
 
-# EXPERIMENTAL: Clustering options. These names are reserved and validated, but no node-to-node
-# implementation ships yet: a server started with "experimental-cluster-listen" set refuses to
-# start, rather than running single-node and looking like a cluster. The "experimental-" prefix
-# means these option names may still change.
+# EXPERIMENTAL: Clustering options. Setting "experimental-cluster-listen" runs this server as one
+# node of a cluster that shares a PostgreSQL database. This is not ready for production: dropped
+# node-to-node batches are not recovered yet, and rate limits and quotas are enforced per node,
+# not across the cluster. The "experimental-" prefix means these option names may still change.
 #
 # - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes
 #   talk to. Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners

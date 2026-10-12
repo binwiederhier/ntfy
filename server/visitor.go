@@ -143,7 +143,7 @@ func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Man
 		accountLimiter:       nil, // Set in resetLimiters, may be nil
 		authLimiter:          nil, // Set in resetLimiters, may be nil
 	}
-	v.resetLimitersNoLock(messages, emails, calls, false)
+	v.resetLimitersNoLock(messages, emails, calls)
 	return v
 }
 
@@ -411,13 +411,20 @@ func (v *visitor) SetUser(u *user.User) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
-	v.user = u                                           // u may be nil!
+	if shouldResetLimiters && v.user != nil && v.user.Tier != nil {
+		// Flush increments counted against the old limiters, under the old account, before they
+		// are replaced below; the rebuilt limiters are re-seeded from the new user's persisted
+		// stats. Usage of an IP-keyed visitor (no user, or no tier) is never persisted, so it must
+		// not land on the new account.
+		v.enqueueUserStatsDeltaNoLock()
+	}
+	v.user = u // u may be nil!
 	if shouldResetLimiters {
 		var messages, emails, calls int64
 		if u != nil {
 			messages, emails, calls = u.Stats.Messages, u.Stats.Emails, u.Stats.Calls
 		}
-		v.resetLimitersNoLock(messages, emails, calls, true)
+		v.resetLimitersNoLock(messages, emails, calls)
 	}
 }
 
@@ -432,12 +439,7 @@ func (v *visitor) MaybeUserID() string {
 	return ""
 }
 
-func (v *visitor) resetLimitersNoLock(messages, emails, calls int64, enqueueUpdate bool) {
-	if enqueueUpdate {
-		// Flush increments counted against the old limiters before they are replaced below;
-		// the rebuilt limiters are re-seeded from the user's persisted stats
-		v.enqueueUserStatsDeltaNoLock()
-	}
+func (v *visitor) resetLimitersNoLock(messages, emails, calls int64) {
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
 	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)

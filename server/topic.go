@@ -16,9 +16,10 @@ const (
 	// time for more requests to come in, so that we can send a {"rejected":["<pushkey>"]} response back.
 	topicExpungeAfter = 16 * time.Hour
 
-	// topicDeliveredRetain is how long a topic remembers that a message went out to its subscribers,
-	// so the tail (see PublishMissed) does not send it again. It must cover the write delay plus
-	// how long the tail waits for a row committed out of order (tailHoleTimeout).
+	// topicDeliveredRetain is how long a topic at least remembers that a message went out to its
+	// subscribers, so the tail (see PublishMissed) does not send it again. It must cover the write
+	// delay plus how long the tail waits for a row committed out of order (tailHoleTimeout). Entries
+	// are dropped by the manager's next pass over the topics (see Stale), so they may live longer.
 	topicDeliveredRetain = 2 * time.Minute
 )
 
@@ -30,13 +31,7 @@ type topic struct {
 	rateVisitor *visitor
 	lastAccess  time.Time
 	delivered   map[string]time.Time // When recent messages went out to the subscribers, by message ID
-	deliveries  []topicDelivery      // The same, oldest first, to expire them
 	mu          sync.RWMutex
-}
-
-type topicDelivery struct {
-	id string
-	at time.Time
 }
 
 type topicSubscriber struct {
@@ -139,7 +134,7 @@ func (t *topic) Publish(v *visitor, m *model.Message) error {
 // subscribers that did not get them: all of them if a message never went out here (its fan-out
 // was lost), or those that subscribed after it went out (they were reconnecting and their read
 // missed it). It returns how many sends it made.
-func (t *topic) PublishMissed(messages []*model.Message, visitorFor func(m *model.Message) *visitor) int {
+func (t *topic) PublishMissed(messages []*model.Message) int {
 	t.mu.Lock()
 	missed := make(map[*topicSubscriber][]*model.Message)
 	for _, m := range messages {
@@ -159,9 +154,8 @@ func (t *topic) PublishMissed(messages []*model.Message, visitorFor func(m *mode
 		// after the last message the client got, so a later one must not overtake an earlier one
 		go func(s subscriber, subscriberMessages []*model.Message) {
 			for _, m := range subscriberMessages {
-				v := visitorFor(m)
-				if err := s(v, m); err != nil {
-					logvm(v, m).Tag(tagPublish).Err(err).Warn("Error forwarding missed message to subscriber")
+				if err := s(nil, m); err != nil { // No visitor: the tail is not a request
+					log.Tag(tagPublish).With(m).Err(err).Warn("Error forwarding missed message to subscriber")
 					return // The connection is broken, so the rest would fail too
 				}
 			}
@@ -205,25 +199,16 @@ func (t *topic) markDelivered(m *model.Message) ([]subscriber, bool) {
 
 // rememberDeliveredNoLock records that the message went out now; t.mu must be held
 func (t *topic) rememberDeliveredNoLock(id string) {
-	now := time.Now()
-	t.delivered[id] = now
-	t.deliveries = append(t.deliveries, topicDelivery{id: id, at: now}) // The older entry of a re-send expires as a no-op
-	t.expireDeliveredNoLock()
+	t.delivered[id] = time.Now()
 }
 
 // expireDeliveredNoLock forgets deliveries older than topicDeliveredRetain; t.mu must be held
 func (t *topic) expireDeliveredNoLock() {
 	cutoff := time.Now().Add(-topicDeliveredRetain)
-	expired := 0
-	for expired < len(t.deliveries) && t.deliveries[expired].at.Before(cutoff) {
-		d := t.deliveries[expired]
-		if t.delivered[d.id].Equal(d.at) { // Not re-sent since
-			delete(t.delivered, d.id)
+	for id, at := range t.delivered {
+		if at.Before(cutoff) {
+			delete(t.delivered, id)
 		}
-		expired++
-	}
-	if expired > 0 {
-		t.deliveries = append(t.deliveries[:0:0], t.deliveries[expired:]...)
 	}
 }
 

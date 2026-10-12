@@ -101,9 +101,9 @@ func TestTopic_PublishMissed_OnlyToSubscribersThatMissedIt(t *testing.T) {
 	waitFor(t, func() bool { return early.Load() == 1 })
 
 	to.Subscribe(countingSubscriber(&late), "", func() {}) // Joined after the live delivery
-	to.PublishMissed([]*model.Message{m}, noVisitor)
+	to.PublishMissed([]*model.Message{m})
 	waitFor(t, func() bool { return late.Load() == 1 })
-	to.PublishMissed([]*model.Message{m}, noVisitor) // Caught up already
+	to.PublishMissed([]*model.Message{m}) // Caught up already
 	time.Sleep(200 * time.Millisecond)
 	require.Equal(t, int32(1), early.Load())
 	require.Equal(t, int32(1), late.Load())
@@ -115,7 +115,7 @@ func TestTopic_Publish_SkipsWhatWasDeliveredAlready(t *testing.T) {
 	var count atomic.Int32
 	to.Subscribe(countingSubscriber(&count), "", func() {})
 	m := model.NewDefaultMessage("mytopic", "hi")
-	to.PublishMissed([]*model.Message{m}, noVisitor)
+	to.PublishMissed([]*model.Message{m})
 	waitFor(t, func() bool { return count.Load() == 1 })
 	require.Nil(t, to.Publish(nil, m))
 	time.Sleep(200 * time.Millisecond)
@@ -147,7 +147,7 @@ func TestTopic_PublishMissed_InWriteOrder(t *testing.T) {
 		messages = append(messages, model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i)))
 		expected = append(expected, fmt.Sprintf("message %d", i))
 	}
-	require.Equal(t, 100, to.PublishMissed(messages, noVisitor))
+	require.Equal(t, 100, to.PublishMissed(messages))
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -156,8 +156,4 @@ func TestTopic_PublishMissed_InWriteOrder(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, expected, received)
-}
-
-func noVisitor(_ *model.Message) *visitor {
-	return nil
 }

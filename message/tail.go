@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	tailPageSize    = 1000        // Rows per query; Next pages through the rest
+	tailPageSize    = 1000        // Rows per read; a backlog drains at this many per read
 	tailHoleTimeout = time.Minute // How long a skipped row id is re-checked before it counts as never committed (rolled back)
 	tailMaxHoles    = 10000       // Bounds the skipped row ids re-checked on every call
 )
@@ -36,49 +36,33 @@ func (c *Cache) Tail() (*Tail, error) {
 	}, nil
 }
 
-// Next returns the published messages written since the last call, in write order. It reads the
-// primary: a replica may lag, and what it does not show yet would be skipped as a hole.
+// Next returns the published messages written since the last call, in write order, at most
+// tailPageSize rows per call. It reads the primary: a replica may lag, and what it does not show
+// yet would be skipped as a hole.
 func (t *Tail) Next() ([]*model.Message, error) {
-	messages := make([]*model.Message, 0)
-	for {
-		page, full, err := t.nextPage()
-		if err != nil {
-			return nil, err
-		}
-		messages = append(messages, page...)
-		if !full {
-			break
-		}
-	}
-	t.expireHoles()
-	return messages, nil
-}
-
-func (t *Tail) nextPage() ([]*model.Message, bool, error) {
+	defer t.expireHoles()
 	holes := make([]int64, 0, len(t.holes))
 	for id := range t.holes {
 		holes = append(holes, id)
 	}
 	holesJSON, err := json.Marshal(holes)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	rows, err := t.cache.db.Primary().Query(t.cache.queries.selectMessagesAfterRowID, t.cursor, string(holesJSON), tailPageSize)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	defer rows.Close()
 	now := time.Now()
 	messages := make([]*model.Message, 0)
-	count := 0
 	for rows.Next() {
 		var rowID int64
 		var published bool
 		m, err := readMessage(rows, &rowID, &published)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
-		count++
 		if _, ok := t.holes[rowID]; ok {
 			delete(t.holes, rowID)
 		} else if rowID > t.cursor {
@@ -93,9 +77,9 @@ func (t *Tail) nextPage() ([]*model.Message, bool, error) {
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	return messages, count == tailPageSize, nil
+	return messages, nil
 }
 
 func (t *Tail) expireHoles() {

@@ -40,15 +40,12 @@ func (s *Server) publishMissed(messages []*model.Message) {
 	for _, m := range messages {
 		byTopic[m.Topic] = append(byTopic[m.Topic], m)
 	}
-	visitorFor := func(m *model.Message) *visitor {
-		return s.visitor(m.Sender, nil) // Like deliverFromBus; logging a failed send needs it
-	}
 	for topicID, topicMessages := range byTopic {
 		s.mu.RLock()
 		t, ok := s.topics[topicID]
 		s.mu.RUnlock()
 		if ok {
-			metrics.TailMessagesMissed.Add(float64(t.PublishMissed(topicMessages, visitorFor)))
+			metrics.TailMessagesMissed.Add(float64(t.PublishMissed(topicMessages)))
 		}
 	}
 }

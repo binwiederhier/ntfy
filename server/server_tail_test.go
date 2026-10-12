@@ -1,13 +1,16 @@
 package server
 
 import (
+	"errors"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -78,29 +81,21 @@ func TestServer_Tail_DeliveredLiveIsNotSentAgain(t *testing.T) {
 	})
 }
 
-func TestServer_Tail_ClusterMarkerWrittenBeforeAnEarlierMessage(t *testing.T) {
-	// Cluster nodes write their batches independently, so a message the client never got (its
-	// fan-out was late) can have a lower row id than the client's since=<id> marker. In a cluster,
-	// the marker is read as a time, a little earlier than the marker message.
-	conf := newTestConfig(t, dbtest.CreateTestPostgresSchema(t))
-	conf.ClusterNodeID = "node-a"
-	conf.ClusterListen = "127.0.0.1:1" // Enables clustering; not bound since Run() is not called
-	conf.ClusterSecret = "s3cret"
-	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
-	s := newTailTestServer(t, conf)
-	now := time.Now().Unix()
-	early := model.NewDefaultMessage("mytopic", "early")
-	early.Time = now - 1
-	marker := model.NewDefaultMessage("mytopic", "marker")
-	marker.Time = now
-	require.Nil(t, s.messageCache.AddMessages([]*model.Message{early, marker})) // early gets the lower row id
-	time.Sleep(2 * time.Second)                                                 // The tail has passed both
-
-	rr := httptest.NewRecorder()
-	cancel := subscribe(t, s, "/mytopic/json?since="+marker.ID, rr)
-	time.Sleep(time.Second)
-	cancel()
-	require.Equal(t, map[string]int{"early": 1}, countMessages(t, rr)) // Not the marker: the client has it
+func TestServer_Tail_SubscriberErrorDoesNotCrash(t *testing.T) {
+	// Sending to a subscriber fails (its connection broke) and the failure is logged
+	log.SetLevel(log.WarnLevel)
+	t.Cleanup(func() { log.SetLevel(log.ErrorLevel) })
+	s := newTailTestServer(t, newTestConfig(t, ""))
+	topics, err := s.topicsFromIDs(nil, "mytopic")
+	require.Nil(t, err)
+	var calls atomic.Int32
+	topics[0].Subscribe(func(_ *visitor, _ *model.Message) error {
+		calls.Add(1)
+		return errors.New("broken pipe")
+	}, "", func() {})
+	require.Nil(t, s.messageCache.AddMessages([]*model.Message{model.NewDefaultMessage("mytopic", "from peer")}))
+	waitFor(t, func() bool { return calls.Load() == 1 })
+	time.Sleep(200 * time.Millisecond) // The failure is logged after the call
 }
 
 func newTailTestServer(t *testing.T, conf *Config) *Server {

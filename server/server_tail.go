@@ -1,13 +1,11 @@
 package server
 
 import (
-	"math"
 	"time"
 
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/metrics"
-	"heckel.io/ntfy/v2/model"
 )
 
 const (
@@ -36,23 +34,9 @@ func (s *Server) runTail(tail *message.Tail) {
 			t, ok := s.topics[m.Topic]
 			s.mu.RUnlock()
 			if ok {
-				metrics.TailMessagesMissed.Add(float64(t.PublishMissed(nil, m)))
+				v := s.visitor(m.Sender, nil) // Like deliverFromBus; logging a failed send needs it
+				metrics.TailMessagesMissed.Add(float64(t.PublishMissed(v, m)))
 			}
 		}
 	}
-}
-
-// clusterSince reads a since=<id> marker as a time a little before that message in a cluster.
-// Nodes write their batches independently, so a message the client never got (its fan-out was
-// late) can have a lower row id than the marker. Single-node, row order is publish order.
-func (s *Server) clusterSince(since model.SinceMarker) model.SinceMarker {
-	if s.config.ClusterListen == "" || !since.IsID() {
-		return since
-	}
-	m, err := s.messageCache.Message(since.ID())
-	if err != nil {
-		return since // Not written yet, or expired: the row id lookup handles both
-	}
-	lag := s.config.CacheBatchTimeout + s.config.ClusterBatchLinger + tailInterval + time.Second
-	return model.NewSinceTime(m.Time - int64(math.Ceil(lag.Seconds())))
 }

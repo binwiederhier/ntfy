@@ -6,14 +6,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.30.0 | Oct 13, 2026  |
+| ntfy server      | v2.30.0 | Oct 12, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
 
 ### ntfy server v2.30.0
-Released October 13, 2026
+Released October 12, 2026
 
 This release links attachments in email notifications, adds SMTP LOGIN auth (e.g. for OVH and Outlook), and fixes the
 PostgreSQL memory growth that came with v2.29.0. It also ships the first experimental version of clustering: several

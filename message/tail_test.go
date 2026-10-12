@@ -2,6 +2,7 @@ package message_test
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
@@ -27,6 +28,23 @@ func TestTail_ReturnsWhatWasWrittenSinceTheLastCall(t *testing.T) {
 
 		require.Nil(t, s.AddMessages([]*model.Message{model.NewDefaultMessage("mytopic", "three")}))
 		requireTail(t, tail, "three")
+	})
+}
+
+func TestTail_ReadsUntilCaughtUp(t *testing.T) {
+	// More than a page written since the last read: one read still returns all of it
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		tail, err := s.Tail()
+		require.Nil(t, err)
+		messages := make([]*model.Message, 0)
+		for i := 0; i < 2500; i++ {
+			messages = append(messages, model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i)))
+		}
+		require.Nil(t, s.AddMessages(messages))
+		read, err := tail.Next()
+		require.Nil(t, err)
+		require.Equal(t, 2500, len(read))
+		require.Equal(t, "message 2499", read[2499].Message)
 	})
 }
 

@@ -30,6 +30,7 @@ func (s *Server) runTail(tail *message.Tail) {
 			continue
 		}
 		metrics.TailMessagesRead.Add(float64(len(messages)))
+		metrics.TailLagSeconds.Set(tailLag(messages, time.Now()).Seconds())
 		s.publishMissed(messages)
 	}
 }
@@ -48,4 +49,16 @@ func (s *Server) publishMissed(messages []*model.Message) {
 			metrics.TailMessagesMissed.Add(float64(t.PublishMissed(topicMessages)))
 		}
 	}
+}
+
+// tailLag is how old the newest message of a read is; zero if there was none (caught up)
+func tailLag(messages []*model.Message, now time.Time) time.Duration {
+	var newest int64
+	for _, m := range messages {
+		newest = max(newest, m.Time)
+	}
+	if newest == 0 {
+		return 0
+	}
+	return now.Sub(time.Unix(newest, 0))
 }

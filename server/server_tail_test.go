@@ -98,6 +98,14 @@ func TestServer_Tail_SubscriberErrorDoesNotCrash(t *testing.T) {
 	time.Sleep(200 * time.Millisecond) // The failure is logged after the call
 }
 
+func TestServer_TailLag(t *testing.T) {
+	now := time.Unix(1700000100, 0)
+	older, newer := model.NewDefaultMessage("mytopic", "older"), model.NewDefaultMessage("mytopic", "newer")
+	older.Time, newer.Time = 1700000000, 1700000090
+	require.Equal(t, 10*time.Second, tailLag([]*model.Message{newer, older}, now)) // The newest message read
+	require.Equal(t, time.Duration(0), tailLag([]*model.Message{}, now))           // Nothing new: caught up
+}
+
 func newTailTestServer(t *testing.T, conf *Config) *Server {
 	conf.CacheBatchSize = 0
 	conf.CacheBatchTimeout = 500 * time.Millisecond

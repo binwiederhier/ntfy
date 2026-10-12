@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	tailPageSize    = 1000        // Rows per read; a backlog drains at this many per read
+	tailPageSize    = 1000        // Rows per query
+	tailMaxPages    = 10          // Queries per read at most, so a read drains a backlog of up to 10,000 rows
 	tailHoleTimeout = time.Minute // How long a skipped row id is re-checked before it counts as never committed (rolled back)
 	tailMaxHoles    = 10000       // Bounds the skipped row ids re-checked on every call
 )
@@ -23,25 +24,44 @@ type Tail struct {
 	holes  map[int64]time.Time // Skipped row ids below the cursor, and when they were skipped
 }
 
-// Next returns the published messages written since the last call, in write order, at most
-// tailPageSize rows per call. It reads the primary: a replica may lag, and what it does not show
-// yet would be skipped as a hole.
+// Next returns the published messages written since the last call, in write order, reading
+// pages until it is caught up or has read tailMaxPages. It reads the primary: a replica may lag,
+// and what it does not show yet would be skipped as a hole.
 func (t *Tail) Next() ([]*model.Message, error) {
 	defer t.expireHoles()
+	messages := make([]*model.Message, 0)
+	for i := 0; i < tailMaxPages; i++ {
+		page, full, err := t.nextPage()
+		if err != nil {
+			if len(messages) > 0 {
+				return messages, nil // The pages read so far are done; the failed one is retried next time
+			}
+			return nil, err
+		}
+		messages = append(messages, page...)
+		if !full {
+			break
+		}
+	}
+	return messages, nil
+}
+
+// nextPage reads one page; true if it was full, so more may be waiting
+func (t *Tail) nextPage() ([]*model.Message, bool, error) {
 	holes := make([]int64, 0, len(t.holes))
 	for id := range t.holes {
 		holes = append(holes, id)
 	}
 	holesJSON, err := json.Marshal(holes)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	rows, err := t.cache.db.Primary().Query(t.cache.queries.selectMessagesAfterRowID, t.cursor, string(holesJSON), tailPageSize)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
-	cursor := t.cursor
+	cursor, count := t.cursor, 0
 	filled, skipped := make([]int64, 0), make([]int64, 0)
 	messages := make([]*model.Message, 0)
 	for rows.Next() {
@@ -49,8 +69,9 @@ func (t *Tail) Next() ([]*model.Message, error) {
 		var published bool
 		m, err := readMessage(rows, &rowID, &published)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		count++
 		if _, ok := t.holes[rowID]; ok {
 			filled = append(filled, rowID)
 		} else if rowID > cursor {
@@ -65,7 +86,7 @@ func (t *Tail) Next() ([]*model.Message, error) {
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	// Only now: a read that fails part way is retried whole, from the same position
 	now := time.Now()
@@ -79,7 +100,7 @@ func (t *Tail) Next() ([]*model.Message, error) {
 		t.holes[id] = now
 	}
 	t.cursor = cursor
-	return messages, nil
+	return messages, count == tailPageSize, nil
 }
 
 // addHoles records the row ids between from and to (both exclusive) as holes

@@ -2128,6 +2128,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Link attachments in email notifications, including the file name and when the link expires ([#672](https://github.com/binwiederhier/ntfy/issues/672), thanks to [@merspieler](https://github.com/merspieler) for suggesting)
 
+* Support SMTP servers that only offer LOGIN auth (e.g. OVH, Outlook) for sending emails ([#930](https://github.com/binwiederhier/ntfy/issues/930)/[#1530](https://github.com/binwiederhier/ntfy/pull/1530), thanks to [@wunter8](https://github.com/wunter8) for reporting and [@santanoce](https://github.com/santanoce) for the initial implementation)
+
 **Bug fixes + maintenance:**
 
 * Fix `Dockerfile-build` failing to build: use Go 1.26 and add the `cluster` package ([#1962](https://github.com/binwiederhier/ntfy/issues/1962), thanks to [@ElectricTea](https://github.com/ElectricTea) for reporting)

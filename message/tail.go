@@ -47,13 +47,22 @@ func (t *Tail) Next() ([]*model.Message, error) {
 	return messages, nil
 }
 
-// nextPage reads one page; true if it was full, so more may be waiting
+// nextPage reads one page of rows: those after the cursor, plus the holes (row ids skipped
+// earlier because they were not committed yet). It returns the published messages among them, and
+// true if the page was full, so more may be waiting. For each row:
+//   - a hole that is now visible is "filled": it is removed from the holes
+//   - a row after the cursor moves the cursor to it; the ids it jumped over are "skipped", and
+//     become holes
+//
+// Example: cursor 103, holes {104}; the page returns rows 104, 105 and 108. Row 104 fills its
+// hole, 105 moves the cursor, and 108 moves it again, skipping 106 and 107. Afterwards: cursor
+// 108, holes {106, 107}. Nothing changes if the read fails part way, so it is retried whole.
 func (t *Tail) nextPage() ([]*model.Message, bool, error) {
 	holes := make([]int64, 0, len(t.holes))
 	for id := range t.holes {
 		holes = append(holes, id)
 	}
-	holesJSON, err := json.Marshal(holes)
+	holesJSON, err := json.Marshal(holes) // One parameter for any number of holes, so the statement text never changes
 	if err != nil {
 		return nil, false, err
 	}
@@ -62,9 +71,9 @@ func (t *Tail) nextPage() ([]*model.Message, bool, error) {
 		return nil, false, err
 	}
 	defer rows.Close()
-	cursor, count := t.cursor, 0
-	filled, skipped := make([]int64, 0), make([]int64, 0)
-	messages := make([]*model.Message, 0)
+	cursor, count := t.cursor, 0                          // Applied to t only once the whole page was read
+	filled, skipped := make([]int64, 0), make([]int64, 0) // Holes now visible; row ids jumped over (new holes)
+	messages := make([]*model.Message, 0)                 // Published messages, in row id order
 	for rows.Next() {
 		m, rowID, published, err := readTailRow(rows)
 		if err != nil {

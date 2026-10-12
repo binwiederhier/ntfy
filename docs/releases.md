@@ -2148,6 +2148,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.30.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Write user stats (messages, emails, calls) as increments, so servers sharing one database add up instead of overwriting each other's counts ([#1989](https://github.com/binwiederhier/ntfy/pull/1989))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

@@ -2148,6 +2148,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.30.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Write user stats (messages, emails, calls) as increments, so servers sharing one database add up instead of overwriting each other's counts ([#1989](https://github.com/binwiederhier/ntfy/pull/1989))
+* Don't add a visitor's anonymous usage to an account's stats when the account takes over that visitor, e.g. right after upgrading ([#2041](https://github.com/binwiederhier/ntfy/pull/2041))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

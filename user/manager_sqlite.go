@@ -77,7 +77,7 @@ const (
 	sqliteUpdateUserRoleQuery           = `UPDATE user SET role = ? WHERE user = ?`
 	sqliteUpdateUserProvisionedQuery    = `UPDATE user SET provisioned = ? WHERE user = ?`
 	sqliteUpdateUserPrefsQuery          = `UPDATE user SET prefs = ? WHERE id = ?`
-	sqliteUpdateUserStatsQuery          = `UPDATE user SET stats_messages = ?, stats_emails = ?, stats_calls = ? WHERE id = ?`
+	sqliteUpdateUserStatsQuery          = `UPDATE user SET stats_messages = stats_messages + ?, stats_emails = stats_emails + ?, stats_calls = stats_calls + ? WHERE id = ?`
 	sqliteUpdateUserStatsResetAllQuery  = `UPDATE user SET stats_messages = 0, stats_emails = 0, stats_calls = 0`
 	sqliteUpdateUserTierQuery           = `UPDATE user SET tier_id = (SELECT id FROM tier WHERE code = ?) WHERE user = ?`
 	sqliteUpdateUserDeletedQuery        = `UPDATE user SET deleted = ? WHERE id = ?`

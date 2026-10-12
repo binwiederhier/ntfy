@@ -365,6 +365,12 @@ func (c *Cache) Message(id string) (*model.Message, error) {
 // Tail returns a tail that starts after the last message written so far. The gaps between the
 // last tailPageSize row ids start out as holes: a row id handed out but not committed yet, below
 // one that already is, must not be skipped.
+//
+// Example: the last row ids are 108, 106, 105 and 103. Walking them oldest first, 103 only sets
+// the cursor (the gap below the oldest is unknown), 105 adds hole 104, 106 adds nothing, and 108
+// adds hole 107. The tail starts at 108 with holes {104, 107}: if 107 was another node's write
+// that commits a moment later, the first read returns it; if 104 was rolled back, it never shows
+// up and the hole expires after tailHoleTimeout.
 func (c *Cache) Tail() (*Tail, error) {
 	rows, err := c.db.Primary().Query(c.queries.selectRecentRowIDs, tailPageSize)
 	if err != nil {

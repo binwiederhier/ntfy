@@ -6,11 +6,37 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.29.0 | Oct 7, 2026   |
+| ntfy server      | v2.30.0 | Oct 13, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.30.0
+Released October 13, 2026
+
+This release links attachments in email notifications, adds SMTP LOGIN auth (e.g. for OVH and Outlook), and fixes the
+PostgreSQL memory growth that came with v2.29.0. It also ships the first experimental version of clustering: several
+ntfy servers sharing one PostgreSQL database. Clustering is not ready for production yet.
+
+**Features:**
+
+* Link attachments in email notifications, including the file name and when the link expires ([#672](https://github.com/binwiederhier/ntfy/issues/672), thanks to [@merspieler](https://github.com/merspieler) for suggesting)
+* Support SMTP servers that only offer LOGIN auth (e.g. OVH, Outlook) for sending emails ([#930](https://github.com/binwiederhier/ntfy/issues/930)/[#1530](https://github.com/binwiederhier/ntfy/pull/1530), thanks to [@wunter8](https://github.com/wunter8) for reporting and [@santanoce](https://github.com/santanoce) for the initial implementation)
+* Experimental: run several ntfy servers as one cluster that shares a PostgreSQL database, enabled with `experimental-cluster-listen`; this is not ready for production yet ([#2005](https://github.com/binwiederhier/ntfy/pull/2005), [#2008](https://github.com/binwiederhier/ntfy/pull/2008), [#2012](https://github.com/binwiederhier/ntfy/pull/2012), [#2013](https://github.com/binwiederhier/ntfy/pull/2013))
+
+**Bug fixes + maintenance:**
+
+* Fix `Dockerfile-build` failing to build: use Go 1.26 and add the `cluster` package ([#1962](https://github.com/binwiederhier/ntfy/issues/1962), thanks to [@ElectricTea](https://github.com/ElectricTea) for reporting)
+* Set the `org.opencontainers.image.version` label on release Docker images ([#1921](https://github.com/binwiederhier/ntfy/issues/1921)/[#1936](https://github.com/binwiederhier/ntfy/pull/1936), thanks to [@Plazzmex](https://github.com/Plazzmex) for reporting and [@w1977-0](https://github.com/w1977-0) for the fix)
+* Warn at startup if `attachment-expiry-duration` is longer than `cache-duration`, since attachments never outlive their message ([#1053](https://github.com/binwiederhier/ntfy/issues/1053), thanks to [@ctschach](https://github.com/ctschach) for reporting)
+* Fix PostgreSQL memory growth after v2.29.0: write message batches with one fixed `INSERT` for any batch size ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
+* CLI: fix `ntfy publish` failing with "invalid header field value" when sending a multi-line message or title along with a file ([#1808](https://github.com/binwiederhier/ntfy/issues/1808), thanks to [@quantenzitrone](https://github.com/quantenzitrone) for reporting)
+* Web app: fix an updated message showing next to its old version when the update arrived via the background poll instead of live ([#2010](https://github.com/binwiederhier/ntfy/pull/2010))
+
+**Documentation:**
+
+* Document recommended PostgreSQL pool settings for busy servers ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
 
 ### ntfy server v2.29.0
 Released October 7, 2026
@@ -2121,27 +2147,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.29.1 (UNRELEASED)
-
-**Features:**
-
-* Link attachments in email notifications, including the file name and when the link expires ([#672](https://github.com/binwiederhier/ntfy/issues/672), thanks to [@merspieler](https://github.com/merspieler) for suggesting)
-
-* Support SMTP servers that only offer LOGIN auth (e.g. OVH, Outlook) for sending emails ([#930](https://github.com/binwiederhier/ntfy/issues/930)/[#1530](https://github.com/binwiederhier/ntfy/pull/1530), thanks to [@wunter8](https://github.com/wunter8) for reporting and [@santanoce](https://github.com/santanoce) for the initial implementation)
-
-**Bug fixes + maintenance:**
-
-* Fix `Dockerfile-build` failing to build: use Go 1.26 and add the `cluster` package ([#1962](https://github.com/binwiederhier/ntfy/issues/1962), thanks to [@ElectricTea](https://github.com/ElectricTea) for reporting)
-* Set the `org.opencontainers.image.version` label on release Docker images ([#1921](https://github.com/binwiederhier/ntfy/issues/1921)/[#1936](https://github.com/binwiederhier/ntfy/pull/1936), thanks to [@Plazzmex](https://github.com/Plazzmex) for reporting and [@w1977-0](https://github.com/w1977-0) for the fix)
-* Warn at startup if `attachment-expiry-duration` is longer than `cache-duration`, since attachments never outlive their message ([#1053](https://github.com/binwiederhier/ntfy/issues/1053), thanks to [@ctschach](https://github.com/ctschach) for reporting)
-* Fix PostgreSQL memory growth after v2.29.0: write message batches with one fixed `INSERT` for any batch size ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
-* CLI: fix `ntfy publish` failing with "invalid header field value" when sending a multi-line message or title along with a file ([#1808](https://github.com/binwiederhier/ntfy/issues/1808), thanks to [@quantenzitrone](https://github.com/quantenzitrone) for reporting)
-* Web app: fix an updated message showing next to its old version when the update arrived via the background poll instead of live ([#2010](https://github.com/binwiederhier/ntfy/pull/2010))
-
-**Documentation:**
-
-* Document recommended PostgreSQL pool settings for busy servers ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

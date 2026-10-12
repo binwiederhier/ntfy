@@ -17,8 +17,7 @@ Released October 13, 2026
 
 This release links attachments in email notifications, adds SMTP LOGIN auth (e.g. for OVH and Outlook), and fixes the
 PostgreSQL memory growth that came with v2.29.0. It also ships the first experimental version of clustering: several
-ntfy servers sharing one PostgreSQL database. Clustering is not ready for production yet. The message database schema
-changes in this release, so please read the upgrade notes before downgrading.
+ntfy servers sharing one PostgreSQL database. Clustering is not ready for production yet.
 
 **Features:**
 
@@ -34,10 +33,6 @@ changes in this release, so please read the upgrade notes before downgrading.
 * Fix PostgreSQL memory growth after v2.29.0: write message batches with one fixed `INSERT` for any batch size ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
 * CLI: fix `ntfy publish` failing with "invalid header field value" when sending a multi-line message or title along with a file ([#1808](https://github.com/binwiederhier/ntfy/issues/1808), thanks to [@quantenzitrone](https://github.com/quantenzitrone) for reporting)
 * Web app: fix an updated message showing next to its old version when the update arrived via the background poll instead of live ([#2010](https://github.com/binwiederhier/ntfy/pull/2010))
-
-**Upgrade notes:**
-
-* This release changes the message database schema (version 15 to 16). Downgrading to v2.29.0 afterwards requires setting the version back by hand first: `UPDATE schema_version SET version = 15 WHERE store = 'message'` on PostgreSQL, or `UPDATE schemaVersion SET version = 15 WHERE id = 1` in the SQLite `cache-file`
 
 **Documentation:**
 

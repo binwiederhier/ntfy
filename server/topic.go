@@ -135,25 +135,39 @@ func (t *topic) Publish(v *visitor, m *model.Message) error {
 	return nil
 }
 
-// PublishMissed asynchronously publishes a message the tail read from the cache to the
-// subscribers that did not get it: all of them if it never went out here (its fan-out was lost),
-// or those that subscribed after it went out (they were reconnecting and their read missed it).
-// It returns how many subscribers it went to.
-func (t *topic) PublishMissed(v *visitor, m *model.Message) int {
+// PublishMissed asynchronously publishes messages the tail read from the cache to the
+// subscribers that did not get them: all of them if a message never went out here (its fan-out
+// was lost), or those that subscribed after it went out (they were reconnecting and their read
+// missed it). It returns how many sends it made.
+func (t *topic) PublishMissed(messages []*model.Message, visitorFor func(m *model.Message) *visitor) int {
 	t.mu.Lock()
-	at, ok := t.delivered[m.ID]
-	subscribers := make([]subscriber, 0)
-	for _, s := range t.subscribers {
-		if !ok || !s.since.Before(at) {
-			subscribers = append(subscribers, s.subscriber)
+	missed := make(map[*topicSubscriber][]*model.Message)
+	for _, m := range messages {
+		at, ok := t.delivered[m.ID]
+		for _, s := range t.subscribers {
+			if !ok || !s.since.Before(at) {
+				missed[s] = append(missed[s], m)
+			}
 		}
+		t.rememberDeliveredNoLock(m.ID)
 	}
-	t.rememberDeliveredNoLock(m.ID)
 	t.mu.Unlock()
-	if len(subscribers) > 0 {
-		t.send(v, m, subscribers)
+	sends := 0
+	for s, subscriberMessages := range missed {
+		sends += len(subscriberMessages)
+		// One Go routine per subscriber, sending in write order: a reconnect asks for what came
+		// after the last message the client got, so a later one must not overtake an earlier one
+		go func(s subscriber, subscriberMessages []*model.Message) {
+			for _, m := range subscriberMessages {
+				v := visitorFor(m)
+				if err := s(v, m); err != nil {
+					logvm(v, m).Tag(tagPublish).Err(err).Warn("Error forwarding missed message to subscriber")
+					return // The connection is broken, so the rest would fail too
+				}
+			}
+		}(s.subscriber, subscriberMessages)
 	}
-	return len(subscribers)
+	return sends
 }
 
 func (t *topic) send(v *visitor, m *model.Message, subscribers []subscriber) {

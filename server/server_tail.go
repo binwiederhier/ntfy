@@ -6,6 +6,7 @@ import (
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/metrics"
+	"heckel.io/ntfy/v2/model"
 )
 
 const (
@@ -29,14 +30,25 @@ func (s *Server) runTail(tail *message.Tail) {
 			continue
 		}
 		metrics.TailMessagesRead.Add(float64(len(messages)))
-		for _, m := range messages {
-			s.mu.RLock()
-			t, ok := s.topics[m.Topic]
-			s.mu.RUnlock()
-			if ok {
-				v := s.visitor(m.Sender, nil) // Like deliverFromBus; logging a failed send needs it
-				metrics.TailMessagesMissed.Add(float64(t.PublishMissed(v, m)))
-			}
+		s.publishMissed(messages)
+	}
+}
+
+// publishMissed hands the messages to their topics, in write order per topic
+func (s *Server) publishMissed(messages []*model.Message) {
+	byTopic := make(map[string][]*model.Message)
+	for _, m := range messages {
+		byTopic[m.Topic] = append(byTopic[m.Topic], m)
+	}
+	visitorFor := func(m *model.Message) *visitor {
+		return s.visitor(m.Sender, nil) // Like deliverFromBus; logging a failed send needs it
+	}
+	for topicID, topicMessages := range byTopic {
+		s.mu.RLock()
+		t, ok := s.topics[topicID]
+		s.mu.RUnlock()
+		if ok {
+			metrics.TailMessagesMissed.Add(float64(t.PublishMissed(topicMessages, visitorFor)))
 		}
 	}
 }

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"fmt"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -99,9 +101,9 @@ func TestTopic_PublishMissed_OnlyToSubscribersThatMissedIt(t *testing.T) {
 	waitFor(t, func() bool { return early.Load() == 1 })
 
 	to.Subscribe(countingSubscriber(&late), "", func() {}) // Joined after the live delivery
-	to.PublishMissed(nil, m)
+	to.PublishMissed([]*model.Message{m}, noVisitor)
 	waitFor(t, func() bool { return late.Load() == 1 })
-	to.PublishMissed(nil, m) // Caught up already
+	to.PublishMissed([]*model.Message{m}, noVisitor) // Caught up already
 	time.Sleep(200 * time.Millisecond)
 	require.Equal(t, int32(1), early.Load())
 	require.Equal(t, int32(1), late.Load())
@@ -113,7 +115,7 @@ func TestTopic_Publish_SkipsWhatWasDeliveredAlready(t *testing.T) {
 	var count atomic.Int32
 	to.Subscribe(countingSubscriber(&count), "", func() {})
 	m := model.NewDefaultMessage("mytopic", "hi")
-	to.PublishMissed(nil, m)
+	to.PublishMissed([]*model.Message{m}, noVisitor)
 	waitFor(t, func() bool { return count.Load() == 1 })
 	require.Nil(t, to.Publish(nil, m))
 	time.Sleep(200 * time.Millisecond)
@@ -125,4 +127,37 @@ func countingSubscriber(count *atomic.Int32) subscriber {
 		count.Add(1)
 		return nil
 	}
+}
+
+func TestTopic_PublishMissed_InWriteOrder(t *testing.T) {
+	// A reconnect asks for what came after the last message the client got, so the client must
+	// get the tail's messages in the order they were written
+	to := newTopic("mytopic")
+	var mu sync.Mutex
+	received := make([]string, 0)
+	to.Subscribe(func(_ *visitor, m *model.Message) error {
+		mu.Lock()
+		defer mu.Unlock()
+		received = append(received, m.Message)
+		return nil
+	}, "", func() {})
+	messages := make([]*model.Message, 0)
+	expected := make([]string, 0)
+	for i := 0; i < 100; i++ {
+		messages = append(messages, model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i)))
+		expected = append(expected, fmt.Sprintf("message %d", i))
+	}
+	require.Equal(t, 100, to.PublishMissed(messages, noVisitor))
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(received) == 100
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, expected, received)
+}
+
+func noVisitor(_ *model.Message) *visitor {
+	return nil
 }

@@ -89,3 +89,40 @@ func TestTopic_Subscribe_DuplicateID(t *testing.T) {
 	require.NotEqual(t, id, a)
 	require.Equal(t, "b", res.userID, "b")
 }
+
+func TestTopic_PublishMissed_OnlyToSubscribersThatMissedIt(t *testing.T) {
+	to := newTopic("mytopic")
+	var early, late atomic.Int32
+	to.Subscribe(countingSubscriber(&early), "", func() {})
+	m := model.NewDefaultMessage("mytopic", "hi")
+	require.Nil(t, to.Publish(nil, m))
+	waitFor(t, func() bool { return early.Load() == 1 })
+
+	to.Subscribe(countingSubscriber(&late), "", func() {}) // Joined after the live delivery
+	to.PublishMissed(nil, m)
+	waitFor(t, func() bool { return late.Load() == 1 })
+	to.PublishMissed(nil, m) // Caught up already
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, int32(1), early.Load())
+	require.Equal(t, int32(1), late.Load())
+}
+
+func TestTopic_Publish_SkipsWhatWasDeliveredAlready(t *testing.T) {
+	// The tail found the message first, then the fan-out from the peer arrived
+	to := newTopic("mytopic")
+	var count atomic.Int32
+	to.Subscribe(countingSubscriber(&count), "", func() {})
+	m := model.NewDefaultMessage("mytopic", "hi")
+	to.PublishMissed(nil, m)
+	waitFor(t, func() bool { return count.Load() == 1 })
+	require.Nil(t, to.Publish(nil, m))
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, int32(1), count.Load())
+}
+
+func countingSubscriber(count *atomic.Int32) subscriber {
+	return func(_ *visitor, _ *model.Message) error {
+		count.Add(1)
+		return nil
+	}
+}

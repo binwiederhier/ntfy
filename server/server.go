@@ -77,6 +77,7 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
+	tailClose         chan struct{} // Stops runTail; nil without a message cache
 	stopOnce          sync.Once
 	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex
@@ -352,6 +353,14 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	if conf.CacheDuration > 0 {
+		tail, err := messageCache.Tail()
+		if err != nil {
+			return nil, err
+		}
+		s.tailClose = make(chan struct{})
+		go s.runTail(tail)
+	}
 	return s, nil
 }
 
@@ -538,6 +547,9 @@ func (s *Server) stop() {
 	}
 	if s.httpClusterServer != nil {
 		s.httpClusterServer.Close()
+	}
+	if s.tailClose != nil {
+		close(s.tailClose) // Before the databases close under it
 	}
 	s.closeDatabases()
 	if s.ban != nil {
@@ -1845,6 +1857,7 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	if since.IsNone() {
 		return nil
 	}
+	since = s.clusterSince(since)
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {

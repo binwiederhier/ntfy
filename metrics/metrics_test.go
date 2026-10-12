@@ -36,6 +36,8 @@ var expectedMetricNames = []string{
 	"ntfy_messages_published_failure",
 	"ntfy_messages_published_success",
 	"ntfy_subscribers_total",
+	"ntfy_tail_messages_missed_total",
+	"ntfy_tail_messages_read_total",
 	"ntfy_topics_total",
 	"ntfy_unifiedpush_published_success",
 	"ntfy_users_total",

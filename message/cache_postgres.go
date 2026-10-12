@@ -55,6 +55,16 @@ const (
 		  AND (id > $2 OR published = FALSE)
 		ORDER BY time DESC, id DESC
 	`
+	postgresSelectMaxRowIDQuery = `SELECT COALESCE(MAX(id), 0) FROM message`
+	// postgresSelectMessagesAfterRowIDQuery reads rows in write order: those after the cursor ($1),
+	// plus the skipped row ids ($2, a JSON array) that were not committed yet when the cursor passed
+	postgresSelectMessagesAfterRowIDQuery = `
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, id, published
+		FROM message
+		WHERE id > $1 OR id = ANY(ARRAY(SELECT jsonb_array_elements_text($2::JSONB)::BIGINT))
+		ORDER BY id
+		LIMIT $3
+	`
 	postgresSelectMessagesLatestQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
@@ -114,6 +124,8 @@ var postgresQueries = queries{
 	selectMessageRowID:               postgresSelectMessageRowIDQuery,
 	selectMessagesSinceID:            postgresSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
+	selectMaxRowID:                   postgresSelectMaxRowIDQuery,
+	selectMessagesAfterRowID:         postgresSelectMessagesAfterRowIDQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,
 	selectMessagesDue:                postgresSelectMessagesDueQuery,
 	claimMessagesDue:                 postgresClaimMessagesDueQuery,

@@ -55,6 +55,8 @@ type queries struct {
 	selectMessageRowID               string
 	selectMessagesSinceID            string
 	selectMessagesSinceIDScheduled   string
+	selectMaxRowID                   string
+	selectMessagesAfterRowID         string
 	selectMessagesLatest             string
 	selectMessagesDue                string
 	claimMessagesDue                 string // Postgres-only: claims due rows and stamps claimed_at; empty for SQLite/mem
@@ -617,11 +619,12 @@ func readMessages(rows *sql.Rows) ([]*model.Message, error) {
 	return messages, nil
 }
 
-func readMessage(rows *sql.Rows) (*model.Message, error) {
+// readMessage reads one message row; extra receives the columns selected after the message columns
+func readMessage(rows *sql.Rows, extra ...any) (*model.Message, error) {
 	var timestamp, expires, attachmentSize, attachmentExpires int64
 	var priority int
 	var id, sequenceID, event, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, contentType, encoding string
-	err := rows.Scan(
+	dest := []any{
 		&id,
 		&sequenceID,
 		&timestamp,
@@ -644,8 +647,8 @@ func readMessage(rows *sql.Rows) (*model.Message, error) {
 		&user,
 		&contentType,
 		&encoding,
-	)
-	if err != nil {
+	}
+	if err := rows.Scan(append(dest, extra...)...); err != nil {
 		return nil, err
 	}
 	var tags []string

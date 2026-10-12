@@ -96,6 +96,12 @@ var (
 	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_leader",
 	})
+	TailMessagesRead = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_tail_messages_read_total",
+	})
+	TailMessagesMissed = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_tail_messages_missed_total", // Sent by the tail, per subscriber that had missed it
+	})
 )
 
 // init registers all collectors with the default Prometheus registry. Registration is
@@ -126,6 +132,8 @@ func init() {
 		ClusterQueueDropped,
 		ClusterMessagesWasted,
 		ClusterLeader,
+		TailMessagesRead,
+		TailMessagesMissed,
 		Visitors,
 		Users,
 		Subscribers,

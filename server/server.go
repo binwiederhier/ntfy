@@ -1865,7 +1865,11 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
-		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, sinceFor(t), scheduled, s.config.MessagePollSizeLimit)
+		topicSince, err := sinceFor(t)
+		if err != nil {
+			return err
+		}
+		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, topicSince, scheduled, s.config.MessagePollSizeLimit)
 		if err != nil {
 			return err
 		}

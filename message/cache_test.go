@@ -1281,4 +1281,10 @@ func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
 	messages, err = combined.Messages("mytopic", model.NewSinceID(m4.ID), false)
 	require.Nil(t, err)
 	require.Equal(t, []string{"m5"}, bodies(messages))
+
+	// A recent time-based replay (the fallback for a marker the cache does not know) reads the
+	// primary for the same reason; an old one is served by the replica as before
+	messages, err = combined.Messages("mytopic", model.NewSinceTime(time.Now().Unix()-30), false)
+	require.Nil(t, err)
+	require.Equal(t, []string{"m1", "m2", "m3", "m4", "m5"}, bodies(messages))
 }

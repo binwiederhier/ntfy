@@ -125,7 +125,9 @@ func TestServer_Tail_UnwrittenMarkerReplaysFromItsDeliveryHere(t *testing.T) {
 
 		rr := httptest.NewRecorder()
 		cancel := subscribe(t, s, "/mytopic/json?since="+marker.ID, rr)
-		time.Sleep(3 * time.Second) // Longer than the wait for an unwritten marker
+		time.Sleep(500 * time.Millisecond) // Not the wait for an unwritten marker: the topic knows it, so no waiting
+		require.GreaterOrEqual(t, countMessages(t, rr)["later"], 1)
+		time.Sleep(2 * time.Second)
 		cancel()
 		counts := countMessages(t, rr)
 		require.Equal(t, 0, counts["older"])

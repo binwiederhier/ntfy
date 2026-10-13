@@ -72,22 +72,29 @@ func tailLag(messages []*model.Message, now time.Time) time.Duration {
 // sinceForTopics returns the replay marker to use per topic. A since=<id> marker that is not
 // in the cache was not written yet (the node that accepted it may be cut off from the database,
 // its write hanging) or has expired. If the message went out on this node, the replay starts a
-// little before then; otherwise it is the topic's whole history, as it always was.
-func (s *Server) sinceForTopics(since model.SinceMarker) (func(t *topic) model.SinceMarker, error) {
+// little before then, right away: waiting for the write, and polling the database meanwhile,
+// is what made a fenced node's clients a database storm. Only a marker nobody here knows is
+// waited for, and replays the topic's whole history if it never shows up, as it always did.
+func (s *Server) sinceForTopics(since model.SinceMarker) (func(t *topic) (model.SinceMarker, error), error) {
+	asIs := func(*topic) (model.SinceMarker, error) { return since, nil }
 	if !since.IsID() {
-		return func(*topic) model.SinceMarker { return since }, nil
+		return asIs, nil
 	}
-	written, err := s.messageCache.MarkerWritten(since.ID())
+	written, err := s.messageCache.MarkerWritten(since.ID(), false)
 	if err != nil {
 		return nil, err
 	}
 	if written {
-		return func(*topic) model.SinceMarker { return since }, nil
+		return asIs, nil
 	}
-	return func(t *topic) model.SinceMarker {
+	return func(t *topic) (model.SinceMarker, error) {
 		if at, ok := t.DeliveredAt(since.ID()); ok {
-			return model.NewSinceTime(at.Add(-unwrittenMarkerMargin).Unix())
+			return model.NewSinceTime(at.Add(-unwrittenMarkerMargin).Unix()), nil
 		}
-		return model.SinceAllMessages
+		written, err := s.messageCache.MarkerWritten(since.ID(), true)
+		if err != nil || written {
+			return since, err
+		}
+		return model.SinceAllMessages, nil
 	}, nil
 }

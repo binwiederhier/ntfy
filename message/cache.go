@@ -43,6 +43,7 @@ const (
 
 const (
 	markerWaitMargin   = time.Second            // On top of the batch timeout: another node's batch, and its fan-out linger
+	recentReplayWindow = time.Minute            // A time-based replay from this close to now reads the primary (see messagesSinceTime)
 	markerWaitInterval = 250 * time.Millisecond // How often an unwritten marker is looked up again; bounds what a mass reconnect costs
 )
 
@@ -244,10 +245,16 @@ func (c *Cache) MessagesCapped(topic string, since model.SinceMarker, scheduled 
 	return c.messagesSinceTime(topic, since, scheduled, maxBytes)
 }
 
+// messagesSinceTime reads a time-based replay. A recent one (the fallback for a since=<id>
+// marker the cache does not know yet) reads the primary: what a lagging replica lacks went out
+// live before the client arrived, so the tail does not resend it either.
 func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
 	var rows *sql.Rows
 	var err error
 	rdb := c.db.ReadOnly()
+	if time.Since(since.Time()) < recentReplayWindow {
+		rdb = c.db.Primary()
+	}
 	if scheduled {
 		rows, err = rdb.Query(c.queries.selectMessagesSinceTimeScheduled, topic, since.Time().Unix())
 	} else {
@@ -280,9 +287,13 @@ func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled
 	return readMessagesCapped(rows, maxBytes)
 }
 
-// MarkerWritten reports whether a since=<mid> marker is in the cache, waiting for a short while
-// if it is not yet (see resolveMarker)
-func (c *Cache) MarkerWritten(mid string) (bool, error) {
+// MarkerWritten reports whether a since=<mid> marker is in the cache. With wait, a marker that
+// is not yet is looked up again for a short while (see resolveMarker); one lookup otherwise.
+func (c *Cache) MarkerWritten(mid string, wait bool) (bool, error) {
+	if !wait {
+		rowID, _, _, err := c.resolveMarkerOnce(mid)
+		return rowID != 0, err
+	}
 	rowID, _, _, err := c.resolveMarker(mid)
 	return rowID != 0, err
 }

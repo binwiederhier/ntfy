@@ -41,6 +41,11 @@ const (
 	insertMessageColumns = 24
 )
 
+const (
+	markerWaitMargin   = time.Second            // On top of the batch timeout: another node's batch, and its fan-out linger
+	markerWaitInterval = 100 * time.Millisecond // How often an unwritten marker is looked up again
+)
+
 var errNoRows = errors.New("no rows found")
 
 // queries holds the database-specific SQL queries
@@ -84,6 +89,7 @@ type Cache struct {
 	// claimTimeout is how long this node's claim on a due message holds off the others; it is a
 	// field only so tests can shorten it
 	claimTimeout time.Duration
+	markerWait   time.Duration // How long a since=<id> lookup waits for a marker that is not written yet
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
@@ -99,6 +105,7 @@ func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTi
 		mu:           mu,
 		queries:      queries,
 		claimTimeout: claimTimeout,
+		markerWait:   batchTimeout + markerWaitMargin,
 	}
 	go c.processMessageBatches()
 	return c
@@ -252,17 +259,21 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 	return readMessagesCapped(rows, maxBytes)
 }
 
+// messagesSinceID returns the messages after the marker: those with a higher row id, and those
+// published in the marker's second or later with a lower row id. The latter exist in a cluster,
+// where nodes write their batches independently (and late, when one is cut off from the
+// database), so a client whose marker was written late would otherwise never get them.
 func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
-	rowID, err := c.resolveMessageRowID(since.ID())
+	rowID, markerTime, err := c.resolveMarker(since.ID())
 	if err != nil {
 		return nil, false, err
 	}
 	var rows *sql.Rows
 	rdb := c.db.ReadOnly()
 	if scheduled {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, rowID)
+		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, rowID, markerTime)
 	} else {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, rowID)
+		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, rowID, markerTime)
 	}
 	if err != nil {
 		return nil, false, err
@@ -270,33 +281,46 @@ func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled
 	return readMessagesCapped(rows, maxBytes)
 }
 
-// resolveMessageRowID resolves a since=<mid> marker to the row id used as the replay cut-off.
-// It asks the replica first and, only if the mid is unknown there, the primary: a client that
-// reconnects right after receiving a message can be ahead of replication, and without the retry
-// its unknown mid resolved to 0 and replayed the topic's entire retained history. A mid unknown
-// to the primary as well (e.g. expired) returns 0, which deliberately keeps that full replay.
-func (c *Cache) resolveMessageRowID(mid string) (int64, error) {
-	rdb := c.db.ReadOnly()
-	rowID, err := c.resolveMessageRowIDOn(rdb, mid)
-	if err != nil {
-		return 0, err
+// resolveMarker resolves a since=<mid> marker to its row id and time, the replay cut-offs. A
+// client that reconnects right after receiving a message has a marker that is not written yet
+// (it is in a write batch, maybe on another node), so an unknown marker is looked up again for up
+// to markerWait. A marker unknown after that (e.g. expired) resolves to 0, 0, which deliberately
+// replays the topic's entire retained history.
+func (c *Cache) resolveMarker(mid string) (int64, int64, error) {
+	deadline := time.Now().Add(c.markerWait)
+	for {
+		rowID, markerTime, err := c.resolveMarkerOnce(mid)
+		if err != nil || rowID != 0 || time.Now().After(deadline) {
+			return rowID, markerTime, err
+		}
+		time.Sleep(markerWaitInterval)
 	}
-	if rowID == 0 && rdb != c.db.Primary() {
-		return c.resolveMessageRowIDOn(c.db.Primary(), mid)
-	}
-	return rowID, nil
 }
 
-// resolveMessageRowIDOn looks the mid up on one database handle; 0 means unknown
-func (c *Cache) resolveMessageRowIDOn(h *sql.DB, mid string) (int64, error) {
-	var rowID int64
-	err := h.QueryRow(c.queries.selectMessageRowID, mid).Scan(&rowID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, nil
-	} else if err != nil {
-		return 0, err
+// resolveMarkerOnce asks the replica first and, only if the mid is unknown there, the primary: a
+// client that reconnects right after receiving a message can be ahead of replication
+func (c *Cache) resolveMarkerOnce(mid string) (int64, int64, error) {
+	rdb := c.db.ReadOnly()
+	rowID, markerTime, err := c.resolveMarkerOn(rdb, mid)
+	if err != nil {
+		return 0, 0, err
 	}
-	return rowID, nil
+	if rowID == 0 && rdb != c.db.Primary() {
+		return c.resolveMarkerOn(c.db.Primary(), mid)
+	}
+	return rowID, markerTime, nil
+}
+
+// resolveMarkerOn looks the mid up on one database handle; 0 means unknown
+func (c *Cache) resolveMarkerOn(h *sql.DB, mid string) (int64, int64, error) {
+	var rowID, markerTime int64
+	err := h.QueryRow(c.queries.selectMessageRowID, mid).Scan(&rowID, &markerTime)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, nil
+	} else if err != nil {
+		return 0, 0, err
+	}
+	return rowID, markerTime, nil
 }
 
 func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {

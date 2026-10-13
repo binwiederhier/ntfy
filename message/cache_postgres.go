@@ -39,12 +39,12 @@ const (
 		WHERE topic = $1 AND time >= $2
 		ORDER BY time DESC, id DESC
 	`
-	postgresSelectMessageRowIDQuery    = `SELECT id FROM message WHERE mid = $1 LIMIT 1`
+	postgresSelectMessageRowIDQuery    = `SELECT id, time FROM message WHERE mid = $1 LIMIT 1`
 	postgresSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE topic = $1
-		  AND id > $2
+		  AND (id > $2 OR (time >= $3 AND id <> $2))
 		  AND published = TRUE
 		ORDER BY time DESC, id DESC
 	`
@@ -52,7 +52,7 @@ const (
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM message
 		WHERE topic = $1
-		  AND (id > $2 OR published = FALSE)
+		  AND (id > $2 OR (time >= $3 AND id <> $2) OR published = FALSE)
 		ORDER BY time DESC, id DESC
 	`
 	postgresSelectRecentRowIDsQuery = `SELECT id FROM message ORDER BY id DESC LIMIT $1`

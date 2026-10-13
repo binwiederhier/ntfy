@@ -43,7 +43,7 @@ const (
 
 const (
 	markerWaitMargin   = time.Second            // On top of the batch timeout: another node's batch, and its fan-out linger
-	markerWaitInterval = 100 * time.Millisecond // How often an unwritten marker is looked up again
+	markerWaitInterval = 250 * time.Millisecond // How often an unwritten marker is looked up again; bounds what a mass reconnect costs
 )
 
 var errNoRows = errors.New("no rows found")

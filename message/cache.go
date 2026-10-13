@@ -264,12 +264,11 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 // where nodes write their batches independently (and late, when one is cut off from the
 // database), so a client whose marker was written late would otherwise never get them.
 func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
-	rowID, markerTime, err := c.resolveMarker(since.ID())
+	rowID, markerTime, rdb, err := c.resolveMarker(since.ID())
 	if err != nil {
 		return nil, false, err
 	}
 	var rows *sql.Rows
-	rdb := c.db.ReadOnly()
 	if scheduled {
 		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, rowID, markerTime)
 	} else {
@@ -281,34 +280,37 @@ func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled
 	return readMessagesCapped(rows, maxBytes)
 }
 
-// resolveMarker resolves a since=<mid> marker to its row id and time, the replay cut-offs. A
-// client that reconnects right after receiving a message has a marker that is not written yet
-// (it is in a write batch, maybe on another node), so an unknown marker is looked up again for up
-// to markerWait. A marker unknown after that (e.g. expired) resolves to 0, 0, which deliberately
-// replays the topic's entire retained history.
-func (c *Cache) resolveMarker(mid string) (int64, int64, error) {
+// resolveMarker resolves a since=<mid> marker to its row id and time, the replay cut-offs, and
+// the database handle to read the replay from. A client that reconnects right after receiving a
+// message has a marker that is not written yet (it is in a write batch, maybe on another node),
+// so an unknown marker is looked up again for up to markerWait. A marker unknown after that
+// (e.g. expired) resolves to 0, 0, which deliberately replays the topic's entire retained history.
+func (c *Cache) resolveMarker(mid string) (int64, int64, *sql.DB, error) {
 	deadline := time.Now().Add(c.markerWait)
 	for {
-		rowID, markerTime, err := c.resolveMarkerOnce(mid)
+		rowID, markerTime, h, err := c.resolveMarkerOnce(mid)
 		if err != nil || rowID != 0 || time.Now().After(deadline) {
-			return rowID, markerTime, err
+			return rowID, markerTime, h, err
 		}
 		time.Sleep(markerWaitInterval)
 	}
 }
 
 // resolveMarkerOnce asks the replica first and, only if the mid is unknown there, the primary: a
-// client that reconnects right after receiving a message can be ahead of replication
-func (c *Cache) resolveMarkerOnce(mid string) (int64, int64, error) {
+// client that reconnects right after receiving a message can be ahead of replication. The replay
+// is then read from the primary as well: what the replica lacks went out live before the client
+// arrived, so the tail does not resend it either.
+func (c *Cache) resolveMarkerOnce(mid string) (int64, int64, *sql.DB, error) {
 	rdb := c.db.ReadOnly()
 	rowID, markerTime, err := c.resolveMarkerOn(rdb, mid)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, rdb, err
 	}
 	if rowID == 0 && rdb != c.db.Primary() {
-		return c.resolveMarkerOn(c.db.Primary(), mid)
+		rowID, markerTime, err = c.resolveMarkerOn(c.db.Primary(), mid)
+		return rowID, markerTime, c.db.Primary(), err
 	}
-	return rowID, markerTime, nil
+	return rowID, markerTime, rdb, nil
 }
 
 // resolveMarkerOn looks the mid up on one database handle; 0 means unknown

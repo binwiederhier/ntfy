@@ -1272,4 +1272,13 @@ func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
 	messages, err := combined.Messages("mytopic", model.NewSinceID(m4.ID), false)
 	require.Nil(t, err)
 	require.Len(t, messages, 0) // Correct cut-off via primary; the lagged replica has nothing newer
+
+	// A message after the marker that the replica does not have yet either: a reconnecting
+	// client must get it from the primary, since it went out live before the client arrived
+	// and the tail does not resend it
+	m5 := model.NewDefaultMessage("mytopic", "m5")
+	require.Nil(t, primaryOnly.AddMessage(m5))
+	messages, err = combined.Messages("mytopic", model.NewSinceID(m4.ID), false)
+	require.Nil(t, err)
+	require.Equal(t, []string{"m5"}, bodies(messages))
 }

@@ -280,6 +280,13 @@ func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled
 	return readMessagesCapped(rows, maxBytes)
 }
 
+// MarkerWritten reports whether a since=<mid> marker is in the cache, waiting for a short while
+// if it is not yet (see resolveMarker)
+func (c *Cache) MarkerWritten(mid string) (bool, error) {
+	rowID, _, _, err := c.resolveMarker(mid)
+	return rowID != 0, err
+}
+
 // resolveMarker resolves a since=<mid> marker to its row id and time, the replay cut-offs, and
 // the database handle to read the replay from. A client that reconnects right after receiving a
 // message has a marker that is not written yet (it is in a write batch, maybe on another node),

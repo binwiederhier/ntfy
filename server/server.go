@@ -1858,10 +1858,14 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	if since.IsNone() {
 		return nil
 	}
+	sinceFor, err := s.sinceForTopics(since)
+	if err != nil {
+		return err
+	}
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
-		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
+		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, sinceFor(t), scheduled, s.config.MessagePollSizeLimit)
 		if err != nil {
 			return err
 		}

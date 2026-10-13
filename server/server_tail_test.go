@@ -106,6 +106,33 @@ func TestServer_TailLag(t *testing.T) {
 	require.Equal(t, time.Duration(0), tailLag([]*model.Message{}, now))           // Nothing new: caught up
 }
 
+func TestServer_Tail_UnwrittenMarkerReplaysFromItsDeliveryHere(t *testing.T) {
+	// The client's marker is not in the cache: the node that accepted it is cut off from the
+	// database and its write hangs. This node saw the message go by (the fan-out still works),
+	// so it replays from then, not the topic's whole history.
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTailTestServer(t, newTestConfig(t, databaseURL))
+		older := model.NewDefaultMessage("mytopic", "older")
+		older.Time = time.Now().Unix() - 30
+		require.Nil(t, s.messageCache.AddMessages([]*model.Message{older}))
+		time.Sleep(1500 * time.Millisecond) // The tail passes "older" before anyone subscribes
+		topics, err := s.topicsFromIDs(nil, "mytopic")
+		require.Nil(t, err)
+		marker := model.NewDefaultMessage("mytopic", "marker")
+		require.Nil(t, topics[0].Publish(nil, marker)) // Went out here, never written
+		time.Sleep(100 * time.Millisecond)
+		publishAndWaitForWrite(t, s, "mytopic", "later")
+
+		rr := httptest.NewRecorder()
+		cancel := subscribe(t, s, "/mytopic/json?since="+marker.ID, rr)
+		time.Sleep(3 * time.Second) // Longer than the wait for an unwritten marker
+		cancel()
+		counts := countMessages(t, rr)
+		require.Equal(t, 0, counts["older"])
+		require.GreaterOrEqual(t, counts["later"], 1) // Twice at most: the read and the tail's resend window
+	})
+}
+
 func newTailTestServer(t *testing.T, conf *Config) *Server {
 	conf.CacheBatchSize = 0
 	conf.CacheBatchTimeout = 500 * time.Millisecond

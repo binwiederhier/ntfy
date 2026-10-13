@@ -76,6 +76,14 @@ func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscribe
 	return subscriberID
 }
 
+// DeliveredAt returns when the message went out to this topic's subscribers, if it did recently
+func (t *topic) DeliveredAt(id string) (time.Time, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	at, ok := t.delivered[id]
+	return at, ok
+}
+
 func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()

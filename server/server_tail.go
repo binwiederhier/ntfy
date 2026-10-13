@@ -13,6 +13,10 @@ const (
 	tagTail        = "tail"
 	tailInterval   = time.Second      // How often the tail reads what was written; bounds how late a missed message arrives
 	tailStaleAfter = 30 * time.Second // A tail that has not read for this long cannot stand in for the fan-out (see closeLocalSubscribers)
+
+	// unwrittenMarkerMargin is how far before an unwritten marker's delivery here its replay
+	// starts: the fan-out linger, and publish times having whole seconds (see sinceForTopics)
+	unwrittenMarkerMargin = 2 * time.Second
 )
 
 // runTail reads every message written to the cache, by any node, and sends it to the local
@@ -63,4 +67,27 @@ func tailLag(messages []*model.Message, now time.Time) time.Duration {
 		return 0
 	}
 	return now.Sub(time.Unix(newest, 0))
+}
+
+// sinceForTopics returns the replay marker to use per topic. A since=<id> marker that is not
+// in the cache was not written yet (the node that accepted it may be cut off from the database,
+// its write hanging) or has expired. If the message went out on this node, the replay starts a
+// little before then; otherwise it is the topic's whole history, as it always was.
+func (s *Server) sinceForTopics(since model.SinceMarker) (func(t *topic) model.SinceMarker, error) {
+	if !since.IsID() {
+		return func(*topic) model.SinceMarker { return since }, nil
+	}
+	written, err := s.messageCache.MarkerWritten(since.ID())
+	if err != nil {
+		return nil, err
+	}
+	if written {
+		return func(*topic) model.SinceMarker { return since }, nil
+	}
+	return func(t *topic) model.SinceMarker {
+		if at, ok := t.DeliveredAt(since.ID()); ok {
+			return model.NewSinceTime(at.Add(-unwrittenMarkerMargin).Unix())
+		}
+		return model.SinceAllMessages
+	}, nil
 }

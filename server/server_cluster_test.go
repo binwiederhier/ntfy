@@ -285,11 +285,38 @@ func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
 		t, ok := topics["mytopic"]
 		return ok && t.SubscribersCount() == 1
 	})
+	s.tailReadAt.Store(0) // The tail cannot read the database either: the subscribers would get nothing
 	s.closeLocalSubscribers()
 	select {
 	case <-done:
 	case <-time.After(3 * time.Second):
 		t.Fatal("subscriber connection still open")
+	}
+}
+
+func TestServer_Cluster_IsolatedNodeKeepsSubscribersWhileTheTailReads(t *testing.T) {
+	// Peers may have dropped this node, but as long as its tail reads the database its
+	// subscribers still get every message, a little late. Closing them would send them to
+	// nodes that are just as slow (a slow database is what makes heartbeats fail), in a storm.
+	s := newTestServer(t, newTestConfig(t, ""))
+	done := make(chan struct{})
+	go func() {
+		rr := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/mytopic/json", nil)
+		s.handle(rr, req)
+		close(done)
+	}()
+	waitFor(t, func() bool {
+		topics := topicsSnapshot(s)
+		t, ok := topics["mytopic"]
+		return ok && t.SubscribersCount() == 1
+	})
+	waitFor(t, func() bool { return s.tailReadAt.Load() > 0 })
+	s.closeLocalSubscribers()
+	select {
+	case <-done:
+		t.Fatal("subscriber connection closed although the tail reads")
+	case <-time.After(2 * time.Second):
 	}
 }
 

@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	tagTail      = "tail"
-	tailInterval = time.Second // How often the tail reads what was written; bounds how late a missed message arrives
+	tagTail        = "tail"
+	tailInterval   = time.Second      // How often the tail reads what was written; bounds how late a missed message arrives
+	tailStaleAfter = 30 * time.Second // A tail that has not read for this long cannot stand in for the fan-out (see closeLocalSubscribers)
 )
 
 // runTail reads every message written to the cache, by any node, and sends it to the local
@@ -29,6 +30,7 @@ func (s *Server) runTail(tail *message.Tail) {
 			log.Tag(tagTail).Err(err).Warn("Cannot read written messages")
 			continue
 		}
+		s.tailReadAt.Store(time.Now().Unix())
 		metrics.TailMessagesRead.Add(float64(len(messages)))
 		metrics.TailMessagesLagSeconds.Set(tailLag(messages, time.Now()).Seconds())
 		s.publishMissed(messages)

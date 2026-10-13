@@ -78,6 +78,7 @@ type Server struct {
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
 	tailClose         chan struct{} // Stops runTail; nil without a message cache
+	tailReadAt        atomic.Int64  // Unix time of the tail's last successful read; 0 before the first
 	stopOnce          sync.Once
 	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex

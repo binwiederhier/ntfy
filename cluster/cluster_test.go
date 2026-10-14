@@ -91,6 +91,23 @@ func TestNew_EnabledRequiresDatabase(t *testing.T) {
 	require.Contains(t, err.Error(), "database")
 }
 
+func TestNew_Role(t *testing.T) {
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.Role = ""
+	c, err := New(conf, pool, nil)
+	require.Nil(t, err)
+	defer c.Close()
+	require.Equal(t, RoleActive, c.Members()[0].Role) // Unset means active, like a node that predates roles
+
+	// A typo must not silently make a node half passive (never leading, but still fencing)
+	conf = newTestMeshConfig("node-b", "http://127.0.0.1:1")
+	conf.Role = "pasive"
+	_, err = New(conf, pool, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-role")
+}
+
 func TestDeliver_LineLimitBelowTheScanBufferIsEnforced(t *testing.T) {
 	// The configured limit is what the sender's own message size limit implies (MessageSizeLimit
 	// * 4 + 1024, so about 17KB for ntfy's default), which is well under bufio's buffer. A

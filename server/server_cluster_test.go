@@ -302,7 +302,7 @@ func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
 		t, ok := topics["mytopic"]
 		return ok && t.SubscribersCount() == 1
 	})
-	s.closeLocalSubscribers()
+	s.maybeCloseLocalSubscribers()
 	select {
 	case <-done:
 	case <-time.After(3 * time.Second):
@@ -328,7 +328,7 @@ func TestServer_Cluster_IsolatedNodeKeepsSubscribersWhileTheTailReads(t *testing
 		return ok && t.SubscribersCount() == 1
 	})
 	waitFor(t, func() bool { return !s.tail.LastRead().IsZero() })
-	s.closeLocalSubscribers()
+	s.maybeCloseLocalSubscribers()
 	select {
 	case <-done:
 		t.Fatal("subscriber connection closed although the tail reads")
@@ -337,7 +337,7 @@ func TestServer_Cluster_IsolatedNodeKeepsSubscribersWhileTheTailReads(t *testing
 }
 
 func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) {
-	// The mesh's isolation loop calls back into the server (closeLocalSubscribers, which takes
+	// The mesh's isolation loop calls back into the server (maybeCloseLocalSubscribers, which takes
 	// s.mu). Stop must not hold s.mu while it waits for that loop, or a callback already
 	// waiting for the lock deadlocks shutdown before the message cache is drained.
 	s, err := New(newTestConfig(t, ""))
@@ -363,7 +363,7 @@ func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) 
 		IsolatedFunc: func() {
 			once.Do(func() { close(entered) })
 			<-release
-			s.closeLocalSubscribers()
+			s.maybeCloseLocalSubscribers()
 		},
 	}, pool, func(*model.Message) {})
 	require.NoError(t, err)

@@ -17,7 +17,7 @@ import (
 // closing tens of thousands of connections then sends them to nodes that are just as slow, as
 // a reconnect storm that keeps the database slow.
 func (s *Server) closeLocalSubscribers() {
-	if readAt := s.tailReadAt.Load(); readAt > 0 && time.Since(time.Unix(readAt, 0)) < tailStaleAfter {
+	if s.tail != nil && time.Since(s.tail.LastRead()) < tailStaleAfter {
 		log.Tag(tagTail).Info("Keeping local subscribers although the cluster registration is stale: the tail still reads the database")
 		return
 	}

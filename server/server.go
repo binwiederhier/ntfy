@@ -77,8 +77,8 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
+	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
 	tailClose         chan struct{} // Stops runTail; nil without a message cache
-	tailReadAt        atomic.Int64  // Unix time of the tail's last successful read; 0 before the first
 	stopOnce          sync.Once
 	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex
@@ -359,8 +359,9 @@ func New(conf *Config) (*Server, error) {
 		if err != nil {
 			return nil, err
 		}
+		s.tail = tail
 		s.tailClose = make(chan struct{})
-		go s.runTail(tail)
+		go s.runTail()
 	}
 	return s, nil
 }

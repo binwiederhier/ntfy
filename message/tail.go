@@ -3,6 +3,7 @@ package message
 import (
 	"database/sql"
 	"encoding/json"
+	"sync/atomic"
 	"time"
 
 	"heckel.io/ntfy/v2/model"
@@ -20,9 +21,20 @@ const (
 // and concurrent writers (cluster nodes) commit out of order: a row id the tail had to skip is a
 // hole, and is re-checked until its row shows up or the hole times out.
 type Tail struct {
-	cache  *Cache
-	cursor int64               // Highest row id read so far
-	holes  map[int64]time.Time // Skipped row ids below the cursor, and when they were skipped
+	cache    *Cache
+	cursor   int64               // Highest row id read so far
+	holes    map[int64]time.Time // Skipped row ids below the cursor, and when they were skipped
+	lastRead atomic.Int64        // Unix nanoseconds of the last successful read (see LastRead); 0 before the first
+}
+
+// LastRead returns when the tail last read the database successfully; zero before the first
+// read. Unlike Next, it may be called from any goroutine.
+func (t *Tail) LastRead() time.Time {
+	nanos := t.lastRead.Load()
+	if nanos == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, nanos)
 }
 
 // Next returns the published messages written since the last call, in write order, reading
@@ -35,6 +47,7 @@ func (t *Tail) Next() ([]*model.Message, error) {
 		page, full, err := t.nextPage()
 		if err != nil {
 			if len(messages) > 0 {
+				t.lastRead.Store(time.Now().UnixNano())
 				return messages, nil // The pages read so far are done; the failed one is retried next time
 			}
 			return nil, err
@@ -44,6 +57,7 @@ func (t *Tail) Next() ([]*model.Message, error) {
 			break
 		}
 	}
+	t.lastRead.Store(time.Now().UnixNano())
 	return messages, nil
 }
 

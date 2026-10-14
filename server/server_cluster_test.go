@@ -272,7 +272,9 @@ func TestServer_Cluster_HealthReflectsCluster(t *testing.T) {
 func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
 	// Called by the cluster when this node lost its registration while peers are healthy:
 	// every local subscriber connection must end, so clients reconnect to a healthy node
-	s := newTestServer(t, newTestConfig(t, ""))
+	conf := newTestConfig(t, "")
+	conf.CacheDuration = 0 // No cache, so no tail: nothing else gets messages to the subscribers
+	s := newTestServer(t, conf)
 	done := make(chan struct{})
 	go func() {
 		rr := httptest.NewRecorder()
@@ -285,7 +287,6 @@ func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
 		t, ok := topics["mytopic"]
 		return ok && t.SubscribersCount() == 1
 	})
-	s.tailReadAt.Store(0) // The tail cannot read the database either: the subscribers would get nothing
 	s.closeLocalSubscribers()
 	select {
 	case <-done:
@@ -311,7 +312,7 @@ func TestServer_Cluster_IsolatedNodeKeepsSubscribersWhileTheTailReads(t *testing
 		t, ok := topics["mytopic"]
 		return ok && t.SubscribersCount() == 1
 	})
-	waitFor(t, func() bool { return s.tailReadAt.Load() > 0 })
+	waitFor(t, func() bool { return !s.tail.LastRead().IsZero() })
 	s.closeLocalSubscribers()
 	select {
 	case <-done:

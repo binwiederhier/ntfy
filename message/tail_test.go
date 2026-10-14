@@ -135,6 +135,30 @@ func insertMessageRow(t *testing.T, tx *sql.Tx, rowID int64, mid, body string) {
 	require.Nil(t, err)
 }
 
+func TestTail_LastRead(t *testing.T) {
+	// When the tail last read the database, for a node deciding whether its subscribers still
+	// get everything; a failed read does not count
+	testDB := dbtest.CreateTestPostgres(t)
+	s, err := message.NewPostgresStore(testDB, 0, 0)
+	require.Nil(t, err)
+	tail, err := s.Tail()
+	require.Nil(t, err)
+	require.True(t, tail.LastRead().IsZero())
+
+	before := time.Now()
+	requireTail(t, tail)
+	read := tail.LastRead()
+	require.False(t, read.Before(before))
+
+	second := model.NewDefaultMessage("mytopic", "second")
+	require.Nil(t, s.AddMessages([]*model.Message{second}))
+	_, err = testDB.Exec(`UPDATE message SET actions = 'invalid json' WHERE mid = $1`, second.ID)
+	require.Nil(t, err)
+	_, err = tail.Next()
+	require.Error(t, err)
+	require.Equal(t, read, tail.LastRead())
+}
+
 func requireTail(t *testing.T, tail *message.Tail, expected ...string) {
 	t.Helper()
 	messages, err := tail.Next()

@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
@@ -22,19 +21,18 @@ const (
 // runTail reads every message written to the cache, by any node, and sends it to the local
 // subscribers that missed it live: its fan-out to this node was lost, or the subscriber was
 // reconnecting while the message was not written yet, so the database read missed it.
-func (s *Server) runTail(tail *message.Tail) {
+func (s *Server) runTail() {
 	for {
 		select {
 		case <-time.After(tailInterval):
 		case <-s.tailClose:
 			return
 		}
-		messages, err := tail.Next()
+		messages, err := s.tail.Next()
 		if err != nil {
 			log.Tag(tagTail).Err(err).Warn("Cannot read written messages")
 			continue
 		}
-		s.tailReadAt.Store(time.Now().Unix())
 		metrics.TailMessagesRead.Add(float64(len(messages)))
 		metrics.TailMessagesLagSeconds.Set(tailLag(messages, time.Now()).Seconds())
 		s.publishMissed(messages)

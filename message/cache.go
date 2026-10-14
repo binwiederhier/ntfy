@@ -405,6 +405,7 @@ func (c *Cache) Tail() (*Tail, error) {
 	t := &Tail{
 		cache: c,
 		holes: make(map[int64]time.Time),
+		done:  make(chan struct{}),
 	}
 	now := time.Now()
 	for _, rowID := range slices.Backward(rowIDs) {

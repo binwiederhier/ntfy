@@ -78,7 +78,6 @@ type Server struct {
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
 	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
-	tailClose         chan struct{} // Stops runTail; nil without a message cache
 	stopOnce          sync.Once
 	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex
@@ -360,7 +359,6 @@ func New(conf *Config) (*Server, error) {
 			return nil, err
 		}
 		s.tail = tail
-		s.tailClose = make(chan struct{})
 		go s.runTail()
 	}
 	return s, nil
@@ -550,8 +548,8 @@ func (s *Server) stop() {
 	if s.httpClusterServer != nil {
 		s.httpClusterServer.Close()
 	}
-	if s.tailClose != nil {
-		close(s.tailClose) // Before the databases close under it
+	if s.tail != nil {
+		s.tail.Close() // Before the databases close under it
 	}
 	s.closeDatabases()
 	if s.ban != nil {

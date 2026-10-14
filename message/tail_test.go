@@ -159,6 +159,26 @@ func TestTail_LastRead(t *testing.T) {
 	require.Equal(t, read, tail.LastRead())
 }
 
+func TestTail_Close(t *testing.T) {
+	// Done tells the loop calling Next to stop; Close may be called more than once
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		tail, err := s.Tail()
+		require.Nil(t, err)
+		select {
+		case <-tail.Done():
+			t.Fatal("done before Close")
+		default:
+		}
+		tail.Close()
+		tail.Close()
+		select {
+		case <-tail.Done():
+		case <-time.After(time.Second):
+			t.Fatal("not done after Close")
+		}
+	})
+}
+
 func requireTail(t *testing.T, tail *message.Tail, expected ...string) {
 	t.Helper()
 	messages, err := tail.Next()

@@ -25,7 +25,7 @@ func (s *Server) runTail() {
 	for {
 		select {
 		case <-time.After(tailInterval):
-		case <-s.tailClose:
+		case <-s.tail.Done():
 			return
 		}
 		messages, err := s.tail.Next()

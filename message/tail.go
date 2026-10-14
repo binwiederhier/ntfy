@@ -3,6 +3,7 @@ package message
 import (
 	"database/sql"
 	"encoding/json"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -25,6 +26,8 @@ type Tail struct {
 	cursor   int64               // Highest row id read so far
 	holes    map[int64]time.Time // Skipped row ids below the cursor, and when they were skipped
 	lastRead atomic.Int64        // Unix nanoseconds of the last successful read (see LastRead); 0 before the first
+	done     chan struct{}       // Closed by Close, to stop the loop calling Next
+	closed   sync.Once           // Guards closing done
 }
 
 // LastRead returns when the tail last read the database successfully; zero before the first
@@ -35,6 +38,18 @@ func (t *Tail) LastRead() time.Time {
 		return time.Time{}
 	}
 	return time.Unix(0, nanos)
+}
+
+// Done returns a channel that is closed when the tail is closed, so the loop calling Next can stop
+func (t *Tail) Done() <-chan struct{} {
+	return t.done
+}
+
+// Close tells the loop calling Next to stop (see Done); it may be called more than once
+func (t *Tail) Close() {
+	t.closed.Do(func() {
+		close(t.done)
+	})
 }
 
 // Next returns the published messages written since the last call, in write order, reading

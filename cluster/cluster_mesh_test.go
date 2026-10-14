@@ -1,12 +1,14 @@
 package cluster
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,6 +19,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -683,4 +686,33 @@ func TestMesh_NotServingWhenAnActivePeerCanTakeOver(t *testing.T) {
 	require.Nil(t, pool.Close())
 	waitFor(t, func() bool { return !mesh.Healthy() })
 	require.False(t, mesh.Serving())
+}
+
+func TestMesh_PassiveNodeWithoutAnActivePeerWarns(t *testing.T) {
+	// A passive node is never ready (load balancers send it nobody) and never leads, so on its own
+	// it is almost certainly a misconfiguration
+	var out bytes.Buffer
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.Contains(t, out.String(), "no active node is live")
+}
+
+func TestMesh_PassiveNodeWithAnActivePeerDoesNotWarn(t *testing.T) {
+	var out bytes.Buffer
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.NotContains(t, out.String(), "no active node is live")
 }

@@ -2150,6 +2150,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.30.1 (UNRELEASED)
 
+**Features:**
+
+* Enroll a device with a one-time code instead of a password or long-lived token, e.g. via a QR code: `POST /v1/account/token/enroll` (or `/v1/users/token/enroll` for admins) issues the code, `POST /v1/account/token/redeem` exchanges it for an access token ([#597](https://github.com/binwiederhier/ntfy/issues/597), see [enrolling devices](config.md#enrolling-devices))
+
 **Bug fixes + maintenance:**
 
 * Write user stats (messages, emails, calls) as increments, so servers sharing one database add up instead of overwriting each other's counts ([#1989](https://github.com/binwiederhier/ntfy/pull/1989))

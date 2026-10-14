@@ -73,23 +73,24 @@ type TokenUpdate struct {
 	LastOrigin netip.Addr
 }
 
-// MagicLinkKind discriminates the two link-token flows stored in the user_magic_link table.
+// MagicLinkKind discriminates the link-token flows stored in the user_magic_link table.
 type MagicLinkKind string
 
 // Magic link kinds
 const (
 	MagicLinkKindEmailVerify   MagicLinkKind = "email_verify"
 	MagicLinkKindPasswordReset MagicLinkKind = "password_reset"
+	MagicLinkKindTokenEnroll   MagicLinkKind = "token_enroll"
 )
 
-// MagicLink is a pending, single-use link token -- either an email verification or a
-// password reset, distinguished by Kind. The raw token travels in the emailed link;
-// only its TokenHash (hex SHA-256) is persisted.
+// MagicLink is a pending, single-use link token -- an email verification, a password reset, or
+// a token enrollment code, distinguished by Kind. The raw token travels in the emailed link (or,
+// for enrollment, a QR code or ntfy:// link); only its TokenHash (hex SHA-256) is persisted.
 type MagicLink struct {
 	TokenHash string
 	Kind      MagicLinkKind
 	UserID    string
-	Email     string // Address being verified for email_verify; empty (NULL) for password_reset
+	Email     string // Address being verified for email_verify; empty (NULL) otherwise
 	Expires   int64
 	Created   int64
 }
@@ -421,7 +422,8 @@ type queries struct {
 	selectMagicLinkByHash        string
 	deleteMagicLinkByHash        string
 	deleteMagicLinkEmailVerify   string // Delete pending email_verify rows for (user_id, email)
-	deleteMagicLinkResetPassword string // Delete the active password_reset row for user_id
+	deleteMagicLinkByUserAndKind string // Delete the active row of one kind for user_id (password_reset, token_enroll)
+	deleteAllMagicLinks          string
 	selectPendingEmails          string // Pending (unverified) email addresses for a user
 	deleteExpiredMagicLinks      string
 

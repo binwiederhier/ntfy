@@ -3597,3 +3597,37 @@ func TestManager_EnqueueStats_DeltasAccumulate(t *testing.T) {
 		require.Equal(t, int64(4), u.Stats.Calls)
 	})
 }
+
+func TestManager_RedeemTokenEnrollCode_ConcurrentRedeemSucceedsOnce(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+		u, err := a.User("ben")
+		require.Nil(t, err)
+		code, err := a.AddMagicLink(MagicLinkKindTokenEnroll, u.ID, "", time.Minute)
+		require.Nil(t, err)
+
+		// All goroutines read the (valid) link before any of them consumes it
+		const redeemers = 50
+		start := make(chan struct{})
+		results := make(chan error, redeemers)
+		for i := 0; i < redeemers; i++ {
+			go func() {
+				<-start
+				_, err := a.RedeemTokenEnrollCode(code, "phone", netip.IPv4Unspecified())
+				results <- err
+			}()
+		}
+		close(start)
+		succeeded := 0
+		for i := 0; i < redeemers; i++ {
+			if err := <-results; err == nil {
+				succeeded++
+			}
+		}
+		require.Equal(t, 1, succeeded)
+		tokens, err := a.Tokens(u.ID)
+		require.Nil(t, err)
+		require.Len(t, tokens, 1)
+	})
+}

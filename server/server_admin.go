@@ -152,6 +152,27 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	return s.writeJSON(w, newSuccessResponse())
 }
 
+// handleUsersTokenEnroll issues a one-time enrollment code for the given user (POST
+// /v1/users/token/enroll), so an integration can hand a device credentials via QR code without
+// knowing or storing the user's password. Like the rest of the admin API, it only targets regular users.
+func (s *Server) handleUsersTokenEnroll(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	req, err := readJSONWithLimit[apiUserTokenEnrollRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	}
+	u, err := s.userManager.User(req.Username)
+	if errors.Is(err, user.ErrUserNotFound) {
+		return errHTTPBadRequestUserNotFound
+	} else if err != nil {
+		return err
+	} else if u.Deleted {
+		return errHTTPBadRequestUserNotFound
+	} else if !u.IsUser() {
+		return errHTTPUnauthorized.Wrap("can only enroll regular users from API")
+	}
+	return s.writeTokenEnrollCode(w, r, v, u)
+}
+
 func (s *Server) handleAccessAllow(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	req, err := readJSONWithLimit[apiAccessAllowRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {

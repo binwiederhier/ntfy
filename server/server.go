@@ -119,9 +119,12 @@ var (
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
+	apiUsersTokenEnrollPath                              = "/v1/users/token/enroll"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountLoginPath                                  = "/v1/account/login"
 	apiAccountTokenPath                                  = "/v1/account/token"
+	apiAccountTokenEnrollPath                            = "/v1/account/token/enroll"
+	apiAccountTokenRedeemPath                            = "/v1/account/token/redeem"
 	apiAccountPasswordPath                               = "/v1/account/password"
 	apiAccountSettingsPath                               = "/v1/account/settings"
 	apiAccountSubscriptionPath                           = "/v1/account/subscription"
@@ -663,6 +666,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersTokenEnrollPath {
+		return s.ensureAdmin(s.handleUsersTokenEnroll)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
@@ -679,6 +684,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureUser(s.withAccountSync(s.handleAccountTokenUpdate))(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiAccountTokenPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountTokenDelete))(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountTokenEnrollPath {
+		return s.ensureUser(s.handleAccountTokenEnroll)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountTokenRedeemPath {
+		return s.ensureUserManager(s.limitRequests(s.handleAccountTokenRedeem))(w, r, v) // Unauthenticated
 	} else if r.Method == http.MethodPatch && r.URL.Path == apiAccountSettingsPath {
 		return s.ensureUser(s.withAccountSync(s.handleAccountSettingsChange))(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountSubscriptionPath {

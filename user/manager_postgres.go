@@ -241,7 +241,8 @@ const (
 	postgresSelectMagicLinkByHashQuery   = `SELECT token_hash, kind, user_id, email, expires, created FROM user_magic_link WHERE token_hash = $1`
 	postgresDeleteMagicLinkByHashQuery   = `DELETE FROM user_magic_link WHERE token_hash = $1`
 	postgresDeleteVerifyScopeQuery       = `DELETE FROM user_magic_link WHERE kind = $1 AND user_id = $2 AND email = $3`
-	postgresDeleteResetScopeQuery        = `DELETE FROM user_magic_link WHERE kind = $1 AND user_id = $2`
+	postgresDeleteUserKindScopeQuery     = `DELETE FROM user_magic_link WHERE kind = $1 AND user_id = $2`
+	postgresDeleteAllMagicLinksQuery     = `DELETE FROM user_magic_link WHERE user_id = $1`
 	postgresSelectPendingEmailsQuery     = `SELECT email FROM user_magic_link WHERE kind = $1 AND user_id = $2 ORDER BY email`
 	postgresDeleteExpiredMagicLinksQuery = `DELETE FROM user_magic_link WHERE expires < $1`
 
@@ -341,7 +342,8 @@ var postgresQueries = queries{
 	selectMagicLinkByHash:          postgresSelectMagicLinkByHashQuery,
 	deleteMagicLinkByHash:          postgresDeleteMagicLinkByHashQuery,
 	deleteMagicLinkEmailVerify:     postgresDeleteVerifyScopeQuery,
-	deleteMagicLinkResetPassword:   postgresDeleteResetScopeQuery,
+	deleteMagicLinkByUserAndKind:   postgresDeleteUserKindScopeQuery,
+	deleteAllMagicLinks:            postgresDeleteAllMagicLinksQuery,
 	selectPendingEmails:            postgresSelectPendingEmailsQuery,
 	deleteExpiredMagicLinks:        postgresDeleteExpiredMagicLinksQuery,
 	updateBilling:                  postgresUpdateBillingQuery,

@@ -835,10 +835,11 @@ want to use a dedicated token to publish from your backup host, and one from you
     and deleting the account, every action can be performed with a token. Granular access tokens are on the roadmap,
     but not yet implemented.
 
-You can create access tokens in two different ways:
+You can create access tokens in three different ways:
 
 * [Using the CLI](#tokens-via-the-cli): Using the `ntfy token` command, you can manually add/update/remove tokens.
 * [In the config](#tokens-via-the-config): You can provision access tokens in the `server.yml` file via `auth-tokens` key.
+* [By enrolling a device](#enrolling-devices): A one-time code, e.g. in a QR code, is exchanged for a new token on the device.
 
 #### Tokens via the CLI
 The `ntfy token` command can be used to manage access tokens for users. Tokens can have labels, and they can expire
@@ -904,6 +905,32 @@ Here's an example:
 In this example, the `auth-users` section defines two users, `phil` and `backup-service`. The `auth-tokens` section
 defines access tokens for these users. `phil` has a token `tk_3gd7d2yftt4b8ixyfe9mnmro88o76`, while `backup-service`
 has a token `tk_f099we8uzj7xi5qshzajwp6jffvkz` with the label "Backup script".
+
+#### Enrolling devices
+To set up a device without typing (or displaying) a password or a long-lived token, you can issue a one-time
+**enrollment code** and hand it to the device, e.g. as a QR code. The device exchanges the code for its own access
+token, which never expires and can be revoked like any other token.
+
+* An enrollment code can be redeemed **once**, and expires after **10 minutes**.
+* Each user has at most one pending enrollment code; issuing a new one invalidates the previous one.
+* Only a hash of the code is stored on the server. Deleting the account invalidates pending codes.
+
+Users can issue a code for themselves, and admins can issue a code for any regular (non-admin) user. The latter
+is useful for integrations that create a dedicated user for each device:
+
+```
+# Issue a code for yourself
+$ curl -u phil:mypass -X POST https://ntfy.example.com/v1/account/token/enroll
+{"code":"3Lm9...","expires":1791940000}
+
+# Issue a code for the user "device-1" (admins only)
+$ curl -u admin:mypass -d '{"username":"device-1"}' https://ntfy.example.com/v1/users/token/enroll
+{"code":"8fQx...","expires":1791940000}
+
+# Redeem the code on the device (no credentials needed); the label is optional
+$ curl -d '{"code":"3Lm9...","label":"Pixel 9"}' https://ntfy.example.com/v1/account/token/redeem
+{"token":"tk_7eevizlsiwf9yi4uxsrs83r4352o0","label":"Pixel 9","last_access":1791939400,"last_origin":"1.2.3.4"}
+```
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,

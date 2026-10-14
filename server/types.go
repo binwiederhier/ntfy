@@ -220,6 +220,20 @@ type apiAccountTokenUpdateRequest struct {
 	Expires *int64  `json:"expires"` // Unix timestamp
 }
 
+type apiAccountTokenEnrollResponse struct {
+	Code    string `json:"code"`
+	Expires int64  `json:"expires"` // Unix timestamp
+}
+
+type apiAccountTokenRedeemRequest struct {
+	Code  string `json:"code"`
+	Label string `json:"label"`
+}
+
+type apiUserTokenEnrollRequest struct {
+	Username string `json:"username"`
+}
+
 type apiAccountTokenResponse struct {
 	Token       string `json:"token"`
 	Label       string `json:"label,omitempty"`

@@ -238,7 +238,8 @@ const (
 	sqliteSelectMagicLinkByHashQuery   = `SELECT token_hash, kind, user_id, email, expires, created FROM user_magic_link WHERE token_hash = ?`
 	sqliteDeleteMagicLinkByHashQuery   = `DELETE FROM user_magic_link WHERE token_hash = ?`
 	sqliteDeleteVerifyScopeQuery       = `DELETE FROM user_magic_link WHERE kind = ? AND user_id = ? AND email = ?`
-	sqliteDeleteResetScopeQuery        = `DELETE FROM user_magic_link WHERE kind = ? AND user_id = ?`
+	sqliteDeleteUserKindScopeQuery     = `DELETE FROM user_magic_link WHERE kind = ? AND user_id = ?`
+	sqliteDeleteAllMagicLinksQuery     = `DELETE FROM user_magic_link WHERE user_id = ?`
 	sqliteSelectPendingEmailsQuery     = `SELECT email FROM user_magic_link WHERE kind = ? AND user_id = ? ORDER BY email`
 	sqliteDeleteExpiredMagicLinksQuery = `DELETE FROM user_magic_link WHERE expires < ?`
 
@@ -337,7 +338,8 @@ var sqliteQueries = queries{
 	selectMagicLinkByHash:          sqliteSelectMagicLinkByHashQuery,
 	deleteMagicLinkByHash:          sqliteDeleteMagicLinkByHashQuery,
 	deleteMagicLinkEmailVerify:     sqliteDeleteVerifyScopeQuery,
-	deleteMagicLinkResetPassword:   sqliteDeleteResetScopeQuery,
+	deleteMagicLinkByUserAndKind:   sqliteDeleteUserKindScopeQuery,
+	deleteAllMagicLinks:            sqliteDeleteAllMagicLinksQuery,
 	selectPendingEmails:            sqliteSelectPendingEmailsQuery,
 	deleteExpiredMagicLinks:        sqliteDeleteExpiredMagicLinksQuery,
 	updateBilling:                  sqliteUpdateBillingQuery,

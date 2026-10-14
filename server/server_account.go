@@ -17,9 +17,11 @@ import (
 
 const (
 	syncTopicAccountSyncEvent    = "sync"
-	tokenExpiryDuration          = 72 * time.Hour // Extend tokens by this much
-	emailVerificationTokenExpiry = 24 * time.Hour // Magic-link lifetime for email verification
-	passwordResetTokenExpiry     = time.Hour      // Magic-link lifetime for password reset (higher-privilege -> shorter)
+	tokenExpiryDuration          = 72 * time.Hour   // Extend tokens by this much
+	emailVerificationTokenExpiry = 24 * time.Hour   // Magic-link lifetime for email verification
+	passwordResetTokenExpiry     = time.Hour        // Magic-link lifetime for password reset (higher-privilege -> shorter)
+	tokenEnrollCodeExpiry        = 10 * time.Minute // Enrollment codes are shown as a QR code and scanned right away
+	tokenEnrollDefaultLabel      = "Enrolled device"
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -312,14 +314,7 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return err
 	}
-	response := &apiAccountTokenResponse{
-		Token:      token.Value,
-		Label:      token.Label,
-		LastAccess: token.LastAccess.Unix(),
-		LastOrigin: token.LastOrigin.String(),
-		Expires:    token.Expires.Unix(),
-	}
-	return s.writeJSON(w, response)
+	return s.writeJSON(w, newAPIAccountTokenResponse(token))
 }
 
 func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -359,14 +354,65 @@ func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request
 		}
 		return err
 	}
-	response := &apiAccountTokenResponse{
+	return s.writeJSON(w, newAPIAccountTokenResponse(token))
+}
+
+// handleAccountTokenEnroll issues a one-time enrollment code for the authenticated user (POST
+// /v1/account/token/enroll). Redeeming the code yields a new access token, so a device can be set up
+// from a QR code or ntfy:// link without the password or a long-lived token ever being displayed.
+func (s *Server) handleAccountTokenEnroll(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	u := v.User()
+	if u == nil {
+		return errHTTPUnauthorized // See handleAccountTokenUpdate
+	}
+	return s.writeTokenEnrollCode(w, r, v, u)
+}
+
+// writeTokenEnrollCode issues an enrollment code for u, superseding any pending one
+func (s *Server) writeTokenEnrollCode(w http.ResponseWriter, r *http.Request, v *visitor, u *user.User) error {
+	code, err := s.userManager.AddMagicLink(user.MagicLinkKindTokenEnroll, u.ID, "", tokenEnrollCodeExpiry)
+	if err != nil {
+		return err
+	}
+	logvr(v, r).Tag(tagAccount).Field("user_id", u.ID).Info("Issued token enrollment code for user %s", u.Name)
+	return s.writeJSON(w, &apiAccountTokenEnrollResponse{
+		Code:    code,
+		Expires: time.Now().Add(tokenEnrollCodeExpiry).Unix(),
+	})
+}
+
+// handleAccountTokenRedeem exchanges a one-time enrollment code for a new, non-expiring access token
+// (POST /v1/account/token/redeem, unauthenticated: the code is the credential). Codes carry ~285 bits
+// of entropy, so the regular request limiter is enough to make guessing pointless.
+func (s *Server) handleAccountTokenRedeem(w http.ResponseWriter, r *http.Request, v *visitor) error {
+	req, err := readJSONWithLimit[apiAccountTokenRedeemRequest](r.Body, jsonBodyBytesLimit, false)
+	if err != nil {
+		return err
+	} else if req.Code == "" {
+		return errHTTPBadRequestEnrollCodeInvalid
+	}
+	label := req.Label
+	if label == "" {
+		label = tokenEnrollDefaultLabel
+	}
+	token, err := s.userManager.RedeemTokenEnrollCode(req.Code, label, v.IP())
+	if errors.Is(err, user.ErrMagicLinkNotFound) {
+		return errHTTPBadRequestEnrollCodeInvalid
+	} else if err != nil {
+		return err
+	}
+	logvr(v, r).Tag(tagAccount).Field("token_label", label).Info("Redeemed token enrollment code")
+	return s.writeJSON(w, newAPIAccountTokenResponse(token))
+}
+
+func newAPIAccountTokenResponse(token *user.Token) *apiAccountTokenResponse {
+	return &apiAccountTokenResponse{
 		Token:      token.Value,
 		Label:      token.Label,
 		LastAccess: token.LastAccess.Unix(),
 		LastOrigin: token.LastOrigin.String(),
 		Expires:    token.Expires.Unix(),
 	}
-	return s.writeJSON(w, response)
 }
 
 func (s *Server) handleAccountTokenDelete(w http.ResponseWriter, r *http.Request, v *visitor) error {

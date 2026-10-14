@@ -250,8 +250,9 @@ func (a *Manager) removeUserTx(tx *sql.Tx, username string) error {
 	return nil
 }
 
-// MarkUserRemoved sets the deleted flag on the user, and deletes all access tokens. This prevents
-// successful auth via Authenticate. A background process will delete the user at a later date.
+// MarkUserRemoved sets the deleted flag on the user, and deletes all access tokens and pending magic
+// links. This prevents successful auth via Authenticate. A background process will delete the user
+// at a later date.
 func (a *Manager) MarkUserRemoved(user *User) error {
 	if !AllowedUsername(user.Name) {
 		return ErrInvalidArgument
@@ -261,6 +262,10 @@ func (a *Manager) MarkUserRemoved(user *User) error {
 			return err
 		}
 		if _, err := tx.Exec(a.queries.deleteAllToken, user.ID); err != nil {
+			return err
+		}
+		// Pending links would otherwise outlive the account, e.g. an enrollment code minting a new token
+		if _, err := tx.Exec(a.queries.deleteAllMagicLinks, user.ID); err != nil {
 			return err
 		}
 		deletedTime := time.Now().Add(userHardDeleteAfterDuration).Unix()
@@ -1621,8 +1626,9 @@ func (a *Manager) SetPrimaryEmail(userID, email string) error {
 // for email_verify, and "" for password_reset.
 //
 // The scope replaced is, for email_verify, the (user_id, email) pair (one pending verification per
-// address); for password_reset, the user_id (one active reset per account). The replace-delete and
-// the insert run in one transaction so a re-request atomically supersedes the old token.
+// address); for password_reset and token_enroll, the user_id (one active reset or enrollment code
+// per account). The replace-delete and the insert run in one transaction so a re-request
+// atomically supersedes the old token.
 func (a *Manager) AddMagicLink(kind MagicLinkKind, userID, email string, ttl time.Duration) (string, error) {
 	token := generateLinkToken()
 	now := time.Now()
@@ -1640,8 +1646,8 @@ func (a *Manager) AddMagicLink(kind MagicLinkKind, userID, email string, ttl tim
 			if _, err := tx.Exec(a.queries.deleteMagicLinkEmailVerify, string(MagicLinkKindEmailVerify), m.UserID, m.Email); err != nil {
 				return err
 			}
-		case MagicLinkKindPasswordReset:
-			if _, err := tx.Exec(a.queries.deleteMagicLinkResetPassword, string(MagicLinkKindPasswordReset), m.UserID); err != nil {
+		case MagicLinkKindPasswordReset, MagicLinkKindTokenEnroll:
+			if _, err := tx.Exec(a.queries.deleteMagicLinkByUserAndKind, string(m.Kind), m.UserID); err != nil {
 				return err
 			}
 		default:
@@ -1667,10 +1673,14 @@ func (a *Manager) MagicLinkByToken(rawToken string) (*MagicLink, error) {
 // ErrMagicLinkNotFound if none exists. Callers must assert the returned Kind matches the flow
 // they serve and check Expires themselves.
 func (a *Manager) MagicLinkByHash(tokenHash string) (*MagicLink, error) {
+	return readMagicLink(a.db.ReadOnly().QueryRow(a.queries.selectMagicLinkByHash, tokenHash))
+}
+
+func readMagicLink(row *sql.Row) (*MagicLink, error) {
 	var m MagicLink
 	var kind string
 	var email sql.NullString
-	err := a.db.ReadOnly().QueryRow(a.queries.selectMagicLinkByHash, tokenHash).Scan(&m.TokenHash, &kind, &m.UserID, &email, &m.Expires, &m.Created)
+	err := row.Scan(&m.TokenHash, &kind, &m.UserID, &email, &m.Expires, &m.Created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrMagicLinkNotFound
 	} else if err != nil {
@@ -1781,6 +1791,34 @@ func (a *Manager) ResetPassword(rawToken, newPassword string) error {
 			return err
 		}
 		return nil
+	})
+}
+
+// RedeemTokenEnrollCode consumes a token-enrollment magic link, identified by its raw code, and
+// creates a non-expiring access token with the given label for the code's user. Reading and
+// deleting the link and creating the token run in one transaction on the primary (a replica may
+// lag behind a fresh or just-consumed code), and the delete must hit the row, so concurrent redeems
+// of the same code yield exactly one token. Returns ErrMagicLinkNotFound if the code is invalid,
+// expired, or not an enrollment code.
+func (a *Manager) RedeemTokenEnrollCode(rawCode, label string, origin netip.Addr) (*Token, error) {
+	return db.QueryTx(a.db, func(tx *sql.Tx) (*Token, error) {
+		m, err := readMagicLink(tx.QueryRow(a.queries.selectMagicLinkByHash, hashToken(rawCode)))
+		if err != nil {
+			return nil, err
+		} else if m.Kind != MagicLinkKindTokenEnroll || time.Now().Unix() > m.Expires {
+			return nil, ErrMagicLinkNotFound
+		}
+		res, err := tx.Exec(a.queries.deleteMagicLinkByHash, m.TokenHash)
+		if err != nil {
+			return nil, err
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return nil, err
+		} else if affected == 0 {
+			return nil, ErrMagicLinkNotFound // Consumed by a concurrent redeem since the read (PostgreSQL is read committed)
+		}
+		return a.createTokenTx(tx, m.UserID, GenerateToken(), label, time.Now(), origin, time.Unix(0, 0), tokenMaxCount, false)
 	})
 }
 

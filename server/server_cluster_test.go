@@ -157,6 +157,21 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 	})
 }
 
+func TestServer_Cluster_Role(t *testing.T) {
+	// The configured role reaches the cluster, which reports it to the LB agents
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1" // Enables clustering; not bound since Run() is not called
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	conf.ClusterRole = cluster.RolePassive
+	s := newTestServer(t, conf)
+	members := s.cluster.Members()
+	require.Len(t, members, 1)
+	require.Equal(t, cluster.RolePassive, members[0].Role)
+}
+
 func TestServer_Cluster_EndToEnd(t *testing.T) {
 	// Two full servers sharing one Postgres schema: a message published to node A over HTTP must
 	// reach a subscriber connected to node B, via the node registry and the fan-out endpoint.

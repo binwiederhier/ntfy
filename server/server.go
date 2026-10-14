@@ -344,6 +344,7 @@ func New(conf *Config) (*Server, error) {
 		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
 		NodeID:          cluster.NodeID(conf.ClusterNodeID),
 		AdvertiseURL:    advertiseURL,
+		Role:            conf.ClusterRole,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
 		IsolatedFunc:    s.closeLocalSubscribers,

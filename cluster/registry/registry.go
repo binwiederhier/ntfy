@@ -27,9 +27,10 @@ const (
 		VALUES ($1, $2, $3, EXTRACT(EPOCH FROM now())::BIGINT)
 		ON CONFLICT (node_id) DO UPDATE SET advertise_url = EXCLUDED.advertise_url, role = EXCLUDED.role, last_heartbeat = EXCLUDED.last_heartbeat
 	`
-	// selectLiveNodesQuery returns every live node INCLUDING this one: the caller needs the
-	// whole set, because the leader is the live active node with the lowest id
-	selectLiveNodesQuery = `SELECT node_id, advertise_url, role FROM node_registry WHERE last_heartbeat >= EXTRACT(EPOCH FROM now())::BIGINT - $1 ORDER BY node_id`
+	// selectLiveNodesQuery returns every node that heartbeated within $1 seconds INCLUDING this
+	// one, with its heartbeat's age: the caller needs the whole set, because the leader is the
+	// live active node with the lowest id, and it filters the live ones from the recent ones
+	selectLiveNodesQuery = `SELECT node_id, advertise_url, role, EXTRACT(EPOCH FROM now())::BIGINT - last_heartbeat FROM node_registry WHERE last_heartbeat >= EXTRACT(EPOCH FROM now())::BIGINT - $1 ORDER BY node_id`
 	pruneStaleNodesQuery = `DELETE FROM node_registry WHERE last_heartbeat < EXTRACT(EPOCH FROM now())::BIGINT - $1`
 	deleteNodeQuery      = `DELETE FROM node_registry WHERE node_id = $1`
 )
@@ -248,7 +249,7 @@ func (r *Registry) Deregister() error {
 // and standing stay in place; leadership then lapses on its own via the registration deadline.
 func (r *Registry) Refresh() ([]*Peer, error) {
 	issued := time.Now()
-	peers, lowest, err := r.queryLiveNodes()
+	peers, lowest, otherActive, err := r.queryLiveNodes()
 	if err != nil {
 		return nil, err
 	}
@@ -258,6 +259,8 @@ func (r *Registry) Refresh() ([]*Peer, error) {
 	lapsed := r.refreshedAt.IsZero() || issued.Sub(r.refreshedAt) >= r.lease()
 	if lowest != r.nodeID {
 		r.lowestSince = time.Time{}
+	} else if (r.lowestSince.IsZero() || lapsed) && !otherActive {
+		r.lowestSince = issued.Add(-r.holdoff()) // No other active node was live recently, so none can still believe it leads
 	} else if r.lowestSince.IsZero() || lapsed {
 		r.lowestSince = issued // Start, or restart, the promotion hold-off
 	}
@@ -266,22 +269,33 @@ func (r *Registry) Refresh() ([]*Peer, error) {
 	return peers, nil
 }
 
-// queryLiveNodes reads the live nodes and returns this node's peers plus the lowest live active
-// id (which may be this node, and is empty if no active node is live).
-func (r *Registry) queryLiveNodes() ([]*Peer, string, error) {
+// queryLiveNodes reads the live nodes and returns this node's peers, the lowest live active id
+// (which may be this node, and is empty if no active node is live), and whether another active
+// node was live recently: within the lease plus the hold-off, the longest that node may still
+// believe it leads after its last heartbeat. Rows that recent but not live are not peers.
+func (r *Registry) queryLiveNodes() ([]*Peer, string, bool, error) {
 	ctx, cancel := r.opContext()
 	defer cancel()
-	rows, err := r.pool.QueryContext(ctx, selectLiveNodesQuery, int64(r.ttl.Seconds()))
+	recent := r.lease() + r.holdoff()
+	rows, err := r.pool.QueryContext(ctx, selectLiveNodesQuery, int64(recent.Seconds()))
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 	defer rows.Close()
 	peers := make([]*Peer, 0)
 	lowest := ""
-	for rows.Next() { // Ordered by node_id, so the first row is the lowest
+	otherActive := false
+	for rows.Next() { // Ordered by node_id, so the first live active row is the lowest
 		p := &Peer{}
-		if err := rows.Scan(&p.NodeID, &p.AdvertiseURL, &p.Role); err != nil {
-			return nil, "", err
+		var age int64
+		if err := rows.Scan(&p.NodeID, &p.AdvertiseURL, &p.Role, &age); err != nil {
+			return nil, "", false, err
+		}
+		if p.NodeID != r.nodeID && p.Role == RoleActive {
+			otherActive = true
+		}
+		if age > int64(r.ttl.Seconds()) {
+			continue // Recently live, not live: not a peer, and not a candidate
 		}
 		if lowest == "" && p.Role == RoleActive {
 			lowest = p.NodeID // A passive node never leads, so it does not count here
@@ -291,9 +305,9 @@ func (r *Registry) queryLiveNodes() ([]*Peer, string, error) {
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
-	return peers, lowest, nil
+	return peers, lowest, otherActive, nil
 }
 
 // opContext bounds a registry database call, so a partition (dropped packets) makes it fail

@@ -78,6 +78,12 @@
 # - experimental-cluster-batch-linger is how long fan-out messages may wait to form a batch per
 #   peer node, trading up to that much cross-node delivery latency for a bounded request rate
 #   between nodes. Set to 0 to send each message immediately.
+# - experimental-cluster-role is "active" (default) or "passive". A passive node is meant to run
+#   outside the load balancer (e.g. to observe a new node under real load): it receives fan-out
+#   and serves clients that connect to it directly, but it never leads the cluster's singleton
+#   jobs, and it never closes its subscribers to send them elsewhere. Active nodes do not count
+#   it as a place to send theirs either. The member list reports each node's role, so load
+#   balancer agents can route to active nodes only.
 #
 # Clustering also requires "database-url": the shared PostgreSQL database carries the durable
 # state and the cluster's own coordination tables.
@@ -91,6 +97,7 @@
 # experimental-cluster-advertise-url: "http://<ip:port>"
 # experimental-cluster-secret: <secret>
 # experimental-cluster-batch-linger: 500ms
+# experimental-cluster-role: active
 
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.

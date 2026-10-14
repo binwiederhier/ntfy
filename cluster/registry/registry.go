@@ -1,7 +1,7 @@
 // Package registry implements cluster membership and, derived from it, leadership for singleton
 // jobs. Each node upserts its own row into the node_registry table with a fresh heartbeat and
-// discovers its peers by reading the other fresh rows; the leader is simply the live node with
-// the lowest id (see IsLeader), so there is no second mechanism and no extra state.
+// discovers its peers by reading the other fresh rows; the leader is simply the live active node
+// with the lowest id (see IsLeader), so there is no second mechanism and no extra state.
 //
 // Nothing uses this yet: it is the membership half of multi-node ntfy, landed on its own so it
 // can be reviewed without the fan-out that will sit on top of it. Node IDs are plain strings
@@ -10,6 +10,7 @@ package registry
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -22,15 +23,21 @@ const (
 	// Heartbeats are stamped with the database clock, never a node's: liveness compares them
 	// across nodes, and leadership is derived from liveness (see IsLeader)
 	upsertNodeQuery = `
-		INSERT INTO node_registry (node_id, advertise_url, last_heartbeat)
-		VALUES ($1, $2, EXTRACT(EPOCH FROM now())::BIGINT)
-		ON CONFLICT (node_id) DO UPDATE SET advertise_url = EXCLUDED.advertise_url, last_heartbeat = EXCLUDED.last_heartbeat
+		INSERT INTO node_registry (node_id, advertise_url, role, last_heartbeat)
+		VALUES ($1, $2, $3, EXTRACT(EPOCH FROM now())::BIGINT)
+		ON CONFLICT (node_id) DO UPDATE SET advertise_url = EXCLUDED.advertise_url, role = EXCLUDED.role, last_heartbeat = EXCLUDED.last_heartbeat
 	`
 	// selectLiveNodesQuery returns every live node INCLUDING this one: the caller needs the
-	// whole set, because the leader is the live node with the lowest id
-	selectLiveNodesQuery = `SELECT node_id, advertise_url FROM node_registry WHERE last_heartbeat >= EXTRACT(EPOCH FROM now())::BIGINT - $1 ORDER BY node_id`
+	// whole set, because the leader is the live active node with the lowest id
+	selectLiveNodesQuery = `SELECT node_id, advertise_url, role FROM node_registry WHERE last_heartbeat >= EXTRACT(EPOCH FROM now())::BIGINT - $1 ORDER BY node_id`
 	pruneStaleNodesQuery = `DELETE FROM node_registry WHERE last_heartbeat < EXTRACT(EPOCH FROM now())::BIGINT - $1`
 	deleteNodeQuery      = `DELETE FROM node_registry WHERE node_id = $1`
+)
+
+// Node roles
+const (
+	RoleActive  Role = "active"
+	RolePassive Role = "passive"
 )
 
 // Schema version and queries
@@ -53,24 +60,43 @@ const (
 	leaseFactor   = 1
 	holdoffFactor = 2
 
-	schemaVersion  = 1
+	schemaVersion  = 2
 	schemaStoreKey = "node_registry"
 )
 
 var (
-	createTable = schema.AsMigrateFunc(`
+	// The role defaults to active, so rows upserted by nodes that predate roles (a rolling
+	// deploy) keep their old meaning. It comes last, where the migration adds it.
+	createTable = schema.AsMigrateFunc(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS node_registry (
 			node_id        TEXT PRIMARY KEY,
 			advertise_url  TEXT NOT NULL,
-			last_heartbeat BIGINT NOT NULL
+			last_heartbeat BIGINT NOT NULL,
+			role           TEXT NOT NULL DEFAULT '%s'
 		)
-	`)
+	`, RoleActive))
+
+	// migrations maps a schema version to the migration upgrading it to the next version.
+	// Always append migrations at the end, never insert in the middle.
+	migrations = map[int]schema.MigrateFunc{
+		1: schema.AsMigrateFunc(fmt.Sprintf(`ALTER TABLE node_registry ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT '%s'`, RoleActive)),
+	}
 )
+
+// Role is a node's part in the cluster. An active node takes client traffic, may lead and may
+// fence; a passive node (e.g. a hidden node under observation) does neither.
+type Role string
+
+// Valid reports whether r is one of the known roles
+func (r Role) Valid() bool {
+	return r == RoleActive || r == RolePassive
+}
 
 // Peer is a live remote node as read from the registry.
 type Peer struct {
 	NodeID       string
 	AdvertiseURL string
+	Role         Role
 }
 
 // Registry is the node membership table (control plane): each node upserts its own row with a
@@ -82,30 +108,32 @@ type Peer struct {
 // waits on the database, not even during an outage, when the snapshot simply goes stale.
 //
 // Leadership is derived from the same data, with no second mechanism: the leader is the live
-// node with the lowest id (see IsLeader).
+// active node with the lowest id (see IsLeader).
 type Registry struct {
 	pool         *db.DB
 	nodeID       string
 	advertiseURL string
+	role         Role
 	ttl          time.Duration
 	peers        []*Peer    // Snapshot of the last Refresh; nil until the first one
 	registeredAt time.Time  // When the last successful Register was ISSUED; zero = never
 	refreshedAt  time.Time  // When the last successful Refresh was ISSUED; zero = never
-	lowestSince  time.Time  // When this node first saw itself as the lowest live id; zero = it is not
+	lowestSince  time.Time  // When this node first saw itself as the lowest live active id; zero = it is not
 	mu           sync.Mutex // Protects peers, registeredAt, refreshedAt and lowestSince
 }
 
 // New creates or migrates the registry schema and returns this node's membership handle. It
 // does NOT register the node: joining the cluster is an explicit Register call, owned by the
 // caller, so read-only uses of the registry stay side-effect free.
-func New(pool *db.DB, nodeID, advertiseURL string, ttl time.Duration) (*Registry, error) {
-	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, createTable, nil); err != nil {
+func New(pool *db.DB, nodeID, advertiseURL string, role Role, ttl time.Duration) (*Registry, error) {
+	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, createTable, migrations); err != nil {
 		return nil, err
 	}
 	return &Registry{
 		pool:         pool,
 		nodeID:       nodeID,
 		advertiseURL: advertiseURL,
+		role:         role,
 		ttl:          ttl,
 	}, nil
 }
@@ -117,7 +145,7 @@ func (r *Registry) Register() error {
 	ctx, cancel := r.opContext()
 	defer cancel()
 	issued := time.Now()
-	if _, err := r.pool.ExecContext(ctx, upsertNodeQuery, r.nodeID, r.advertiseURL); err != nil {
+	if _, err := r.pool.ExecContext(ctx, upsertNodeQuery, r.nodeID, r.advertiseURL, r.role); err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -156,16 +184,17 @@ func (r *Registry) Prune() error {
 }
 
 // IsLeader reports whether this node should run the cluster's singleton jobs. Leadership is not
-// a separate mechanism: the leader is the live node with the lowest id, which every node can
-// work out from the membership data it already reads.
+// a separate mechanism: the leader is the live active node with the lowest id, which every node
+// can work out from the membership data it already reads. A passive node never leads, and with
+// no active node live there is no leader.
 //
 // Three conditions, and the last two are what keep two nodes from both believing:
 //
-//  1. This node is the lowest live id, as of its last Refresh.
+//  1. This node is the lowest live active id, as of its last Refresh.
 //  2. Its own registration is fresh, dated from when the heartbeat was issued (lease). A node
 //     that cannot reach the database stops believing within the lease, and it stops before any
 //     successor begins, because the successor cannot finish its hold-off that early.
-//  3. It has been the lowest live id, *continuously observed*, for the hold-off. A returning
+//  3. It has been the lowest live active id, *continuously observed*, for the hold-off. A returning
 //     lower-id node would otherwise believe at once, while the incumbent still believes until
 //     its next read.
 //
@@ -200,7 +229,7 @@ func (r *Registry) lease() time.Duration {
 	return leaseFactor * r.ttl
 }
 
-// holdoff is how long this node must have been the lowest live id before it believes
+// holdoff is how long this node must have been the lowest live active id before it believes
 func (r *Registry) holdoff() time.Duration {
 	return holdoffFactor * r.ttl
 }
@@ -237,8 +266,8 @@ func (r *Registry) Refresh() ([]*Peer, error) {
 	return peers, nil
 }
 
-// queryLiveNodes reads the live nodes and returns this node's peers plus the lowest live id
-// (which may be this node).
+// queryLiveNodes reads the live nodes and returns this node's peers plus the lowest live active
+// id (which may be this node, and is empty if no active node is live).
 func (r *Registry) queryLiveNodes() ([]*Peer, string, error) {
 	ctx, cancel := r.opContext()
 	defer cancel()
@@ -251,11 +280,11 @@ func (r *Registry) queryLiveNodes() ([]*Peer, string, error) {
 	lowest := ""
 	for rows.Next() { // Ordered by node_id, so the first row is the lowest
 		p := &Peer{}
-		if err := rows.Scan(&p.NodeID, &p.AdvertiseURL); err != nil {
+		if err := rows.Scan(&p.NodeID, &p.AdvertiseURL, &p.Role); err != nil {
 			return nil, "", err
 		}
-		if lowest == "" {
-			lowest = p.NodeID
+		if lowest == "" && p.Role == RoleActive {
+			lowest = p.NodeID // A passive node never leads, so it does not count here
 		}
 		if p.NodeID != r.nodeID {
 			peers = append(peers, p)

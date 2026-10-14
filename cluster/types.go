@@ -13,6 +13,7 @@ type Config struct {
 	Enabled           bool            // Master switch; when false, New returns the nop cluster
 	NodeID            NodeID          // Stable per-node identifier; required
 	AdvertiseURL      string          // Base URL peers use to reach this node's fan-out endpoint
+	Role              Role            // Active (default) or passive: a passive node never leads and never fences
 	Secret            string          // Shared secret authenticating node-to-node fan-out requests
 	HeartbeatInterval time.Duration   // How often the node registry heartbeat is refreshed
 	NodeTTL           time.Duration   // Registry rows older than this do not count as live peers

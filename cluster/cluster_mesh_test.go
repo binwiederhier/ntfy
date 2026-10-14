@@ -39,6 +39,7 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 		Enabled:           true,
 		NodeID:            NodeID(nodeID),
 		AdvertiseURL:      advertiseURL,
+		Role:              RoleActive,
 		Secret:            testSecret,
 		HeartbeatInterval: 100 * time.Millisecond,
 		// The liveness window AND the leadership hold-off. One second is the floor: heartbeats
@@ -55,7 +56,12 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 // heartbeat caches the peer list. The fake never refreshes its heartbeat.
 func registerFakePeer(t testing.TB, pool *db.DB, nodeID NodeID, url string) {
 	t.Helper()
-	reg, err := registry.New(pool, string(nodeID), url, time.Minute)
+	registerFakePeerWithRole(t, pool, nodeID, url, RoleActive)
+}
+
+func registerFakePeerWithRole(t testing.TB, pool *db.DB, nodeID NodeID, url string, role Role) {
+	t.Helper()
+	reg, err := registry.New(pool, string(nodeID), url, role, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, reg.Register())
 }
@@ -467,7 +473,24 @@ func TestMesh_NoIsolatedFuncWhenAPeerAnswers200WithoutBeingNtfy(t *testing.T) {
 	isolatedTest(t, http.StatusOK, "<html>hello from some proxy</html>", false)
 }
 
+func TestMesh_ActiveNodeDoesNotFenceForPassivePeer(t *testing.T) {
+	// A passive peer is not behind the load balancer, so it is not somewhere better for these
+	// clients: closing them would only send them back through the LB, a reconnect storm for
+	// nothing. Only a healthy active peer justifies fencing.
+	isolatedTestWithRoles(t, RoleActive, RolePassive, http.StatusOK, `{"healthy":true}`, false)
+}
+
+func TestMesh_PassiveNodeNeverFences(t *testing.T) {
+	// Nothing routes a passive node's clients anywhere else (they connected to it directly), so
+	// it keeps them even when it lost its registration and an active peer is healthy
+	isolatedTestWithRoles(t, RolePassive, RoleActive, http.StatusOK, `{"healthy":true}`, false)
+}
+
 func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wantIsolated bool) {
+	isolatedTestWithRoles(t, RoleActive, RoleActive, peerHealthStatus, peerHealthBody, wantIsolated)
+}
+
+func isolatedTestWithRoles(t *testing.T, role, peerRole Role, peerHealthStatus int, peerHealthBody string, wantIsolated bool) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == HealthPath {
@@ -482,11 +505,12 @@ func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wan
 	pool := db.New(host, nil)
 	var isolated atomic.Int32
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.Role = role
 	conf.NodeTTL = time.Second // The floor: a shorter TTL truncates the SQL liveness cutoff to zero
 	conf.IsolatedFunc = func() { isolated.Add(1) }
 	// Registered last: the fake peer never heartbeats again, so its row must still be fresh
 	// when the mesh takes its first peer snapshot
-	registerFakePeer(t, openTestPool(t, schemaDSN), "node-peer", peer.URL)
+	registerFakePeerWithRole(t, openTestPool(t, schemaDSN), "node-peer", peer.URL, peerRole)
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()

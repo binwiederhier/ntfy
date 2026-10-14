@@ -113,6 +113,7 @@ var (
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
+	apiReadyPath                                         = "/v1/ready"
 	apiVersionPath                                       = "/v1/version"
 	apiConfigPath                                        = "/v1/config"
 	apiStatsPath                                         = "/v1/stats"
@@ -656,6 +657,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
 		return s.handleHealth(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiReadyPath {
+		return s.handleReady(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiVersionPath {
 		return s.ensureAdmin(s.handleVersion)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiConfigPath {
@@ -813,7 +816,18 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor
 	if !healthy {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy})
+	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy, Role: s.cluster.Role()})
+}
+
+// handleReady answers whether a load balancer should send clients here: an active node that is
+// serving. A passive node is healthy (see handleHealth) but not ready.
+func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	role := s.cluster.Role()
+	ready := role == cluster.RoleActive && s.cluster.Serving()
+	if !ready {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	return s.writeJSON(w, &apiReadyResponse{Ready: ready, Role: role})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,

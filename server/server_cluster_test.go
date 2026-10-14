@@ -28,6 +28,7 @@ type fakeCluster struct {
 	announced  []string
 	notLeader  bool
 	notHealthy bool
+	role       cluster.Role // Empty means active
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -47,6 +48,15 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 
 func (b *fakeCluster) Serving() bool {
 	return b.Healthy() // The fake has no peers to hand clients to; tests set health directly
+}
+
+func (b *fakeCluster) Role() cluster.Role {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.role == "" {
+		return cluster.RoleActive
+	}
+	return b.role
 }
 
 func (b *fakeCluster) Healthy() bool {
@@ -463,4 +473,44 @@ func topicsSnapshot(s *Server) map[string]*topic {
 		topics[id] = t
 	}
 	return topics
+}
+
+func TestServer_Cluster_HealthReportsRole(t *testing.T) {
+	// A passive node is healthy: role and health are separate answers
+	s := newTestServer(t, newTestConfig(t, ""))
+	s.cluster = &fakeCluster{role: cluster.RolePassive}
+	rr := request(t, s, "GET", "/v1/health", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"healthy":true,"role":"passive"}`, rr.Body.String())
+}
+
+func TestServer_Cluster_Ready(t *testing.T) {
+	// Readiness is what a load balancer checks: an active node that is serving. A passive (or,
+	// later, draining) node is healthy but not ready.
+	s := newTestServer(t, newTestConfig(t, ""))
+	cl := &fakeCluster{}
+	s.cluster = cl
+	rr := request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
+
+	cl.setHealthy(false) // Another active node can take the clients (see Cluster.Serving)
+	rr = request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 503, rr.Code)
+	require.JSONEq(t, `{"ready":false,"role":"active"}`, rr.Body.String())
+
+	cl.setHealthy(true)
+	cl.mu.Lock()
+	cl.role = cluster.RolePassive
+	cl.mu.Unlock()
+	rr = request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 503, rr.Code)
+	require.JSONEq(t, `{"ready":false,"role":"passive"}`, rr.Body.String())
+}
+
+func TestServer_ReadyWithoutClustering(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t, ""))
+	rr := request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
 }

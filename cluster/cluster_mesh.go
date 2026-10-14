@@ -187,6 +187,11 @@ func (c *meshCluster) Healthy() bool {
 	return time.Since(c.lastRegistered) < c.conf.NodeTTL
 }
 
+// Role reports this node's configured role
+func (c *meshCluster) Role() Role {
+	return c.conf.Role
+}
+
 // Serving reports whether clients should keep connecting here (see the Cluster interface). It
 // reads the last peer snapshot rather than probing peers, since health checks call it often.
 func (c *meshCluster) Serving() bool {

@@ -115,6 +115,8 @@ type Cluster interface {
 	// is not Healthy and another active node could take its clients. The only active node keeps
 	// serving with a stale heartbeat, since pulling it would leave clients nowhere to go.
 	Serving() bool
+	// Role reports this node's configured role (active, or passive)
+	Role() Role
 	// Close stops the cluster and releases its resources.
 	Close() error
 }

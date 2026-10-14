@@ -1,6 +1,7 @@
 package server
 
 import (
+	"heckel.io/ntfy/v2/cluster"
 	"net/http"
 
 	"heckel.io/ntfy/v2/model"
@@ -145,7 +146,13 @@ type templateFile struct {
 }
 
 type apiHealthResponse struct {
-	Healthy bool `json:"healthy"`
+	Healthy bool         `json:"healthy"`
+	Role    cluster.Role `json:"role"`
+}
+
+type apiReadyResponse struct {
+	Ready bool         `json:"ready"`
+	Role  cluster.Role `json:"role"`
 }
 
 type apiVersionResponse struct {

@@ -2233,7 +2233,15 @@ A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint
 If a non-200 HTTP status code is returned or if the returned `healthy` field is `false` the ntfy service should be considered as unhealthy.
 
 ```json
-{"healthy":true}
+{"healthy":true,"role":"active"}
+```
+
+For load balancers, use `/v1/ready` instead: it returns 200 only if the server should receive clients. Without
+clustering that is the same as being healthy. With clustering (experimental, see the `experimental-cluster-*` options), a passive node is healthy
+but not ready, so a load balancer checking `/v1/ready` does not send it any clients.
+
+```json
+{"ready":true,"role":"active"}
 ```
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.

@@ -14,7 +14,7 @@ const (
 	tailStaleAfter = 30 * time.Second // A tail that has not read for this long cannot stand in for the fan-out (see closeLocalSubscribers)
 
 	// unwrittenMarkerMargin is how far before an unwritten marker's delivery here its replay
-	// starts: the fan-out linger, and publish times having whole seconds (see sinceForTopics)
+	// starts: the fan-out linger, and publish times having whole seconds (see sinceForTopic)
 	unwrittenMarkerMargin = 2 * time.Second
 )
 

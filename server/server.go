@@ -806,9 +806,10 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node;
-	// 503 lets status-code LB checks pull it (checkers must fail open, see cluster.Cluster)
-	healthy := s.cluster.Healthy()
+	// Unhealthy = the registry heartbeat went stale, peers stopped forwarding to this node, and
+	// another active node can take its clients; 503 lets status-code LB checks pull it (checkers
+	// must fail open, see cluster.Cluster)
+	healthy := s.cluster.Serving()
 	if !healthy {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}

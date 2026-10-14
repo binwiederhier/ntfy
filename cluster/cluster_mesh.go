@@ -187,6 +187,22 @@ func (c *meshCluster) Healthy() bool {
 	return time.Since(c.lastRegistered) < c.conf.NodeTTL
 }
 
+// Serving reports whether clients should keep connecting here (see the Cluster interface). It
+// reads the last peer snapshot rather than probing peers, since health checks call it often.
+func (c *meshCluster) Serving() bool {
+	if c.Healthy() {
+		return true
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, p := range c.knownPeers {
+		if p.Role == RoleActive {
+			return false // Another active node can take this node's clients
+		}
+	}
+	return true
+}
+
 // Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,
 // and waits for them to exit.
 func (c *meshCluster) Close() error {

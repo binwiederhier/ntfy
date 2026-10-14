@@ -45,6 +45,10 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	b.announced = append(b.announced, state.AddedTopics...)
 }
 
+func (b *fakeCluster) Serving() bool {
+	return b.Healthy() // The fake has no peers to hand clients to; tests set health directly
+}
+
 func (b *fakeCluster) Healthy() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -170,6 +174,62 @@ func TestServer_Cluster_Role(t *testing.T) {
 	members := s.cluster.Members()
 	require.Len(t, members, 1)
 	require.Equal(t, cluster.RolePassive, members[0].Role)
+}
+
+func TestServer_Cluster_ActiveWithPassivePeer(t *testing.T) {
+	// The setup for trying clustering beside production: the production server is the only
+	// active node, a second one runs passive. The active one leads right away, both deliver
+	// each other's messages, and only the active one leads.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string, role cluster.Role) *Server {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		require.Nil(t, err)
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = listener.Addr().String()
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://" + listener.Addr().String()
+		conf.ClusterRole = role
+		s := newTestServer(t, conf)
+		srv := &http.Server{Handler: s.cluster}
+		go srv.Serve(listener)
+		t.Cleanup(func() { srv.Close() })
+		return s
+	}
+	passive := newNode("node-a", cluster.RolePassive) // Lower id, but passive
+	started := time.Now()
+	active := newNode("node-b", cluster.RoleActive)
+	waitFor(t, func() bool { return active.cluster.IsLeader() })
+	require.Less(t, time.Since(started), 5*time.Second) // Not after a one-minute hold-off
+	require.False(t, passive.cluster.IsLeader())
+
+	// Both nodes know each other before publishing, or the fan-out has no peer to go to
+	waitFor(t, func() bool { return len(active.cluster.Members()) == 2 && len(passive.cluster.Members()) == 2 })
+	receive := func(s *Server, topic string) func() []string {
+		topics, err := s.topicsFromIDs(nil, topic)
+		require.Nil(t, err)
+		var mu sync.Mutex
+		received := make([]string, 0)
+		topics[0].Subscribe(func(_ *visitor, m *model.Message) error {
+			mu.Lock()
+			defer mu.Unlock()
+			received = append(received, m.Message)
+			return nil
+		}, "", func() {})
+		return func() []string {
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]string{}, received...)
+		}
+	}
+	onPassive := receive(passive, "toward-passive")
+	onActive := receive(active, "toward-active")
+	require.Equal(t, 200, request(t, active, "PUT", "/toward-passive", "from active", nil).Code)
+	require.Equal(t, 200, request(t, passive, "PUT", "/toward-active", "from passive", nil).Code)
+	waitFor(t, func() bool { return len(onPassive()) == 1 && len(onActive()) == 1 })
+	require.Equal(t, []string{"from active"}, onPassive())
+	require.Equal(t, []string{"from passive"}, onActive())
+	require.Equal(t, 200, request(t, active, "GET", "/v1/health", "", nil).Code)
 }
 
 func TestServer_Cluster_EndToEnd(t *testing.T) {

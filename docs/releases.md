@@ -2150,6 +2150,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.30.1 (UNRELEASED)
 
+**Features:**
+
+* Experimental clustering: add `experimental-cluster-role` to run a `passive` node that never leads and never takes over another node's subscribers, e.g. one that is not behind the load balancer ([#2049](https://github.com/binwiederhier/ntfy/pull/2049))
+
 **Bug fixes + maintenance:**
 
 * Write user stats (messages, emails, calls) as increments, so servers sharing one database add up instead of overwriting each other's counts ([#1989](https://github.com/binwiederhier/ntfy/pull/1989))

@@ -30,7 +30,8 @@ const (
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
 // PostgreSQL only as a control plane: the node_registry table is both the membership mechanism
-// and, read as "the live node with the lowest id", the leader election (see registry.IsLeader).
+// and, read as "the live active node with the lowest id", the leader election (see
+// registry.IsLeader).
 // The message path never touches the database, not even for membership: see registry.Peers.
 //
 // A published message goes to EVERY live peer, which then drops it unless it has a subscriber
@@ -45,11 +46,11 @@ type meshCluster struct {
 	deliver        DeliverFunc
 	registry       *registry.Registry
 	httpClient     *http.Client
-	mux            *http.ServeMux        // The internal peer API; Cluster is an http.Handler
-	queues         map[NodeID]*peerQueue // per-peer send queues; reconciled against the registry
-	closed         bool                  // Guards against ForwardMessage spawning new workers after Close
-	knownPeers     map[NodeID]string     // Peers seen in the last reconcile, for join/leave logging
-	lastRegistered time.Time             // Last successful registry heartbeat, for Healthy
+	mux            *http.ServeMux            // The internal peer API; Cluster is an http.Handler
+	queues         map[NodeID]*peerQueue     // per-peer send queues; reconciled against the registry
+	closed         bool                      // Guards against ForwardMessage spawning new workers after Close
+	knownPeers     map[NodeID]*registry.Peer // Peers seen in the last reconcile, for join/leave logging and fencing
+	lastRegistered time.Time                 // Last successful registry heartbeat, for Healthy
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
@@ -60,7 +61,7 @@ type meshCluster struct {
 // (synchronously, so it is discoverable before New returns), and starts the heartbeat loop.
 // Peer delivery workers are started lazily as peers appear in the registry.
 func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluster, error) {
-	reg, err := registry.New(pool, string(conf.NodeID), conf.AdvertiseURL, conf.NodeTTL)
+	reg, err := registry.New(pool, string(conf.NodeID), conf.AdvertiseURL, conf.Role, conf.NodeTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		httpClient:     &http.Client{Timeout: meshHTTPTimeout},
 		queues:         make(map[NodeID]*peerQueue),
 		lastRegistered: time.Now(), // The synchronous Register above just succeeded
-		knownPeers:     make(map[NodeID]string),
+		knownPeers:     make(map[NodeID]*registry.Peer),
 		ctx:            ctx,
 		cancel:         cancel,
 	}
@@ -166,9 +167,9 @@ func (c *meshCluster) BroadcastState(state *State) {
 // which is what an agent needs to disregard its answer and keep the upstreams it has.
 func (c *meshCluster) Members() []Member {
 	fresh := c.registry.Fresh()
-	members := []Member{{NodeID: c.conf.NodeID, AdvertiseURL: c.conf.AdvertiseURL, Healthy: c.Healthy()}}
+	members := []Member{{NodeID: c.conf.NodeID, AdvertiseURL: c.conf.AdvertiseURL, Role: c.conf.Role, Healthy: c.Healthy()}}
 	for _, p := range c.registry.Peers() {
-		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Healthy: fresh})
+		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Role: p.Role, Healthy: fresh})
 	}
 	return members
 }
@@ -245,7 +246,7 @@ func (c *meshCluster) heartbeat() error {
 	c.mu.Lock()
 	c.lastRegistered = time.Now()
 	c.mu.Unlock()
-	// Effective leadership: the lowest live node id, with a hold-off that guarantees a
+	// Effective leadership: the lowest live active node id, with a hold-off that guarantees a
 	// no-leader gap on failover rather than two leaders (see registry.IsLeader)
 	if c.registry.IsLeader() {
 		metrics.ClusterLeader.Set(1)
@@ -272,15 +273,15 @@ func (c *meshCluster) heartbeat() error {
 // reachable immediately.
 func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
 	metrics.ClusterPeers.Set(float64(len(peers)))
-	alive := make(map[NodeID]string, len(peers)) // node ID -> advertise URL
+	alive := make(map[NodeID]*registry.Peer, len(peers))
 	for _, p := range peers {
-		alive[NodeID(p.NodeID)] = p.AdvertiseURL
+		alive[NodeID(p.NodeID)] = p
 	}
 	c.mu.Lock()
 	// Log joins and leaves (as seen through the up-to-NodeTTL-stale registry view)
-	for nodeID, url := range alive {
+	for nodeID, p := range alive {
 		if _, ok := c.knownPeers[nodeID]; !ok {
-			log.Tag(tag).Info("Peer %s (%s) joined the cluster", nodeID, url)
+			log.Tag(tag).Info("Peer %s (%s, %s) joined the cluster", nodeID, p.AdvertiseURL, p.Role)
 		}
 	}
 	for nodeID := range c.knownPeers {
@@ -290,7 +291,7 @@ func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
 	}
 	c.knownPeers = alive
 	for nodeID, q := range c.queues {
-		if url, ok := alive[nodeID]; !ok || q.advertiseURL != url {
+		if p, ok := alive[nodeID]; !ok || q.advertiseURL != p.AdvertiseURL {
 			q.queue.Close() // Flushes the remainder; the worker exits when the queue is drained
 			delete(c.queues, nodeID)
 		}
@@ -315,7 +316,7 @@ func (c *meshCluster) isolationLoop() {
 }
 
 // maybeIsolated calls IsolatedFunc while this node's registration is stale (peers no longer
-// forward to it) but at least one known peer is healthy.
+// forward to it) but at least one known active peer is healthy.
 //
 // The peer probe is what makes this safe, and it answers one question: is there somewhere better
 // for these clients to go? Closing them only helps if their reconnect lands on a node that still
@@ -323,14 +324,20 @@ func (c *meshCluster) isolationLoop() {
 // is unhealthy and disconnect everyone, in a loop, every tick, while the mesh is in fact still
 // delivering, because Peers serves the last snapshot and never queries. So with no healthy peer
 // this does nothing: here is as good as anywhere, and the alternative is a reconnect storm.
+//
+// Roles narrow this further. A passive peer is not behind the load balancer, so it is nowhere
+// better for clients that reconnect through it. A passive node never fences at all: its
+// clients connected to it directly, and nothing would route them elsewhere.
 func (c *meshCluster) maybeIsolated() {
-	if c.conf.IsolatedFunc == nil || c.Healthy() {
+	if c.conf.IsolatedFunc == nil || c.conf.Role == RolePassive || c.Healthy() {
 		return
 	}
 	c.mu.Lock()
 	urls := make([]string, 0, len(c.knownPeers))
-	for _, url := range c.knownPeers {
-		urls = append(urls, url)
+	for _, p := range c.knownPeers {
+		if p.Role == RoleActive {
+			urls = append(urls, p.AdvertiseURL)
+		}
 	}
 	c.mu.Unlock()
 	for _, url := range urls {

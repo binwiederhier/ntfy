@@ -349,7 +349,7 @@ func New(conf *Config) (*Server, error) {
 		Role:            conf.ClusterRole,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
-		IsolatedFunc:    s.closeLocalSubscribers,
+		IsolatedFunc:    s.maybeCloseLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {

@@ -90,6 +90,14 @@ type Cache struct {
 	claimTimeout time.Duration
 }
 
+// Marker is a resolved since=<mid> marker (see ResolveMarker): its row id and publish time, and
+// the database that knew it, which the replay is read from
+type Marker struct {
+	rowID int64
+	time  int64
+	db    *sql.DB // The primary, if the replica did not know the marker yet: it lacks the newest rows too
+}
+
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
 	var queue *util.BatchingQueue[*model.Message]
 	if batchSize > 0 || batchTimeout > 0 {
@@ -262,31 +270,43 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 	return readMessagesCapped(rows, maxBytes)
 }
 
-// messagesSinceID returns the messages after the marker: those with a higher row id, and those
-// published in the marker's second or later with a lower row id. The latter exist in a cluster,
-// where nodes write their batches independently (and late, when one is cut off from the
-// database), so a client whose marker was written late would otherwise never get them.
+// messagesSinceID returns the messages after a since=<mid> marker (see MessagesAfterMarker). A
+// marker the cache does not know replays the topic's entire retained history.
 func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
-	rowID, markerTime, rdb, err := c.resolveMarker(since.ID())
+	marker, err := c.ResolveMarker(since.ID())
 	if err != nil {
 		return nil, false, err
+	} else if marker == nil {
+		marker = &Marker{db: c.db.ReadOnly()} // Row 0, time 0: everything
 	}
+	return c.MessagesAfterMarker(topic, marker, scheduled, maxBytes)
+}
+
+// ResolveMarker looks up a since=<mid> marker once, for replaying any number of topics after it
+// (see MessagesAfterMarker); nil if the cache does not know it (not written yet, or expired)
+func (c *Cache) ResolveMarker(mid string) (*Marker, error) {
+	rowID, markerTime, rdb, err := c.resolveMarker(mid)
+	if err != nil || rowID == 0 {
+		return nil, err
+	}
+	return &Marker{rowID: rowID, time: markerTime, db: rdb}, nil
+}
+
+// MessagesAfterMarker is MessagesCapped for a resolved since=<mid> marker: the messages after
+// it, those with a higher row id and those published in its second or later with a lower one
+// (nodes write their batches independently, and late when one is cut off from the database)
+func (c *Cache) MessagesAfterMarker(topic string, marker *Marker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
 	var rows *sql.Rows
+	var err error
 	if scheduled {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, rowID, markerTime)
+		rows, err = marker.db.Query(c.queries.selectMessagesSinceIDScheduled, topic, marker.rowID, marker.time)
 	} else {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, rowID, markerTime)
+		rows, err = marker.db.Query(c.queries.selectMessagesSinceID, topic, marker.rowID, marker.time)
 	}
 	if err != nil {
 		return nil, false, err
 	}
 	return readMessagesCapped(rows, maxBytes)
-}
-
-// MarkerWritten reports whether a since=<mid> marker is in the cache
-func (c *Cache) MarkerWritten(mid string) (bool, error) {
-	rowID, _, _, err := c.resolveMarker(mid)
-	return rowID != 0, err
 }
 
 // resolveMarker resolves a since=<mid> marker to its row id and time, the replay cut-offs, and
@@ -295,7 +315,7 @@ func (c *Cache) MarkerWritten(mid string) (bool, error) {
 // ahead of replication. The replay is then read from the primary as well: what the replica lacks
 // went out live before the client arrived, so the tail does not resend it either. A marker
 // unknown to both (not written yet, or expired) resolves to 0, 0, which replays the topic's
-// entire retained history; the server avoids that for markers it saw go out (sinceForTopics).
+// entire retained history; the server avoids that for markers it saw go out (sinceForTopic).
 func (c *Cache) resolveMarker(mid string) (int64, int64, *sql.DB, error) {
 	rdb := c.db.ReadOnly()
 	rowID, markerTime, err := c.resolveMarkerOn(rdb, mid)

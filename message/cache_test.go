@@ -1193,6 +1193,41 @@ func TestStore_MessagesSinceID_MarkerWrittenAfterALaterMessage(t *testing.T) {
 	})
 }
 
+func TestStore_MessagesAfterMarker_ResolvesTheMarkerOnce(t *testing.T) {
+	// A multi-topic subscription replays every topic after one marker: one lookup of the marker,
+	// then one query per topic, not a lookup per topic
+	testDB, proxy := dbtest.CreateTestPostgresWithLatency(t, 0)
+	s, err := message.NewPostgresStore(testDB, 0, 0)
+	require.Nil(t, err)
+	marker := model.NewDefaultMessage("topic0", "marker")
+	require.Nil(t, s.AddMessages([]*model.Message{marker}))
+	for i := 0; i < 5; i++ {
+		require.Nil(t, s.AddMessages([]*model.Message{model.NewDefaultMessage(fmt.Sprintf("topic%d", i), "after")}))
+	}
+	resolved, err := s.ResolveMarker(marker.ID)
+	require.Nil(t, err)
+	require.NotNil(t, resolved)
+	_, _, err = s.MessagesAfterMarker("topic0", resolved, false, 0) // Prepares the statement
+	require.Nil(t, err)
+
+	before := proxy.Requests()
+	for i := 0; i < 5; i++ {
+		messages, _, err := s.MessagesAfterMarker(fmt.Sprintf("topic%d", i), resolved, false, 0)
+		require.Nil(t, err)
+		require.Equal(t, []string{"after"}, bodies(messages))
+	}
+	t.Logf("requests for 5 topics: %d", proxy.Requests()-before)
+	require.LessOrEqual(t, proxy.Requests()-before, int64(5))
+}
+
+func TestStore_ResolveMarker_Unknown(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		resolved, err := s.ResolveMarker("unknown00000")
+		require.Nil(t, err)
+		require.Nil(t, resolved)
+	})
+}
+
 func bodies(messages []*model.Message) []string {
 	out := make([]string, 0, len(messages))
 	for _, m := range messages {

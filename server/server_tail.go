@@ -67,28 +67,19 @@ func tailLag(messages []*model.Message, now time.Time) time.Duration {
 	return now.Sub(time.Unix(newest, 0))
 }
 
-// sinceForTopics returns the replay marker to use per topic. A since=<id> marker that is not
-// in the cache was not written yet (it is in a write batch, or the node that accepted it is cut
-// off from the database, its write hanging) or has expired. If the message went out on this
-// node, the replay starts a little before then; otherwise it is the topic's whole history, as it
-// always was. Nothing waits for the write: an expired marker looks the same, and waiting would
-// delay every poll of a phone that was offline for longer than the cache duration.
-func (s *Server) sinceForTopics(since model.SinceMarker) (func(t *topic) model.SinceMarker, error) {
-	asIs := func(*topic) model.SinceMarker { return since }
+// sinceForTopic returns the replay marker for a topic when since is not a since=<id> marker the
+// cache knows. Such a marker was not written yet (it is in a write batch, or the node that
+// accepted it is cut off from the database, its write hanging) or has expired. If the message
+// went out on this node, the replay starts a little before then; otherwise it is the topic's
+// whole history, as it always was. Nothing waits for the write: an expired marker looks the
+// same, and waiting would delay every poll of a phone that was offline for longer than the
+// cache duration.
+func sinceForTopic(t *topic, since model.SinceMarker) model.SinceMarker {
 	if !since.IsID() {
-		return asIs, nil
+		return since
 	}
-	written, err := s.messageCache.MarkerWritten(since.ID())
-	if err != nil {
-		return nil, err
+	if at, ok := t.DeliveredAt(since.ID()); ok {
+		return model.NewSinceTime(at.Add(-unwrittenMarkerMargin).Unix())
 	}
-	if written {
-		return asIs, nil
-	}
-	return func(t *topic) model.SinceMarker {
-		if at, ok := t.DeliveredAt(since.ID()); ok {
-			return model.NewSinceTime(at.Add(-unwrittenMarkerMargin).Unix())
-		}
-		return model.SinceAllMessages
-	}, nil
+	return model.SinceAllMessages
 }

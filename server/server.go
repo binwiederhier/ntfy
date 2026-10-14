@@ -1857,14 +1857,24 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	if since.IsNone() {
 		return nil
 	}
-	sinceFor, err := s.sinceForTopics(since)
-	if err != nil {
-		return err
+	var marker *message.Marker
+	if since.IsID() {
+		var err error
+		if marker, err = s.messageCache.ResolveMarker(since.ID()); err != nil {
+			return err
+		}
 	}
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
-		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, sinceFor(t), scheduled, s.config.MessagePollSizeLimit)
+		var topicMessages []*model.Message
+		var topicTruncated bool
+		var err error
+		if marker != nil {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesAfterMarker(t.ID, marker, scheduled, s.config.MessagePollSizeLimit)
+		} else {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesCapped(t.ID, sinceForTopic(t, since), scheduled, s.config.MessagePollSizeLimit)
+		}
 		if err != nil {
 			return err
 		}

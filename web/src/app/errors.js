@@ -63,6 +63,22 @@ export class EmailPrimaryElsewhereError extends Error {
   }
 }
 
+export class SubscriptionExistsError extends Error {
+  static CODE = 40903; // errHTTPConflictSubscriptionExists
+
+  constructor() {
+    super("Topic subscription already exists");
+  }
+}
+
+export class EnrollCodeInvalidError extends Error {
+  static CODE = 40060; // errHTTPBadRequestEnrollCodeInvalid
+
+  constructor() {
+    super("Enrollment code invalid or expired");
+  }
+}
+
 export const throwAppError = async (response) => {
   if (response.status === 401 || response.status === 403) {
     console.log(`[Error] HTTP ${response.status}`, response);
@@ -83,6 +99,10 @@ export const throwAppError = async (response) => {
       throw new EmailVerificationCodeInvalidError();
     } else if (error.code === EmailPrimaryElsewhereError.CODE) {
       throw new EmailPrimaryElsewhereError();
+    } else if (error.code === SubscriptionExistsError.CODE) {
+      throw new SubscriptionExistsError();
+    } else if (error.code === EnrollCodeInvalidError.CODE) {
+      throw new EnrollCodeInvalidError();
     } else if (error?.error) {
       throw new Error(`Error ${error.code}: ${error.error}`);
     }

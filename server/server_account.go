@@ -395,14 +395,17 @@ func (s *Server) handleAccountTokenRedeem(w http.ResponseWriter, r *http.Request
 	if label == "" {
 		label = tokenEnrollDefaultLabel
 	}
-	token, err := s.userManager.RedeemTokenEnrollCode(req.Code, label, v.IP())
+	u, token, err := s.userManager.RedeemTokenEnrollCode(req.Code, label, v.IP())
 	if errors.Is(err, user.ErrMagicLinkNotFound) {
 		return errHTTPBadRequestEnrollCodeInvalid
 	} else if err != nil {
 		return err
 	}
-	logvr(v, r).Tag(tagAccount).Field("token_label", label).Info("Redeemed token enrollment code")
-	return s.writeJSON(w, newAPIAccountTokenResponse(token))
+	logvr(v, r).Tag(tagAccount).Field("token_label", label).Info("Redeemed token enrollment code for user %s", u.Name)
+	return s.writeJSON(w, &apiAccountTokenRedeemResponse{
+		apiAccountTokenResponse: *newAPIAccountTokenResponse(token),
+		Username:                u.Name,
+	})
 }
 
 func newAPIAccountTokenResponse(token *user.Token) *apiAccountTokenResponse {

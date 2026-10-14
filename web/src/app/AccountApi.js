@@ -16,6 +16,7 @@ import {
   accountReservationUrl,
   accountSettingsUrl,
   accountSubscriptionUrl,
+  accountTokenRedeemUrl,
   accountTokenUrl,
   accountUrl,
   maybeWithBearerAuth,
@@ -376,6 +377,25 @@ class AccountApi {
         token,
       }),
     });
+  }
+
+  // redeemToken exchanges a one-time enrollment code for an access token. It is unauthenticated: the
+  // code identifies the account, so the response names it.
+  async redeemToken(code, label) {
+    const url = accountTokenRedeemUrl(config.base_url);
+    console.log(`[AccountApi] Redeeming enrollment code at ${url}`);
+    const response = await fetchOrThrow(url, {
+      method: "POST",
+      body: JSON.stringify({
+        code,
+        label,
+      }),
+    });
+    const json = await response.json(); // May throw SyntaxError
+    if (!json.token || !json.username) {
+      throw new Error(`Unexpected server response: Cannot find token or username`);
+    }
+    return { token: json.token, username: json.username };
   }
 
   // resendEmailVerification re-sends the magic link for a pending (unverified) address.

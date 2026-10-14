@@ -2152,7 +2152,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Enroll a device with a one-time code instead of a password or long-lived token, e.g. via a QR code: `POST /v1/account/token/enroll` (or `/v1/users/token/enroll` for admins) issues the code, `POST /v1/account/token/redeem` exchanges it for an access token ([#597](https://github.com/binwiederhier/ntfy/issues/597), see [enrolling devices](config.md#enrolling-devices))
+* Enroll a device with a one-time code instead of a password or long-lived token, e.g. via a QR code: `POST /v1/account/token/enroll` (or `/v1/users/token/enroll` for admins) issues the code, `POST /v1/account/token/redeem` exchanges it for an access token, and `/account/token/redeem#code=...` signs the web app in with it ([#597](https://github.com/binwiederhier/ntfy/issues/597), see [enrolling devices](config.md#enrolling-devices))
 
 **Bug fixes + maintenance:**
 

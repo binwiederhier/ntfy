@@ -929,8 +929,18 @@ $ curl -u admin:mypass -d '{"username":"device-1"}' https://ntfy.example.com/v1/
 
 # Redeem the code on the device (no credentials needed); the label is optional
 $ curl -d '{"code":"3Lm9...","label":"Pixel 9"}' https://ntfy.example.com/v1/account/token/redeem
-{"token":"tk_7eevizlsiwf9yi4uxsrs83r4352o0","label":"Pixel 9","last_access":1791939400,"last_origin":"1.2.3.4"}
+{"token":"tk_7eevizlsiwf9yi4uxsrs83r4352o0","label":"Pixel 9","last_access":1791939400,"last_origin":"1.2.3.4","username":"phil"}
 ```
+
+To sign in the **web app** with a code, open `/account/token/redeem` with the code in the URL fragment, which the
+browser never sends to the server. `user` and `subscribe` (a comma-separated list of topics) are optional:
+
+```
+https://ntfy.example.com/account/token/redeem#code=3Lm9...&user=phil&subscribe=alerts,backups
+```
+
+The web app never replaces an existing session: if it is already signed in as `user` (or the link names no user),
+it leaves the code unused and only subscribes to the topics; if it is signed in as someone else, it refuses.
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,

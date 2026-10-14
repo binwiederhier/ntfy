@@ -4447,6 +4447,7 @@ to avoid having to configure your password across multiple publishing/subscribin
 want to use a dedicated token to publish from your backup host, and one from your home automation system.
 
 You can create access tokens using the `ntfy token` command, or in the web app in the "Account" section (when logged in).
+To set up a device without typing a password, you can also [enroll it](config.md#enrolling-devices) with a one-time code.
 See [access tokens](config.md#access-tokens) for details.
 
 Once an access token is created, you can use it to authenticate against the ntfy server, e.g. when you publish or 

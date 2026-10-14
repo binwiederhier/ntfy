@@ -24,9 +24,10 @@ func TestAccount_TokenEnroll_SelfRedeem(t *testing.T) {
 		// Redeeming needs no credentials; the code is the credential
 		rr := request(t, s, "POST", "/v1/account/token/redeem", fmt.Sprintf(`{"code":"%s","label":"Pixel 9"}`, enroll.Code), nil)
 		require.Equal(t, 200, rr.Code)
-		token, err := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+		token, err := util.UnmarshalJSON[apiAccountTokenRedeemResponse](io.NopCloser(rr.Body))
 		require.Nil(t, err)
 		require.True(t, user.ValidToken(token.Token))
+		require.Equal(t, "phil", token.Username) // The redeemer has no other way to learn who it is signed in as
 		require.Equal(t, "Pixel 9", token.Label)
 		require.Equal(t, int64(0), token.Expires) // A device token lives until it is revoked
 
@@ -173,8 +174,9 @@ func TestUser_TokenEnroll_AdminEnrollsUserForProtectedTopic(t *testing.T) {
 
 		rr := request(t, s, "POST", "/v1/account/token/redeem", fmt.Sprintf(`{"code":"%s","label":"Phone"}`, enroll.Code), nil)
 		require.Equal(t, 200, rr.Code)
-		token, err := util.UnmarshalJSON[apiAccountTokenResponse](io.NopCloser(rr.Body))
+		token, err := util.UnmarshalJSON[apiAccountTokenRedeemResponse](io.NopCloser(rr.Body))
 		require.Nil(t, err)
+		require.Equal(t, "device-1", token.Username)
 		device := map[string]string{"Authorization": util.BearerAuth(token.Token)}
 
 		require.Equal(t, 200, request(t, s, "GET", "/device-1-topic/json?poll=1", "", device).Code)
@@ -203,6 +205,19 @@ func TestUser_TokenEnroll_AdminRestrictions(t *testing.T) {
 		// The admin API does not mint credentials for admins, matching what it can create and delete
 		rr = request(t, s, "POST", "/v1/users/token/enroll", `{"username":"other-admin"}`, map[string]string{"Authorization": util.BasicAuth("phil", "phil")})
 		require.Equal(t, 401, rr.Code)
+	})
+}
+
+func TestAccount_TokenEnroll_WebLandingPage(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfigWithAuthFile(t, databaseURL))
+		defer s.closeDatabases()
+
+		// The code travels in the fragment, which browsers never send, so the page itself is static
+		rr := request(t, s, "GET", "/account/token/redeem", "", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Equal(t, "noindex", rr.Header().Get("X-Robots-Tag"))
+		require.Equal(t, "no-referrer", rr.Header().Get("Referrer-Policy"))
 	})
 }
 

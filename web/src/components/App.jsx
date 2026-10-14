@@ -21,6 +21,7 @@ import Login from "./Login";
 import Signup from "./Signup";
 import Account from "./Account";
 import EmailVerify from "./EmailVerify";
+import TokenRedeem from "./TokenRedeem";
 import PasswordReset from "./PasswordReset";
 import PasswordResetRequest from "./PasswordResetRequest";
 import initI18n from "../app/i18n"; // Translations!
@@ -84,6 +85,7 @@ const App = () => {
                     <Route path={routes.passwordResetRequest} element={<PasswordResetRequest />} />
                     <Route path={routes.passwordReset} element={<PasswordReset />} />
                     <Route path={routes.emailVerify} element={<EmailVerify />} />
+                    <Route path={routes.tokenRedeem} element={<TokenRedeem />} />
                   </Route>
                   <Route element={<Layout />}>
                     <Route path={routes.app} element={<AllSubscriptions />} />

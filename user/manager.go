@@ -1795,13 +1795,14 @@ func (a *Manager) ResetPassword(rawToken, newPassword string) error {
 }
 
 // RedeemTokenEnrollCode consumes a token-enrollment magic link, identified by its raw code, and
-// creates a non-expiring access token with the given label for the code's user. Reading and
+// creates a non-expiring access token with the given label for the code's user, returning both. Reading and
 // deleting the link and creating the token run in one transaction on the primary (a replica may
 // lag behind a fresh or just-consumed code), and the delete must hit the row, so concurrent redeems
 // of the same code yield exactly one token. Returns ErrMagicLinkNotFound if the code is invalid,
 // expired, or not an enrollment code.
-func (a *Manager) RedeemTokenEnrollCode(rawCode, label string, origin netip.Addr) (*Token, error) {
-	return db.QueryTx(a.db, func(tx *sql.Tx) (*Token, error) {
+func (a *Manager) RedeemTokenEnrollCode(rawCode, label string, origin netip.Addr) (*User, *Token, error) {
+	var userID string
+	token, err := db.QueryTx(a.db, func(tx *sql.Tx) (*Token, error) {
 		m, err := readMagicLink(tx.QueryRow(a.queries.selectMagicLinkByHash, hashToken(rawCode)))
 		if err != nil {
 			return nil, err
@@ -1818,8 +1819,17 @@ func (a *Manager) RedeemTokenEnrollCode(rawCode, label string, origin netip.Addr
 		} else if affected == 0 {
 			return nil, ErrMagicLinkNotFound // Consumed by a concurrent redeem since the read (PostgreSQL is read committed)
 		}
+		userID = m.UserID
 		return a.createTokenTx(tx, m.UserID, GenerateToken(), label, time.Now(), origin, time.Unix(0, 0), tokenMaxCount, false)
 	})
+	if err != nil {
+		return nil, nil, err
+	}
+	u, err := a.UserByID(userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return u, token, nil
 }
 
 // deleteExpiredMagicLinks removes magic links whose expiry has passed. Expiry is also enforced

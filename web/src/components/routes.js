@@ -10,6 +10,7 @@ const routes = {
   passwordResetRequest: "/reset-password",
   passwordReset: "/account/password/reset/:token",
   emailVerify: "/account/email/verify/:token",
+  tokenRedeem: "/account/token/redeem",
   subscription: "/:topic",
   subscriptionExternal: "/:baseUrl/:topic",
   forSubscription: (subscription) => {

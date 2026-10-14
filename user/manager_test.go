@@ -3614,7 +3614,7 @@ func TestManager_RedeemTokenEnrollCode_ConcurrentRedeemSucceedsOnce(t *testing.T
 		for i := 0; i < redeemers; i++ {
 			go func() {
 				<-start
-				_, err := a.RedeemTokenEnrollCode(code, "phone", netip.IPv4Unspecified())
+				_, _, err := a.RedeemTokenEnrollCode(code, "phone", netip.IPv4Unspecified())
 				results <- err
 			}()
 		}

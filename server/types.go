@@ -230,6 +230,13 @@ type apiAccountTokenRedeemRequest struct {
 	Label string `json:"label"`
 }
 
+// apiAccountTokenRedeemResponse also names the account, since the redeemer (an app or the web app)
+// only holds the code and must know who it is signed in as
+type apiAccountTokenRedeemResponse struct {
+	apiAccountTokenResponse
+	Username string `json:"username"`
+}
+
 type apiUserTokenEnrollRequest struct {
 	Username string `json:"username"`
 }

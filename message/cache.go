@@ -45,7 +45,10 @@ const (
 	recentReplayWindow = time.Minute // A time-based replay from this close to now reads the primary (see messagesSinceTime)
 )
 
-var errNoRows = errors.New("no rows found")
+var (
+	errNoRows             = errors.New("no rows found")
+	errSinceIDNeedsMarker = errors.New("since=<id> needs ResolveMarker and MessagesAfterMarker")
+)
 
 // queries holds the database-specific SQL queries
 type queries struct {
@@ -236,7 +239,8 @@ func (c *Cache) Messages(topic string, since model.SinceMarker, scheduled bool) 
 
 // MessagesCapped returns cached messages for a topic, oldest first, keeping the newest messages
 // that fit in maxBytes worth of Message.Size (0 = no budget). The bool reports whether older messages
-// were dropped, so the caller can tell the client that what it got is incomplete.
+// were dropped, so the caller can tell the client that what it got is incomplete. A since=<id>
+// marker is rejected: it goes through ResolveMarker and MessagesAfterMarker instead.
 func (c *Cache) MessagesCapped(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
 	if since.IsNone() {
 		return make([]*model.Message, 0), false, nil
@@ -244,7 +248,7 @@ func (c *Cache) MessagesCapped(topic string, since model.SinceMarker, scheduled 
 		messages, err := c.messagesLatest(topic)
 		return messages, false, err
 	} else if since.IsID() {
-		return c.messagesSinceID(topic, since, scheduled, maxBytes)
+		return nil, false, errSinceIDNeedsMarker
 	}
 	return c.messagesSinceTime(topic, since, scheduled, maxBytes)
 }
@@ -268,18 +272,6 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 		return nil, false, err
 	}
 	return readMessagesCapped(rows, maxBytes)
-}
-
-// messagesSinceID returns the messages after a since=<mid> marker (see MessagesAfterMarker). A
-// marker the cache does not know replays the topic's entire retained history.
-func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
-	marker, err := c.ResolveMarker(since.ID())
-	if err != nil {
-		return nil, false, err
-	} else if marker == nil {
-		marker = &Marker{db: c.db.ReadOnly()} // Row 0, time 0: everything
-	}
-	return c.MessagesAfterMarker(topic, marker, scheduled, maxBytes)
 }
 
 // ResolveMarker looks up a since=<mid> marker once, for replaying any number of topics after it

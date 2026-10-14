@@ -70,31 +70,27 @@ func tailLag(messages []*model.Message, now time.Time) time.Duration {
 }
 
 // sinceForTopics returns the replay marker to use per topic. A since=<id> marker that is not
-// in the cache was not written yet (the node that accepted it may be cut off from the database,
-// its write hanging) or has expired. If the message went out on this node, the replay starts a
-// little before then, right away: waiting for the write, and polling the database meanwhile,
-// is what made a fenced node's clients a database storm. Only a marker nobody here knows is
-// waited for, and replays the topic's whole history if it never shows up, as it always did.
-func (s *Server) sinceForTopics(since model.SinceMarker) (func(t *topic) (model.SinceMarker, error), error) {
-	asIs := func(*topic) (model.SinceMarker, error) { return since, nil }
+// in the cache was not written yet (it is in a write batch, or the node that accepted it is cut
+// off from the database, its write hanging) or has expired. If the message went out on this
+// node, the replay starts a little before then; otherwise it is the topic's whole history, as it
+// always was. Nothing waits for the write: an expired marker looks the same, and waiting would
+// delay every poll of a phone that was offline for longer than the cache duration.
+func (s *Server) sinceForTopics(since model.SinceMarker) (func(t *topic) model.SinceMarker, error) {
+	asIs := func(*topic) model.SinceMarker { return since }
 	if !since.IsID() {
 		return asIs, nil
 	}
-	written, err := s.messageCache.MarkerWritten(since.ID(), false)
+	written, err := s.messageCache.MarkerWritten(since.ID())
 	if err != nil {
 		return nil, err
 	}
 	if written {
 		return asIs, nil
 	}
-	return func(t *topic) (model.SinceMarker, error) {
+	return func(t *topic) model.SinceMarker {
 		if at, ok := t.DeliveredAt(since.ID()); ok {
-			return model.NewSinceTime(at.Add(-unwrittenMarkerMargin).Unix()), nil
+			return model.NewSinceTime(at.Add(-unwrittenMarkerMargin).Unix())
 		}
-		written, err := s.messageCache.MarkerWritten(since.ID(), true)
-		if err != nil || written {
-			return since, err
-		}
-		return model.SinceAllMessages, nil
+		return model.SinceAllMessages
 	}, nil
 }

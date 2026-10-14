@@ -42,9 +42,7 @@ const (
 )
 
 const (
-	markerWaitMargin   = time.Second            // On top of the batch timeout: another node's batch, and its fan-out linger
-	recentReplayWindow = time.Minute            // A time-based replay from this close to now reads the primary (see messagesSinceTime)
-	markerWaitInterval = 250 * time.Millisecond // How often an unwritten marker is looked up again; bounds what a mass reconnect costs
+	recentReplayWindow = time.Minute // A time-based replay from this close to now reads the primary (see messagesSinceTime)
 )
 
 var errNoRows = errors.New("no rows found")
@@ -90,7 +88,6 @@ type Cache struct {
 	// claimTimeout is how long this node's claim on a due message holds off the others; it is a
 	// field only so tests can shorten it
 	claimTimeout time.Duration
-	markerWait   time.Duration // How long a since=<id> lookup waits for a marker that is not written yet
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
@@ -106,7 +103,6 @@ func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTi
 		mu:           mu,
 		queries:      queries,
 		claimTimeout: claimTimeout,
-		markerWait:   batchTimeout + markerWaitMargin,
 	}
 	go c.processMessageBatches()
 	return c
@@ -287,38 +283,20 @@ func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled
 	return readMessagesCapped(rows, maxBytes)
 }
 
-// MarkerWritten reports whether a since=<mid> marker is in the cache. With wait, a marker that
-// is not yet is looked up again for a short while (see resolveMarker); one lookup otherwise.
-func (c *Cache) MarkerWritten(mid string, wait bool) (bool, error) {
-	if !wait {
-		rowID, _, _, err := c.resolveMarkerOnce(mid)
-		return rowID != 0, err
-	}
+// MarkerWritten reports whether a since=<mid> marker is in the cache
+func (c *Cache) MarkerWritten(mid string) (bool, error) {
 	rowID, _, _, err := c.resolveMarker(mid)
 	return rowID != 0, err
 }
 
 // resolveMarker resolves a since=<mid> marker to its row id and time, the replay cut-offs, and
-// the database handle to read the replay from. A client that reconnects right after receiving a
-// message has a marker that is not written yet (it is in a write batch, maybe on another node),
-// so an unknown marker is looked up again for up to markerWait. A marker unknown after that
-// (e.g. expired) resolves to 0, 0, which deliberately replays the topic's entire retained history.
+// the database handle to read the replay from. It asks the replica first and, only if the mid is
+// unknown there, the primary: a client that reconnects right after receiving a message can be
+// ahead of replication. The replay is then read from the primary as well: what the replica lacks
+// went out live before the client arrived, so the tail does not resend it either. A marker
+// unknown to both (not written yet, or expired) resolves to 0, 0, which replays the topic's
+// entire retained history; the server avoids that for markers it saw go out (sinceForTopics).
 func (c *Cache) resolveMarker(mid string) (int64, int64, *sql.DB, error) {
-	deadline := time.Now().Add(c.markerWait)
-	for {
-		rowID, markerTime, h, err := c.resolveMarkerOnce(mid)
-		if err != nil || rowID != 0 || time.Now().After(deadline) {
-			return rowID, markerTime, h, err
-		}
-		time.Sleep(markerWaitInterval)
-	}
-}
-
-// resolveMarkerOnce asks the replica first and, only if the mid is unknown there, the primary: a
-// client that reconnects right after receiving a message can be ahead of replication. The replay
-// is then read from the primary as well: what the replica lacks went out live before the client
-// arrived, so the tail does not resend it either.
-func (c *Cache) resolveMarkerOnce(mid string) (int64, int64, *sql.DB, error) {
 	rdb := c.db.ReadOnly()
 	rowID, markerTime, err := c.resolveMarkerOn(rdb, mid)
 	if err != nil {

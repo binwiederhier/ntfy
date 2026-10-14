@@ -1193,25 +1193,6 @@ func TestStore_MessagesSinceID_MarkerWrittenAfterALaterMessage(t *testing.T) {
 	})
 }
 
-func TestStore_MessagesSinceID_WaitsForTheMarkerToBeWritten(t *testing.T) {
-	// A client that reconnects right after receiving a message has a marker that is still in the
-	// write batch. Waiting for it beats the alternative, replaying the topic's whole history.
-	testDB := dbtest.CreateTestPostgres(t)
-	s, err := message.NewPostgresStore(testDB, 0, 300*time.Millisecond)
-	require.Nil(t, err)
-	older := model.NewDefaultMessage("mytopic", "older")
-	older.Time = time.Now().Unix() - 10 // An earlier second: the marker's own second is replayed
-	require.Nil(t, s.AddMessages([]*model.Message{older}))
-	marker := model.NewDefaultMessage("mytopic", "marker")
-	require.Nil(t, s.AddMessage(marker)) // Queued, not written
-
-	started := time.Now()
-	messages, err := s.Messages("mytopic", model.NewSinceID(marker.ID), false)
-	require.Nil(t, err)
-	require.Equal(t, []string{}, bodies(messages))
-	require.GreaterOrEqual(t, time.Since(started), 200*time.Millisecond)
-}
-
 func bodies(messages []*model.Message) []string {
 	out := make([]string, 0, len(messages))
 	for _, m := range messages {

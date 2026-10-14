@@ -133,6 +133,23 @@ func TestServer_Tail_UnwrittenMarkerReplaysFromItsDeliveryHere(t *testing.T) {
 	})
 }
 
+func TestServer_Tail_ExpiredMarkerDoesNotWait(t *testing.T) {
+	// A phone offline for longer than the cache duration polls with a marker the cache no longer
+	// has. It gets the topic's whole history, as always, and right away: nothing here can tell an
+	// expired marker from one not written yet, so waiting for it would delay every such poll.
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTailTestServer(t, newTestConfig(t, databaseURL))
+		publishAndWaitForWrite(t, s, "mytopic", "kept")
+		started := time.Now()
+		response := request(t, s, "GET", "/mytopic/json?poll=1&since=expired00000", "", nil)
+		require.Less(t, time.Since(started), 500*time.Millisecond)
+		require.Equal(t, 200, response.Code)
+		messages := toMessages(t, response.Body.String())
+		require.Len(t, messages, 1)
+		require.Equal(t, "kept", messages[0].Message)
+	})
+}
+
 func newTailTestServer(t *testing.T, conf *Config) *Server {
 	conf.CacheBatchSize = 0
 	conf.CacheBatchTimeout = 500 * time.Millisecond

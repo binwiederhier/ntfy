@@ -30,28 +30,6 @@ type Tail struct {
 	closed   sync.Once           // Guards closing done
 }
 
-// LastRead returns when the tail last read the database successfully; zero before the first
-// read. Unlike Next, it may be called from any goroutine.
-func (t *Tail) LastRead() time.Time {
-	nanos := t.lastRead.Load()
-	if nanos == 0 {
-		return time.Time{}
-	}
-	return time.Unix(0, nanos)
-}
-
-// Done returns a channel that is closed when the tail is closed, so the loop calling Next can stop
-func (t *Tail) Done() <-chan struct{} {
-	return t.done
-}
-
-// Close tells the loop calling Next to stop (see Done); it may be called more than once
-func (t *Tail) Close() {
-	t.closed.Do(func() {
-		close(t.done)
-	})
-}
-
 // Next returns the published messages written since the last call, in write order, reading
 // pages until it is caught up or has read tailMaxPages. It reads the primary: a replica may lag,
 // and what it does not show yet would be skipped as a hole.
@@ -152,17 +130,39 @@ func readTailRow(rows *sql.Rows) (*model.Message, int64, bool, error) {
 	return m, rowID, published, nil
 }
 
-// addHoles records the row ids between from and to (both exclusive) as holes
-func (t *Tail) addHoles(from, to int64, now time.Time) {
-	for id := from + 1; id < to && len(t.holes) < tailMaxHoles; id++ {
-		t.holes[id] = now
-	}
-}
-
 func (t *Tail) expireHoles() {
 	for id, skipped := range t.holes {
 		if time.Since(skipped) > tailHoleTimeout {
 			delete(t.holes, id)
 		}
+	}
+}
+
+// LastRead returns when the tail last read the database successfully; zero before the first
+// read. Unlike Next, it may be called from any goroutine.
+func (t *Tail) LastRead() time.Time {
+	nanos := t.lastRead.Load()
+	if nanos == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, nanos)
+}
+
+// Done returns a channel that is closed when the tail is closed, so the loop calling Next can stop
+func (t *Tail) Done() <-chan struct{} {
+	return t.done
+}
+
+// Close tells the loop calling Next to stop (see Done); it may be called more than once
+func (t *Tail) Close() {
+	t.closed.Do(func() {
+		close(t.done)
+	})
+}
+
+// addHoles records the row ids between from and to (both exclusive) as holes
+func (t *Tail) addHoles(from, to int64, now time.Time) {
+	for id := from + 1; id < to && len(t.holes) < tailMaxHoles; id++ {
+		t.holes[id] = now
 	}
 }

@@ -24,5 +24,7 @@ services:
       - NET_BIND_SERVICE
       - SETUID
       - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
     security_opt:
       - "apparmor=docker-default"

@@ -39,8 +39,8 @@ func (c *nopCluster) Role() Role {
 	return RoleActive // A single node takes all client traffic
 }
 
-func (c *nopCluster) Serving() bool {
-	return true // A single node always serves
+func (c *nopCluster) Ready() bool {
+	return true // A single node takes all client traffic
 }
 
 func (c *nopCluster) Close() error {

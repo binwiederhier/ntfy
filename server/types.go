@@ -1,9 +1,9 @@
 package server
 
 import (
-	"heckel.io/ntfy/v2/cluster"
 	"net/http"
 
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"

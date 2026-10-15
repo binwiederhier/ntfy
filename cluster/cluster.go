@@ -111,10 +111,10 @@ type Cluster interface {
 	// fail open (never pull ALL nodes): during a full database outage every node reports
 	// unhealthy while the mesh keeps delivering on stale peer caches.
 	Healthy() bool
-	// Serving reports whether clients should keep connecting to this node: false only while it
-	// is not Healthy and another active node could take its clients. The only active node keeps
-	// serving with a stale heartbeat, since pulling it would leave clients nowhere to go.
-	Serving() bool
+	// Ready reports whether a load balancer should send clients here: an active node that is
+	// Healthy, or that is not but has no other active node to take its clients. The only active
+	// node stays ready with a stale heartbeat, since pulling it would leave clients nowhere to go.
+	Ready() bool
 	// Role reports this node's configured role (active, or passive)
 	Role() Role
 	// Close stops the cluster and releases its resources.

@@ -646,3 +646,17 @@ func TestRegistry_RecentlyLiveActivePeerMeansHoldOff(t *testing.T) {
 	require.False(t, a.IsLeader())
 	waitForLeader(t, a)
 }
+
+func TestRegistry_PruneKeepsRecentlyLiveActiveNodes(t *testing.T) {
+	// A crashed leader's row must outlive the window in which a new node still holds off for it,
+	// or Prune would let the next node lead while the old one may still believe it does
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	insertNodeAt(t, pool, "app0", "http://10.0.0.9:2587", time.Now().Add(-a.lease()-a.holdoff()+leaderTestTTL))
+	require.Nil(t, a.Prune())
+	require.Equal(t, 1, countRows(t, pool, "app0"))
+	tick(t, a)
+	require.False(t, a.IsLeader())
+}

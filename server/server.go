@@ -809,25 +809,23 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	// Unhealthy = the registry heartbeat went stale, peers stopped forwarding to this node, and
-	// another active node can take its clients; 503 lets status-code LB checks pull it (checkers
-	// must fail open, see cluster.Cluster)
-	healthy := s.cluster.Serving()
+	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node. For
+	// monitoring; load balancers check /v1/ready, which keeps the only active node in
+	healthy := s.cluster.Healthy()
 	if !healthy {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy, Role: s.cluster.Role()})
 }
 
-// handleReady answers whether a load balancer should send clients here: an active node that is
-// serving. A passive node is healthy (see handleHealth) but not ready.
+// handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
+// Ready). A passive node is healthy (see handleHealth) but never ready.
 func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	role := s.cluster.Role()
-	ready := role == cluster.RoleActive && s.cluster.Serving()
+	ready := s.cluster.Ready()
 	if !ready {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, &apiReadyResponse{Ready: ready, Role: role})
+	return s.writeJSON(w, &apiReadyResponse{Ready: ready, Role: s.cluster.Role()})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,

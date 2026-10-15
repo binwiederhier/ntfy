@@ -28,6 +28,7 @@ type fakeCluster struct {
 	announced  []string
 	notLeader  bool
 	notHealthy bool
+	notReady   bool
 	role       cluster.Role // Empty means active
 }
 
@@ -46,8 +47,16 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	b.announced = append(b.announced, state.AddedTopics...)
 }
 
-func (b *fakeCluster) Serving() bool {
-	return b.Healthy() // The fake has no peers to hand clients to; tests set health directly
+func (b *fakeCluster) Ready() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return !b.notReady
+}
+
+func (b *fakeCluster) setReady(ready bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.notReady = !ready
 }
 
 func (b *fakeCluster) Role() cluster.Role {
@@ -341,7 +350,7 @@ func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
 
 func TestServer_Cluster_HealthReflectsCluster(t *testing.T) {
 	// A node whose registry heartbeat went stale no longer receives forwarded messages, so
-	// health checks must pull it from rotation (the fail-open policy lives in the checker)
+	// health reports it (load balancers check /v1/ready, see TestServer_Cluster_Ready)
 	s := newTestServer(t, newTestConfig(t, ""))
 	cl := &fakeCluster{}
 	s.cluster = cl
@@ -485,8 +494,7 @@ func TestServer_Cluster_HealthReportsRole(t *testing.T) {
 }
 
 func TestServer_Cluster_Ready(t *testing.T) {
-	// Readiness is what a load balancer checks: an active node that is serving. A passive (or,
-	// later, draining) node is healthy but not ready.
+	// Readiness is what a load balancer checks; the cluster decides it (see Cluster.Ready)
 	s := newTestServer(t, newTestConfig(t, ""))
 	cl := &fakeCluster{}
 	s.cluster = cl
@@ -494,18 +502,27 @@ func TestServer_Cluster_Ready(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
 
-	cl.setHealthy(false) // Another active node can take the clients (see Cluster.Serving)
-	rr = request(t, s, "GET", "/v1/ready", "", nil)
-	require.Equal(t, 503, rr.Code)
-	require.JSONEq(t, `{"ready":false,"role":"active"}`, rr.Body.String())
-
-	cl.setHealthy(true)
+	cl.setReady(false)
 	cl.mu.Lock()
 	cl.role = cluster.RolePassive
 	cl.mu.Unlock()
 	rr = request(t, s, "GET", "/v1/ready", "", nil)
 	require.Equal(t, 503, rr.Code)
 	require.JSONEq(t, `{"ready":false,"role":"passive"}`, rr.Body.String())
+}
+
+func TestServer_Cluster_HealthIsTheHeartbeat(t *testing.T) {
+	// The only active node with a stale heartbeat (database unreachable) is unhealthy, which
+	// monitoring should see, but stays ready, since there is nowhere better for its clients
+	s := newTestServer(t, newTestConfig(t, ""))
+	cl := &fakeCluster{}
+	s.cluster = cl
+	cl.setHealthy(false)
+	rr := request(t, s, "GET", "/v1/health", "", nil)
+	require.Equal(t, 503, rr.Code)
+	require.JSONEq(t, `{"healthy":false,"role":"active"}`, rr.Body.String())
+	rr = request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
 }
 
 func TestServer_ReadyWithoutClustering(t *testing.T) {

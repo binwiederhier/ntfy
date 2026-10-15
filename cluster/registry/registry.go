@@ -175,12 +175,12 @@ func (r *Registry) Fresh() bool {
 	return !r.refreshedAt.IsZero() && time.Since(r.refreshedAt) < r.ttl
 }
 
-// Prune deletes registry rows whose heartbeat is long expired. Only the leader calls this; the
-// grace period of 3x the TTL avoids deleting rows of nodes that are merely slow to heartbeat.
+// Prune deletes registry rows whose heartbeat is long expired. Only the leader calls this. It
+// keeps recently live rows (see recent): a new node holds off for those, and must still see them.
 func (r *Registry) Prune() error {
 	ctx, cancel := r.opContext()
 	defer cancel()
-	_, err := r.pool.ExecContext(ctx, pruneStaleNodesQuery, int64((3 * r.ttl).Seconds()))
+	_, err := r.pool.ExecContext(ctx, pruneStaleNodesQuery, int64(r.recent().Seconds()))
 	return err
 }
 
@@ -235,6 +235,12 @@ func (r *Registry) holdoff() time.Duration {
 	return holdoffFactor * r.ttl
 }
 
+// recent is how long after its last heartbeat a node may still believe it leads: its lease, plus
+// the hold-off it waited before it led
+func (r *Registry) recent() time.Duration {
+	return r.lease() + r.holdoff()
+}
+
 // Deregister deletes this node's registry row; called on shutdown.
 func (r *Registry) Deregister() error {
 	ctx, cancel := r.opContext()
@@ -276,8 +282,7 @@ func (r *Registry) Refresh() ([]*Peer, error) {
 func (r *Registry) queryLiveNodes() ([]*Peer, string, bool, error) {
 	ctx, cancel := r.opContext()
 	defer cancel()
-	recent := r.lease() + r.holdoff()
-	rows, err := r.pool.QueryContext(ctx, selectLiveNodesQuery, int64(recent.Seconds()))
+	rows, err := r.pool.QueryContext(ctx, selectLiveNodesQuery, int64(r.recent().Seconds()))
 	if err != nil {
 		return nil, "", false, err
 	}

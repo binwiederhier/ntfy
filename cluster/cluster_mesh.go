@@ -206,10 +206,12 @@ func (c *meshCluster) Role() Role {
 	return c.conf.Role
 }
 
-// Serving reports whether clients should keep connecting here (see the Cluster interface). It
-// reads the last peer snapshot rather than probing peers, since health checks call it often.
-func (c *meshCluster) Serving() bool {
-	if c.Healthy() {
+// Ready reports whether a load balancer should send clients here (see the Cluster interface). It
+// reads the last peer snapshot rather than probing peers, since load balancers call it often.
+func (c *meshCluster) Ready() bool {
+	if c.conf.Role != RoleActive {
+		return false
+	} else if c.Healthy() {
 		return true
 	}
 	c.mu.Lock()

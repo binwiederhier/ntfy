@@ -2153,6 +2153,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Experimental clustering: add `experimental-cluster-role` to run a `passive` node that never leads and never takes over another node's subscribers, e.g. one that is not behind the load balancer ([#2049](https://github.com/binwiederhier/ntfy/pull/2049))
+* Add `/v1/ready` for load balancers, and the node's role to `/v1/health`; with clustering, a node with no other active node leads right away instead of after a one-minute hold-off ([#2050](https://github.com/binwiederhier/ntfy/pull/2050))
 
 **Bug fixes + maintenance:**
 

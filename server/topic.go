@@ -138,8 +138,6 @@ func (t *topic) Unsubscribe(id int) {
 // Publish asynchronously publishes to all subscribers, unless the message went out already
 func (t *topic) Publish(v *visitor, m *model.Message) error {
 	go func() {
-		// We want to lock the topic as short as possible, so we make a shallow copy of the
-		// subscribers map here. Actually sending out the messages then doesn't have to lock.
 		subscribers, ok := t.markDelivered(m)
 		if !ok {
 			logvm(v, m).Tag(tagPublish).Trace("Delivered already, not forwarding")

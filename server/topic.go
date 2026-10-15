@@ -178,7 +178,8 @@ func (t *topic) deliver(v *visitor, messages []*model.Message) int {
 	// Send each subscriber its messages, chained after its earlier sends so they stay in order
 	for s, subscriberMessages := range pending {
 		sends += len(subscriberMessages)
-		previous, done := s.sent, make(chan struct{})
+		previous := s.sent
+		done := make(chan struct{})
 		s.sent = done
 		// In their own Go routines because sends block, and a slow subscriber must not hold up others
 		go func(s subscriber, subscriberMessages []*model.Message) {

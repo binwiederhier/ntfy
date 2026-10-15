@@ -35,11 +35,11 @@ type topic struct {
 }
 
 type topicSubscriber struct {
-	userID     string // User ID associated with this subscription, may be empty
-	subscriber subscriber
-	cancel     func()
-	since      time.Time     // When it subscribed; what went out before, it missed
-	sent       chan struct{} // Closed when the last batch of sends to this subscriber is done; the next one waits for it
+	userID       string // User ID associated with this subscription, may be empty
+	subscriber   subscriber
+	cancel       func()
+	subscribedAt time.Time     // When it subscribed; what went out before, it missed
+	sent         chan struct{} // Closed when the last batch of sends to this subscriber is done; the next one waits for it
 }
 
 // subscriber is a function that is called for every new message on a topic
@@ -67,10 +67,10 @@ func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscribe
 		}
 	}
 	t.subscribers[subscriberID] = &topicSubscriber{
-		userID:     userID, // May be empty
-		subscriber: s,
-		cancel:     cancel,
-		since:      time.Now(),
+		userID:       userID, // May be empty
+		subscriber:   s,
+		cancel:       cancel,
+		subscribedAt: time.Now(),
 	}
 	t.lastAccess = time.Now()
 	return subscriberID
@@ -167,7 +167,7 @@ func (t *topic) deliver(v *visitor, messages []*model.Message) int {
 	for _, m := range messages {
 		at, ok := t.delivered[m.ID]
 		for _, s := range t.subscribers {
-			if !ok || !s.since.Before(at) {
+			if !ok || !s.subscribedAt.Before(at) {
 				pending[s] = append(pending[s], m)
 			}
 		}

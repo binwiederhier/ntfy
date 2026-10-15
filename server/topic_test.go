@@ -179,3 +179,19 @@ func TestTopic_PublishMissed_InWriteOrderAcrossReads(t *testing.T) {
 	require.Equal(t, "first", <-received)
 	require.Equal(t, "second", <-received)
 }
+
+func TestTopic_ExpireDelivered(t *testing.T) {
+	// Stale only answers; forgetting old deliveries is ExpireDelivered's job
+	to := newTopic("mytopic")
+	to.delivered["old"] = time.Now().Add(-topicDeliveredRetain - time.Second)
+	to.delivered["new"] = time.Now()
+	require.False(t, to.Stale())
+	_, ok := to.DeliveredAt("old")
+	require.True(t, ok)
+
+	to.ExpireDelivered()
+	_, ok = to.DeliveredAt("old")
+	require.False(t, ok)
+	_, ok = to.DeliveredAt("new")
+	require.True(t, ok)
+}

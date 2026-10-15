@@ -19,7 +19,7 @@ const (
 	// topicDeliveredRetain is how long a topic at least remembers that a message went out to its
 	// subscribers, so the tail (see PublishMissed) does not send it again. It must cover the write
 	// delay plus how long the tail waits for a row committed out of order (tailHoleTimeout). Entries
-	// are dropped by the manager's next pass over the topics (see Stale), so they may live longer.
+	// are dropped by the manager's next pass over the topics (see ExpireDelivered), so they may live longer.
 	topicDeliveredRetain = 2 * time.Minute
 )
 
@@ -84,10 +84,22 @@ func (t *topic) DeliveredAt(id string) (time.Time, bool) {
 	return at, ok
 }
 
+// ExpireDelivered forgets deliveries older than topicDeliveredRetain; the manager calls it on
+// every pass over the topics
+func (t *topic) ExpireDelivered() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	cutoff := time.Now().Add(-topicDeliveredRetain)
+	for id, at := range t.delivered {
+		if at.Before(cutoff) {
+			delete(t.delivered, id)
+		}
+	}
+}
+
 func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.expireDeliveredNoLock()
 	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
 		return false
 	}
@@ -215,16 +227,6 @@ func (t *topic) markDelivered(m *model.Message) ([]subscriber, bool) {
 // rememberDeliveredNoLock records that the message went out now; t.mu must be held
 func (t *topic) rememberDeliveredNoLock(id string) {
 	t.delivered[id] = time.Now()
-}
-
-// expireDeliveredNoLock forgets deliveries older than topicDeliveredRetain; t.mu must be held
-func (t *topic) expireDeliveredNoLock() {
-	cutoff := time.Now().Add(-topicDeliveredRetain)
-	for id, at := range t.delivered {
-		if at.Before(cutoff) {
-			delete(t.delivered, id)
-		}
-	}
 }
 
 // Stats returns the number of subscribers and last access to this topic

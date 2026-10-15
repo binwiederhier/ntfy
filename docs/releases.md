@@ -6,11 +6,36 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.30.0 | Oct 12, 2026  |
+| ntfy server      | v2.31.0 | Oct 16, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.31.0
+Released October 16, 2026
+
+This release fixes messages that could be lost when a client reconnects, e.g. a phone switching networks, right when
+messages are published: every server now reads newly written messages from its message cache once a second and sends them
+to the subscribers that missed them. In load tests with server restarts and crashes, this brought lost messages down from
+465 to 2 out of about 615,000. It also adds a `/v1/ready` endpoint for load balancers, and continues the experimental
+clustering work with node roles.
+
+**Features:**
+
+* Add `/v1/ready` for load balancers, and the node's role to `/v1/health`; with clustering, a node with no other active node leads right away instead of after a one-minute hold-off ([#2050](https://github.com/binwiederhier/ntfy/pull/2050))
+* Experimental clustering: add `experimental-cluster-role` to run a `passive` node that never leads and never takes over another node's subscribers, e.g. one that is not behind the load balancer ([#2049](https://github.com/binwiederhier/ntfy/pull/2049))
+
+**Bug fixes + maintenance:**
+
+* Fix messages lost when a client reconnects before they are written to the message cache, or when a cluster node's fan-out is lost: every node now reads newly written messages once a second and sends them to the subscribers that missed them ([#2040](https://github.com/binwiederhier/ntfy/pull/2040))
+* Write user stats (messages, emails, calls) as increments, so servers sharing one database add up instead of overwriting each other's counts ([#1989](https://github.com/binwiederhier/ntfy/pull/1989))
+* Don't add a visitor's anonymous usage to an account's stats when the account takes over that visitor, e.g. right after upgrading ([#2041](https://github.com/binwiederhier/ntfy/pull/2041))
+
+**Upgrade notes:**
+
+* A reconnect with `since=<message ID>` now also returns the messages published in the same second as that message, so none are skipped when several servers write out of order. The ntfy apps and web app drop these by ID; your own scripts may see a few duplicates ([#2040](https://github.com/binwiederhier/ntfy/pull/2040))
+* Experimental clustering only: this release changes the cluster's node registry schema (version 1 to 2). Downgrading a clustered server to v2.30.0 afterwards requires setting the version back by hand first: `UPDATE schema_version SET version = 1 WHERE store = 'node_registry'` ([#2049](https://github.com/binwiederhier/ntfy/pull/2049))
 
 ### ntfy server v2.30.0
 Released October 12, 2026
@@ -2147,19 +2172,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.30.1 (UNRELEASED)
-
-**Features:**
-
-* Experimental clustering: add `experimental-cluster-role` to run a `passive` node that never leads and never takes over another node's subscribers, e.g. one that is not behind the load balancer ([#2049](https://github.com/binwiederhier/ntfy/pull/2049))
-* Add `/v1/ready` for load balancers, and the node's role to `/v1/health`; with clustering, a node with no other active node leads right away instead of after a one-minute hold-off ([#2050](https://github.com/binwiederhier/ntfy/pull/2050))
-
-**Bug fixes + maintenance:**
-
-* Write user stats (messages, emails, calls) as increments, so servers sharing one database add up instead of overwriting each other's counts ([#1989](https://github.com/binwiederhier/ntfy/pull/1989))
-* Don't add a visitor's anonymous usage to an account's stats when the account takes over that visitor, e.g. right after upgrading ([#2041](https://github.com/binwiederhier/ntfy/pull/2041))
-* Fix messages lost when a client reconnects before they are written to the message cache, or when a cluster node's fan-out is lost: every node now reads newly written messages once a second and sends them to the subscribers that missed them ([#2040](https://github.com/binwiederhier/ntfy/pull/2040))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

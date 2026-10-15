@@ -39,7 +39,7 @@ type topicSubscriber struct {
 	subscriber subscriber
 	cancel     func()
 	since      time.Time     // When it subscribed; what went out before, it missed
-	missedDone chan struct{} // Closed when the tail's last batch for this subscriber is sent; the next one waits for it
+	sent       chan struct{} // Closed when the last batch of sends to this subscriber is done; the next one waits for it
 }
 
 // subscriber is a function that is called for every new message on a topic
@@ -135,96 +135,68 @@ func (t *topic) Unsubscribe(id int) {
 	delete(t.subscribers, id)
 }
 
-// Publish asynchronously publishes to all subscribers, unless the message went out already
+// Publish sends a live message to the subscribers that have not had it (see deliver), without
+// waiting for the sends
 func (t *topic) Publish(v *visitor, m *model.Message) error {
-	go func() {
-		subscribers, ok := t.markDelivered(m)
-		if !ok {
-			logvm(v, m).Tag(tagPublish).Trace("Delivered already, not forwarding")
-			return
-		}
-		t.send(v, m, subscribers)
-		t.Keepalive()
-	}()
+	if sends := t.deliver(v, []*model.Message{m}); sends > 0 {
+		logvm(v, m).Tag(tagPublish).Debug("Forwarding to %d subscriber(s)", sends)
+	} else {
+		logvm(v, m).Tag(tagPublish).Trace("No subscribers that have not had it, not forwarding")
+	}
+	t.Keepalive()
 	return nil
 }
 
-// PublishMissed asynchronously publishes messages the tail read from the cache to the
-// subscribers that did not get them: all of them if a message never went out here (its fan-out
-// was lost), or those that subscribed after it went out (they were reconnecting and their read
-// missed it). It returns how many sends it made.
+// PublishMissed sends messages the tail read from the cache to the subscribers that have not had
+// them (see deliver), without waiting for the sends. It returns how many sends it started.
 func (t *topic) PublishMissed(messages []*model.Message) int {
+	return t.deliver(nil, messages) // No visitor: the tail is not a request
+}
+
+// deliver sends each message to the subscribers that have not had it: all of them if it never
+// went out here, or those that subscribed after it went out (they were reconnecting and their
+// read missed it, or the tail was faster than the fan-out). It records each as gone out now, and
+// picks the subscribers under the same lock, so a subscriber either gets a message or subscribed
+// after. Each subscriber's messages go out from one Go routine, in order, after its earlier ones:
+// a reconnect asks for what came after the last message the client got, so none may overtake.
+func (t *topic) deliver(v *visitor, messages []*model.Message) int {
 	t.mu.Lock()
-	missed := make(map[*topicSubscriber][]*model.Message)
+	defer t.mu.Unlock()
+	now := time.Now()
+	pending := make(map[*topicSubscriber][]*model.Message)
 	for _, m := range messages {
 		at, ok := t.delivered[m.ID]
 		for _, s := range t.subscribers {
 			if !ok || !s.since.Before(at) {
-				missed[s] = append(missed[s], m)
+				pending[s] = append(pending[s], m)
 			}
 		}
-		t.rememberDeliveredNoLock(m.ID)
+		t.delivered[m.ID] = now
 	}
 	sends := 0
-	for s, subscriberMessages := range missed {
+	for s, subscriberMessages := range pending {
 		sends += len(subscriberMessages)
-		previous, done := s.missedDone, make(chan struct{})
-		s.missedDone = done
-		// One Go routine per subscriber, sending in write order after the previous batch: a reconnect
-		// asks for what came after the last message the client got, so no later one may overtake
+		previous, done := s.sent, make(chan struct{})
+		s.sent = done
+		// In their own Go routines because sends block, and a slow subscriber must not hold up others
 		go func(s subscriber, subscriberMessages []*model.Message) {
 			defer close(done)
 			if previous != nil {
 				<-previous
 			}
 			for _, m := range subscriberMessages {
-				if err := s(nil, m); err != nil { // No visitor: the tail is not a request
-					log.Tag(tagPublish).With(m).Err(err).Warn("Error forwarding missed message to subscriber")
+				if err := s(v, m); err != nil {
+					ev := log.Tag(tagPublish).With(m)
+					if v != nil {
+						ev = logvm(v, m).Tag(tagPublish)
+					}
+					ev.Err(err).Warn("Error forwarding to subscriber")
 					return // The connection is broken, so the rest would fail too
 				}
 			}
 		}(s.subscriber, subscriberMessages)
 	}
-	t.mu.Unlock()
 	return sends
-}
-
-func (t *topic) send(v *visitor, m *model.Message, subscribers []subscriber) {
-	if len(subscribers) == 0 {
-		logvm(v, m).Tag(tagPublish).Trace("No stream or WebSocket subscribers, not forwarding")
-		return
-	}
-	logvm(v, m).Tag(tagPublish).Debug("Forwarding to %d subscriber(s)", len(subscribers))
-	for _, s := range subscribers {
-		// We call the subscriber functions in their own Go routines because they are blocking, and
-		// we don't want individual slow subscribers to be able to block others.
-		go func(s subscriber) {
-			if err := s(v, m); err != nil {
-				logvm(v, m).Tag(tagPublish).Err(err).Warn("Error forwarding to subscriber")
-			}
-		}(s)
-	}
-}
-
-// markDelivered records that the message goes out now, and returns who it goes out to; false if
-// it went out already. Both under one lock, so a subscriber either gets it or subscribed after.
-func (t *topic) markDelivered(m *model.Message) ([]subscriber, bool) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if _, ok := t.delivered[m.ID]; ok {
-		return nil, false
-	}
-	t.rememberDeliveredNoLock(m.ID)
-	subscribers := make([]subscriber, 0, len(t.subscribers))
-	for _, s := range t.subscribers {
-		subscribers = append(subscribers, s.subscriber)
-	}
-	return subscribers, true
-}
-
-// rememberDeliveredNoLock records that the message went out now; t.mu must be held
-func (t *topic) rememberDeliveredNoLock(id string) {
-	t.delivered[id] = time.Now()
 }
 
 // Stats returns the number of subscribers and last access to this topic

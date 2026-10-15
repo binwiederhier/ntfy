@@ -284,9 +284,21 @@ func (c *Cache) ResolveMarker(mid string) (*Marker, error) {
 	return &Marker{rowID: rowID, time: markerTime, db: rdb}, nil
 }
 
-// MessagesAfterMarker is MessagesCapped for a resolved since=<mid> marker: the messages after
-// it, those with a higher row id and those published in its second or later with a lower one
-// (nodes write their batches independently, and late when one is cut off from the database)
+// MessagesAfterMarker is MessagesCapped for a resolved since=<mid> marker. The query matches
+// "id > marker row id OR (time >= marker time AND id <> marker row id)":
+//   - id > marker row id: the rows written after the marker, the usual case
+//   - time >= marker time: rows published in the marker's second or later but written before it.
+//     Nodes write their batches independently, and late when one is cut off from the database,
+//     so the marker itself may have been written late, after messages published later than it.
+//   - id <> marker row id: the marker matches its own time, and the client has it
+//
+// Example: the client's marker M was published at 12:00:05 on a node cut off from the database
+// and written when it came back, as row 900; N was published at 12:00:07 on another node and
+// written right away, as row 850. "id > 900" misses N, "time >= 12:00:05" finds it.
+//
+// The cost is a duplicate for each message published in the marker's second before it; clients
+// drop duplicates by id. Times are whole seconds on purpose: they come from each node's clock,
+// and a second hides clock skew between nodes that milliseconds would turn into losses.
 func (c *Cache) MessagesAfterMarker(topic string, marker *Marker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
 	var rows *sql.Rows
 	var err error

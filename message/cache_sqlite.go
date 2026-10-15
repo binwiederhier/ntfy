@@ -44,17 +44,25 @@ const (
 		WHERE topic = ? AND time >= ?
 		ORDER BY time DESC, id DESC
 	`
-	sqliteSelectMessageRowIDQuery    = `SELECT id FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectMessageRowIDQuery       = `SELECT id, time FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectRecentRowIDsQuery       = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
+	sqliteSelectMessagesAfterRowIDQuery = `
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, id, published
+		FROM messages
+		WHERE id > ? OR id IN (SELECT value FROM json_each(?))
+		ORDER BY id
+		LIMIT ?
+	`
 	sqliteSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
-		WHERE topic = ? AND id > ? AND published = 1
+		WHERE topic = ?1 AND (id > ?2 OR (time >= ?3 AND id <> ?2)) AND published = 1
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
-		WHERE topic = ? AND (id > ? OR published = 0)
+		WHERE topic = ?1 AND (id > ?2 OR (time >= ?3 AND id <> ?2) OR published = 0)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesLatestQuery = `
@@ -96,6 +104,8 @@ var sqliteQueries = queries{
 	selectMessageRowID:               sqliteSelectMessageRowIDQuery,
 	selectMessagesSinceID:            sqliteSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   sqliteSelectMessagesSinceIDIncludeScheduledQuery,
+	selectRecentRowIDs:               sqliteSelectRecentRowIDsQuery,
+	selectMessagesAfterRowID:         sqliteSelectMessagesAfterRowIDQuery,
 	selectMessagesLatest:             sqliteSelectMessagesLatestQuery,
 	selectMessagesDue:                sqliteSelectMessagesDueQuery,
 	deleteExpiredMessages:            sqliteDeleteExpiredMessagesQuery,

@@ -77,6 +77,7 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
+	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
 	stopOnce          sync.Once
 	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex
@@ -347,11 +348,19 @@ func New(conf *Config) (*Server, error) {
 		Role:            conf.ClusterRole,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
-		IsolatedFunc:    s.closeLocalSubscribers,
+		IsolatedFunc:    s.maybeCloseLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
 		return nil, err
+	}
+	if conf.CacheDuration > 0 {
+		tail, err := messageCache.Tail()
+		if err != nil {
+			return nil, err
+		}
+		s.tail = tail
+		go s.runTail()
 	}
 	return s, nil
 }
@@ -539,6 +548,9 @@ func (s *Server) stop() {
 	}
 	if s.httpClusterServer != nil {
 		s.httpClusterServer.Close()
+	}
+	if s.tail != nil {
+		s.tail.Close() // Before the databases close under it
 	}
 	s.closeDatabases()
 	if s.ban != nil {
@@ -1846,10 +1858,24 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	if since.IsNone() {
 		return nil
 	}
+	var marker *message.Marker
+	if since.IsID() {
+		var err error
+		if marker, err = s.messageCache.ResolveMarker(since.ID()); err != nil {
+			return err
+		}
+	}
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
-		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
+		var topicMessages []*model.Message
+		var topicTruncated bool
+		var err error
+		if marker != nil {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesAfterMarker(t.ID, marker, scheduled, s.config.MessagePollSizeLimit)
+		} else {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesCapped(t.ID, sinceForTopic(t, since), scheduled, s.config.MessagePollSizeLimit)
+		}
 		if err != nil {
 			return err
 		}

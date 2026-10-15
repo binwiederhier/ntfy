@@ -164,6 +164,7 @@ func (t *topic) deliver(v *visitor, messages []*model.Message) int {
 	defer t.mu.Unlock()
 	now := time.Now()
 	pending := make(map[*topicSubscriber][]*model.Message)
+	// Pick the subscribers that have not had each message, and record it as gone out to all of them now
 	for _, m := range messages {
 		at, ok := t.delivered[m.ID]
 		for _, s := range t.subscribers {
@@ -174,6 +175,7 @@ func (t *topic) deliver(v *visitor, messages []*model.Message) int {
 		t.delivered[m.ID] = now
 	}
 	sends := 0
+	// Send each subscriber its messages, chained after its earlier sends so they stay in order
 	for s, subscriberMessages := range pending {
 		sends += len(subscriberMessages)
 		previous, done := s.sent, make(chan struct{})

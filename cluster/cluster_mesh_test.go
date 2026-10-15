@@ -1,12 +1,14 @@
 package cluster
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,6 +19,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -645,4 +648,84 @@ func TestMesh_MembersOfAnIsolatedNodeAreNotReportedHealthy(t *testing.T) {
 	for _, m := range mesh.Members() {
 		require.False(t, m.Healthy, "an isolated node reported %s as healthy", m.NodeID)
 	}
+}
+
+func TestMesh_ReadyWithoutAnActivePeer(t *testing.T) {
+	// The only active node (a production server with passive peers beside it) stays ready when
+	// its heartbeat fails: there is nowhere better for its clients, so a load balancer must not
+	// pull it
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	registerFakePeerWithRole(t, pool, "node-passive", "http://192.168.1.51:2587", RolePassive)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, func() bool {
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.knownPeers) == 1
+	})
+	require.Nil(t, pool.Close()) // Heartbeats fail from here on
+	waitFor(t, func() bool { return !mesh.Healthy() })
+	require.True(t, mesh.Ready())
+}
+
+func TestMesh_NotReadyWhenAnActivePeerCanTakeOver(t *testing.T) {
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, func() bool {
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.knownPeers) == 1
+	})
+	require.True(t, mesh.Ready())
+	require.Nil(t, pool.Close())
+	waitFor(t, func() bool { return !mesh.Healthy() })
+	require.False(t, mesh.Ready())
+}
+
+func TestMesh_PassiveNodeWithoutAnActivePeerWarns(t *testing.T) {
+	// A passive node is never ready (load balancers send it nobody) and never leads, so on its own
+	// it is almost certainly a misconfiguration
+	var out bytes.Buffer
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.Contains(t, out.String(), "no active node is live")
+}
+
+func TestMesh_PassiveNodeWithAnActivePeerDoesNotWarn(t *testing.T) {
+	var out bytes.Buffer
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.NotContains(t, out.String(), "no active node is live")
+}
+
+func TestMesh_PassiveNodeIsNeverReady(t *testing.T) {
+	// A passive node is healthy, but takes no clients from a load balancer, alone or not
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.True(t, mesh.Healthy())
+	require.False(t, mesh.Ready())
 }

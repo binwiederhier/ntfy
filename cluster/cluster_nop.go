@@ -35,6 +35,14 @@ func (c *nopCluster) Healthy() bool {
 	return true // Health here means "the registry heartbeat is fresh", and there is no registry
 }
 
+func (c *nopCluster) Role() Role {
+	return RoleActive // A single node takes all client traffic
+}
+
+func (c *nopCluster) Ready() bool {
+	return true // A single node takes all client traffic
+}
+
 func (c *nopCluster) Close() error {
 	return nil // Nothing was started
 }

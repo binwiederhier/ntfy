@@ -28,6 +28,8 @@ type fakeCluster struct {
 	announced  []string
 	notLeader  bool
 	notHealthy bool
+	notReady   bool
+	role       cluster.Role // Empty means active
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -43,6 +45,27 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.announced = append(b.announced, state.AddedTopics...)
+}
+
+func (b *fakeCluster) Ready() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return !b.notReady
+}
+
+func (b *fakeCluster) setReady(ready bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.notReady = !ready
+}
+
+func (b *fakeCluster) Role() cluster.Role {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.role == "" {
+		return cluster.RoleActive
+	}
+	return b.role
 }
 
 func (b *fakeCluster) Healthy() bool {
@@ -172,6 +195,62 @@ func TestServer_Cluster_Role(t *testing.T) {
 	require.Equal(t, cluster.RolePassive, members[0].Role)
 }
 
+func TestServer_Cluster_ActiveWithPassivePeer(t *testing.T) {
+	// The setup for trying clustering beside production: the production server is the only
+	// active node, a second one runs passive. The active one leads right away, both deliver
+	// each other's messages, and only the active one leads.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string, role cluster.Role) *Server {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		require.Nil(t, err)
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = listener.Addr().String()
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://" + listener.Addr().String()
+		conf.ClusterRole = role
+		s := newTestServer(t, conf)
+		srv := &http.Server{Handler: s.cluster}
+		go srv.Serve(listener)
+		t.Cleanup(func() { srv.Close() })
+		return s
+	}
+	passive := newNode("node-a", cluster.RolePassive) // Lower id, but passive
+	started := time.Now()
+	active := newNode("node-b", cluster.RoleActive)
+	waitFor(t, func() bool { return active.cluster.IsLeader() })
+	require.Less(t, time.Since(started), 5*time.Second) // Not after a one-minute hold-off
+	require.False(t, passive.cluster.IsLeader())
+
+	// Both nodes know each other before publishing, or the fan-out has no peer to go to
+	waitFor(t, func() bool { return len(active.cluster.Members()) == 2 && len(passive.cluster.Members()) == 2 })
+	receive := func(s *Server, topic string) func() []string {
+		topics, err := s.topicsFromIDs(nil, topic)
+		require.Nil(t, err)
+		var mu sync.Mutex
+		received := make([]string, 0)
+		topics[0].Subscribe(func(_ *visitor, m *model.Message) error {
+			mu.Lock()
+			defer mu.Unlock()
+			received = append(received, m.Message)
+			return nil
+		}, "", func() {})
+		return func() []string {
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]string{}, received...)
+		}
+	}
+	onPassive := receive(passive, "toward-passive")
+	onActive := receive(active, "toward-active")
+	require.Equal(t, 200, request(t, active, "PUT", "/toward-passive", "from active", nil).Code)
+	require.Equal(t, 200, request(t, passive, "PUT", "/toward-active", "from passive", nil).Code)
+	waitFor(t, func() bool { return len(onPassive()) == 1 && len(onActive()) == 1 })
+	require.Equal(t, []string{"from active"}, onPassive())
+	require.Equal(t, []string{"from passive"}, onActive())
+	require.Equal(t, 200, request(t, active, "GET", "/v1/health", "", nil).Code)
+}
+
 func TestServer_Cluster_EndToEnd(t *testing.T) {
 	// Two full servers sharing one Postgres schema: a message published to node A over HTTP must
 	// reach a subscriber connected to node B, via the node registry and the fan-out endpoint.
@@ -271,7 +350,7 @@ func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
 
 func TestServer_Cluster_HealthReflectsCluster(t *testing.T) {
 	// A node whose registry heartbeat went stale no longer receives forwarded messages, so
-	// health checks must pull it from rotation (the fail-open policy lives in the checker)
+	// health reports it (load balancers check /v1/ready, see TestServer_Cluster_Ready)
 	s := newTestServer(t, newTestConfig(t, ""))
 	cl := &fakeCluster{}
 	s.cluster = cl
@@ -403,4 +482,52 @@ func topicsSnapshot(s *Server) map[string]*topic {
 		topics[id] = t
 	}
 	return topics
+}
+
+func TestServer_Cluster_HealthReportsRole(t *testing.T) {
+	// A passive node is healthy: role and health are separate answers
+	s := newTestServer(t, newTestConfig(t, ""))
+	s.cluster = &fakeCluster{role: cluster.RolePassive}
+	rr := request(t, s, "GET", "/v1/health", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"healthy":true,"role":"passive"}`, rr.Body.String())
+}
+
+func TestServer_Cluster_Ready(t *testing.T) {
+	// Readiness is what a load balancer checks; the cluster decides it (see Cluster.Ready)
+	s := newTestServer(t, newTestConfig(t, ""))
+	cl := &fakeCluster{}
+	s.cluster = cl
+	rr := request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
+
+	cl.setReady(false)
+	cl.mu.Lock()
+	cl.role = cluster.RolePassive
+	cl.mu.Unlock()
+	rr = request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 503, rr.Code)
+	require.JSONEq(t, `{"ready":false,"role":"passive"}`, rr.Body.String())
+}
+
+func TestServer_Cluster_HealthIsTheHeartbeat(t *testing.T) {
+	// The only active node with a stale heartbeat (database unreachable) is unhealthy, which
+	// monitoring should see, but stays ready, since there is nowhere better for its clients
+	s := newTestServer(t, newTestConfig(t, ""))
+	cl := &fakeCluster{}
+	s.cluster = cl
+	cl.setHealthy(false)
+	rr := request(t, s, "GET", "/v1/health", "", nil)
+	require.Equal(t, 503, rr.Code)
+	require.JSONEq(t, `{"healthy":false,"role":"active"}`, rr.Body.String())
+	rr = request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
+}
+
+func TestServer_ReadyWithoutClustering(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t, ""))
+	rr := request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
 }

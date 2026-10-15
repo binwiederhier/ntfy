@@ -113,6 +113,7 @@ var (
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
+	apiReadyPath                                         = "/v1/ready"
 	apiVersionPath                                       = "/v1/version"
 	apiConfigPath                                        = "/v1/config"
 	apiStatsPath                                         = "/v1/stats"
@@ -656,6 +657,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
 		return s.handleHealth(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiReadyPath {
+		return s.handleReady(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiVersionPath {
 		return s.ensureAdmin(s.handleVersion)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiConfigPath {
@@ -806,13 +809,23 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node;
-	// 503 lets status-code LB checks pull it (checkers must fail open, see cluster.Cluster)
+	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node. For
+	// monitoring; load balancers check /v1/ready, which keeps the only active node in
 	healthy := s.cluster.Healthy()
 	if !healthy {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy})
+	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy, Role: s.cluster.Role()})
+}
+
+// handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
+// Ready). A passive node is healthy (see handleHealth) but never ready.
+func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	ready := s.cluster.Ready()
+	if !ready {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	return s.writeJSON(w, &apiReadyResponse{Ready: ready, Role: s.cluster.Role()})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,

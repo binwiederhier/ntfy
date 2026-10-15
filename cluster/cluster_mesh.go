@@ -78,8 +78,12 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	if err := reg.Register(); err != nil {
 		return nil, err
 	}
-	if _, err := reg.Refresh(); err != nil {
+	peers, err := reg.Refresh()
+	if err != nil {
 		return nil, err
+	}
+	if conf.Role == RolePassive && !hasActivePeer(peers) {
+		log.Tag(tag).Warn("This node is passive and no active node is live: load balancers checking /v1/ready send it no clients, and the cluster has no leader until an active node joins")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &meshCluster{
@@ -102,6 +106,16 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	go c.heartbeatLoop()
 	go c.isolationLoop()
 	return c, nil
+}
+
+// hasActivePeer reports whether any of the peers is active
+func hasActivePeer(peers []*registry.Peer) bool {
+	for _, p := range peers {
+		if p.Role == RoleActive {
+			return true
+		}
+	}
+	return false
 }
 
 // ForwardMessage enqueues the message for delivery to every live peer node; a peer without
@@ -185,6 +199,29 @@ func (c *meshCluster) Healthy() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return time.Since(c.lastRegistered) < c.conf.NodeTTL
+}
+
+// Role reports this node's configured role
+func (c *meshCluster) Role() Role {
+	return c.conf.Role
+}
+
+// Ready reports whether a load balancer should send clients here (see the Cluster interface). It
+// reads the last peer snapshot rather than probing peers, since load balancers call it often.
+func (c *meshCluster) Ready() bool {
+	if c.conf.Role != RoleActive {
+		return false
+	} else if c.Healthy() {
+		return true
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, p := range c.knownPeers {
+		if p.Role == RoleActive {
+			return false // Another active node can take this node's clients
+		}
+	}
+	return true
 }
 
 // Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,

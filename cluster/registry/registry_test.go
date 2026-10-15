@@ -291,8 +291,9 @@ func TestRegistry_LowestLiveNodeLeads(t *testing.T) {
 	require.Nil(t, err)
 	c, err := New(pool, "app3", "http://10.0.0.3:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
-	// Nobody leads before the hold-off has elapsed
-	tick(t, a, b, c)
+	// app2 and app3 register first; app1 sees them live and waits out the hold-off (app2, alone
+	// when it first ticked, may lead meanwhile, never at the same time)
+	tick(t, b, c, a)
 	require.False(t, a.IsLeader())
 	waitForLeader(t, a, b, c)
 	require.False(t, b.IsLeader())
@@ -608,4 +609,54 @@ func tickPastHoldoff(t *testing.T, check func(), rs ...*Registry) {
 		check()
 		time.Sleep(leaderTestPoll)
 	}
+}
+
+func TestRegistry_AloneLeadsRightAway(t *testing.T) {
+	// The hold-off keeps a previous leader's belief from overlapping with the next one. A node
+	// that sees no other active node, live or recently live, has nobody to overlap with: it
+	// leads at once, so a restarted single node does not pause its scheduled jobs for a minute
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	tick(t, a)
+	require.True(t, a.IsLeader())
+}
+
+func TestRegistry_OnlyPassivePeersLeadsRightAway(t *testing.T) {
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	b, err := New(pool, "app0", "http://10.0.0.2:2587", RolePassive, leaderTestTTL) // Lower id, but passive
+	require.Nil(t, err)
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	tick(t, b, a)
+	require.True(t, a.IsLeader())
+	require.False(t, b.IsLeader())
+}
+
+func TestRegistry_RecentlyLiveActivePeerMeansHoldOff(t *testing.T) {
+	// Another active node stopped heartbeating a moment ago: it may still believe it leads
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	insertNodeAt(t, pool, "app0", "http://10.0.0.9:2587", time.Now().Add(-2*leaderTestTTL)) // Stale, but recent
+	tick(t, a)
+	require.False(t, a.IsLeader())
+	waitForLeader(t, a)
+}
+
+func TestRegistry_PruneKeepsRecentlyLiveActiveNodes(t *testing.T) {
+	// A crashed leader's row must outlive the window in which a new node still holds off for it,
+	// or Prune would let the next node lead while the old one may still believe it does
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	insertNodeAt(t, pool, "app0", "http://10.0.0.9:2587", time.Now().Add(-a.lease()-a.holdoff()+leaderTestTTL))
+	require.Nil(t, a.Prune())
+	require.Equal(t, 1, countRows(t, pool, "app0"))
+	tick(t, a)
+	require.False(t, a.IsLeader())
 }

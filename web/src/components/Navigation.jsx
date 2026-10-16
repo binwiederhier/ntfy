@@ -140,7 +140,8 @@ const NavList = (props) => {
   return (
     <>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
-      <List component="nav" sx={{ paddingTop: { xs: 0, sm: alertVisible ? 0 : "" } }}>
+      {/* The list scrolls on its own, so the upgrade banner below it never covers the last items */}
+      <List component="nav" sx={{ paddingTop: { xs: 0, sm: alertVisible ? 0 : "" }, flexGrow: 1, overflowY: "auto" }}>
         {versionChanged && <VersionUpdateBanner />}
         {showNotificationPermissionRequired && <NotificationPermissionRequired />}
         {showNotificationPermissionDenied && <NotificationPermissionDeniedAlert />}
@@ -201,12 +202,12 @@ const NavList = (props) => {
           </ListItemIcon>
           <ListItemText primary={t("nav_button_subscribe")} />
         </ListItemButton>
-        {showUpgradeBanner && (
-          // The text background gradient didn't seem to do well with switching between light/dark mode,
-          // So adding a `key` forces React to replace the entire component when the theme changes
-          <UpgradeBanner key={`upgrade-banner-${theme.palette.mode}`} mode={theme.palette.mode} />
-        )}
       </List>
+      {showUpgradeBanner && (
+        // The text background gradient didn't seem to do well with switching between light/dark mode,
+        // So adding a `key` forces React to replace the entire component when the theme changes
+        <UpgradeBanner key={`upgrade-banner-${theme.palette.mode}`} mode={theme.palette.mode} />
+      )}
       <SubscribeDialog
         key={`subscribeDialog${subscribeDialogKey}`} // Resets dialog when canceled/closed
         open={subscribeDialogOpen}
@@ -231,10 +232,7 @@ const UpgradeBanner = ({ mode }) => {
   return (
     <Box
       sx={{
-        position: "fixed",
-        width: `${Navigation.width - 1}px`,
-        bottom: 0,
-        mt: "auto",
+        flexShrink: 0,
         background:
           mode === "light"
             ? "linear-gradient(150deg, rgba(196, 228, 221, 0.46) 0%, rgb(255, 255, 255) 100%)"

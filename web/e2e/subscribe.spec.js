@@ -71,7 +71,7 @@ test("the same topic on two servers opens the right one", async ({ page }) => {
   await expect(title).toHaveText(other);
 });
 
-test("protected topic asks for a login",async ({ page, request, users, serverConfig }) => {
+test("protected topic asks for a login", async ({ page, request, users, serverConfig }) => {
   test.skip(!serverConfig.enable_reservations, "reservations disabled");
   const owner = await users.create({ paid: true });
   const token = await apiToken(request, owner);

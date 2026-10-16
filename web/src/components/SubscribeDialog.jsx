@@ -91,8 +91,9 @@ const SubscribePage = (props) => {
   const [everyone, setEveryone] = useState(Permission.DENY_ALL);
   const baseUrl = anotherServerVisible ? props.baseUrl : config.base_url;
   const { topic } = props;
-  const existingTopicUrls = props.subscriptions.map((s) => topicUrl(s.baseUrl, s.topic));
-  const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...props.subscriptions.map((s) => s.baseUrl)])).filter(
+  const subscriptions = props.subscriptions ?? []; // Undefined until loaded from IndexedDB, which can be slow or blocked
+  const existingTopicUrls = subscriptions.map((s) => topicUrl(s.baseUrl, s.topic));
+  const existingBaseUrls = Array.from(new Set([publicBaseUrl, ...subscriptions.map((s) => s.baseUrl)])).filter(
     (s) => s !== config.base_url,
   );
   const showReserveTopicCheckbox = config.enable_reservations && !anotherServerVisible && (config.enable_payments || account);

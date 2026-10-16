@@ -13,6 +13,14 @@ export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;
+
+// findSubscriptionForRoute returns the subscription the current route points to: /:topic for the
+// default server, /:baseUrl/:topic for any other server. The default server only matches when the
+// route has no baseUrl, or the same topic on two servers would resolve to whichever is listed first.
+export const findSubscriptionForRoute = (subscriptions, params, defaultBaseUrl) => {
+  const baseUrls = params.baseUrl ? expandUrl(params.baseUrl) : [defaultBaseUrl];
+  return subscriptions.find((s) => baseUrls.includes(s.baseUrl) && params.topic === s.topic);
+};
 export const topicUrl = (baseUrl, topic) => `${baseUrl}/${topic}`;
 export const topicUrlWs = (baseUrl, topic) =>
   `${topicUrl(baseUrl, topic)}/ws`.replaceAll("https://", "wss://").replaceAll("http://", "ws://");

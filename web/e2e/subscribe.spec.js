@@ -20,6 +20,17 @@ test("generate a topic name", async ({ page }) => {
   await expect(page.getByRole("button", { name: topic, exact: true })).toBeVisible();
 });
 
+test("the subscribe dialog opens before the topic list has loaded", async ({ page }) => {
+  // #2014: if IndexedDB is slow or blocked (e.g. another tab holds it during an upgrade), the
+  // splash hides after 3s without the topic list, and opening the dialog used to crash the app
+  await page.addInitScript(() => {
+    indexedDB.open = () => new Proxy({}, { get: () => undefined, set: () => true }); // Never opens
+  });
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Subscribe to topic" }).click();
+  await expect(page.getByRole("dialog").getByLabel(/topic name/i)).toBeVisible();
+});
+
 test("visiting a topic URL subscribes to it", async ({ page }) => {
   const topic = unique("visit");
   await page.goto(`/${topic}`);
@@ -44,6 +55,31 @@ test("subscribe to a topic on another server", async ({ page, request }) => {
 
   await request.post(`/${topic}`, { data: "via the other server" });
   await expect(page.getByText("via the other server")).toBeVisible();
+});
+
+test("the same topic on two servers opens the right one", async ({ page }) => {
+  // #858: the default server's subscription used to win for /:baseUrl/:topic as well
+  test.skip(remote, "needs a second hostname for the server");
+  const topic = unique("same");
+  const other = `localhost:${port}/${topic}`;
+  const title = page.getByRole("banner").getByText(/same/);
+  await page.goto(`/${topic}`);
+  await expect(title).toHaveText(topic);
+
+  await page.getByRole("button", { name: "Subscribe to topic" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/topic name/i).fill(topic);
+  await dialog.getByRole("switch", { name: "Use another server" }).check();
+  await dialog.getByRole("combobox").fill(`http://localhost:${port}`);
+  await dialog.getByRole("button", { name: "Subscribe", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/${other}$`));
+  await expect(title).toHaveText(other);
+
+  // Switch back and forth through the navigation
+  await page.getByRole("button", { name: topic, exact: true }).click();
+  await expect(title).toHaveText(topic);
+  await page.getByRole("button", { name: other, exact: true }).click();
+  await expect(title).toHaveText(other);
 });
 
 test("protected topic asks for a login", async ({ page, request, users, serverConfig }) => {

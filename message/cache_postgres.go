@@ -39,12 +39,12 @@ const (
 		WHERE topic = $1 AND time >= $2
 		ORDER BY time DESC, id DESC
 	`
-	postgresSelectMessageRowIDQuery    = `SELECT id FROM message WHERE mid = $1 LIMIT 1`
+	postgresSelectMessageRowIDQuery    = `SELECT id, time FROM message WHERE mid = $1 LIMIT 1`
 	postgresSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM message
 		WHERE topic = $1
-		  AND id > $2
+		  AND (id > $2 OR (time >= $3 AND id <> $2))
 		  AND published = TRUE
 		ORDER BY time DESC, id DESC
 	`
@@ -52,8 +52,18 @@ const (
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM message
 		WHERE topic = $1
-		  AND (id > $2 OR published = FALSE)
+		  AND (id > $2 OR (time >= $3 AND id <> $2) OR published = FALSE)
 		ORDER BY time DESC, id DESC
+	`
+	postgresSelectRecentRowIDsQuery = `SELECT id FROM message ORDER BY id DESC LIMIT $1`
+	// postgresSelectMessagesAfterRowIDQuery reads rows in write order: those after the cursor ($1),
+	// plus the skipped row ids ($2, a JSON array) that were not committed yet when the cursor passed
+	postgresSelectMessagesAfterRowIDQuery = `
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple, id, published
+		FROM message
+		WHERE id > $1 OR id = ANY(ARRAY(SELECT jsonb_array_elements_text($2::JSONB)::BIGINT))
+		ORDER BY id
+		LIMIT $3
 	`
 	postgresSelectMessagesLatestQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
@@ -114,6 +124,8 @@ var postgresQueries = queries{
 	selectMessageRowID:               postgresSelectMessageRowIDQuery,
 	selectMessagesSinceID:            postgresSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
+	selectRecentRowIDs:               postgresSelectRecentRowIDsQuery,
+	selectMessagesAfterRowID:         postgresSelectMessagesAfterRowIDQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,
 	selectMessagesDue:                postgresSelectMessagesDueQuery,
 	claimMessagesDue:                 postgresClaimMessagesDueQuery,

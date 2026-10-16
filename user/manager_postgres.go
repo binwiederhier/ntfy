@@ -73,7 +73,7 @@ const (
 	postgresUpdateUserRoleQuery           = `UPDATE "user" SET role = $1 WHERE user_name = $2`
 	postgresUpdateUserProvisionedQuery    = `UPDATE "user" SET provisioned = $1 WHERE user_name = $2`
 	postgresUpdateUserPrefsQuery          = `UPDATE "user" SET prefs = $1 WHERE id = $2`
-	postgresUpdateUserStatsQuery          = `UPDATE "user" SET stats_messages = $1, stats_emails = $2, stats_calls = $3 WHERE id = $4`
+	postgresUpdateUserStatsQuery          = `UPDATE "user" SET stats_messages = stats_messages + $1, stats_emails = stats_emails + $2, stats_calls = stats_calls + $3 WHERE id = $4`
 	postgresUpdateUserStatsResetAllQuery  = `UPDATE "user" SET stats_messages = 0, stats_emails = 0, stats_calls = 0`
 	postgresUpdateUserTierQuery           = `UPDATE "user" SET tier_id = (SELECT id FROM tier WHERE code = $1) WHERE user_name = $2`
 	postgresUpdateUserDeletedQuery        = `UPDATE "user" SET deleted = $1 WHERE id = $2`

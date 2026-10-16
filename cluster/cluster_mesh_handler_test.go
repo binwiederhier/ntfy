@@ -149,3 +149,34 @@ func TestMesh_MembersEndpoint(t *testing.T) {
 	require.True(t, byID["node-a"].Healthy)
 	require.Equal(t, "http://192.168.1.50:2587", byID["node-peer"].AdvertiseURL)
 }
+
+func TestMesh_MembersEndpointReportsRoles(t *testing.T) {
+	// LB agents route client traffic to active nodes only, so every member carries its role,
+	// this node's from its config and each peer's from the registry
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	registerFakePeerWithRole(t, pool, "node-active", "http://192.168.1.50:2587", RoleActive)
+	registerFakePeerWithRole(t, pool, "node-passive", "http://192.168.1.51:2587", RolePassive)
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, func() bool {
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.knownPeers) == 2
+	})
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", MembersPath, nil)
+	req.Header.Set(secretHeader, testSecret)
+	mesh.ServeHTTP(rr, req)
+	require.Equal(t, http.StatusOK, rr.Code)
+	var members []map[string]any // Raw JSON, since the field name is the contract with the agents
+	require.Nil(t, json.Unmarshal(rr.Body.Bytes(), &members))
+	roles := make(map[string]any)
+	for _, m := range members {
+		roles[m["node_id"].(string)] = m["role"]
+	}
+	require.Equal(t, map[string]any{"node-a": "passive", "node-active": "active", "node-passive": "passive"}, roles)
+}

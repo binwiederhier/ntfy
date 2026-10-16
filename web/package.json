@@ -43,11 +43,12 @@
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^17.13.0",
     "prettier": "^3.9.4",
     "vite": "^8.0.16",
-    "vite-plugin-pwa": "^1.0.0",
-    "vitest": "^4.1.9"
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.0.3"
   },
   "browserslist": {
     "production": [

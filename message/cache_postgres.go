@@ -66,11 +66,16 @@ const (
 	`
 	postgresSelectRecentRowIDsQuery = `SELECT id FROM message ORDER BY id DESC LIMIT $1`
 	// postgresSelectMessagesAfterRowIDQuery reads rows in write order: those after the cursor ($1),
-	// plus the skipped row ids ($2, a JSON array) that were not committed yet when the cursor passed
+	// plus the skipped row ids ($2, a JSON array) that were not committed yet when the cursor passed.
+	// The parts are separate so that the primary key checks every condition, also in the plan made
+	// without the parameter values; as one OR, that plan read the whole table.
 	postgresSelectMessagesAfterRowIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, id, published
-		FROM message
-		WHERE id > $1 OR id = ANY(ARRAY(SELECT jsonb_array_elements_text($2::JSONB)::BIGINT))
+		FROM (
+			SELECT * FROM message WHERE id > $1
+			UNION ALL
+			SELECT * FROM message WHERE id = ANY(ARRAY(SELECT jsonb_array_elements_text($2::JSONB)::BIGINT)) AND id <= $1
+		) m
 		ORDER BY id
 		LIMIT $3
 	`

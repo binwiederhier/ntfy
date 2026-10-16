@@ -8,16 +8,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// See TestPostgresQueries_SinceIDUsesOnlyIndexConditions
-func TestSQLiteQueries_SinceIDUsesOnlyIndexConditions(t *testing.T) {
+// See TestPostgresQueries_GenericPlansUseOnlyIndexConditions
+func TestSQLiteQueries_SinceIDAndTailUseOnlyIndexConditions(t *testing.T) {
+	// SQLite plans without the parameter values, so this is the plan it always uses
 	c, err := NewSQLiteStore(filepath.Join(t.TempDir(), "cache.db"), "", 0, 0, 0, false)
 	require.Nil(t, err)
 	defer c.Close()
-	for name, query := range map[string]string{
-		"published":         sqliteQueries.selectMessagesSinceID,
-		"include scheduled": sqliteQueries.selectMessagesSinceIDScheduled,
+	for name, q := range map[string]struct {
+		query string
+		args  []any
+	}{
+		"since id":                    {sqliteQueries.selectMessagesSinceID, []any{"mytopic", 1000, 1792160000}},
+		"since id, include scheduled": {sqliteQueries.selectMessagesSinceIDScheduled, []any{"mytopic", 1000, 1792160000}},
+		"tail":                        {sqliteQueries.selectMessagesAfterRowID, []any{1000, "[998, 999]", 1000}},
 	} {
-		rows, err := c.db.Primary().Query("EXPLAIN QUERY PLAN "+query, "mytopic", 1000, 1792160000)
+		rows, err := c.db.Primary().Query("EXPLAIN QUERY PLAN "+q.query, q.args...)
 		require.Nil(t, err)
 		plan := make([]string, 0)
 		for rows.Next() {

@@ -44,14 +44,18 @@ const (
 		WHERE topic = ? AND time >= ?
 		ORDER BY time DESC, id DESC
 	`
-	sqliteSelectMessageRowIDQuery       = `SELECT id, time FROM messages WHERE mid = ? LIMIT 1`
-	sqliteSelectRecentRowIDsQuery       = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
+	sqliteSelectMessageRowIDQuery = `SELECT id, time FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectRecentRowIDsQuery = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
+	// sqliteSelectMessagesAfterRowIDQuery: see postgresSelectMessagesAfterRowIDQuery
 	sqliteSelectMessagesAfterRowIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, id, published
-		FROM messages
-		WHERE id > ? OR id IN (SELECT value FROM json_each(?))
+		FROM (
+			SELECT * FROM messages WHERE id > ?1
+			UNION ALL
+			SELECT * FROM messages WHERE id IN (SELECT value FROM json_each(?2)) AND id <= ?1
+		)
 		ORDER BY id
-		LIMIT ?
+		LIMIT ?3
 	`
 	// sqliteSelectMessagesSinceIDQuery: see postgresSelectMessagesSinceIDQuery
 	sqliteSelectMessagesSinceIDQuery = `

@@ -6,11 +6,31 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.31.0 | Oct 16, 2026  |
+| ntfy server      | v2.31.1 | Oct 16, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.31.1
+Released October 16, 2026
+
+This release fixes the database load that made us roll back ntfy.sh from v2.31.0: reconnecting with `since=<message ID>`
+read every message of the topic from the database. A new index makes these reconnects cheap, cheaper than in v2.30.0.
+It also lets ntfy start with a warning on a newer database schema, so later rollbacks need no manual step.
+
+**Bug fixes + maintenance:**
+
+* Fix reconnects with `since=<message ID>` reading every message of the topic from the database, which overloaded ntfy.sh's database right after the v2.31.0 upgrade; the message cache gets a new index: (topic, published, id) on PostgreSQL, (topic, published, time) on SQLite ([#2058](https://github.com/binwiederhier/ntfy/pull/2058))
+* Start with a warning instead of failing when the database schema is newer than this version of ntfy supports, so a rollback or a rolling cluster upgrade needs no manual schema change ([#2059](https://github.com/binwiederhier/ntfy/pull/2059))
+* Web app: Fix the wrong topic opening when subscribed to the same topic on two different servers ([#858](https://github.com/binwiederhier/ntfy/issues/858))
+* Web app: Fix the "Upgrade to ntfy Pro" banner covering the bottom of a long topic list ([#1007](https://github.com/binwiederhier/ntfy/issues/1007))
+* Web app: The "Notifications are disabled" and "Notifications are blocked" warnings can now be closed ([#1220](https://github.com/binwiederhier/ntfy/issues/1220))
+* Web app: Fix a crash when opening the subscribe dialog before the topic list has loaded, e.g. while another tab holds the browser database ([#2014](https://github.com/binwiederhier/ntfy/issues/2014), [#1881](https://github.com/binwiederhier/ntfy/issues/1881))
+
+**Upgrade notes:**
+
+* This release changes the message database schema (version 16 to 17: an index for `since=<message ID>` reconnects). Downgrading to v2.31.0 or earlier afterwards requires setting the version back by hand first: `UPDATE schema_version SET version = 16 WHERE store = 'message'` on PostgreSQL, or `UPDATE schemaVersion SET version = 16 WHERE id = 1` in the SQLite `cache-file`. From this release on, a newer schema only logs a warning ([#2059](https://github.com/binwiederhier/ntfy/pull/2059))
 
 ### ntfy server v2.31.0
 Released October 16, 2026
@@ -2172,21 +2192,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.31.1 (UNRELEASED)
-
-**Bug fixes + maintenance:**
-
-* Fix reconnects with `since=<message ID>` reading every message of the topic from the database, which overloaded ntfy.sh's database right after the v2.31.0 upgrade; the message cache gets a new index: (topic, published, id) on PostgreSQL, (topic, published, time) on SQLite ([#2058](https://github.com/binwiederhier/ntfy/pull/2058))
-* Start with a warning instead of failing when the database schema is newer than this version of ntfy supports, so a rollback or a rolling cluster upgrade needs no manual schema change ([#2059](https://github.com/binwiederhier/ntfy/pull/2059))
-* Web app: Fix the wrong topic opening when subscribed to the same topic on two different servers ([#858](https://github.com/binwiederhier/ntfy/issues/858))
-* Web app: Fix the "Upgrade to ntfy Pro" banner covering the bottom of a long topic list ([#1007](https://github.com/binwiederhier/ntfy/issues/1007))
-* Web app: The "Notifications are disabled" and "Notifications are blocked" warnings can now be closed ([#1220](https://github.com/binwiederhier/ntfy/issues/1220))
-* Web app: Fix a crash when opening the subscribe dialog before the topic list has loaded, e.g. while another tab holds the browser database ([#2014](https://github.com/binwiederhier/ntfy/issues/2014), [#1881](https://github.com/binwiederhier/ntfy/issues/1881))
-
-**Upgrade notes:**
-
-* This release changes the message database schema (version 16 to 17: an index for `since=<message ID>` reconnects). Downgrading to v2.31.0 or earlier afterwards requires setting the version back by hand first: `UPDATE schema_version SET version = 16 WHERE store = 'message'` on PostgreSQL, or `UPDATE schemaVersion SET version = 16 WHERE id = 1` in the SQLite `cache-file`. From this release on, a newer schema only logs a warning ([#2059](https://github.com/binwiederhier/ntfy/pull/2059))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

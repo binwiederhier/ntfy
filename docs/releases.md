@@ -2177,12 +2177,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
-* Fix reconnects with `since=<message ID>` reading every message of the topic from the database, which overloaded ntfy.sh's database right after the v2.31.0 upgrade; SQLite caches get a new index on (topic, published, time) for the same query ([#2040](https://github.com/binwiederhier/ntfy/pull/2040))
-
-### ntfy server v2.31.1 (UNRELEASED)
-
-**Bug fixes + maintenance:**
-
+* Fix reconnects with `since=<message ID>` reading every message of the topic from the database, which overloaded ntfy.sh's database right after the v2.31.0 upgrade; SQLite caches get a new index on (topic, published, time) for the same query ([#2058](https://github.com/binwiederhier/ntfy/pull/2058))
 * Web app: Fix the wrong topic opening when subscribed to the same topic on two different servers ([#858](https://github.com/binwiederhier/ntfy/issues/858))
 * Web app: Fix the "Upgrade to ntfy Pro" banner covering the bottom of a long topic list ([#1007](https://github.com/binwiederhier/ntfy/issues/1007))
 * Web app: The "Notifications are disabled" and "Notifications are blocked" warnings can now be closed ([#1220](https://github.com/binwiederhier/ntfy/issues/1220))

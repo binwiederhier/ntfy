@@ -1943,7 +1943,7 @@ func checkMigratedSqliteSchema(t *testing.T, filename string) {
 }
 
 func checkSchemaVersion(t *testing.T, d *db.DB) {
-	rows, err := d.Query(`SELECT version FROM schemaVersion`)
+	rows, err := d.Query(`SELECT version FROM schemaVersion WHERE id = 1`)
 	require.Nil(t, err)
 	require.True(t, rows.Next())
 

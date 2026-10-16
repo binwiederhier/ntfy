@@ -153,29 +153,42 @@ func TestMigrate_FreshCreateTakesMinVersionFromSteps(t *testing.T) {
 	})
 }
 
-func TestMigrate_AddsMinVersionToAnExistingVersionTable(t *testing.T) {
-	// Version tables created before the minimum version existed get the column; older code,
-	// which writes only the version, keeps working on the new table
+func TestMigrate_KeepsTheVersionTableShape(t *testing.T) {
+	// Older ntfy versions read and write the version table as it always was: the minimum version is
+	// an extra row, not a column, so the table they see does not change
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
-		createOld, upsertOld := `CREATE TABLE schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`, `INSERT INTO schema_version (store, version) VALUES ('things', 1) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`
+		createOld, upsertOld, columnsQuery := `CREATE TABLE schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`, `INSERT INTO schema_version (store, version) VALUES ('things', 1) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`, `SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'schema_version' ORDER BY ordinal_position`
 		if dialect == schema.SQLite {
-			createOld, upsertOld = `CREATE TABLE schemaVersion (id INT PRIMARY KEY, version INT NOT NULL)`, `INSERT INTO schemaVersion (id, version) VALUES (1, 1) ON CONFLICT (id) DO UPDATE SET version = excluded.version`
+			createOld, upsertOld, columnsQuery = `CREATE TABLE schemaVersion (id INT PRIMARY KEY, version INT NOT NULL)`, `INSERT INTO schemaVersion (id, version) VALUES (1, 1) ON CONFLICT (id) DO UPDATE SET version = excluded.version`, `SELECT name FROM pragma_table_info('schemaVersion') ORDER BY cid`
 		}
 		_, err := d.Exec(testCreateQuery)
 		require.Nil(t, err)
 		_, err = d.Exec(createOld)
 		require.Nil(t, err)
-		_, err = d.Exec(upsertOld)
-		require.Nil(t, err)
-		require.Nil(t, schema.Migrate(d, dialect, "things", 1, testCreate, nil))
-		require.Equal(t, 1, storeMinVersion(t, d, dialect, "things"))
-		_, err = d.Exec(upsertOld) // Older code writing its version
+		_, err = d.Exec(upsertOld) // Older code wrote version 1
 		require.Nil(t, err)
 
 		// A breaking migration to version 2 locks out code that supports only version 1
 		require.Nil(t, schema.Migrate(d, dialect, "things", 2, testCreate, map[int]schema.Migration{1: schema.Breaking(schema.Nop)}))
+		require.Equal(t, 2, storeVersion(t, d, dialect, "things"))
 		require.Equal(t, 2, storeMinVersion(t, d, dialect, "things"))
 		require.Error(t, schema.Migrate(d, dialect, "things", 1, testCreate, nil))
+
+		// The table has exactly the columns older code knows
+		rows, err := d.Query(columnsQuery)
+		require.Nil(t, err)
+		columns := make([]string, 0)
+		for rows.Next() {
+			var column string
+			require.Nil(t, rows.Scan(&column))
+			columns = append(columns, column)
+		}
+		require.Nil(t, rows.Close())
+		if dialect == schema.Postgres {
+			require.Equal(t, []string{"store", "version"}, columns)
+		} else {
+			require.Equal(t, []string{"id", "version"}, columns)
+		}
 	})
 }
 
@@ -249,9 +262,9 @@ func storeMinVersion(t *testing.T, d *sql.DB, dialect schema.Dialect, store stri
 	t.Helper()
 	var minVersion int
 	if dialect == schema.Postgres {
-		require.Nil(t, d.QueryRow(`SELECT min_version FROM schema_version WHERE store = $1`, store).Scan(&minVersion))
+		require.Nil(t, d.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, store+":min").Scan(&minVersion))
 	} else {
-		require.Nil(t, d.QueryRow(`SELECT min_version FROM schemaVersion WHERE id = 1`).Scan(&minVersion))
+		require.Nil(t, d.QueryRow(`SELECT version FROM schemaVersion WHERE id = 2`).Scan(&minVersion))
 	}
 	return minVersion
 }

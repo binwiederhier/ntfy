@@ -380,13 +380,16 @@ const SubscriptionItem = (props) => {
   );
 };
 
+// Sidebar warnings use a smaller font than the default 1rem, so they take up less of the narrow sidebar
+const navAlertSx = { paddingTop: 2, "& .MuiAlertTitle-root, & .MuiTypography-root": { fontSize: "0.9rem" } };
+
 const NotificationPermissionRequired = () => {
   const { t } = useTranslation();
   const requestPermission = async () => {
     await notifier.maybeRequestPermission();
   };
   return (
-    <Alert severity="warning" sx={{ paddingTop: 2 }} onClose={dismissNotificationAlert}>
+    <Alert severity="warning" sx={navAlertSx} onClose={dismissNotificationAlert}>
       <AlertTitle>{t("alert_notification_permission_required_title")}</AlertTitle>
       <Typography gutterBottom>{t("alert_notification_permission_required_description")}</Typography>
       <Button sx={{ float: "right" }} color="inherit" size="small" onClick={requestPermission}>
@@ -399,7 +402,7 @@ const NotificationPermissionRequired = () => {
 const NotificationPermissionDeniedAlert = () => {
   const { t } = useTranslation();
   return (
-    <Alert severity="warning" sx={{ paddingTop: 2 }} onClose={dismissNotificationAlert}>
+    <Alert severity="warning" sx={navAlertSx} onClose={dismissNotificationAlert}>
       <AlertTitle>{t("alert_notification_permission_denied_title")}</AlertTitle>
       <Typography gutterBottom>{t("alert_notification_permission_denied_description")}</Typography>
     </Alert>
@@ -414,7 +417,7 @@ const dismissNotificationAlert = async () => {
 const NotificationIOSInstallRequiredAlert = () => {
   const { t } = useTranslation();
   return (
-    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+    <Alert severity="warning" sx={navAlertSx}>
       <AlertTitle>{t("alert_notification_ios_install_required_title")}</AlertTitle>
       <Typography gutterBottom>{t("alert_notification_ios_install_required_description")}</Typography>
     </Alert>
@@ -424,7 +427,7 @@ const NotificationIOSInstallRequiredAlert = () => {
 const NotificationBrowserNotSupportedAlert = () => {
   const { t } = useTranslation();
   return (
-    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+    <Alert severity="warning" sx={navAlertSx}>
       <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
       <Typography gutterBottom>{t("alert_not_supported_description")}</Typography>
     </Alert>
@@ -434,7 +437,7 @@ const NotificationBrowserNotSupportedAlert = () => {
 const NotificationContextNotSupportedAlert = () => {
   const { t } = useTranslation();
   return (
-    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+    <Alert severity="warning" sx={navAlertSx}>
       <AlertTitle>{t("alert_not_supported_title")}</AlertTitle>
       <Typography gutterBottom>
         <Trans

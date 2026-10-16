@@ -6,7 +6,7 @@ import (
 
 // Initial PostgreSQL schema
 const (
-	postgresCurrentSchemaVersion = 16
+	postgresCurrentSchemaVersion = 17
 	postgresCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
@@ -39,6 +39,7 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_message_mid ON message (mid);
 		CREATE INDEX IF NOT EXISTS idx_message_sequence_id ON message (sequence_id);
 		CREATE INDEX IF NOT EXISTS idx_message_topic_published_time ON message (topic, published, time, id);
+		CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id);
 		CREATE INDEX IF NOT EXISTS idx_message_published_expires ON message (published, expires);
 		CREATE INDEX IF NOT EXISTS idx_message_attachment_expires ON message (attachment_expires) WHERE attachment_deleted = FALSE;
 		CREATE INDEX IF NOT EXISTS idx_message_sender_attachment_expires ON message (sender, attachment_expires) WHERE user_id = '';
@@ -62,6 +63,11 @@ const (
 	postgresMigrate15To16AddClaimedAtQuery = `
 		ALTER TABLE message ADD COLUMN IF NOT EXISTS claimed_at BIGINT NOT NULL DEFAULT 0;
 	`
+
+	// 16 -> 17: serves the rows after a since=<id> marker; ntfy.sh got it by hand on 2026-10-16, which IF NOT EXISTS keeps
+	postgresMigrate16To17CreateIndexQuery = `
+		CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id);
+	`
 )
 
 var (
@@ -72,5 +78,6 @@ var (
 	postgresMigrations = map[int]schema.Migration{
 		14: schema.Query(postgresMigrate14To15CreateIndexQuery),
 		15: schema.Query(postgresMigrate15To16AddClaimedAtQuery),
+		16: schema.Query(postgresMigrate16To17CreateIndexQuery),
 	}
 )

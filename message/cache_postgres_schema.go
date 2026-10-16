@@ -7,7 +7,11 @@ import (
 // Initial PostgreSQL schema
 const (
 	postgresCurrentSchemaVersion = 16
-	postgresCreateTablesQuery    = `
+	// postgresCreateTopicPublishedIDIndexQuery serves the rows after a since=<id> marker. It is created on every
+	// start instead of in a migration: an index needs no schema version, so older versions still start (ntfy.sh
+	// got it by hand on 2026-10-16, which IF NOT EXISTS keeps).
+	postgresCreateTopicPublishedIDIndexQuery = `CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id)`
+	postgresCreateTablesQuery                = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
 			mid TEXT NOT NULL,

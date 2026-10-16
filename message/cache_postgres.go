@@ -41,24 +41,25 @@ const (
 	`
 	postgresSelectMessageRowIDQuery = `SELECT id, time FROM message WHERE mid = $1 LIMIT 1`
 	// postgresSelectMessagesSinceIDQuery replays after a since=<mid> marker (see Cache.MessagesAfterMarker):
-	// rows written after the marker ($2), and rows published in its second or later but written before
-	// it ($3). The halves are separate so that the index checks every condition; as one OR, every row of
-	// the topic was read and filtered (incident 2026-10-16).
+	// rows published in the marker's second ($3) or later, except the marker ($2), and rows written after
+	// the marker but published before it. Each part starts its index scan at the marker; as one OR, every
+	// row of the topic was read (incident 2026-10-16). "time + 0" keeps the second part off the time index,
+	// whose scan would start at the topic's oldest row.
 	postgresSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM (
-			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND id > $2
+			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id <> $2
 			UNION ALL
-			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id < $2
+			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND id > $2 AND time + 0 < $3
 		) m
 		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM (
-			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND id > $2
+			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id <> $2
 			UNION ALL
-			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id < $2
+			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND id > $2 AND time + 0 < $3
 			UNION ALL
 			SELECT * FROM message WHERE topic = $1 AND published = FALSE
 		) m
@@ -159,6 +160,9 @@ var postgresQueries = queries{
 // NewPostgresStore creates a new PostgreSQL-backed message cache store using an existing database connection pool.
 func NewPostgresStore(d *db.DB, batchSize int, batchTimeout time.Duration) (*Cache, error) {
 	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, postgresMigrations); err != nil {
+		return nil, err
+	}
+	if _, err := d.Primary().Exec(postgresCreateTopicPublishedIDIndexQuery); err != nil {
 		return nil, err
 	}
 	return newCache(d, postgresQueries, nil, batchSize, batchTimeout, false), nil

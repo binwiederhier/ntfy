@@ -61,18 +61,18 @@ const (
 	sqliteSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM (
-			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id <> ?2
 			UNION ALL
-			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id < ?2
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2 AND time + 0 < ?3
 		)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM (
-			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id <> ?2
 			UNION ALL
-			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id < ?2
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2 AND time + 0 < ?3
 			UNION ALL
 			SELECT * FROM messages WHERE topic = ?1 AND published = 0
 		)

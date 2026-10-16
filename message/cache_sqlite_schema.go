@@ -10,6 +10,7 @@ import (
 // Initial SQLite schema
 const (
 	sqliteCurrentSchemaVersion = 16
+	sqliteMinSchemaVersion     = 1 // Oldest schema version whose code still runs on this schema; only a breaking migration raises it (see package schema)
 	sqliteCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,

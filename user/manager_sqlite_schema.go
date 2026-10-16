@@ -115,6 +115,7 @@ const (
 
 const (
 	sqliteCurrentSchemaVersion = 9
+	sqliteMinSchemaVersion     = 1 // Oldest schema version whose code still runs on this schema; only a breaking migration raises it (see package schema)
 )
 
 // Schema migrations for SQLite

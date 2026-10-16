@@ -8,6 +8,10 @@
 // are nullable or have a default. Never drop or rename a column, add a NOT NULL column without a
 // default, or change what existing data means. A change that cannot be additive takes two
 // releases: the first adds the new shape and keeps the old one working, a later one removes the old.
+//
+// If a breaking migration is unavoidable, it raises the store's minimum version (the oldest schema
+// version whose code still runs on the schema) to its own version: older code then refuses to start
+// instead of misreading the data.
 package schema
 
 import (
@@ -24,19 +28,24 @@ const (
 )
 
 const (
-	sqliteCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schemaVersion (id INT PRIMARY KEY, version INT NOT NULL)`
-	sqliteSelectVersionQuery      = `SELECT version FROM schemaVersion WHERE id = 1`
-	sqliteUpsertVersionQuery      = `INSERT INTO schemaVersion (id, version) VALUES (1, ?) ON CONFLICT (id) DO UPDATE SET version = excluded.version`
+	sqliteCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schemaVersion (id INT PRIMARY KEY, version INT NOT NULL, min_version INT NOT NULL DEFAULT 1)`
+	sqliteHasMinVersionQuery      = `SELECT COUNT(*) FROM pragma_table_info('schemaVersion') WHERE name = 'min_version'`
+	sqliteAddMinVersionQuery      = `ALTER TABLE schemaVersion ADD COLUMN min_version INT NOT NULL DEFAULT 1`
+	sqliteSelectVersionQuery      = `SELECT version, min_version FROM schemaVersion WHERE id = 1`
+	sqliteUpsertVersionQuery      = `INSERT INTO schemaVersion (id, version, min_version) VALUES (1, ?, ?) ON CONFLICT (id) DO UPDATE SET version = excluded.version, min_version = excluded.min_version`
 
-	postgresCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`
-	postgresSelectVersionQuery      = `SELECT version FROM schema_version WHERE store = $1`
-	postgresUpsertVersionQuery      = `INSERT INTO schema_version (store, version) VALUES ($1, $2) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`
+	postgresCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL, min_version INT NOT NULL DEFAULT 1)`
+	postgresHasMinVersionQuery      = `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'schema_version' AND column_name = 'min_version'`
+	postgresAddMinVersionQuery      = `ALTER TABLE schema_version ADD COLUMN min_version INT NOT NULL DEFAULT 1`
+	postgresSelectVersionQuery      = `SELECT version, min_version FROM schema_version WHERE store = $1`
+	postgresUpsertVersionQuery      = `INSERT INTO schema_version (store, version, min_version) VALUES ($1, $2, $3) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version, min_version = EXCLUDED.min_version`
 	postgresAdvisoryLockQuery       = `SELECT pg_advisory_xact_lock($1)` // Transaction-scoped lock to avoid migration races
 )
 
 // Migrate creates or upgrades the named store's schema to targetVersion in one transaction, or
-// creates a new database using the "create" function.
-func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, create MigrateFunc, migrations map[int]MigrateFunc) error {
+// creates a new database using the "create" function. minVersion is the oldest schema version whose
+// code still runs on targetVersion's schema; only a breaking migration raises it (see package doc).
+func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion, minVersion int, create MigrateFunc, migrations map[int]MigrateFunc) error {
 	if dialect != Postgres && dialect != SQLite {
 		return fmt.Errorf("unsupported schema dialect %d", dialect)
 	}
@@ -52,26 +61,27 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 			return fmt.Errorf("cannot acquire %s schema advisory lock: %w", store, err)
 		}
 	}
-	if _, err := tx.Exec(createVersionTableQuery(dialect)); err != nil {
-		return fmt.Errorf("cannot create schema version table: %w", err)
+	if err := ensureVersionTable(tx, dialect); err != nil {
+		return err
 	}
-	version, err := readVersion(tx, dialect, store)
+	version, storedMinVersion, err := readVersion(tx, dialect, store)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Fresh database: create the store's tables at the target version
 		if err := create(tx); err != nil {
 			return fmt.Errorf("cannot create %s schema: %w", store, err)
 		}
-		if err := writeVersion(tx, dialect, store, targetVersion); err != nil {
+		if err := writeVersion(tx, dialect, store, targetVersion, minVersion); err != nil {
 			return fmt.Errorf("cannot write %s schema version: %w", store, err)
 		}
 		return tx.Commit()
 	} else if err != nil {
 		return fmt.Errorf("cannot read %s schema version: %w", store, err)
 	}
-	if version == targetVersion {
+	if storedMinVersion > targetVersion {
+		return fmt.Errorf("the %s database schema version %d needs ntfy that supports at least version %d, this version supports up to %d", store, version, storedMinVersion, targetVersion)
+	} else if version == targetVersion {
 		return tx.Commit()
-	}
-	if version > targetVersion {
+	} else if version > targetVersion {
 		// Migrations are additive (see package doc), so this version still works on the newer schema
 		log.Tag(tag).Warn("The %s database schema version %d is newer than this version of ntfy supports (%d); continuing, since schema changes are backwards compatible", store, version, targetVersion)
 		return tx.Commit()
@@ -86,34 +96,49 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 			return fmt.Errorf("%s migration step from version %d to %d failed: %w", store, v, v+1, err)
 		}
 	}
-	if err := writeVersion(tx, dialect, store, targetVersion); err != nil {
+	if err := writeVersion(tx, dialect, store, targetVersion, minVersion); err != nil {
 		return fmt.Errorf("cannot write %s schema version: %w", store, err)
 	}
 	return tx.Commit()
 }
 
-func createVersionTableQuery(dialect Dialect) string {
+// ensureVersionTable creates the version table, and adds the min_version column to one created
+// before it existed. Older code writes only the version and leaves the column alone.
+func ensureVersionTable(tx *sql.Tx, dialect Dialect) error {
+	createQuery, hasQuery, addQuery := sqliteCreateVersionTableQuery, sqliteHasMinVersionQuery, sqliteAddMinVersionQuery
 	if dialect == Postgres {
-		return postgresCreateVersionTableQuery
+		createQuery, hasQuery, addQuery = postgresCreateVersionTableQuery, postgresHasMinVersionQuery, postgresAddMinVersionQuery
 	}
-	return sqliteCreateVersionTableQuery
+	if _, err := tx.Exec(createQuery); err != nil {
+		return fmt.Errorf("cannot create schema version table: %w", err)
+	}
+	var columns int
+	if err := tx.QueryRow(hasQuery).Scan(&columns); err != nil {
+		return fmt.Errorf("cannot inspect schema version table: %w", err)
+	} else if columns > 0 {
+		return nil
+	}
+	if _, err := tx.Exec(addQuery); err != nil {
+		return fmt.Errorf("cannot add min_version to schema version table: %w", err)
+	}
+	return nil
 }
 
-func readVersion(tx *sql.Tx, dialect Dialect, store string) (version int, err error) {
+func readVersion(tx *sql.Tx, dialect Dialect, store string) (version, minVersion int, err error) {
 	if dialect == Postgres {
-		err = tx.QueryRow(postgresSelectVersionQuery, store).Scan(&version)
+		err = tx.QueryRow(postgresSelectVersionQuery, store).Scan(&version, &minVersion)
 	} else {
-		err = tx.QueryRow(sqliteSelectVersionQuery).Scan(&version)
+		err = tx.QueryRow(sqliteSelectVersionQuery).Scan(&version, &minVersion)
 	}
 	return
 }
 
-func writeVersion(tx *sql.Tx, dialect Dialect, store string, version int) error {
+func writeVersion(tx *sql.Tx, dialect Dialect, store string, version, minVersion int) error {
 	var err error
 	if dialect == Postgres {
-		_, err = tx.Exec(postgresUpsertVersionQuery, store, version)
+		_, err = tx.Exec(postgresUpsertVersionQuery, store, version, minVersion)
 	} else {
-		_, err = tx.Exec(sqliteUpsertVersionQuery, version)
+		_, err = tx.Exec(sqliteUpsertVersionQuery, version, minVersion)
 	}
 	return err
 }

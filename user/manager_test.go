@@ -3497,7 +3497,7 @@ func TestManager_Emails_PrimaryFlagAndHelpers(t *testing.T) {
 func openReplicaTestSQLite(t *testing.T, filename string) *sql.DB {
 	d, err := sql.Open("sqlite3", filename+"?_case_sensitive_like=on")
 	require.Nil(t, err)
-	require.Nil(t, schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations))
+	require.Nil(t, schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, 1, sqliteCreateTables, sqliteMigrations))
 	return d
 }
 

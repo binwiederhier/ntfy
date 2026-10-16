@@ -7,6 +7,7 @@ import (
 // Initial PostgreSQL schema
 const (
 	postgresCurrentSchemaVersion = 16
+	postgresMinSchemaVersion     = 1 // Oldest schema version whose code still runs on this schema; only a breaking migration raises it (see package schema)
 	postgresCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,

@@ -48,6 +48,7 @@ const (
 // Schema version and queries
 const (
 	sqliteCurrentSchemaVersion = 1
+	sqliteMinSchemaVersion     = 1 // Oldest schema version whose code still runs on this schema; only a breaking migration raises it (see package schema)
 )
 
 var (
@@ -80,7 +81,7 @@ func NewSQLiteStore(filename, startupQueries string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, nil); err != nil {
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteMinSchemaVersion, sqliteCreateTables, nil); err != nil {
 		return nil, err
 	}
 	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {

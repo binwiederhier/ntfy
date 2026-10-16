@@ -41,6 +41,7 @@ const (
 // Schema version and queries
 const (
 	postgresCurrentSchemaVersion = 1
+	postgresMinSchemaVersion     = 1 // Oldest schema version whose code still runs on this schema; only a breaking migration raises it (see package schema)
 )
 
 var (
@@ -69,7 +70,7 @@ var (
 
 // NewPostgresStore creates a new PostgreSQL-backed web push store using an existing database connection pool.
 func NewPostgresStore(d *db.DB) (*Store, error) {
-	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, nil); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresMinSchemaVersion, postgresCreateTables, nil); err != nil {
 		return nil, err
 	}
 	return &Store{

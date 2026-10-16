@@ -2093,6 +2093,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.29.0 (UNRELEASED)
+
+**Security:**
+
+* Fix an authentication race where a request could be authorized as another request's user. Requests from one visitor bucket (untiered accounts and anonymous access are keyed by client IP) shared a single mutable user field, so two overlapping requests from the same bucket could observe each other's identity: an anonymous request could mint a token for or read a private topic of a concurrently-active user, and a user's own concurrent requests could be rejected as unauthenticated. The authenticated user is now carried per request rather than on the shared rate-limit bucket
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

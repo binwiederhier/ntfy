@@ -48,6 +48,8 @@ import AccountContext from "./AccountContext";
 import { PermissionDenyAll, PermissionRead, PermissionReadWrite, PermissionWrite } from "./ReserveIcons";
 import { SubscriptionPopup } from "./SubscriptionPopup";
 import { useNotificationPermissionListener, useVersionChangeListener } from "./hooks";
+import { usePrefCache } from "./PrefCache";
+import prefs from "../app/Prefs";
 
 const navWidth = 280;
 
@@ -92,6 +94,7 @@ const NavList = (props) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { account } = useContext(AccountContext);
+  const { notificationAlertDismissed } = usePrefCache();
   const [subscribeDialogKey, setSubscribeDialogKey] = useState(0);
   const [subscribeDialogOpen, setSubscribeDialogOpen] = useState(false);
   const [versionChanged, setVersionChanged] = useState(false);
@@ -123,8 +126,10 @@ const NavList = (props) => {
   const hasTier = !!account?.tier;
   const showUpgradeBanner = config.enable_payments && !isAdmin && !isPaid && !hasTier;
   const showSubscriptionsList = props.subscriptions?.length > 0;
-  const showNotificationPermissionRequired = useNotificationPermissionListener(() => notifier.notRequested());
-  const showNotificationPermissionDenied = useNotificationPermissionListener(() => notifier.denied());
+  const notificationPermissionRequired = useNotificationPermissionListener(() => notifier.notRequested());
+  const notificationPermissionDenied = useNotificationPermissionListener(() => notifier.denied());
+  const showNotificationPermissionRequired = notificationPermissionRequired && !notificationAlertDismissed;
+  const showNotificationPermissionDenied = notificationPermissionDenied && !notificationAlertDismissed;
   const showNotificationIOSInstallRequired = notifier.iosSupportedButInstallRequired();
   const showNotificationBrowserNotSupportedBox = !showNotificationIOSInstallRequired && !notifier.browserSupported();
   const showNotificationContextNotSupportedBox = notifier.browserSupported() && !notifier.contextSupported(); // Only show if notifications are generally supported in the browser
@@ -381,7 +386,7 @@ const NotificationPermissionRequired = () => {
     await notifier.maybeRequestPermission();
   };
   return (
-    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+    <Alert severity="warning" sx={{ paddingTop: 2 }} onClose={dismissNotificationAlert}>
       <AlertTitle>{t("alert_notification_permission_required_title")}</AlertTitle>
       <Typography gutterBottom>{t("alert_notification_permission_required_description")}</Typography>
       <Button sx={{ float: "right" }} color="inherit" size="small" onClick={requestPermission}>
@@ -394,11 +399,16 @@ const NotificationPermissionRequired = () => {
 const NotificationPermissionDeniedAlert = () => {
   const { t } = useTranslation();
   return (
-    <Alert severity="warning" sx={{ paddingTop: 2 }}>
+    <Alert severity="warning" sx={{ paddingTop: 2 }} onClose={dismissNotificationAlert}>
       <AlertTitle>{t("alert_notification_permission_denied_title")}</AlertTitle>
       <Typography gutterBottom>{t("alert_notification_permission_denied_description")}</Typography>
     </Alert>
   );
+};
+
+// Remembers that one of the two alerts above was closed, so neither shows again in this browser
+const dismissNotificationAlert = async () => {
+  await prefs.setNotificationAlertDismissed(true);
 };
 
 const NotificationIOSInstallRequiredAlert = () => {

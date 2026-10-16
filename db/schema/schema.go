@@ -9,9 +9,9 @@
 // default, or change what existing data means. A change that cannot be additive takes two
 // releases: the first adds the new shape and keeps the old one working, a later one removes the old.
 //
-// If a breaking migration is unavoidable, it raises the store's minimum version (the oldest schema
-// version whose code still runs on the schema) to its own version: older code then refuses to start
-// instead of misreading the data.
+// If a breaking migration is unavoidable, mark its step with Breaking: the store's minimum version
+// (the oldest schema version whose code still runs on the schema) becomes the step's result, and
+// older code then refuses to start instead of misreading the data.
 package schema
 
 import (
@@ -43,9 +43,9 @@ const (
 )
 
 // Migrate creates or upgrades the named store's schema to targetVersion in one transaction, or
-// creates a new database using the "create" function. minVersion is the oldest schema version whose
-// code still runs on targetVersion's schema; only a breaking migration raises it (see package doc).
-func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion, minVersion int, create MigrateFunc, migrations map[int]MigrateFunc) error {
+// creates a new database using the "create" function. The store's minimum version follows from the
+// steps: the version after the newest breaking step, or 1 (see package doc).
+func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, create MigrateFunc, migrations map[int]Migration) error {
 	if dialect != Postgres && dialect != SQLite {
 		return fmt.Errorf("unsupported schema dialect %d", dialect)
 	}
@@ -61,6 +61,7 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion, minVersio
 			return fmt.Errorf("cannot acquire %s schema advisory lock: %w", store, err)
 		}
 	}
+	minVersion := minVersionOf(targetVersion, migrations)
 	if err := ensureVersionTable(tx, dialect); err != nil {
 		return err
 	}
@@ -87,12 +88,12 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion, minVersio
 		return tx.Commit()
 	}
 	for v := version; v < targetVersion; v++ {
-		migrate, ok := migrations[v]
+		step, ok := migrations[v]
 		if !ok {
 			return fmt.Errorf("cannot find %s migration step from version %d to %d", store, v, v+1)
 		}
 		log.Tag(tag).Info("Migrating %s database schema: from %d to %d", store, v, v+1)
-		if err := migrate(tx); err != nil {
+		if err := step.Migrate(tx); err != nil {
 			return fmt.Errorf("%s migration step from version %d to %d failed: %w", store, v, v+1, err)
 		}
 	}
@@ -100,6 +101,18 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion, minVersio
 		return fmt.Errorf("cannot write %s schema version: %w", store, err)
 	}
 	return tx.Commit()
+}
+
+// minVersionOf returns the oldest schema version whose code still runs on targetVersion's schema:
+// the version after the newest breaking step, or 1 if no step is breaking
+func minVersionOf(targetVersion int, migrations map[int]Migration) int {
+	minVersion := 1
+	for v, step := range migrations {
+		if step.Breaking && v < targetVersion && v+1 > minVersion {
+			minVersion = v + 1
+		}
+	}
+	return minVersion
 }
 
 // ensureVersionTable creates the version table, and adds the min_version column to one created

@@ -10,7 +10,6 @@ import (
 // Initial SQLite schema
 const (
 	sqliteCurrentSchemaVersion = 16
-	sqliteMinSchemaVersion     = 1 // Oldest schema version whose code still runs on this schema; only a breaking migration raises it (see package schema)
 	sqliteCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -179,29 +178,29 @@ var (
 // sqliteMigrations returns the migration steps, keyed by the version they upgrade FROM. The
 // cache duration is carried into the 9 -> 10 step via closure (it backfills "expires" from it).
 // Always append migrations at the end, never insert in the middle.
-func sqliteMigrations(cacheDuration time.Duration) map[int]schema.MigrateFunc {
-	return map[int]schema.MigrateFunc{
-		1: schema.AsMigrateFunc(sqliteMigrate1To2AlterMessagesTableQuery),
-		2: schema.AsMigrateFunc(sqliteMigrate2To3AlterMessagesTableQuery),
-		3: schema.AsMigrateFunc(sqliteMigrate3To4AlterMessagesTableQuery),
-		4: schema.AsMigrateFunc(sqliteMigrate4To5AlterMessagesTableQuery),
-		5: schema.AsMigrateFunc(sqliteMigrate5To6AlterMessagesTableQuery),
-		6: schema.AsMigrateFunc(sqliteMigrate6To7AlterMessagesTableQuery),
-		7: schema.AsMigrateFunc(sqliteMigrate7To8AlterMessagesTableQuery),
-		8: schema.AsMigrateFunc(sqliteMigrate8To9AlterMessagesTableQuery),
-		9: func(tx *sql.Tx) error {
+func sqliteMigrations(cacheDuration time.Duration) map[int]schema.Migration {
+	return map[int]schema.Migration{
+		1: schema.Query(sqliteMigrate1To2AlterMessagesTableQuery),
+		2: schema.Query(sqliteMigrate2To3AlterMessagesTableQuery),
+		3: schema.Query(sqliteMigrate3To4AlterMessagesTableQuery),
+		4: schema.Query(sqliteMigrate4To5AlterMessagesTableQuery),
+		5: schema.Query(sqliteMigrate5To6AlterMessagesTableQuery),
+		6: schema.Query(sqliteMigrate6To7AlterMessagesTableQuery),
+		7: schema.Query(sqliteMigrate7To8AlterMessagesTableQuery),
+		8: schema.Query(sqliteMigrate8To9AlterMessagesTableQuery),
+		9: schema.Func(func(tx *sql.Tx) error {
 			if _, err := tx.Exec(sqliteMigrate9To10AlterMessagesTableQuery); err != nil {
 				return err
 			}
 			_, err := tx.Exec(sqliteMigrate9To10UpdateMessageExpiryQuery, int64(cacheDuration.Seconds()))
 			return err
-		},
-		10: schema.AsMigrateFunc(sqliteMigrate10To11AlterMessagesTableQuery),
-		11: schema.AsMigrateFunc(sqliteMigrate11To12AlterMessagesTableQuery),
-		12: schema.AsMigrateFunc(sqliteMigrate12To13AlterMessagesTableQuery),
-		13: schema.AsMigrateFunc(sqliteMigrate13To14AlterMessagesTableQuery),
-		14: schema.NopMigrateFunc, // Corresponds to Postgres migration
-		15: schema.NopMigrateFunc, // 15 -> 16 adds the Postgres claim column; SQLite is single-node
+		}),
+		10: schema.Query(sqliteMigrate10To11AlterMessagesTableQuery),
+		11: schema.Query(sqliteMigrate11To12AlterMessagesTableQuery),
+		12: schema.Query(sqliteMigrate12To13AlterMessagesTableQuery),
+		13: schema.Query(sqliteMigrate13To14AlterMessagesTableQuery),
+		14: schema.Nop, // Corresponds to Postgres migration
+		15: schema.Nop, // 15 -> 16 adds the Postgres claim column; SQLite is single-node
 	}
 }
 

@@ -61,9 +61,8 @@ const (
 	leaseFactor   = 1
 	holdoffFactor = 2
 
-	schemaVersion    = 2
-	minSchemaVersion = 1 // Oldest schema version whose code still runs on this schema; only a breaking migration raises it (see package schema)
-	schemaStoreKey   = "node_registry"
+	schemaVersion  = 2
+	schemaStoreKey = "node_registry"
 )
 
 var (
@@ -80,8 +79,8 @@ var (
 
 	// migrations maps a schema version to the migration upgrading it to the next version.
 	// Always append migrations at the end, never insert in the middle.
-	migrations = map[int]schema.MigrateFunc{
-		1: schema.AsMigrateFunc(fmt.Sprintf(`ALTER TABLE node_registry ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT '%s'`, RoleActive)),
+	migrations = map[int]schema.Migration{
+		1: schema.Query(fmt.Sprintf(`ALTER TABLE node_registry ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT '%s'`, RoleActive)),
 	}
 )
 
@@ -128,7 +127,7 @@ type Registry struct {
 // does NOT register the node: joining the cluster is an explicit Register call, owned by the
 // caller, so read-only uses of the registry stay side-effect free.
 func New(pool *db.DB, nodeID, advertiseURL string, role Role, ttl time.Duration) (*Registry, error) {
-	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, minSchemaVersion, createTable, migrations); err != nil {
+	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, createTable, migrations); err != nil {
 		return nil, err
 	}
 	return &Registry{

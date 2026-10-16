@@ -134,7 +134,7 @@ func NewSQLiteStore(filename, startupQueries string, cacheDuration time.Duration
 	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {
 		return nil, err
 	}
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteMinSchemaVersion, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
 		return nil, err
 	}
 	return newCache(db.New(&db.Host{DB: d}, nil), sqliteQueries, &sync.Mutex{}, batchSize, batchTimeout, nop), nil

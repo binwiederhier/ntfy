@@ -9,11 +9,8 @@ import (
 
 // Initial SQLite schema
 const (
-	sqliteCurrentSchemaVersion = 16
-	// sqliteCreateTopicPublishedTimeIndexQuery serves the since=<id> replay, like Postgres' index of the same name. It is
-	// created on every start instead of in a migration: an index needs no schema version, so older versions still open the file.
-	sqliteCreateTopicPublishedTimeIndexQuery = `CREATE INDEX IF NOT EXISTS idx_topic_published_time ON messages (topic, published, time)`
-	sqliteCreateTablesQuery                  = `
+	sqliteCurrentSchemaVersion = 17
+	sqliteCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			mid TEXT NOT NULL,
@@ -45,6 +42,7 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_sequence_id ON messages (sequence_id);
 		CREATE INDEX IF NOT EXISTS idx_time ON messages (time);
 		CREATE INDEX IF NOT EXISTS idx_topic ON messages (topic);
+		CREATE INDEX IF NOT EXISTS idx_topic_published_time ON messages (topic, published, time);
 		CREATE INDEX IF NOT EXISTS idx_expires ON messages (expires);
 		CREATE INDEX IF NOT EXISTS idx_sender ON messages (sender);
 		CREATE INDEX IF NOT EXISTS idx_user ON messages (user);
@@ -172,6 +170,11 @@ const (
 		ALTER TABLE messages ADD COLUMN event TEXT NOT NULL DEFAULT('message');
 		CREATE INDEX IF NOT EXISTS idx_sequence_id ON messages (sequence_id);
 	`
+
+	// 16 -> 17: serves the since=<id> replay, like Postgres' idx_message_topic_published_time
+	sqliteMigrate16To17CreateIndexQuery = `
+		CREATE INDEX IF NOT EXISTS idx_topic_published_time ON messages (topic, published, time);
+	`
 )
 
 var (
@@ -204,6 +207,7 @@ func sqliteMigrations(cacheDuration time.Duration) map[int]schema.MigrateFunc {
 		13: schema.AsMigrateFunc(sqliteMigrate13To14AlterMessagesTableQuery),
 		14: schema.NopMigrateFunc, // Corresponds to Postgres migration
 		15: schema.NopMigrateFunc, // 15 -> 16 adds the Postgres claim column; SQLite is single-node
+		16: schema.AsMigrateFunc(sqliteMigrate16To17CreateIndexQuery),
 	}
 }
 

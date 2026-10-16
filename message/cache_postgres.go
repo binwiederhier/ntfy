@@ -162,9 +162,6 @@ func NewPostgresStore(d *db.DB, batchSize int, batchTimeout time.Duration) (*Cac
 	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, postgresMigrations); err != nil {
 		return nil, err
 	}
-	if _, err := d.Primary().Exec(postgresCreateTopicPublishedIDIndexQuery); err != nil {
-		return nil, err
-	}
 	return newCache(d, postgresQueries, nil, batchSize, batchTimeout, false), nil
 }
 

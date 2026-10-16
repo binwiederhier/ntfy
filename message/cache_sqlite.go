@@ -150,9 +150,6 @@ func NewSQLiteStore(filename, startupQueries string, cacheDuration time.Duration
 	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
 		return nil, err
 	}
-	if _, err := d.Exec(sqliteCreateTopicPublishedTimeIndexQuery); err != nil {
-		return nil, err
-	}
 	return newCache(db.New(&db.Host{DB: d}, nil), sqliteQueries, &sync.Mutex{}, batchSize, batchTimeout, nop), nil
 }
 

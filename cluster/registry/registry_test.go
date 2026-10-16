@@ -187,8 +187,9 @@ func TestRegistry_SchemaVersionWritten(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestRegistry_SchemaVersionFromTheFuture(t *testing.T) {
-	// A node running older code must refuse to touch a schema migrated by newer code
+func TestRegistry_OlderNodeStartsOnNewerSchema(t *testing.T) {
+	// During a rolling upgrade, a node still running older code shares a schema migrated by a
+	// newer node: it starts (migrations are additive, see package schema) and leaves the version alone
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	_, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
@@ -196,7 +197,10 @@ func TestRegistry_SchemaVersionFromTheFuture(t *testing.T) {
 	_, err = pool.Exec(`UPDATE schema_version SET version = 99 WHERE store = $1`, schemaStoreKey)
 	require.Nil(t, err)
 	_, err = New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
-	require.Error(t, err)
+	require.Nil(t, err)
+	var version int
+	require.Nil(t, pool.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, schemaStoreKey).Scan(&version))
+	require.Equal(t, 99, version)
 }
 
 // insertNodeAt registers a fake node with a chosen heartbeat. Register() stamps the database

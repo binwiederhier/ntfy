@@ -53,16 +53,25 @@ const (
 		ORDER BY id
 		LIMIT ?
 	`
+	// sqliteSelectMessagesSinceIDQuery: see postgresSelectMessagesSinceIDQuery
 	sqliteSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
-		FROM messages
-		WHERE topic = ?1 AND (id > ?2 OR (time >= ?3 AND id <> ?2)) AND published = 1
+		FROM (
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id < ?2
+		)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
-		FROM messages
-		WHERE topic = ?1 AND (id > ?2 OR (time >= ?3 AND id <> ?2) OR published = 0)
+		FROM (
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id < ?2
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 0
+		)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesLatestQuery = `
@@ -135,6 +144,9 @@ func NewSQLiteStore(filename, startupQueries string, cacheDuration time.Duration
 		return nil, err
 	}
 	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
+		return nil, err
+	}
+	if _, err := d.Exec(sqliteCreateTopicPublishedTimeIndexQuery); err != nil {
 		return nil, err
 	}
 	return newCache(db.New(&db.Host{DB: d}, nil), sqliteQueries, &sync.Mutex{}, batchSize, batchTimeout, nop), nil

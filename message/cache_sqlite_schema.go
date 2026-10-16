@@ -10,7 +10,10 @@ import (
 // Initial SQLite schema
 const (
 	sqliteCurrentSchemaVersion = 16
-	sqliteCreateTablesQuery    = `
+	// sqliteCreateTopicPublishedTimeIndexQuery serves the since=<id> replay, like Postgres' index of the same name. It is
+	// created on every start instead of in a migration: an index needs no schema version, so older versions still open the file.
+	sqliteCreateTopicPublishedTimeIndexQuery = `CREATE INDEX IF NOT EXISTS idx_topic_published_time ON messages (topic, published, time)`
+	sqliteCreateTablesQuery                  = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			mid TEXT NOT NULL,

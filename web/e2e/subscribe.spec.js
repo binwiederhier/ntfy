@@ -46,7 +46,32 @@ test("subscribe to a topic on another server", async ({ page, request }) => {
   await expect(page.getByText("via the other server")).toBeVisible();
 });
 
-test("protected topic asks for a login", async ({ page, request, users, serverConfig }) => {
+test("the same topic on two servers opens the right one", async ({ page }) => {
+  // #858: the default server's subscription used to win for /:baseUrl/:topic as well
+  test.skip(remote, "needs a second hostname for the server");
+  const topic = unique("same");
+  const other = `localhost:${port}/${topic}`;
+  const title = page.getByRole("banner").getByText(/same/);
+  await page.goto(`/${topic}`);
+  await expect(title).toHaveText(topic);
+
+  await page.getByRole("button", { name: "Subscribe to topic" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/topic name/i).fill(topic);
+  await dialog.getByRole("switch", { name: "Use another server" }).check();
+  await dialog.getByRole("combobox").fill(`http://localhost:${port}`);
+  await dialog.getByRole("button", { name: "Subscribe", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/${other}$`));
+  await expect(title).toHaveText(other);
+
+  // Switch back and forth through the navigation
+  await page.getByRole("button", { name: topic, exact: true }).click();
+  await expect(title).toHaveText(topic);
+  await page.getByRole("button", { name: other, exact: true }).click();
+  await expect(title).toHaveText(other);
+});
+
+test("protected topic asks for a login",async ({ page, request, users, serverConfig }) => {
   test.skip(!serverConfig.enable_reservations, "reservations disabled");
   const owner = await users.create({ paid: true });
   const token = await apiToken(request, owner);

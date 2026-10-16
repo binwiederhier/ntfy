@@ -28,6 +28,18 @@ func sigHandlerConfigReload(config string) {
 	}
 }
 
+// sigHandlerShutdown stops the server gracefully on SIGTERM/SIGINT (systemd stop, Ctrl-C), so
+// pending writes such as the message cache batch are persisted. It closes stopping first, so
+// the caller can tell the resulting Run error apart from a real failure.
+func sigHandlerShutdown(s *server.Server, stopping chan<- struct{}) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
+	sig := <-sigs
+	log.Info("Received %s, shutting down ...", sig)
+	close(stopping)
+	s.Stop()
+}
+
 func reloadLogLevel(inputSource altsrc.InputSourceContext) error {
 	newLevelStr, err := inputSource.String("log-level")
 	if err != nil {

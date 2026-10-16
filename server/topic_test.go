@@ -1,7 +1,9 @@
 package server
 
 import (
+	"fmt"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -88,4 +90,147 @@ func TestTopic_Subscribe_DuplicateID(t *testing.T) {
 
 	require.NotEqual(t, id, a)
 	require.Equal(t, "b", res.userID, "b")
+}
+
+func TestTopic_PublishMissed_OnlyToSubscribersThatMissedIt(t *testing.T) {
+	to := newTopic("mytopic")
+	var early, late atomic.Int32
+	to.Subscribe(countingSubscriber(&early), "", func() {})
+	m := model.NewDefaultMessage("mytopic", "hi")
+	require.Nil(t, to.Publish(nil, m))
+	waitFor(t, func() bool { return early.Load() == 1 })
+
+	to.Subscribe(countingSubscriber(&late), "", func() {}) // Joined after the live delivery
+	to.PublishMissed([]*model.Message{m})
+	waitFor(t, func() bool { return late.Load() == 1 })
+	to.PublishMissed([]*model.Message{m}) // Caught up already
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, int32(1), early.Load())
+	require.Equal(t, int32(1), late.Load())
+}
+
+func TestTopic_Publish_SkipsWhatWasDeliveredAlready(t *testing.T) {
+	// The tail found the message first, then the fan-out from the peer arrived
+	to := newTopic("mytopic")
+	var count atomic.Int32
+	to.Subscribe(countingSubscriber(&count), "", func() {})
+	m := model.NewDefaultMessage("mytopic", "hi")
+	to.PublishMissed([]*model.Message{m})
+	waitFor(t, func() bool { return count.Load() == 1 })
+	require.Nil(t, to.Publish(nil, m))
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, int32(1), count.Load())
+}
+
+func countingSubscriber(count *atomic.Int32) subscriber {
+	return func(_ *visitor, _ *model.Message) error {
+		count.Add(1)
+		return nil
+	}
+}
+
+func TestTopic_PublishMissed_InWriteOrder(t *testing.T) {
+	// A reconnect asks for what came after the last message the client got, so the client must
+	// get the tail's messages in the order they were written
+	to := newTopic("mytopic")
+	var mu sync.Mutex
+	received := make([]string, 0)
+	to.Subscribe(func(_ *visitor, m *model.Message) error {
+		mu.Lock()
+		defer mu.Unlock()
+		received = append(received, m.Message)
+		return nil
+	}, "", func() {})
+	messages := make([]*model.Message, 0)
+	expected := make([]string, 0)
+	for i := 0; i < 100; i++ {
+		messages = append(messages, model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i)))
+		expected = append(expected, fmt.Sprintf("message %d", i))
+	}
+	require.Equal(t, 100, to.PublishMissed(messages))
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(received) == 100
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, expected, received)
+}
+
+func TestTopic_PublishMissed_InWriteOrderAcrossReads(t *testing.T) {
+	// A subscriber still busy with one read's messages must not get the next read's first
+	to := newTopic("mytopic")
+	firstEntered, releaseFirst := make(chan struct{}), make(chan struct{})
+	received := make(chan string, 2)
+	to.Subscribe(func(_ *visitor, m *model.Message) error {
+		if m.Message == "first" {
+			close(firstEntered)
+			<-releaseFirst
+		}
+		received <- m.Message
+		return nil
+	}, "", func() {})
+	to.PublishMissed([]*model.Message{model.NewDefaultMessage("mytopic", "first")})
+	<-firstEntered
+	to.PublishMissed([]*model.Message{model.NewDefaultMessage("mytopic", "second")})
+	time.Sleep(200 * time.Millisecond) // Room for "second" to overtake
+	close(releaseFirst)
+	require.Equal(t, "first", <-received)
+	require.Equal(t, "second", <-received)
+}
+
+func TestTopic_ExpireDelivered(t *testing.T) {
+	// Stale only answers; forgetting old deliveries is ExpireDelivered's job
+	to := newTopic("mytopic")
+	to.delivered["old"] = time.Now().Add(-topicDeliveredRetain - time.Second)
+	to.delivered["new"] = time.Now()
+	require.False(t, to.Stale())
+	_, ok := to.DeliveredAt("old")
+	require.True(t, ok)
+
+	to.ExpireDelivered()
+	_, ok = to.DeliveredAt("old")
+	require.False(t, ok)
+	_, ok = to.DeliveredAt("new")
+	require.True(t, ok)
+}
+
+func TestTopic_Publish_InOrderPerSubscriber(t *testing.T) {
+	// Live messages, like the tail's, reach each subscriber in publish order: a slow send of one
+	// must not let the next overtake it
+	to := newTopic("mytopic")
+	firstEntered, releaseFirst := make(chan struct{}), make(chan struct{})
+	received := make(chan string, 2)
+	to.Subscribe(func(_ *visitor, m *model.Message) error {
+		if m.Message == "first" {
+			close(firstEntered)
+			<-releaseFirst
+		}
+		received <- m.Message
+		return nil
+	}, "", func() {})
+	require.Nil(t, to.Publish(nil, model.NewDefaultMessage("mytopic", "first")))
+	<-firstEntered
+	require.Nil(t, to.Publish(nil, model.NewDefaultMessage("mytopic", "second")))
+	time.Sleep(200 * time.Millisecond) // Room for "second" to overtake
+	close(releaseFirst)
+	require.Equal(t, "first", <-received)
+	require.Equal(t, "second", <-received)
+}
+
+func TestTopic_Publish_LateFanOutReachesLaterSubscribers(t *testing.T) {
+	// The tail delivered the message first; the peer's fan-out arrives later. Subscribers that
+	// had it are skipped, one that subscribed in between gets it: the same rule as the tail's.
+	to := newTopic("mytopic")
+	var early, late atomic.Int32
+	to.Subscribe(countingSubscriber(&early), "", func() {})
+	m := model.NewDefaultMessage("mytopic", "hi")
+	to.PublishMissed([]*model.Message{m})
+	waitFor(t, func() bool { return early.Load() == 1 })
+	to.Subscribe(countingSubscriber(&late), "", func() {})
+	require.Nil(t, to.Publish(nil, m))
+	waitFor(t, func() bool { return late.Load() == 1 })
+	time.Sleep(200 * time.Millisecond)
+	require.Equal(t, int32(1), early.Load())
 }

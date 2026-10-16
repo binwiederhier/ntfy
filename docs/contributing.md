@@ -13,6 +13,8 @@ If you'd like to contribute code to ntfy:
    before investing significant time
 4. Submit a pull request on GitHub
 
+If you use AI tools to write your code, please read the [AI policy](ai-policy.md) first.
+
 All contributions are welcome, from small bug fixes to major features.
 
 ## Translations

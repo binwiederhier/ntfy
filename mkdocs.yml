@@ -105,6 +105,7 @@ nav:
       - "Deprecation notices": deprecations.md
       - "Development": develop.md
       - "Contributing": contributing.md
+      - "AI policy": ai-policy.md
       - "Privacy policy": privacy.md
       - "Terms of Service": terms.md
       - "Contact": contact.md

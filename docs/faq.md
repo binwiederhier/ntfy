@@ -87,7 +87,8 @@ In the default configuration, you'll be able to do 60 requests as a burst, and t
 choose a random 10 digit topic name using only A-Z, a-z, 0-9, _ and -, there are 64^10 possible topic names. Even if you
 could do hundreds of requests per seconds (which you cannot), it would take many years to brute force a topic name.
 
-For ntfy.sh, there's even a fail2ban in place which will ban your IP pretty quickly.
+For ntfy.sh, there are additional protections in place which will ban your IP pretty quickly. If you think you have
+been banned from ntfy.sh, you can check at [am-i-banned.ntfy.sh](https://am-i-banned.ntfy.sh/).
 
 ## Where can I donate?
 I have just very recently started accepting donations via [GitHub Sponsors](https://github.com/sponsors/binwiederhier).

@@ -6,11 +6,91 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.28.0 | Aug 27, 2026  |
+| ntfy server      | v2.31.0 | Oct 16, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.31.0
+Released October 16, 2026
+
+This release fixes messages that could be lost when a client reconnects, e.g. a phone switching networks, right when
+messages are published: every server now reads newly written messages from its message cache once a second and sends them
+to the subscribers that missed them. In load tests with server restarts and crashes, this brought lost messages down from
+465 to 2 out of about 615,000. It also adds a `/v1/ready` endpoint for load balancers, and continues the experimental
+clustering work with node roles.
+
+**Features:**
+
+* Add `/v1/ready` for load balancers, and the node's role to `/v1/health`; with clustering, a node with no other active node leads right away instead of after a one-minute hold-off ([#2050](https://github.com/binwiederhier/ntfy/pull/2050))
+* Experimental clustering: add `experimental-cluster-role` to run a `passive` node that never leads and never takes over another node's subscribers, e.g. one that is not behind the load balancer ([#2049](https://github.com/binwiederhier/ntfy/pull/2049))
+
+**Bug fixes + maintenance:**
+
+* Fix messages lost when a client reconnects before they are written to the message cache, or when a cluster node's fan-out is lost: every node now reads newly written messages once a second and sends them to the subscribers that missed them ([#2040](https://github.com/binwiederhier/ntfy/pull/2040))
+* Write user stats (messages, emails, calls) as increments, so servers sharing one database add up instead of overwriting each other's counts ([#1989](https://github.com/binwiederhier/ntfy/pull/1989))
+* Don't add a visitor's anonymous usage to an account's stats when the account takes over that visitor, e.g. right after upgrading ([#2041](https://github.com/binwiederhier/ntfy/pull/2041))
+
+**Upgrade notes:**
+
+* A reconnect with `since=<message ID>` now also returns the messages published in the same second as that message, so none are skipped when several servers write out of order. The ntfy apps and web app drop these by ID; your own scripts may see a few duplicates ([#2040](https://github.com/binwiederhier/ntfy/pull/2040))
+* Experimental clustering only: this release changes the cluster's node registry schema (version 1 to 2). Downgrading a clustered server to v2.30.0 afterwards requires setting the version back by hand first: `UPDATE schema_version SET version = 1 WHERE store = 'node_registry'` ([#2049](https://github.com/binwiederhier/ntfy/pull/2049))
+
+### ntfy server v2.30.0
+Released October 12, 2026
+
+This release links attachments in email notifications, adds SMTP LOGIN auth (e.g. for OVH and Outlook), and fixes the
+PostgreSQL memory growth that came with v2.29.0. It also ships the first experimental version of clustering: several
+ntfy servers sharing one PostgreSQL database. Clustering is not ready for production yet.
+
+**Features:**
+
+* Link attachments in email notifications, including the file name and when the link expires ([#672](https://github.com/binwiederhier/ntfy/issues/672), thanks to [@merspieler](https://github.com/merspieler) for suggesting)
+* Support SMTP servers that only offer LOGIN auth (e.g. OVH, Outlook) for sending emails ([#930](https://github.com/binwiederhier/ntfy/issues/930)/[#1530](https://github.com/binwiederhier/ntfy/pull/1530), thanks to [@wunter8](https://github.com/wunter8) for reporting and [@santanoce](https://github.com/santanoce) for the initial implementation)
+* Experimental: run several ntfy servers as one cluster that shares a PostgreSQL database, enabled with `experimental-cluster-listen`; this is not ready for production yet ([#2005](https://github.com/binwiederhier/ntfy/pull/2005), [#2008](https://github.com/binwiederhier/ntfy/pull/2008), [#2012](https://github.com/binwiederhier/ntfy/pull/2012), [#2013](https://github.com/binwiederhier/ntfy/pull/2013))
+
+**Bug fixes + maintenance:**
+
+* Fix `Dockerfile-build` failing to build: use Go 1.26 and add the `cluster` package ([#1962](https://github.com/binwiederhier/ntfy/issues/1962), thanks to [@ElectricTea](https://github.com/ElectricTea) for reporting)
+* Set the `org.opencontainers.image.version` label on release Docker images ([#1921](https://github.com/binwiederhier/ntfy/issues/1921)/[#1936](https://github.com/binwiederhier/ntfy/pull/1936), thanks to [@Plazzmex](https://github.com/Plazzmex) for reporting and [@w1977-0](https://github.com/w1977-0) for the fix)
+* Warn at startup if `attachment-expiry-duration` is longer than `cache-duration`, since attachments never outlive their message ([#1053](https://github.com/binwiederhier/ntfy/issues/1053), thanks to [@ctschach](https://github.com/ctschach) for reporting)
+* Fix PostgreSQL memory growth after v2.29.0: write message batches with one fixed `INSERT` for any batch size ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
+* CLI: fix `ntfy publish` failing with "invalid header field value" when sending a multi-line message or title along with a file ([#1808](https://github.com/binwiederhier/ntfy/issues/1808), thanks to [@quantenzitrone](https://github.com/quantenzitrone) for reporting)
+* Web app: fix an updated message showing next to its old version when the update arrived via the background poll instead of live ([#2010](https://github.com/binwiederhier/ntfy/pull/2010))
+
+**Documentation:**
+
+* Document recommended PostgreSQL pool settings for busy servers ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
+
+### ntfy server v2.29.0
+Released October 7, 2026
+
+This release fixes how ntfy writes messages to the cache under load. On ntfy.sh, every top of the hour brought a
+burst of cron-driven publishes that the single batch writer could not keep up with: messages took up to 40 seconds
+to reach the database (so `poll=1` and `since=` requests missed them), and publish requests stalled behind the full
+queue. The writer now stores a whole batch in one statement, publishes no longer wait on the writer, and PostgreSQL
+connections are kept idle instead of re-opened on every burst. The rest is smaller fixes that accumulated since
+v2.28.0, plus timezone and RFC 3339 support for delayed notifications.
+
+**Features:**
+
+* Support a timezone for delayed notifications via the `X-Timezone` header, `timezone` query parameter or JSON field, e.g. `At: tomorrow, 10am` with `Timezone: Asia/Tokyo`; the web app sends the browser's timezone automatically ([#1967](https://github.com/binwiederhier/ntfy/pull/1967)/[#1924](https://github.com/binwiederhier/ntfy/issues/1924), thanks to [@beemines](https://github.com/beemines) for the contribution)
+* Support RFC 3339 timestamps for delayed notifications, e.g. `Delay: 2026-12-02T10:00:00Z` or `At: 2026-12-10T11:00:00-05:00`, to schedule a message at a precise point in time ([#1931](https://github.com/binwiederhier/ntfy/pull/1931), thanks to [@ALPHACOM-Brehmer](https://github.com/ALPHACOM-Brehmer) for the contribution)
+
+**Bug fixes + maintenance:**
+
+* Fix messages becoming visible to pollers only seconds later (and publishes stalling) under publish bursts: the message cache writer now stores each batch with a single multi-row `INSERT` instead of one statement per message (on PostgreSQL and SQLite), publishes no longer wait behind each batch write (up to 100 batches are buffered before the writer applies backpressure), and the per-publish lookup for a scheduled message with the same sequence ID is skipped when the client did not set one ([#2006](https://github.com/binwiederhier/ntfy/pull/2006))
+* Fix a recurring panic in the account token-update endpoint when a concurrent anonymous request from the same IP raced the authenticated request on the shared visitor (nil-user dereference); the request now fails with HTTP 401
+* Fix accepted messages being dropped from the cache on shutdown: the batched-write queue is now flushed, and `ntfy serve` shuts down gracefully on `SIGTERM`/`SIGINT` instead of dying mid-batch
+* Keep PostgreSQL pool connections idle instead of re-opening them: `pool_max_idle_conns` now defaults to `pool_max_conns`, so bursts no longer pay a DNS lookup, TCP/TLS handshake and authentication per query
+* Fix `since=<message-id>` replays flooding a client with a topic's entire retained history when the ID was not on the read replica yet (a client reconnecting right after receiving a message); the ID is now resolved on the primary in that case
+* Use the PostgreSQL row estimate for the `messages_cached` metric instead of a full-table `COUNT(*)` every minute
+* Detect Markdown when the `Content-Type` header has parameters or is uppercase, e.g. `text/markdown; charset=utf-8` ([#1995](https://github.com/binwiederhier/ntfy/pull/1995), thanks to [@cipherprofessor](https://github.com/cipherprofessor) for the contribution)
+* Fix the built-in Alertmanager template showing a bogus `0001-01-01` end time for firing alerts and joining a resolved alert's start and end times onto one line ([#1946](https://github.com/binwiederhier/ntfy/pull/1946)/[#1940](https://github.com/binwiederhier/ntfy/issues/1940), thanks to [@justadityaraj](https://github.com/justadityaraj) for the contribution and [@deferred](https://github.com/deferred) for reporting)
+* Ship the time zone database with the server (`time/tzdata`), so named time zones for delayed notifications work on the ARM Docker images and other minimal runtimes without system zone files
+* Build with Go 1.27; the minimum Go version to build from source is now 1.26
+* Groundwork for horizontal scaling: merged the first building blocks for running multiple ntfy servers as a cluster (node registry, util primitives, reserved experimental config options); clustering is not usable yet ([#1991](https://github.com/binwiederhier/ntfy/pull/1991), [#1997](https://github.com/binwiederhier/ntfy/pull/1997), [#2001](https://github.com/binwiederhier/ntfy/pull/2001), [#2003](https://github.com/binwiederhier/ntfy/pull/2003))
 
 ### ntfy server v2.28.0
 Released August 27, 2026
@@ -2093,11 +2173,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-### ntfy server v2.29.0 (UNRELEASED)
+### ntfy server v2.31.1 (UNRELEASED)
 
 **Security:**
 
-* Fix an authentication race where a request could be authorized as another request's user. Requests from one visitor bucket (untiered accounts and anonymous access are keyed by client IP) shared a single mutable user field, so two overlapping requests from the same bucket could observe each other's identity: an anonymous request could mint a token for or read a private topic of a concurrently-active user, and a user's own concurrent requests could be rejected as unauthenticated. The authenticated user is now carried per request rather than on the shared rate-limit bucket
+* Fix an authentication race where a request could be authorized as another request's user. Requests from one visitor bucket (untiered accounts and anonymous access are keyed by client IP) shared a single mutable user field, so two overlapping requests from the same bucket could observe each other's identity: an anonymous request could mint a token for or read a private topic of a concurrently-active user, and a user's own concurrent requests could be rejected as unauthenticated. The authenticated user is now carried per request rather than on the shared rate-limit bucket ([#1051](https://github.com/binwiederhier/ntfy/issues/1051))
+
+**Bug fixes + maintenance:**
+
+* Web app: Fix the wrong topic opening when subscribed to the same topic on two different servers ([#858](https://github.com/binwiederhier/ntfy/issues/858))
+* Web app: Fix the "Upgrade to ntfy Pro" banner covering the bottom of a long topic list ([#1007](https://github.com/binwiederhier/ntfy/issues/1007))
+* Web app: The "Notifications are disabled" and "Notifications are blocked" warnings can now be closed ([#1220](https://github.com/binwiederhier/ntfy/issues/1220))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

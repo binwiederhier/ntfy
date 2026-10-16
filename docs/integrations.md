@@ -44,6 +44,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Beszel](https://beszel.dev/guide/notifications/ntfy) - Server monitoring platform
 - [Simple Observability](https://simpleobservability.com/docs/alerts/ntfy) - Server monitoring and observability platform
 - [Sifio](https://sifio.net) - Aggregate updates from RSS, social media, and other sources, then deliver them to ntfy, Slack, Notion and more
+- [SolidPing](https://docs.solidping.io/docs/configuration/notifications#ntfy) - Uptime and synthetic monitoring
 
 ## Integration via HTTP/SMTP/etc.
 
@@ -88,11 +89,12 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfy-logging](https://github.com/Pimak/ntfy-logging) - Turns JVM error logs into ntfy notifications, with zero-code adapters for java.util.logging, Logback, Log4j2, Spring Boot, Micronaut and Quarkus (Java)
 
 ## CLIs + GUIs
-
+- [ntfy-wear](https://github.com/cloudsliberty/ntfy-wear) - Lightweight ntfy client for Wear OS round-screen smartwatches.
 - [ntfy.sh.sh](https://github.com/mininmobile/ntfy.sh.sh) - Run scripts on ntfy.sh events
 - [ntfy-desktop](https://codeberg.org/zvava/ntfy-desktop) - Cross-platform desktop application for ntfy
 - [ntfy-desktop](https://github.com/Aetherinox/ntfy-desktop) - Desktop client for Windows, Linux, and MacOS with push notifications
 - [ntfy Desktop (Windows)](https://github.com/simoneferrari/ntfy-desktop) - Native Windows desktop client with multi-server support, toast notifications and message history, built with WPF and .NET (C#)
+- [Notidesk](https://github.com/onatakduman/ntfy-desktop-windows) - Native Windows desktop client built with WinUI 3, with toast notifications, tray support and publishing; available on the [Microsoft Store](https://apps.microsoft.com/detail/9PJDD0JKR719) (C#)
 - [wio-ntfy-ticker](https://github.com/nachotp/wio-ntfy-ticker) - Ticker display for a ntfy.sh topic
 - [ntfysh-windows](https://github.com/mshafer1/ntfysh-windows) - A ntfy client for Windows Desktop
 - [ntfyr](https://github.com/haxwithaxe/ntfyr) - A simple commandline tool to send notifications to ntfy
@@ -103,6 +105,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [ntfyexec](https://github.com/alecthomas/ntfyexec) - Send a notification through ntfy.sh if a command fails
 - [Ntfy Desktop](https://github.com/emmaexe/ntfyDesktop) - Fully featured desktop client for Linux, built with Qt and C++.
 - [Ntfy App](https://github.com/rubix-studios-pty-ltd/ntfy-app) - Tauri/Rust desktop client for Windows, Linux and MacOS with push notifications.
+- [mac_ntfy](https://github.com/wangty163/mac_ntfy) - Native macOS client for ntfy (Swift)
 
 ## Projects + scripts 
 
@@ -153,6 +156,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [nlog-ntfy](https://github.com/MichelMichels/nlog-ntfy) - Send NLog messages over ntfy (C# / .NET / NLog)
 - [helm-charts](https://github.com/sarab97/helm-charts) - Helm charts of some of the selfhosted services, incl. ntfy
 - [ntfy_ansible_role](https://github.com/stevenengland/ntfy_ansible_role) (on [Ansible Galaxy](https://galaxy.ansible.com/stevenengland/ntfy)) - Ansible role to install ntfy
+- [MASH playbook](https://github.com/mother-of-all-self-hosting/mash-playbook/blob/main/docs/services/ntfy.md) - Ansible playbook to install ntfy (and 250+ other self-hosted services) as Docker containers
 - [easy2ntfy](https://github.com/chromoxdor/easy2ntfy) - Gateway for ESPeasy to receive commands through ntfy and using easyfetch (HTML/JS)
 - [ntfy_lite](https://github.com/MPI-IS/ntfy_lite) - Minimalist python API for pushing ntfy notifications (Python)
 - [notify](https://github.com/guanguans/notify) - 推送通知 (PHP)
@@ -193,6 +197,9 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [SIA-Server](https://github.com/ZebMcKayhan/SIA-Server) - A light weight, self-hosted notification Server for Honywell Galaxy Flex alarm systems (Python)
 - [zabbix-ntfy](https://github.com/torgrimt/zabbix-ntfy) - Zabbix server Mediatype to add support for ntfy.sh services
 - [Rubix Notify](https://wordpress.org/plugins/rubix-notify) - WordPress Integration with ntfy (PHP + React).
+- [NotiFerry](https://notiferry.com/) - macOS menu bar app that forwards Notification Center alerts from other Mac apps to an ntfy topic on ntfy.sh or a self-hosted server (commercial, Swift)
+- [Flock](https://github.com/HNF-FRN/flock) - Runs several Claude Desktop accounts side by side on Windows; its phone app starts and continues Claude Code sessions on the PC through end-to-end encrypted ntfy messages (JS)
+- [epokio](https://github.com/8rulerstar/epokio) - Alerts when an ML training run stalls, hits NaN or finishes, by reading its existing logs (Python)
 
 ## Blog + forum posts
 
@@ -321,6 +328,7 @@ ntfy community. Thanks to everyone running a public server. **You guys rock!**
 | [ntfy.mzte.de](https://ntfy.mzte.de/)             | 🇩🇪 Germany       |
 | [ntfy.hostux.net](https://ntfy.hostux.net/)       | 🇫🇷 France        |
 | [ntfy.fossman.de](https://ntfy.fossman.de/)       | 🇩🇪 Germany       |
+| [notify.utilibre.org](https://notify.utilibre.org/) | 🇩🇪 Germany |
 
 Please be aware that **server operators can log your messages**. The project also cannot guarantee the reliability
 and uptime of third party servers, so use of each server is **at your own discretion**.

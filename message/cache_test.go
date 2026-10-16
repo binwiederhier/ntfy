@@ -1,6 +1,7 @@
 package message_test
 
 import (
+	"fmt"
 	"net/netip"
 	"path/filepath"
 	"sync"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/model"
@@ -85,7 +88,7 @@ func TestStore_Messages(t *testing.T) {
 		require.Empty(t, messages)
 
 		// mytopic: since m1 (by ID)
-		messages, _ = s.Messages("mytopic", model.NewSinceID(m1.ID), false)
+		messages = messagesAfter(t, s, "mytopic", m1.ID, false)
 		require.Equal(t, 1, len(messages))
 		require.Equal(t, m2.ID, messages[0].ID)
 		require.Equal(t, "my other message", messages[0].Message)
@@ -211,14 +214,14 @@ func TestStore_MessagesSinceID(t *testing.T) {
 		require.Nil(t, s.AddMessage(m7))
 
 		// Case 1: Since ID exists, exclude scheduled
-		messages, _ := s.Messages("mytopic", model.NewSinceID(m2.ID), false)
+		messages := messagesAfter(t, s, "mytopic", m2.ID, false)
 		require.Equal(t, 3, len(messages))
 		require.Equal(t, "message 4", messages[0].Message)
 		require.Equal(t, "message 6", messages[1].Message) // Not scheduled m3/m5!
 		require.Equal(t, "message 7", messages[2].Message)
 
 		// Case 2: Since ID exists, include scheduled
-		messages, _ = s.Messages("mytopic", model.NewSinceID(m2.ID), true)
+		messages = messagesAfter(t, s, "mytopic", m2.ID, true)
 		require.Equal(t, 5, len(messages))
 		require.Equal(t, "message 4", messages[0].Message)
 		require.Equal(t, "message 6", messages[1].Message)
@@ -226,23 +229,17 @@ func TestStore_MessagesSinceID(t *testing.T) {
 		require.Equal(t, "message 5", messages[3].Message) // Order!
 		require.Equal(t, "message 3", messages[4].Message) // Order!
 
-		// Case 3: Since ID does not exist (-> Return all messages), include scheduled
-		messages, _ = s.Messages("mytopic", model.NewSinceID("doesntexist"), true)
-		require.Equal(t, 7, len(messages))
-		require.Equal(t, "message 1", messages[0].Message)
-		require.Equal(t, "message 2", messages[1].Message)
-		require.Equal(t, "message 4", messages[2].Message)
-		require.Equal(t, "message 6", messages[3].Message)
-		require.Equal(t, "message 7", messages[4].Message)
-		require.Equal(t, "message 5", messages[5].Message) // Order!
-		require.Equal(t, "message 3", messages[6].Message) // Order!
+		// Case 3: Since ID does not exist: the caller decides (the server replays everything)
+		marker, err := s.ResolveMarker("doesntexist")
+		require.Nil(t, err)
+		require.Nil(t, marker)
 
 		// Case 4: Since ID exists and is last message (-> Return no messages), exclude scheduled
-		messages, _ = s.Messages("mytopic", model.NewSinceID(m7.ID), false)
+		messages = messagesAfter(t, s, "mytopic", m7.ID, false)
 		require.Equal(t, 0, len(messages))
 
 		// Case 5: Since ID exists and is last message (-> Return no messages), include scheduled
-		messages, _ = s.Messages("mytopic", model.NewSinceID(m7.ID), true)
+		messages = messagesAfter(t, s, "mytopic", m7.ID, true)
 		require.Equal(t, 2, len(messages))
 		require.Equal(t, "message 5", messages[0].Message)
 		require.Equal(t, "message 3", messages[1].Message)
@@ -556,6 +553,76 @@ func TestStore_MarkPublished(t *testing.T) {
 	})
 }
 
+func TestStore_MessagesDue_ClaimExactlyOnce(t *testing.T) {
+	// Postgres-only: exercises "FOR UPDATE SKIP LOCKED" claiming so that concurrent delayed
+	// senders running on different cluster nodes never pick up (and deliver) the same due
+	// message twice. With the non-claiming implementation, every concurrent caller sees every
+	// due row, so this test fails; with claiming, each row is returned to exactly one caller.
+	s := newTestPostgresStore(t) // skips if NTFY_TEST_DATABASE_URL is unset
+	const n = 40
+	for i := 0; i < n; i++ {
+		m := model.NewDefaultMessage("mytopic", fmt.Sprintf("scheduled %d", i))
+		m.Time = time.Now().Add(time.Hour).Unix() // future -> stored as published=FALSE
+		require.Nil(t, s.AddMessage(m))
+		// Move the time into the past so the message is due now (but still unpublished)
+		require.Nil(t, s.UpdateMessageTime(m.ID, time.Now().Add(-time.Minute).Unix()))
+	}
+	var mu sync.Mutex
+	seen := make(map[string]int)
+	var wg sync.WaitGroup
+	for c := 0; c < 6; c++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			due, err := s.MessagesDue()
+			require.Nil(t, err)
+			mu.Lock()
+			defer mu.Unlock()
+			for _, m := range due {
+				seen[m.ID]++
+			}
+		}()
+	}
+	wg.Wait()
+	require.Len(t, seen, n) // every due message was claimed
+	for id, count := range seen {
+		require.Equalf(t, 1, count, "message %s was claimed %d times, want exactly 1", id, count)
+	}
+}
+
+func TestStore_MessagesDue_AbandonedClaimIsReclaimed(t *testing.T) {
+	// A node that dies between claiming and delivering leaves its rows claimed but unpublished.
+	// Nothing would ever deliver them again if the claim were permanent, so it expires: until it
+	// does, no other node sees the message; after it does, any node may claim it afresh.
+	s := newTestPostgresStore(t) // skips if NTFY_TEST_DATABASE_URL is unset
+	m := model.NewDefaultMessage("mytopic", "scheduled")
+	m.Time = time.Now().Add(time.Hour).Unix() // future -> stored unpublished
+	require.Nil(t, s.AddMessage(m))
+	require.Nil(t, s.UpdateMessageTime(m.ID, time.Now().Add(-time.Minute).Unix()))
+
+	// The claim takes it, and nothing else can have it while the claim holds
+	due, err := s.MessagesDue()
+	require.Nil(t, err)
+	require.Len(t, due, 1)
+	require.Equal(t, m.ID, due[0].ID)
+	due, err = s.MessagesDue()
+	require.Nil(t, err)
+	require.Empty(t, due, "a claimed message was handed out again while the claim still held")
+
+	// The claimer never published it (it died); past the timeout the message is claimable again
+	s.SetClaimTimeoutForTest(0)
+	due, err = s.MessagesDue()
+	require.Nil(t, err)
+	require.Len(t, due, 1, "an abandoned claim was never reclaimed")
+	require.Equal(t, m.ID, due[0].ID)
+
+	// Once it is actually delivered, no timeout brings it back
+	require.Nil(t, s.MarkPublished(due[0]))
+	due, err = s.MessagesDue()
+	require.Nil(t, err)
+	require.Empty(t, due, "a published message was handed out again")
+}
+
 func TestStore_ExpireMessages(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, s *message.Cache) {
 		// Add messages to two topics
@@ -690,6 +757,101 @@ func TestStore_AddMessages(t *testing.T) {
 		}
 		require.NotNil(t, s.AddMessages(badMsgs))
 	})
+}
+
+func TestStore_AddMessages_AllFields(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		// Every column must land in the right row when several messages are written in one batch
+		msgs := make([]*model.Message, 0)
+		for i := 0; i < 3; i++ {
+			m := model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i))
+			m.Time = int64(1000 + i)
+			m.SequenceID = fmt.Sprintf("seq%d", i)
+			m.Title = fmt.Sprintf("title %d", i)
+			m.Priority = i + 1
+			m.Tags = []string{fmt.Sprintf("tag%d", i), "common"}
+			m.Click = fmt.Sprintf("https://example.com/%d", i)
+			m.Icon = fmt.Sprintf("https://example.com/%d.png", i)
+			m.Actions = []*model.Action{{ID: fmt.Sprintf("a%d", i), Action: "view", Label: fmt.Sprintf("label %d", i), URL: "https://example.com"}}
+			m.Attachment = &model.Attachment{Name: fmt.Sprintf("file%d.txt", i), Type: "text/plain", Size: int64(10 + i), Expires: int64(2000 + i), URL: fmt.Sprintf("https://example.com/file%d.txt", i)}
+			m.Sender = netip.MustParseAddr(fmt.Sprintf("1.2.3.%d", i+1))
+			m.User = fmt.Sprintf("u_%d", i)
+			m.ContentType = "text/markdown"
+			m.Encoding = "base64"
+			msgs = append(msgs, m)
+		}
+		require.Nil(t, s.AddMessages(msgs))
+
+		messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
+		require.Nil(t, err)
+		require.Equal(t, 3, len(messages))
+		for i, m := range messages {
+			require.Equal(t, msgs[i].ID, m.ID)
+			require.Equal(t, fmt.Sprintf("seq%d", i), m.SequenceID)
+			require.Equal(t, int64(1000+i), m.Time)
+			require.Equal(t, fmt.Sprintf("message %d", i), m.Message)
+			require.Equal(t, fmt.Sprintf("title %d", i), m.Title)
+			require.Equal(t, i+1, m.Priority)
+			require.Equal(t, []string{fmt.Sprintf("tag%d", i), "common"}, m.Tags)
+			require.Equal(t, fmt.Sprintf("https://example.com/%d", i), m.Click)
+			require.Equal(t, fmt.Sprintf("https://example.com/%d.png", i), m.Icon)
+			require.Equal(t, 1, len(m.Actions))
+			require.Equal(t, fmt.Sprintf("label %d", i), m.Actions[0].Label)
+			require.Equal(t, fmt.Sprintf("file%d.txt", i), m.Attachment.Name)
+			require.Equal(t, int64(10+i), m.Attachment.Size)
+			require.Equal(t, int64(2000+i), m.Attachment.Expires)
+			require.Equal(t, fmt.Sprintf("https://example.com/file%d.txt", i), m.Attachment.URL)
+			require.Equal(t, fmt.Sprintf("1.2.3.%d", i+1), m.Sender.String())
+			require.Equal(t, fmt.Sprintf("u_%d", i), m.User)
+			require.Equal(t, "text/markdown", m.ContentType)
+			require.Equal(t, "base64", m.Encoding)
+		}
+	})
+}
+
+func TestPostgresStore_AddMessages_OneRoundTripPerBatch(t *testing.T) {
+	// The batch writer is the only writer, so its round trips cap the publish rate on cron bursts.
+	// With one INSERT per row, a batch of 100 against a remote database costs 100+ round trips.
+	testDB, proxy := dbtest.CreateTestPostgresWithLatency(t, time.Millisecond)
+	s, err := message.NewPostgresStore(testDB, 0, 0)
+	require.Nil(t, err)
+	msgs := make([]*model.Message, 0)
+	for i := 0; i < 100; i++ {
+		msgs = append(msgs, model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i)))
+	}
+	require.Nil(t, s.AddMessages(msgs[:1])) // Warm up the pool connection
+	before := proxy.Requests()
+	require.Nil(t, s.AddMessages(msgs[1:]))
+	roundTrips := proxy.Requests() - before
+	require.Less(t, roundTrips, int64(10), "writing 99 messages took %d round trips", roundTrips)
+
+	messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 100, len(messages))
+}
+
+func TestPostgresStore_AddMessages_OnePreparedStatementForAnyBatchSize(t *testing.T) {
+	// pgx prepares every distinct statement text server-side and keeps up to 512 per connection.
+	// A multi-row INSERT whose text depends on the batch size leaves hundreds of multi-MB plans
+	// in every pooled backend (ntfy.sh primary memory crept from 50% to 65% in 3h after 2.29.0).
+	testDB := dbtest.CreateTestPostgres(t)
+	testDB.Primary().SetMaxOpenConns(1) // Every statement lands on the same backend
+	s, err := message.NewPostgresStore(testDB, 0, 0)
+	require.Nil(t, err)
+	for _, size := range []int{1, 2, 50, 300} {
+		msgs := make([]*model.Message, 0)
+		for i := 0; i < size; i++ {
+			msgs = append(msgs, model.NewDefaultMessage("mytopic", fmt.Sprintf("message %d", i)))
+		}
+		require.Nil(t, s.AddMessages(msgs))
+	}
+	var prepared int
+	require.Nil(t, testDB.Primary().QueryRow("SELECT COUNT(*) FROM pg_prepared_statements WHERE statement ~ '^\\s*INSERT INTO message '").Scan(&prepared)) // Anchored, so this SELECT does not count itself
+	require.Equal(t, 1, prepared, "one INSERT shape regardless of batch size")
+
+	messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 353, len(messages))
 }
 
 func TestStore_MessagesDue(t *testing.T) {
@@ -946,4 +1108,211 @@ func TestStore_AddMessage_InvalidUTF8BatchDoesNotDropValidMessages(t *testing.T)
 		require.Nil(t, err)
 		require.Equal(t, 3, len(messages))
 	})
+}
+
+func TestStore_CloseGivesUpOnAStuckBatchWrite(t *testing.T) {
+	// A wedged database must not make Close, and with it the entire shutdown, block forever.
+	// systemd would SIGKILL us eventually, but only after its stop timeout.
+	testDB := dbtest.CreateTestPostgres(t)
+	s, err := message.NewPostgresStore(testDB, 100, time.Hour)
+	require.Nil(t, err)
+
+	// Hold a lock on the message table, so the final batch write cannot make progress
+	tx, err := testDB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE")
+	require.Nil(t, err)
+
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "my message")))
+	done := make(chan struct{})
+	go func() {
+		s.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Close did not return while the database was stuck")
+	}
+}
+
+func TestStore_CloseGivesUpOnAnInFlightBatchWrite(t *testing.T) {
+	// Same as TestStore_CloseGivesUpOnAStuckBatchWrite, but with a batch already handed to the
+	// batch writer, so Close cannot even hand over the messages that are still pending
+	testDB := dbtest.CreateTestPostgres(t)
+	s, err := message.NewPostgresStore(testDB, 2, time.Hour)
+	require.Nil(t, err)
+
+	tx, err := testDB.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec("LOCK TABLE message IN EXCLUSIVE MODE")
+	require.Nil(t, err)
+
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "stuck 1")))
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "stuck 2"))) // Batch of 2, handed over
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "pending")))
+	done := make(chan struct{})
+	go func() {
+		s.Close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Close did not return while the database was stuck")
+	}
+}
+
+func TestStore_MessagesSinceID_MarkerWrittenAfterALaterMessage(t *testing.T) {
+	// Cluster nodes write their batches independently, so a message can be written after one
+	// that was published later. A client whose marker is the late-written one must still get
+	// the later message, although its row id is lower.
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		older := model.NewDefaultMessage("mytopic", "older")
+		older.Time = 50
+		sameSecond := model.NewDefaultMessage("mytopic", "same second")
+		sameSecond.Time = 100
+		marker := model.NewDefaultMessage("mytopic", "marker")
+		marker.Time = 100
+		later := model.NewDefaultMessage("mytopic", "later")
+		later.Time = 200
+		require.Nil(t, s.AddMessages([]*model.Message{older, sameSecond, later}))
+		require.Nil(t, s.AddMessages([]*model.Message{marker})) // Written last, e.g. its node was cut off from the database
+
+		messages := messagesAfter(t, s, "mytopic", marker.ID, false)
+		require.Equal(t, []string{"same second", "later"}, bodies(messages)) // "same second" is the price: the client may have it
+	})
+}
+
+func TestStore_MessagesAfterMarker_ResolvesTheMarkerOnce(t *testing.T) {
+	// A multi-topic subscription replays every topic after one marker: one lookup of the marker,
+	// then one query per topic, not a lookup per topic
+	testDB, proxy := dbtest.CreateTestPostgresWithLatency(t, 0)
+	s, err := message.NewPostgresStore(testDB, 0, 0)
+	require.Nil(t, err)
+	marker := model.NewDefaultMessage("topic0", "marker")
+	require.Nil(t, s.AddMessages([]*model.Message{marker}))
+	for i := 0; i < 5; i++ {
+		require.Nil(t, s.AddMessages([]*model.Message{model.NewDefaultMessage(fmt.Sprintf("topic%d", i), "after")}))
+	}
+	resolved, err := s.ResolveMarker(marker.ID)
+	require.Nil(t, err)
+	require.NotNil(t, resolved)
+	_, _, err = s.MessagesAfterMarker("topic0", resolved, false, 0) // Prepares the statement
+	require.Nil(t, err)
+
+	before := proxy.Requests()
+	for i := 0; i < 5; i++ {
+		messages, _, err := s.MessagesAfterMarker(fmt.Sprintf("topic%d", i), resolved, false, 0)
+		require.Nil(t, err)
+		require.Equal(t, []string{"after"}, bodies(messages))
+	}
+	t.Logf("requests for 5 topics: %d", proxy.Requests()-before)
+	require.LessOrEqual(t, proxy.Requests()-before, int64(5))
+}
+
+func TestStore_ResolveMarker_Unknown(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		resolved, err := s.ResolveMarker("unknown00000")
+		require.Nil(t, err)
+		require.Nil(t, resolved)
+	})
+}
+
+func TestStore_MessagesCapped_RejectsIDMarker(t *testing.T) {
+	// A since=<id> marker goes through ResolveMarker and MessagesAfterMarker, so the caller
+	// decides what an unknown marker means; MessagesCapped does not guess
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		m := model.NewDefaultMessage("mytopic", "message")
+		require.Nil(t, s.AddMessages([]*model.Message{m}))
+		_, _, err := s.MessagesCapped("mytopic", model.NewSinceID(m.ID), false, 0)
+		require.Error(t, err)
+	})
+}
+
+// messagesAfter replays the topic after a since=<id> marker the cache knows
+func messagesAfter(t *testing.T, s *message.Cache, topic, mid string, scheduled bool) []*model.Message {
+	t.Helper()
+	marker, err := s.ResolveMarker(mid)
+	require.Nil(t, err)
+	require.NotNil(t, marker)
+	messages, _, err := s.MessagesAfterMarker(topic, marker, scheduled, 0)
+	require.Nil(t, err)
+	return messages
+}
+
+func bodies(messages []*model.Message) []string {
+	out := make([]string, 0, len(messages))
+	for _, m := range messages {
+		out = append(out, m.Message)
+	}
+	return out
+}
+
+func TestStore_MessagesSinceID_ForeignMidActsAsPositionalMarker(t *testing.T) {
+	// Multi-topic subscriptions apply ONE since=<mid> marker to every subscribed topic, so for
+	// all but the marker's own topic the mid is foreign; it must act as a positional cut-off
+	// (everything the marker's row precedes), not as "unknown -> full replay"
+	s := newTestPostgresStore(t)
+	bOld := model.NewDefaultMessage("topicb", "b old")
+	bOld.Time = time.Now().Unix() - 10 // An earlier second: the marker's own second is replayed
+	require.Nil(t, s.AddMessage(bOld))
+	marker := model.NewDefaultMessage("topica", "marker a")
+	require.Nil(t, s.AddMessage(marker))
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("topicb", "b new")))
+	messages := messagesAfter(t, s, "topicb", marker.ID, false)
+	require.Len(t, messages, 1)
+	require.Equal(t, "b new", messages[0].Message)
+}
+
+func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
+	// since=<mid> resolution must fall back to the primary when the replica does not know the
+	// mid yet (publish on node A, client reconnects to node B before replication catches up).
+	// Without the fallback, the unknown mid resolves to "id > 0" and the client is flooded
+	// with the topic's whole retained history.
+	primaryDSN, replicaDSN := dbtest.CreateTestPostgresSchema(t), dbtest.CreateTestPostgresSchema(t)
+	openStoreOn := func(dsn string, replicas []*db.Host) *message.Cache {
+		host, err := pg.Open(dsn)
+		require.Nil(t, err)
+		d := db.New(host, replicas)
+		d.MarkReplicasHealthyForTest() // Route ReadOnly() to the lagged replica deterministically
+		store, err := message.NewPostgresStore(d, 0, 0)
+		require.Nil(t, err)
+		t.Cleanup(func() { store.Close() })
+		return store
+	}
+	// The "replica" is a separate schema holding only the first 3 messages (fully lagged after
+	// that); row ids align because both schemas insert in the same order
+	replicaOnly := openStoreOn(replicaDSN, nil)
+	primaryOnly := openStoreOn(primaryDSN, nil)
+	for i := 1; i <= 3; i++ {
+		m := model.NewDefaultMessage("mytopic", fmt.Sprintf("m%d", i))
+		m.Time = time.Now().Unix() - 10 // An earlier second: the marker's own second is replayed
+		require.Nil(t, primaryOnly.AddMessage(m))
+		require.Nil(t, replicaOnly.AddMessage(m))
+	}
+	m4 := model.NewDefaultMessage("mytopic", "m4")
+	require.Nil(t, primaryOnly.AddMessage(m4)) // Not yet replicated
+
+	replicaHost, err := pg.OpenReplica(replicaDSN)
+	require.Nil(t, err)
+	combined := openStoreOn(primaryDSN, []*db.Host{replicaHost})
+	messages := messagesAfter(t, combined, "mytopic", m4.ID, false)
+	require.Len(t, messages, 0) // Correct cut-off via primary; the lagged replica has nothing newer
+
+	// A message after the marker that the replica does not have yet either: a reconnecting
+	// client must get it from the primary, since it went out live before the client arrived
+	// and the tail does not resend it
+	m5 := model.NewDefaultMessage("mytopic", "m5")
+	require.Nil(t, primaryOnly.AddMessage(m5))
+	messages = messagesAfter(t, combined, "mytopic", m4.ID, false)
+	require.Equal(t, []string{"m5"}, bodies(messages))
+
+	// A recent time-based replay (the fallback for a marker the cache does not know) reads the
+	// primary for the same reason; an old one is served by the replica as before
+	messages, err = combined.Messages("mytopic", model.NewSinceTime(time.Now().Unix()-30), false)
+	require.Nil(t, err)
+	require.Equal(t, []string{"m1", "m2", "m3", "m4", "m5"}, bodies(messages))
 }

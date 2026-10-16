@@ -35,6 +35,7 @@ export const PREF_DEFAULTS = {
   dateFormat: DATE_FORMAT.SYSTEM,
   timeFormat: TIME_FORMAT.SYSTEM,
   webPushEnabled: false,
+  notificationAlertDismissed: false,
 };
 
 // Guards against values the current build doesn't know about (e.g. a pref synced from a newer
@@ -81,6 +82,17 @@ export class Prefs {
 
   async setWebPushEnabled(enabled) {
     await this.db.prefs.put({ key: "webPushEnabled", value: enabled });
+  }
+
+  // Whether the "Notifications are disabled/blocked" alert in the navigation was closed. Per browser,
+  // since one machine may want desktop notifications and another not.
+  async notificationAlertDismissed() {
+    const dismissed = await this.db.prefs.get("notificationAlertDismissed");
+    return dismissed?.value ?? PREF_DEFAULTS.notificationAlertDismissed;
+  }
+
+  async setNotificationAlertDismissed(dismissed) {
+    await this.db.prefs.put({ key: "notificationAlertDismissed", value: dismissed });
   }
 
   async theme() {

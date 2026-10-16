@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -27,6 +28,7 @@ type publishMessage struct {
 	Cache      string         `json:"cache"`    // use string as it defaults to true (or use &bool instead)
 	Firebase   string         `json:"firebase"` // use string as it defaults to true (or use &bool instead)
 	Delay      string         `json:"delay"`
+	Timezone   string         `json:"timezone"`
 }
 
 // dispatchOpts selects which delivery targets fire for a published message, beyond delivery
@@ -144,7 +146,13 @@ type templateFile struct {
 }
 
 type apiHealthResponse struct {
-	Healthy bool `json:"healthy"`
+	Healthy bool         `json:"healthy"`
+	Role    cluster.Role `json:"role"`
+}
+
+type apiReadyResponse struct {
+	Ready bool         `json:"ready"`
+	Role  cluster.Role `json:"role"`
 }
 
 type apiVersionResponse struct {

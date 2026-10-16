@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -32,6 +33,7 @@ import (
 	"heckel.io/ntfy/v2/action"
 	"heckel.io/ntfy/v2/attachment"
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -49,11 +51,13 @@ import (
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config            *Config
-	db                *db.DB // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
+	db                *db.DB          // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
+	cluster           cluster.Cluster // Fans messages out to peer cluster nodes (nop when not clustered)
 	httpServer        *http.Server
 	httpsServer       *http.Server
 	httpMetricsServer *http.Server
 	httpProfileServer *http.Server
+	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	unixListener      net.Listener
 	smtpServer        *smtp.Server
 	smtpServerBackend *smtpBackend
@@ -73,6 +77,9 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
+	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
+	stopOnce          sync.Once
+	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex
 }
 
@@ -106,6 +113,7 @@ var (
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
+	apiReadyPath                                         = "/v1/ready"
 	apiVersionPath                                       = "/v1/version"
 	apiConfigPath                                        = "/v1/config"
 	apiStatsPath                                         = "/v1/stats"
@@ -163,6 +171,11 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+
+	// stopTimeout bounds the entire shutdown. The stores wait for their own background work
+	// (the attachment sync loop queries the database), and none of those waits has a deadline,
+	// so this is the backstop that keeps a wedged database from stalling us until SIGKILL.
+	stopTimeout = 10 * time.Second
 )
 
 // WebSocket constants
@@ -303,6 +316,11 @@ func New(conf *Config) (*Server, error) {
 			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
 		})
 	}
+	// Peers reach this node on the dedicated cluster listener, never on the public ones
+	advertiseURL := conf.ClusterAdvertiseURL
+	if advertiseURL == "" && conf.ClusterListen != "" {
+		advertiseURL = "http://" + conf.ClusterListen
+	}
 	s := &Server{
 		config:          conf,
 		db:              pool,
@@ -320,7 +338,31 @@ func New(conf *Config) (*Server, error) {
 		visitors:        make(map[string]*visitorBucket),
 		stripe:          stripe,
 	}
+	// Everything from here on needs the server itself: the price cache calls a method on it, and
+	// the cluster delivers peer messages through callbacks into it (which is how the cluster
+	// package stays independent of the server)
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
+	s.cluster, err = cluster.New(&cluster.Config{
+		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
+		NodeID:          cluster.NodeID(conf.ClusterNodeID),
+		AdvertiseURL:    advertiseURL,
+		Role:            conf.ClusterRole,
+		Secret:          conf.ClusterSecret,
+		BatchLinger:     conf.ClusterBatchLinger,
+		IsolatedFunc:    s.maybeCloseLocalSubscribers,
+		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
+	}, pool, s.deliverFromBus)
+	if err != nil {
+		return nil, err
+	}
+	if conf.CacheDuration > 0 {
+		tail, err := messageCache.Tail()
+		if err != nil {
+			return nil, err
+		}
+		s.tail = tail
+		go s.runTail()
+	}
 	return s, nil
 }
 
@@ -374,7 +416,14 @@ func (s *Server) Run() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)
 	errChan := make(chan error)
+	if s.stopped.Load() {
+		return nil // Stopped before we got here; a stuck shutdown must not block us on the lock
+	}
 	s.mu.Lock()
+	if s.stopped.Load() {
+		s.mu.Unlock()
+		return nil // Stopped while we waited for the lock, i.e. the stores are closed by now
+	}
 	s.closeChan = make(chan bool)
 	if s.config.ListenHTTP != "" {
 		s.httpServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
@@ -392,6 +441,10 @@ func (s *Server) Run() error {
 		go func() {
 			var err error
 			s.mu.Lock()
+			if s.stopped.Load() {
+				s.mu.Unlock()
+				return // Nobody would close this listener anymore
+			}
 			os.Remove(s.config.ListenUnix)
 			s.unixListener, err = net.Listen("unix", s.config.ListenUnix)
 			if err != nil {
@@ -420,6 +473,14 @@ func (s *Server) Run() error {
 	} else if s.config.EnableMetrics {
 		s.metricsHandler = promhttp.Handler()
 	}
+	if s.config.ClusterListen != "" {
+		// The cluster serves the whole private listener: every path on it is the peer API, which
+		// the cluster owns and authenticates itself
+		s.httpClusterServer = &http.Server{Addr: s.config.ClusterListen, Handler: s.cluster}
+		go func() {
+			errChan <- s.httpClusterServer.ListenAndServe()
+		}()
+	}
 	if s.config.ProfileListenHTTP != "" {
 		profileMux := http.NewServeMux()
 		profileMux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -446,8 +507,29 @@ func (s *Server) Run() error {
 	return <-errChan
 }
 
-// Stop stops HTTP (+HTTPS) server and all managers
+// Stop stops the HTTP (+HTTPS) server and all managers. It is idempotent: a signal handler and
+// the serve command both call it, and the second call waits for the first to finish.
 func (s *Server) Stop() {
+	s.stopped.Store(true) // Before the lock: Run must see this even if stop() is stuck
+	s.stopOnce.Do(s.stopBounded)
+}
+
+// stopBounded runs the shutdown and gives up on it after stopTimeout, so that a store which
+// never finishes closing cannot keep the process alive
+func (s *Server) stopBounded() {
+	done := make(chan struct{})
+	go func() {
+		s.stop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(stopTimeout):
+		log.Tag(tagStartup).Warn("Shutdown did not finish within %v, exiting anyway", stopTimeout)
+	}
+}
+
+func (s *Server) stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.httpServer != nil {
@@ -465,6 +547,12 @@ func (s *Server) Stop() {
 	if s.attachment != nil {
 		s.attachment.Close()
 	}
+	if s.httpClusterServer != nil {
+		s.httpClusterServer.Close()
+	}
+	if s.tail != nil {
+		s.tail.Close() // Before the databases close under it
+	}
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -475,11 +563,13 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) closeDatabases() {
-	if s.userManager != nil {
-		s.userManager.Close()
-	}
+	// Message cache first: it may still be writing its last batch, and on Postgres all stores
+	// share one pool, so closing any other store first would close the pool under that write
 	if s.messageCache != nil {
 		s.messageCache.Close()
+	}
+	if s.userManager != nil {
+		s.userManager.Close()
 	}
 	if s.webPush != nil {
 		s.webPush.Close()
@@ -567,6 +657,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
 		return s.handleHealth(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiReadyPath {
+		return s.handleReady(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiVersionPath {
 		return s.ensureAdmin(s.handleVersion)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiConfigPath {
@@ -717,10 +809,23 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	response := &apiHealthResponse{
-		Healthy: true,
+	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node. For
+	// monitoring; load balancers check /v1/ready, which keeps the only active node in
+	healthy := s.cluster.Healthy()
+	if !healthy {
+		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, response)
+	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy, Role: s.cluster.Role()})
+}
+
+// handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
+// Ready). A passive node is healthy (see handleHealth) but never ready.
+func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	ready := s.cluster.Ready()
+	if !ready {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	return s.writeJSON(w, &apiReadyResponse{Ready: ready, Role: s.cluster.Role()})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -824,6 +929,11 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 // the single choke point through which every published message must pass; t may be nil when
 // the topic has no local subscribers (delayed sender).
 func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchOpts) error {
+	// Hand the message to the other cluster nodes: fire-and-forget, so a slow or dead peer never
+	// delays the publisher. Nop single-node.
+	if err := s.cluster.ForwardMessage(m); err != nil {
+		logvm(v, m).Err(err).Warn("Unable to forward message to cluster peers")
+	}
 	// Deliver to local subscribers
 	if t != nil {
 		if opts.async {
@@ -947,15 +1057,18 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
 	}
 	if cache {
-		// Delete any existing scheduled message with the same sequence ID
-		deletedIDs, err := s.messageCache.DeleteScheduledBySequenceID(t.ID, m.SequenceID)
-		if err != nil {
-			return nil, err
-		}
-		// Delete attachment files for deleted scheduled messages
-		if s.attachment != nil && len(deletedIDs) > 0 {
-			if err := s.attachment.Remove(deletedIDs...); err != nil {
-				logvrm(v, r, m).Tag(tagPublish).Err(err).Warn("Error removing attachments for deleted scheduled messages")
+		// Delete any existing scheduled message with the same sequence ID. Without a client-provided
+		// sequence ID, it is the message's own fresh ID and nothing can match, so skip the round trip.
+		if m.SequenceID != m.ID {
+			deletedIDs, err := s.messageCache.DeleteScheduledBySequenceID(t.ID, m.SequenceID)
+			if err != nil {
+				return nil, err
+			}
+			// Delete attachment files for deleted scheduled messages
+			if s.attachment != nil && len(deletedIDs) > 0 {
+				if err := s.attachment.Remove(deletedIDs...); err != nil {
+					logvrm(v, r, m).Tag(tagPublish).Err(err).Warn("Error removing attachments for deleted scheduled messages")
+				}
 			}
 		}
 		logvrm(v, r, m).Tag(tagPublish).Debug("Adding message to cache")
@@ -965,7 +1078,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	}
 	u := v.User()
 	if s.userManager != nil && u != nil && u.Tier != nil {
-		go s.userManager.EnqueueUserStats(u.ID, v.Stats())
+		go v.EnqueueUserStatsDelta()
 	}
 	s.mu.Lock()
 	s.messages++
@@ -1235,7 +1348,15 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		if call != "" {
 			return false, false, "", "", "", false, "", errHTTPBadRequestDelayNoCall // we cannot store the phone number (yet)
 		}
-		delay, err := util.ParseFutureTime(delayStr, time.Now())
+		now := time.Now()
+		if timezone := readParam(r, "x-timezone", "timezone"); timezone != "" {
+			location, err := time.LoadLocation(timezone)
+			if err != nil {
+				return false, false, "", "", "", false, "", errHTTPBadRequestTimezoneInvalid
+			}
+			now = now.In(location)
+		}
+		delay, err := util.ParseFutureTime(delayStr, now)
 		if err != nil {
 			return false, false, "", "", "", false, "", errHTTPBadRequestDelayCannotParse
 		} else if delay.Unix() < time.Now().Add(s.config.MessageDelayMin).Unix() {
@@ -1253,7 +1374,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		}
 	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
-	if markdown || strings.ToLower(contentType) == "text/markdown" {
+	if markdown || isMarkdownContentType(contentType) {
 		m.ContentType = "text/markdown"
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
@@ -1750,10 +1871,24 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	if since.IsNone() {
 		return nil
 	}
+	var marker *message.Marker
+	if since.IsID() {
+		var err error
+		if marker, err = s.messageCache.ResolveMarker(since.ID()); err != nil {
+			return err
+		}
+	}
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
-		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
+		var topicMessages []*model.Message
+		var topicTruncated bool
+		var err error
+		if marker != nil {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesAfterMarker(t.ID, marker, scheduled, s.config.MessagePollSizeLimit)
+		} else {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesCapped(t.ID, sinceForTopic(t, since), scheduled, s.config.MessagePollSizeLimit)
+		}
 		if err != nil {
 			return err
 		}
@@ -1971,6 +2106,11 @@ func (s *Server) runFirebaseKeepaliver() {
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
+			// Leader only: a keepalive wakes every subscribed phone, so the cluster sends it
+			// once rather than once per node. Per tick, to survive a failover.
+			if !s.cluster.IsLeader() {
+				continue
+			}
 			s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
 		/*
 			FIXME: Disable iOS polling entirely for now due to thundering herd problem (see #677)
@@ -1990,6 +2130,11 @@ func (s *Server) runDelayedSender() {
 	for {
 		select {
 		case <-time.After(s.config.DelayedSenderInterval):
+			// Leader only, to keep delayed sends on one node. A preference, not what makes
+			// delivery safe: MessagesDue claims each row, so a non-leader is harmless.
+			if !s.cluster.IsLeader() {
+				continue
+			}
 			if err := s.sendDelayedMessages(); err != nil {
 				log.Tag(tagPublish).Err(err).Warn("Error sending delayed messages")
 			}
@@ -2095,6 +2240,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Delay != "" {
 			r.Header.Set("X-Delay", m.Delay)
+		}
+		if m.Timezone != "" {
+			r.Header.Set("X-Timezone", m.Timezone)
 		}
 		if m.Call != "" {
 			r.Header.Set("X-Call", m.Call)

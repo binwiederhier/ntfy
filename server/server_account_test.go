@@ -8,6 +8,8 @@ import (
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -898,3 +900,29 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 	account, _ = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
 	require.Equal(t, int64(2), account.Stats.Messages) // Is not reset!
 }*/
+
+func TestAccount_TokenUpdate_NilUserRace_NoPanic(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Regression for the recurring production panic in handleAccountTokenUpdate: the
+		// handler re-reads v.User() after ensureUser already checked it, and a concurrent
+		// anonymous request on the same IP-keyed visitor can SetUser(nil) in between. The
+		// handler must return 401, not dereference a nil user.
+		conf := newTestConfigWithAuthFile(t, databaseURL)
+		conf.EnableLogin = true
+		s := newTestServer(t, conf)
+		require.Nil(t, s.userManager.AddUser("phil", "phil12345", user.RoleUser, false))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+
+		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+		v.SetUser(nil) // The concurrent anonymous request, made deterministic
+
+		r, _ := http.NewRequest("PATCH", "/v1/account/token", strings.NewReader("{}"))
+		rr := httptest.NewRecorder()
+		err = s.handleAccountTokenUpdate(rr, r, v)
+		require.Error(t, err)
+		httpErr, ok := err.(*errHTTP)
+		require.True(t, ok)
+		require.Equal(t, 401, httpErr.HTTPCode)
+	})
+}

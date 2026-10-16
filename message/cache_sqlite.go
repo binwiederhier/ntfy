@@ -4,21 +4,26 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/util"
 )
 
 // SQLite runtime query constants
 const (
-	sqliteInsertMessageQuery = `
-		INSERT INTO messages (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, published)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	// sqliteInsertMessagesQuery is the head of the multi-row INSERT; one sqliteInsertMessagesRow per
+	// message follows, with the values in the order of insertMessageArgs. sqliteInsertMessagesMaxRows
+	// caps the rows per statement, keeping the parameter count well below SQLite's 32766.
+	sqliteInsertMessagesQuery   = `INSERT INTO messages (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, published) VALUES `
+	sqliteInsertMessagesRow     = `(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	sqliteInsertMessagesMaxRows = 1000
+
 	sqliteSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM messages WHERE topic = ? AND sequence_id = ? AND published = 0`
 	sqliteDeleteScheduledBySequenceIDQuery      = `DELETE FROM messages WHERE topic = ? AND sequence_id = ? AND published = 0`
 	sqliteUpdateMessagesForTopicExpiryQuery     = `UPDATE messages SET expires = ? WHERE topic = ?`
@@ -39,16 +44,25 @@ const (
 		WHERE topic = ? AND time >= ?
 		ORDER BY time DESC, id DESC
 	`
+	sqliteSelectMessageRowIDQuery       = `SELECT id, time FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectRecentRowIDsQuery       = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
+	sqliteSelectMessagesAfterRowIDQuery = `
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, id, published
+		FROM messages
+		WHERE id > ? OR id IN (SELECT value FROM json_each(?))
+		ORDER BY id
+		LIMIT ?
+	`
 	sqliteSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
-		WHERE topic = ? AND id > COALESCE((SELECT id FROM messages WHERE mid = ?), 0) AND published = 1
+		WHERE topic = ?1 AND (id > ?2 OR (time >= ?3 AND id <> ?2)) AND published = 1
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM messages
-		WHERE topic = ? AND (id > COALESCE((SELECT id FROM messages WHERE mid = ?), 0) OR published = 0)
+		WHERE topic = ?1 AND (id > ?2 OR (time >= ?3 AND id <> ?2) OR published = 0)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesLatestQuery = `
@@ -80,15 +94,18 @@ const (
 )
 
 var sqliteQueries = queries{
-	insertMessage:                    sqliteInsertMessageQuery,
+	insertMessages:                   sqliteInsertMessages,
 	selectScheduledMessageIDsBySeqID: sqliteSelectScheduledMessageIDsBySeqIDQuery,
 	deleteScheduledBySequenceID:      sqliteDeleteScheduledBySequenceIDQuery,
 	updateMessagesForTopicExpiry:     sqliteUpdateMessagesForTopicExpiryQuery,
 	selectMessagesByID:               sqliteSelectMessagesByIDQuery,
 	selectMessagesSinceTime:          sqliteSelectMessagesSinceTimeQuery,
 	selectMessagesSinceTimeScheduled: sqliteSelectMessagesSinceTimeIncludeScheduledQuery,
+	selectMessageRowID:               sqliteSelectMessageRowIDQuery,
 	selectMessagesSinceID:            sqliteSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   sqliteSelectMessagesSinceIDIncludeScheduledQuery,
+	selectRecentRowIDs:               sqliteSelectRecentRowIDsQuery,
+	selectMessagesAfterRowID:         sqliteSelectMessagesAfterRowIDQuery,
 	selectMessagesLatest:             sqliteSelectMessagesLatestQuery,
 	selectMessagesDue:                sqliteSelectMessagesDueQuery,
 	deleteExpiredMessages:            sqliteDeleteExpiredMessagesQuery,
@@ -142,4 +159,26 @@ func NewNopStore() (*Cache, error) {
 // Every connection to this string will point to the same in-memory database."
 func createMemoryFilename() string {
 	return fmt.Sprintf("file:%s?mode=memory&cache=shared", util.RandomString(10))
+}
+
+// sqliteInsertMessages writes the batch as multi-row INSERTs of at most sqliteInsertMessagesMaxRows
+// messages each
+func sqliteInsertMessages(tx *sql.Tx, ms []*model.Message) error {
+	for len(ms) > 0 {
+		chunk := ms[:min(len(ms), sqliteInsertMessagesMaxRows)]
+		ms = ms[len(chunk):]
+		args := make([]any, 0, len(chunk)*insertMessageColumns)
+		for _, m := range chunk {
+			rowArgs, err := insertMessageArgs(m)
+			if err != nil {
+				return err
+			}
+			args = append(args, rowArgs...)
+		}
+		query := sqliteInsertMessagesQuery + strings.Repeat(sqliteInsertMessagesRow+", ", len(chunk)-1) + sqliteInsertMessagesRow
+		if _, err := tx.Exec(query, args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -1,16 +1,3 @@
-<div align="center" markdown="1">
-<sup>Special thanks to:</sup>
-<br>
-<br>
-<a href="https://go.warp.dev/ntfy">
-  <img alt="Warp sponsorship" width="400" src="https://raw.githubusercontent.com/warpdotdev/brand-assets/refs/heads/main/Github/Sponsor/Warp-Github-LG-02.png">
-</a>
-
-### [Warp, built for coding with multiple AI agents.](https://go.warp.dev/ntfy)
-[Available for MacOS, Linux, & Windows](https://go.warp.dev/ntfy)<br>
-</div>
-<hr>
-
 ![ntfy](web/public/static/images/ntfy.png)
 
 # ntfy.sh | Send push notifications to your phone or desktop via PUT/POST
@@ -80,13 +67,7 @@ If you'd like to support the ntfy maintainers, please consider donating to [GitH
 and [Liberapay](https://liberapay.com/ntfy). We would be humbled if you helped carry the server and developer 
 account costs. Even small donations are very much appreciated. 
 
-Thank you to our commercial sponsors, who help keep the service running and the development going:
-
-<a href="https://m.do.co/c/442b929528db"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
-
-<a href="https://go.warp.dev/ntfy"><img src="https://raw.githubusercontent.com/warpdotdev/brand-assets/refs/heads/main/Logos/Warp-Wordmark-Black.png" width="160px"></a>
-
-And a big fat **Thank You** to the individuals who have sponsored ntfy in the past, or are still sponsoring ntfy:
+A big fat **Thank You** to the individuals who have sponsored ntfy in the past, or are still sponsoring ntfy:
 
 <a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
 <a href="https://github.com/aspyct"><img src="https://github.com/aspyct.png" width="40px" /></a>

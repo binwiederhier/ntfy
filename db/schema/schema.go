@@ -27,22 +27,18 @@ const (
 	tag = "schema"
 )
 
-// The minimum version is a second row next to the version, not a column, so that the table older
-// ntfy versions read and write does not change: on SQLite the row with id = 2, on Postgres the row
-// of the store name plus minVersionStoreSuffix. A missing row means 1.
 const (
-	sqliteVersionID    = 1
-	sqliteMinVersionID = 2
+	sqliteCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schemaVersion (id INT PRIMARY KEY, version INT NOT NULL, min_version INT NOT NULL DEFAULT 1)`
+	sqliteHasMinVersionQuery      = `SELECT COUNT(*) FROM pragma_table_info('schemaVersion') WHERE name = 'min_version'`
+	sqliteAddMinVersionQuery      = `ALTER TABLE schemaVersion ADD COLUMN min_version INT NOT NULL DEFAULT 1`
+	sqliteSelectVersionQuery      = `SELECT version, min_version FROM schemaVersion WHERE id = 1`
+	sqliteUpsertVersionQuery      = `INSERT INTO schemaVersion (id, version, min_version) VALUES (1, ?, ?) ON CONFLICT (id) DO UPDATE SET version = excluded.version, min_version = excluded.min_version`
 
-	sqliteCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schemaVersion (id INT PRIMARY KEY, version INT NOT NULL)`
-	sqliteSelectVersionQuery      = `SELECT version FROM schemaVersion WHERE id = ?`
-	sqliteUpsertVersionQuery      = `INSERT INTO schemaVersion (id, version) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET version = excluded.version`
-
-	minVersionStoreSuffix = ":min"
-
-	postgresCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`
-	postgresSelectVersionQuery      = `SELECT version FROM schema_version WHERE store = $1`
-	postgresUpsertVersionQuery      = `INSERT INTO schema_version (store, version) VALUES ($1, $2) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version`
+	postgresCreateVersionTableQuery = `CREATE TABLE IF NOT EXISTS schema_version (store TEXT PRIMARY KEY, version INT NOT NULL, min_version INT NOT NULL DEFAULT 1)`
+	postgresHasMinVersionQuery      = `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'schema_version' AND column_name = 'min_version'`
+	postgresAddMinVersionQuery      = `ALTER TABLE schema_version ADD COLUMN min_version INT NOT NULL DEFAULT 1`
+	postgresSelectVersionQuery      = `SELECT version, min_version FROM schema_version WHERE store = $1`
+	postgresUpsertVersionQuery      = `INSERT INTO schema_version (store, version, min_version) VALUES ($1, $2, $3) ON CONFLICT (store) DO UPDATE SET version = EXCLUDED.version, min_version = EXCLUDED.min_version`
 	postgresAdvisoryLockQuery       = `SELECT pg_advisory_xact_lock($1)` // Transaction-scoped lock to avoid migration races
 )
 
@@ -66,8 +62,8 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 		}
 	}
 	minVersion := minVersionOf(targetVersion, migrations)
-	if _, err := tx.Exec(createVersionTableQuery(dialect)); err != nil {
-		return fmt.Errorf("cannot create schema version table: %w", err)
+	if err := ensureVersionTable(tx, dialect); err != nil {
+		return err
 	}
 	version, storedMinVersion, err := readVersion(tx, dialect, store)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -119,60 +115,43 @@ func minVersionOf(targetVersion int, migrations map[int]Migration) int {
 	return minVersion
 }
 
-func createVersionTableQuery(dialect Dialect) string {
+// ensureVersionTable creates the version table, and adds the min_version column to one created
+// before it existed. Older code writes only the version and leaves the column alone.
+func ensureVersionTable(tx *sql.Tx, dialect Dialect) error {
+	createQuery, hasQuery, addQuery := sqliteCreateVersionTableQuery, sqliteHasMinVersionQuery, sqliteAddMinVersionQuery
 	if dialect == Postgres {
-		return postgresCreateVersionTableQuery
+		createQuery, hasQuery, addQuery = postgresCreateVersionTableQuery, postgresHasMinVersionQuery, postgresAddMinVersionQuery
 	}
-	return sqliteCreateVersionTableQuery
+	if _, err := tx.Exec(createQuery); err != nil {
+		return fmt.Errorf("cannot create schema version table: %w", err)
+	}
+	var columns int
+	if err := tx.QueryRow(hasQuery).Scan(&columns); err != nil {
+		return fmt.Errorf("cannot inspect schema version table: %w", err)
+	} else if columns > 0 {
+		return nil
+	}
+	if _, err := tx.Exec(addQuery); err != nil {
+		return fmt.Errorf("cannot add min_version to schema version table: %w", err)
+	}
+	return nil
 }
 
-// readVersion reads the store's version and minimum version; sql.ErrNoRows means a fresh database
 func readVersion(tx *sql.Tx, dialect Dialect, store string) (version, minVersion int, err error) {
-	if err := readVersionRow(tx, dialect, store, false, &version); err != nil {
-		return 0, 0, err
+	if dialect == Postgres {
+		err = tx.QueryRow(postgresSelectVersionQuery, store).Scan(&version, &minVersion)
+	} else {
+		err = tx.QueryRow(sqliteSelectVersionQuery).Scan(&version, &minVersion)
 	}
-	if err := readVersionRow(tx, dialect, store, true, &minVersion); errors.Is(err, sql.ErrNoRows) {
-		minVersion = 1 // Written by code from before the minimum version existed
-	} else if err != nil {
-		return 0, 0, err
-	}
-	return version, minVersion, nil
+	return
 }
 
 func writeVersion(tx *sql.Tx, dialect Dialect, store string, version, minVersion int) error {
-	if err := writeVersionRow(tx, dialect, store, false, version); err != nil {
-		return err
-	}
-	return writeVersionRow(tx, dialect, store, true, minVersion)
-}
-
-func readVersionRow(tx *sql.Tx, dialect Dialect, store string, isMin bool, version *int) error {
-	if dialect == Postgres {
-		return tx.QueryRow(postgresSelectVersionQuery, versionKey(store, isMin)).Scan(version)
-	}
-	return tx.QueryRow(sqliteSelectVersionQuery, sqliteVersionRowID(isMin)).Scan(version)
-}
-
-func writeVersionRow(tx *sql.Tx, dialect Dialect, store string, isMin bool, version int) error {
 	var err error
 	if dialect == Postgres {
-		_, err = tx.Exec(postgresUpsertVersionQuery, versionKey(store, isMin), version)
+		_, err = tx.Exec(postgresUpsertVersionQuery, store, version, minVersion)
 	} else {
-		_, err = tx.Exec(sqliteUpsertVersionQuery, sqliteVersionRowID(isMin), version)
+		_, err = tx.Exec(sqliteUpsertVersionQuery, version, minVersion)
 	}
 	return err
-}
-
-func versionKey(store string, isMin bool) string {
-	if isMin {
-		return store + minVersionStoreSuffix
-	}
-	return store
-}
-
-func sqliteVersionRowID(isMin bool) int {
-	if isMin {
-		return sqliteMinVersionID
-	}
-	return sqliteVersionID
 }

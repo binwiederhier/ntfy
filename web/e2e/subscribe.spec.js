@@ -20,6 +20,17 @@ test("generate a topic name", async ({ page }) => {
   await expect(page.getByRole("button", { name: topic, exact: true })).toBeVisible();
 });
 
+test("the subscribe dialog opens before the topic list has loaded", async ({ page }) => {
+  // #2014: if IndexedDB is slow or blocked (e.g. another tab holds it during an upgrade), the
+  // splash hides after 3s without the topic list, and opening the dialog used to crash the app
+  await page.addInitScript(() => {
+    indexedDB.open = () => new Proxy({}, { get: () => undefined, set: () => true }); // Never opens
+  });
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Subscribe to topic" }).click();
+  await expect(page.getByRole("dialog").getByLabel(/topic name/i)).toBeVisible();
+});
+
 test("visiting a topic URL subscribes to it", async ({ page }) => {
   const topic = unique("visit");
   await page.goto(`/${topic}`);

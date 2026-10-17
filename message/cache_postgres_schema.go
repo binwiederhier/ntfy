@@ -6,8 +6,7 @@ import (
 
 // Initial PostgreSQL schema
 const (
-	postgresCurrentSchemaVersion = 17
-	postgresCreateTablesQuery    = `
+	postgresCreateTablesQuery = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
 			mid TEXT NOT NULL,

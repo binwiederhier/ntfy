@@ -18,6 +18,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/log"
@@ -42,12 +43,17 @@ const (
 	postgresAdvisoryLockQuery       = `SELECT pg_advisory_xact_lock($1)` // Transaction-scoped lock to avoid migration races
 )
 
-// Migrate creates or upgrades the named store's schema to targetVersion in one transaction, or
-// creates a new database using the "create" function. The store's minimum version follows from the
-// steps: the version after the newest breaking step, or 1 (see package doc).
-func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, create MigrateFunc, migrations map[int]Migration) error {
+// Migrate creates or upgrades the named store's schema in one transaction, or creates a new
+// database using the "create" function. Both versions follow from the steps: the target is the
+// version after the last step (see TargetVersion), the minimum the version after the newest
+// breaking step, or 1 (see package doc).
+func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migrations map[int]Migration) error {
 	if dialect != Postgres && dialect != SQLite {
 		return fmt.Errorf("unsupported schema dialect %d", dialect)
+	}
+	targetVersion, err := TargetVersion(migrations)
+	if err != nil {
+		return fmt.Errorf("invalid %s migration steps: %w", store, err)
 	}
 	tx, err := db.Begin()
 	if err != nil {
@@ -61,7 +67,7 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 			return fmt.Errorf("cannot acquire %s schema advisory lock: %w", store, err)
 		}
 	}
-	minVersion := minVersionOf(targetVersion, migrations)
+	minVersion := minVersionOf(migrations)
 	if err := ensureVersionTable(tx, dialect); err != nil {
 		return err
 	}
@@ -103,12 +109,33 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 	return tx.Commit()
 }
 
-// minVersionOf returns the oldest schema version whose code still runs on targetVersion's schema:
-// the version after the newest breaking step, or 1 if no step is breaking
-func minVersionOf(targetVersion int, migrations map[int]Migration) int {
+// TargetVersion returns the schema version a store's steps lead to: the version after the last
+// step, or 1 without steps. The steps must be contiguous, so a forgotten one fails at startup.
+func TargetVersion(migrations map[int]Migration) (int, error) {
+	if len(migrations) == 0 {
+		return 1, nil
+	}
+	first, last := math.MaxInt, 0
+	for v := range migrations {
+		first, last = min(first, v), max(last, v)
+	}
+	if first < 1 {
+		return 0, fmt.Errorf("migration step %d is invalid, steps start at version 1", first)
+	}
+	for v := first; v < last; v++ {
+		if _, ok := migrations[v]; !ok {
+			return 0, fmt.Errorf("missing migration step from version %d to %d", v, v+1)
+		}
+	}
+	return last + 1, nil
+}
+
+// minVersionOf returns the oldest schema version whose code still runs on the schema the steps
+// lead to: the version after the newest breaking step, or 1 if no step is breaking
+func minVersionOf(migrations map[int]Migration) int {
 	minVersion := 1
 	for v, step := range migrations {
-		if step.Breaking && v < targetVersion && v+1 > minVersion {
+		if step.Breaking && v+1 > minVersion {
 			minVersion = v + 1
 		}
 	}

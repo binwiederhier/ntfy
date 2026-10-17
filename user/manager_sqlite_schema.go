@@ -113,10 +113,6 @@ const (
 	sqliteBuiltinStartupQueries = `PRAGMA foreign_keys = ON;`
 )
 
-const (
-	sqliteCurrentSchemaVersion = 9
-)
-
 // Schema migrations for SQLite
 const (
 	// 1 -> 2 (complex migration!)

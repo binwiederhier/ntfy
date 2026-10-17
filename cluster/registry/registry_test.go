@@ -181,7 +181,7 @@ func TestRegistry_SchemaVersionWritten(t *testing.T) {
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, pool.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, schemaStoreKey).Scan(&version))
-	require.Equal(t, schemaVersion, version)
+	require.Equal(t, 2, version)
 	// Setup is idempotent: a second node boots against the migrated schema
 	_, err = New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
 	require.Nil(t, err)

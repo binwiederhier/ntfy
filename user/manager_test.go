@@ -1907,7 +1907,7 @@ func TestMigrationFrom6Postgres(t *testing.T) {
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'user'`).Scan(&version))
-	require.Equal(t, postgresCurrentSchemaVersion, version)
+	require.Equal(t, 9, version)
 	// The manager works against the migrated schema
 	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
 	u, err := a.User("phil")
@@ -1949,7 +1949,7 @@ func checkSchemaVersion(t *testing.T, d *db.DB) {
 
 	var schemaVersion int
 	require.Nil(t, rows.Scan(&schemaVersion))
-	require.Equal(t, sqliteCurrentSchemaVersion, schemaVersion)
+	require.Equal(t, 9, schemaVersion)
 	require.Nil(t, rows.Close())
 }
 
@@ -3497,7 +3497,7 @@ func TestManager_Emails_PrimaryFlagAndHelpers(t *testing.T) {
 func openReplicaTestSQLite(t *testing.T, filename string) *sql.DB {
 	d, err := sql.Open("sqlite3", filename+"?_case_sensitive_like=on")
 	require.Nil(t, err)
-	require.Nil(t, schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations))
+	require.Nil(t, schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations))
 	return d
 }
 

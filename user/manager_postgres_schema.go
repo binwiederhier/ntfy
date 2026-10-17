@@ -96,10 +96,6 @@ const (
 )
 
 const (
-	postgresCurrentSchemaVersion = 9
-)
-
-const (
 	postgresMigrate6To7UpdateQueries = `
 		CREATE TABLE IF NOT EXISTS user_email (
 			user_id TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,

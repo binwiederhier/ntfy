@@ -9,8 +9,7 @@ import (
 
 // Initial SQLite schema
 const (
-	sqliteCurrentSchemaVersion = 17
-	sqliteCreateTablesQuery    = `
+	sqliteCreateTablesQuery = `
 		CREATE TABLE IF NOT EXISTS messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			mid TEXT NOT NULL,

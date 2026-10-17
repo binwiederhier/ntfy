@@ -45,11 +45,7 @@ const (
 	sqliteDeleteSubscriptionTopicWithoutSubscriptionQuery = `DELETE FROM subscription_topic WHERE subscription_id NOT IN (SELECT id FROM subscription)`
 )
 
-// Schema version and queries
-const (
-	sqliteCurrentSchemaVersion = 1
-)
-
+// Schema
 var (
 	sqliteCreateTables = schema.AsMigrateFunc(`
 		CREATE TABLE IF NOT EXISTS subscription (
@@ -80,7 +76,7 @@ func NewSQLiteStore(filename, startupQueries string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, nil); err != nil {
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, nil); err != nil {
 		return nil, err
 	}
 	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {

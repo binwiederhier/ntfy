@@ -2193,6 +2193,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.32.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Return HTTP 409 instead of 500 when deleting or changing the password of a user provisioned via `auth-users` through the admin API ([#2062](https://github.com/binwiederhier/ntfy/issues/2062), thanks to [@daniloamiranda](https://github.com/daniloamiranda) for reporting)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

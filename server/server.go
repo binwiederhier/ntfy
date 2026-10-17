@@ -2310,6 +2310,9 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 		s.messagesHistory = s.messagesHistory[1:]
 	}
 	s.mu.Unlock()
+	if !s.cluster.IsLeader() {
+		return // Overwritten, not added to: a second writer would replace the total with its own count
+	}
 	if err := s.messageCache.UpdateStats(messagesCount); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
 	}

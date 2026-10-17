@@ -101,6 +101,14 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 	return manager, nil
 }
 
+// ReloadAccessCache refreshes the in-memory access cache for the given users (all users when
+// none are named) from the primary database. No-op when the cache is disabled. Callers that
+// learn about an ACL change made elsewhere (another cluster node revoking access) use it to
+// avoid serving a stale permission until the periodic reload.
+func (a *Manager) ReloadAccessCache(usernames ...string) error {
+	return a.maybeReloadAccessCache(usernames...)
+}
+
 // maybeReloadAccessCache refreshes the in-memory access cache from the
 // primary database. No-op when the cache is disabled. With no usernames it
 // does a full bulk reload; with one or more it refreshes only those users'

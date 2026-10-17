@@ -234,3 +234,15 @@ func TestTopic_Publish_LateFanOutReachesLaterSubscribers(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	require.Equal(t, int32(1), early.Load())
 }
+
+func TestTopic_SubscriberUserIDs(t *testing.T) {
+	subFn := func(v *visitor, msg *model.Message) error {
+		return nil
+	}
+	to := newTopic("mytopic")
+	to.Subscribe(subFn, "", func() {})
+	to.Subscribe(subFn, "u_phil", func() {})
+	to.Subscribe(subFn, "u_phil", func() {})
+	to.Subscribe(subFn, "u_ben", func() {})
+	require.ElementsMatch(t, []string{"u_phil", "u_ben"}, to.SubscriberUserIDs())
+}

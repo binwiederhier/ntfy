@@ -3,6 +3,9 @@ package server
 import (
 	"encoding/json"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/cluster"
+	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"sync/atomic"
@@ -491,4 +494,62 @@ func TestAccess_AllowReset_KillConnection(t *testing.T) {
 			return timeTaken.Load() >= 500
 		})
 	})
+}
+
+func TestAccess_Reset_RelaysSubscriberCancelToPeers(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Subscribers are per node, so revoking access (or deleting the user) must also ask peer
+		// nodes to cancel the user's connections, not only this node's
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		s := newTestServer(t, c)
+		defer s.closeDatabases()
+		b := &fakeCluster{}
+		s.cluster = b
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+		require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+		require.Nil(t, s.userManager.AllowAccess("ben", "gol*", user.PermissionRead))
+		ben, err := s.userManager.User("ben")
+		require.Nil(t, err)
+		admin := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
+
+		rr := request(t, s, "DELETE", "/v1/users/access", `{"username": "ben", "topic":"gol*"}`, admin)
+		require.Equal(t, 200, rr.Code)
+		rr = request(t, s, "DELETE", "/v1/users", `{"username": "ben"}`, admin)
+		require.Equal(t, 200, rr.Code)
+		require.Equal(t, []*cluster.SubscriberCancel{
+			{Topic: "gol*", UserID: ben.ID},
+			{Topic: "*", UserID: ben.ID},
+		}, b.Cancels())
+	})
+}
+
+func TestAccess_PeerCancelReloadsAccessAndCancels(t *testing.T) {
+	// A peer's revocation must cancel the local subscriber AND refresh this node's access cache:
+	// otherwise the client reconnects at once and is let in by the stale cached permission
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	newNode := func() *Server {
+		conf := newTestConfig(t, dsn)
+		conf.AuthDefault = user.PermissionDenyAll
+		conf.AuthAccessCacheEnabled = true
+		conf.AuthAccessCacheReloadInterval = time.Hour
+		return newTestServer(t, conf)
+	}
+	a := newNode()
+	require.Nil(t, a.userManager.AddUser("alice", "password", user.RoleUser, false))
+	require.Nil(t, a.userManager.AllowAccess("alice", "private", user.PermissionRead))
+	b := newNode()
+	alice, err := a.userManager.User("alice")
+	require.Nil(t, err)
+	headers := map[string]string{"Authorization": util.BasicAuth("alice", "password")}
+	require.Equal(t, 200, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
+	topics, err := b.topicsFromIDs(nil, "private")
+	require.Nil(t, err)
+	canceled := atomic.Bool{}
+	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, alice.ID, func() { canceled.Store(true) })
+
+	// Node A revokes; node B learns about it only through the relayed cancel
+	require.Nil(t, a.userManager.ResetAccess("alice", "private"))
+	b.applySubscriberCancel(&cluster.SubscriberCancel{Topic: "private", UserID: alice.ID})
+	require.True(t, canceled.Load())
+	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
 }

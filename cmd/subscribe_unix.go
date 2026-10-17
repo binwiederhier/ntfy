@@ -10,5 +10,6 @@ or ~/.config/ntfy/client.yml for all other users.`
 )
 
 var (
-	scriptLauncher = []string{"sh", "-c"}
+	scriptLauncher    = []string{"sh", "-c"}
+	scriptVarRewriter = func(script string) string { return script }
 )

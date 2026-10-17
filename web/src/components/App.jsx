@@ -11,7 +11,7 @@ import ActionBar from "./ActionBar";
 import Preferences from "./Preferences";
 import subscriptionManager from "../app/SubscriptionManager";
 import userManager from "../app/UserManager";
-import { expandUrl, getKebabCaseLangStr, darkModeEnabled, updateFavicon } from "../app/utils";
+import { findSubscriptionForRoute, getKebabCaseLangStr, darkModeEnabled, updateFavicon } from "../app/utils";
 import ErrorBoundary from "./ErrorBoundary";
 import routes from "./routes";
 import { useAccountListener, useBackgroundProcesses, useConnectionListeners, useWebPushTopics } from "./hooks";
@@ -129,11 +129,7 @@ const Layout = () => {
   const webPushTopics = useWebPushTopics();
   const subscriptionsWithoutInternal = subscriptions?.filter((s) => !s.internal);
   const newNotificationsCount = subscriptionsWithoutInternal?.reduce((prev, cur) => prev + cur.new, 0) || 0;
-  const [selected] = (subscriptionsWithoutInternal || []).filter(
-    (s) =>
-      (params.baseUrl && expandUrl(params.baseUrl).includes(s.baseUrl) && params.topic === s.topic) ||
-      (config.base_url === s.baseUrl && params.topic === s.topic),
-  );
+  const selected = findSubscriptionForRoute(subscriptionsWithoutInternal || [], params, config.base_url);
 
   useConnectionListeners(account, subscriptions, users, webPushTopics);
   useAccountListener(setAccount);

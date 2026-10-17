@@ -44,17 +44,38 @@ const (
 		WHERE topic = ? AND time >= ?
 		ORDER BY time DESC, id DESC
 	`
-	sqliteSelectMessageRowIDQuery    = `SELECT id FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectMessageRowIDQuery = `SELECT id, time FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectRecentRowIDsQuery = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
+	// sqliteSelectMessagesAfterRowIDQuery: see postgresSelectMessagesAfterRowIDQuery
+	sqliteSelectMessagesAfterRowIDQuery = `
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, id, published
+		FROM (
+			SELECT * FROM messages WHERE id > ?1
+			UNION ALL
+			SELECT * FROM messages WHERE id IN (SELECT value FROM json_each(?2)) AND id <= ?1
+		)
+		ORDER BY id
+		LIMIT ?3
+	`
+	// sqliteSelectMessagesSinceIDQuery: see postgresSelectMessagesSinceIDQuery
 	sqliteSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
-		FROM messages
-		WHERE topic = ? AND id > ? AND published = 1
+		FROM (
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id <> ?2
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2 AND time + 0 < ?3
+		)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
-		FROM messages
-		WHERE topic = ? AND (id > ? OR published = 0)
+		FROM (
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id <> ?2
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2 AND time + 0 < ?3
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 0
+		)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesLatestQuery = `
@@ -96,6 +117,8 @@ var sqliteQueries = queries{
 	selectMessageRowID:               sqliteSelectMessageRowIDQuery,
 	selectMessagesSinceID:            sqliteSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   sqliteSelectMessagesSinceIDIncludeScheduledQuery,
+	selectRecentRowIDs:               sqliteSelectRecentRowIDsQuery,
+	selectMessagesAfterRowID:         sqliteSelectMessagesAfterRowIDQuery,
 	selectMessagesLatest:             sqliteSelectMessagesLatestQuery,
 	selectMessagesDue:                sqliteSelectMessagesDueQuery,
 	deleteExpiredMessages:            sqliteDeleteExpiredMessagesQuery,

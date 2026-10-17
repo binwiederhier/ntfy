@@ -1,8 +1,10 @@
 package schema_test
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/db/schema"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/log"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -104,11 +107,17 @@ func TestMigrate_InvalidDialect(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestMigrate_RefusesFutureVersion(t *testing.T) {
+func TestMigrate_NewerVersionWarnsAndStarts(t *testing.T) {
+	// An older version of ntfy (a rollback, or an old node during a rolling upgrade) runs on a
+	// newer schema: it warns, starts, and leaves the newer version in place
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
+		var out bytes.Buffer
+		log.SetOutput(&out)
+		t.Cleanup(func() { log.SetOutput(os.Stderr) })
 		require.Nil(t, schema.Migrate(d, dialect, "things", 2, testCreate, map[int]schema.MigrateFunc{}))
-		err := schema.Migrate(d, dialect, "things", 1, testCreate, nil)
-		require.Error(t, err)
+		require.Nil(t, schema.Migrate(d, dialect, "things", 1, testCreate, nil))
+		require.Contains(t, out.String(), "things database schema version 2 is newer than this version of ntfy supports (1)")
+		require.Equal(t, 2, storeVersion(t, d, dialect, "things"))
 	})
 }
 

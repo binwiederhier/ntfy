@@ -88,7 +88,7 @@ func TestStore_Messages(t *testing.T) {
 		require.Empty(t, messages)
 
 		// mytopic: since m1 (by ID)
-		messages, _ = s.Messages("mytopic", model.NewSinceID(m1.ID), false)
+		messages = messagesAfter(t, s, "mytopic", m1.ID, false)
 		require.Equal(t, 1, len(messages))
 		require.Equal(t, m2.ID, messages[0].ID)
 		require.Equal(t, "my other message", messages[0].Message)
@@ -214,14 +214,14 @@ func TestStore_MessagesSinceID(t *testing.T) {
 		require.Nil(t, s.AddMessage(m7))
 
 		// Case 1: Since ID exists, exclude scheduled
-		messages, _ := s.Messages("mytopic", model.NewSinceID(m2.ID), false)
+		messages := messagesAfter(t, s, "mytopic", m2.ID, false)
 		require.Equal(t, 3, len(messages))
 		require.Equal(t, "message 4", messages[0].Message)
 		require.Equal(t, "message 6", messages[1].Message) // Not scheduled m3/m5!
 		require.Equal(t, "message 7", messages[2].Message)
 
 		// Case 2: Since ID exists, include scheduled
-		messages, _ = s.Messages("mytopic", model.NewSinceID(m2.ID), true)
+		messages = messagesAfter(t, s, "mytopic", m2.ID, true)
 		require.Equal(t, 5, len(messages))
 		require.Equal(t, "message 4", messages[0].Message)
 		require.Equal(t, "message 6", messages[1].Message)
@@ -229,23 +229,17 @@ func TestStore_MessagesSinceID(t *testing.T) {
 		require.Equal(t, "message 5", messages[3].Message) // Order!
 		require.Equal(t, "message 3", messages[4].Message) // Order!
 
-		// Case 3: Since ID does not exist (-> Return all messages), include scheduled
-		messages, _ = s.Messages("mytopic", model.NewSinceID("doesntexist"), true)
-		require.Equal(t, 7, len(messages))
-		require.Equal(t, "message 1", messages[0].Message)
-		require.Equal(t, "message 2", messages[1].Message)
-		require.Equal(t, "message 4", messages[2].Message)
-		require.Equal(t, "message 6", messages[3].Message)
-		require.Equal(t, "message 7", messages[4].Message)
-		require.Equal(t, "message 5", messages[5].Message) // Order!
-		require.Equal(t, "message 3", messages[6].Message) // Order!
+		// Case 3: Since ID does not exist: the caller decides (the server replays everything)
+		marker, err := s.ResolveMarker("doesntexist")
+		require.Nil(t, err)
+		require.Nil(t, marker)
 
 		// Case 4: Since ID exists and is last message (-> Return no messages), exclude scheduled
-		messages, _ = s.Messages("mytopic", model.NewSinceID(m7.ID), false)
+		messages = messagesAfter(t, s, "mytopic", m7.ID, false)
 		require.Equal(t, 0, len(messages))
 
 		// Case 5: Since ID exists and is last message (-> Return no messages), include scheduled
-		messages, _ = s.Messages("mytopic", model.NewSinceID(m7.ID), true)
+		messages = messagesAfter(t, s, "mytopic", m7.ID, true)
 		require.Equal(t, 2, len(messages))
 		require.Equal(t, "message 5", messages[0].Message)
 		require.Equal(t, "message 3", messages[1].Message)
@@ -1171,17 +1165,104 @@ func TestStore_CloseGivesUpOnAnInFlightBatchWrite(t *testing.T) {
 	}
 }
 
+func TestStore_MessagesSinceID_MarkerWrittenAfterALaterMessage(t *testing.T) {
+	// Cluster nodes write their batches independently, so a message can be written after one
+	// that was published later. A client whose marker is the late-written one must still get
+	// the later message, although its row id is lower.
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		older := model.NewDefaultMessage("mytopic", "older")
+		older.Time = 50
+		sameSecond := model.NewDefaultMessage("mytopic", "same second")
+		sameSecond.Time = 100
+		marker := model.NewDefaultMessage("mytopic", "marker")
+		marker.Time = 100
+		later := model.NewDefaultMessage("mytopic", "later")
+		later.Time = 200
+		require.Nil(t, s.AddMessages([]*model.Message{older, sameSecond, later}))
+		require.Nil(t, s.AddMessages([]*model.Message{marker})) // Written last, e.g. its node was cut off from the database
+
+		messages := messagesAfter(t, s, "mytopic", marker.ID, false)
+		require.Equal(t, []string{"same second", "later"}, bodies(messages)) // "same second" is the price: the client may have it
+	})
+}
+
+func TestStore_MessagesAfterMarker_ResolvesTheMarkerOnce(t *testing.T) {
+	// A multi-topic subscription replays every topic after one marker: one lookup of the marker,
+	// then one query per topic, not a lookup per topic
+	testDB, proxy := dbtest.CreateTestPostgresWithLatency(t, 0)
+	s, err := message.NewPostgresStore(testDB, 0, 0)
+	require.Nil(t, err)
+	marker := model.NewDefaultMessage("topic0", "marker")
+	require.Nil(t, s.AddMessages([]*model.Message{marker}))
+	for i := 0; i < 5; i++ {
+		require.Nil(t, s.AddMessages([]*model.Message{model.NewDefaultMessage(fmt.Sprintf("topic%d", i), "after")}))
+	}
+	resolved, err := s.ResolveMarker(marker.ID)
+	require.Nil(t, err)
+	require.NotNil(t, resolved)
+	_, _, err = s.MessagesAfterMarker("topic0", resolved, false, 0) // Prepares the statement
+	require.Nil(t, err)
+
+	before := proxy.Requests()
+	for i := 0; i < 5; i++ {
+		messages, _, err := s.MessagesAfterMarker(fmt.Sprintf("topic%d", i), resolved, false, 0)
+		require.Nil(t, err)
+		require.Equal(t, []string{"after"}, bodies(messages))
+	}
+	t.Logf("requests for 5 topics: %d", proxy.Requests()-before)
+	require.LessOrEqual(t, proxy.Requests()-before, int64(5))
+}
+
+func TestStore_ResolveMarker_Unknown(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		resolved, err := s.ResolveMarker("unknown00000")
+		require.Nil(t, err)
+		require.Nil(t, resolved)
+	})
+}
+
+func TestStore_MessagesCapped_RejectsIDMarker(t *testing.T) {
+	// A since=<id> marker goes through ResolveMarker and MessagesAfterMarker, so the caller
+	// decides what an unknown marker means; MessagesCapped does not guess
+	forEachBackend(t, func(t *testing.T, s *message.Cache) {
+		m := model.NewDefaultMessage("mytopic", "message")
+		require.Nil(t, s.AddMessages([]*model.Message{m}))
+		_, _, err := s.MessagesCapped("mytopic", model.NewSinceID(m.ID), false, 0)
+		require.Error(t, err)
+	})
+}
+
+// messagesAfter replays the topic after a since=<id> marker the cache knows
+func messagesAfter(t *testing.T, s *message.Cache, topic, mid string, scheduled bool) []*model.Message {
+	t.Helper()
+	marker, err := s.ResolveMarker(mid)
+	require.Nil(t, err)
+	require.NotNil(t, marker)
+	messages, _, err := s.MessagesAfterMarker(topic, marker, scheduled, 0)
+	require.Nil(t, err)
+	return messages
+}
+
+func bodies(messages []*model.Message) []string {
+	out := make([]string, 0, len(messages))
+	for _, m := range messages {
+		out = append(out, m.Message)
+	}
+	return out
+}
+
 func TestStore_MessagesSinceID_ForeignMidActsAsPositionalMarker(t *testing.T) {
 	// Multi-topic subscriptions apply ONE since=<mid> marker to every subscribed topic, so for
 	// all but the marker's own topic the mid is foreign; it must act as a positional cut-off
 	// (everything the marker's row precedes), not as "unknown -> full replay"
 	s := newTestPostgresStore(t)
-	require.Nil(t, s.AddMessage(model.NewDefaultMessage("topicb", "b old")))
+	bOld := model.NewDefaultMessage("topicb", "b old")
+	bOld.Time = time.Now().Unix() - 10 // An earlier second: the marker's own second is replayed
+	require.Nil(t, s.AddMessage(bOld))
 	marker := model.NewDefaultMessage("topica", "marker a")
 	require.Nil(t, s.AddMessage(marker))
 	require.Nil(t, s.AddMessage(model.NewDefaultMessage("topicb", "b new")))
-	messages, err := s.Messages("topicb", model.NewSinceID(marker.ID), false)
-	require.Nil(t, err)
+	messages := messagesAfter(t, s, "topicb", marker.ID, false)
 	require.Len(t, messages, 1)
 	require.Equal(t, "b new", messages[0].Message)
 }
@@ -1208,6 +1289,7 @@ func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
 	primaryOnly := openStoreOn(primaryDSN, nil)
 	for i := 1; i <= 3; i++ {
 		m := model.NewDefaultMessage("mytopic", fmt.Sprintf("m%d", i))
+		m.Time = time.Now().Unix() - 10 // An earlier second: the marker's own second is replayed
 		require.Nil(t, primaryOnly.AddMessage(m))
 		require.Nil(t, replicaOnly.AddMessage(m))
 	}
@@ -1217,7 +1299,20 @@ func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
 	replicaHost, err := pg.OpenReplica(replicaDSN)
 	require.Nil(t, err)
 	combined := openStoreOn(primaryDSN, []*db.Host{replicaHost})
-	messages, err := combined.Messages("mytopic", model.NewSinceID(m4.ID), false)
-	require.Nil(t, err)
+	messages := messagesAfter(t, combined, "mytopic", m4.ID, false)
 	require.Len(t, messages, 0) // Correct cut-off via primary; the lagged replica has nothing newer
+
+	// A message after the marker that the replica does not have yet either: a reconnecting
+	// client must get it from the primary, since it went out live before the client arrived
+	// and the tail does not resend it
+	m5 := model.NewDefaultMessage("mytopic", "m5")
+	require.Nil(t, primaryOnly.AddMessage(m5))
+	messages = messagesAfter(t, combined, "mytopic", m4.ID, false)
+	require.Equal(t, []string{"m5"}, bodies(messages))
+
+	// A recent time-based replay (the fallback for a marker the cache does not know) reads the
+	// primary for the same reason; an old one is served by the replica as before
+	messages, err = combined.Messages("mytopic", model.NewSinceTime(time.Now().Unix()-30), false)
+	require.Nil(t, err)
+	require.Equal(t, []string{"m1", "m2", "m3", "m4", "m5"}, bodies(messages))
 }

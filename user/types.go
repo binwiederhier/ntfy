@@ -184,6 +184,44 @@ type Reservation struct {
 	Everyone Permission
 }
 
+// UserFilter narrows and pages the result of Manager.UsersPage
+type UserFilter struct {
+	Search string // Case-insensitive substring of the username; empty matches all
+	Limit  int    // Maximum number of users to return; <= 0 means no limit
+	Offset int
+}
+
+// UsersPage is a page of users, along with the grants and reservations of only those users
+type UsersPage struct {
+	Users        []*User
+	Total        int64                    // Number of users matching the filter, ignoring limit/offset
+	Grants       map[string][]Grant       // User ID -> grants, including the user's own reservation entries
+	Reservations map[string][]Reservation // User ID -> reservations
+}
+
+// AccessFilter narrows and pages the result of Manager.AccessEntries
+type AccessFilter struct {
+	Search string // Case-insensitive substring of the topic or the username; empty matches all
+	Limit  int    // Maximum number of entries to return; <= 0 means no limit
+	Offset int
+}
+
+// AccessEntry is a single row of the access control list
+type AccessEntry struct {
+	Username     string // May be Everyone
+	TopicPattern string // May include wildcard (*)
+	Permission   Permission
+	Owner        string // Username of the user who reserved the topic, empty if not a reservation
+	Provisioned  bool   // Whether the entry was provisioned by the config file
+}
+
+// ReservationEntry is a topic reservation of any user, as listed by Manager.ReservationEntries
+type ReservationEntry struct {
+	Username string // Owner of the reservation
+	Topic    string
+	Everyone Permission // Access for everyone else
+}
+
 // Email is a verified email address on a user account, along with whether it is the user's
 // designated primary (recovery) address.
 type Email struct {
@@ -346,6 +384,9 @@ type queries struct {
 	selectUsernames                string
 	selectUsers                    string
 	selectUserCount                string
+	selectUsersPage                string // Filtered, paged variant of selectUsers
+	selectUsersPageCount           string
+	selectUsersPageAccess          string // Access rows of (and owned by) the users on a selectUsersPage page
 	selectUserIDFromUsername       string
 	insertUser                     string
 	updateUserPass                 string
@@ -362,21 +403,25 @@ type queries struct {
 	deleteUsersProvisioned         string
 
 	// Access queries
-	selectTopicPerms            string             // Direct-DB authorizeTopicAccess query; used when the in-memory cache is disabled
-	selectAccessCacheAll        string             // Bulk load: (user_name, topic, read, write) for the in-memory ACL cache
-	selectAccessCacheUsers      func(n int) string // Returns a per-users load query whose IN clause is sized for n usernames
-	selectUserAllAccess         string
-	selectUserAccess            string
-	selectUserReservations      string
-	selectUserReservationsCount string
-	selectUserReservationsOwner string
-	selectUserHasReservation    string
-	selectOtherAccessCount      string
-	upsertUserAccess            string
-	deleteUserAccess            string
-	deleteUserAccessProvisioned string
-	deleteTopicAccess           string
-	deleteAllAccess             string
+	selectTopicPerms              string             // Direct-DB authorizeTopicAccess query; used when the in-memory cache is disabled
+	selectAccessCacheAll          string             // Bulk load: (user_name, topic, read, write) for the in-memory ACL cache
+	selectAccessCacheUsers        func(n int) string // Returns a per-users load query whose IN clause is sized for n usernames
+	selectUserAllAccess           string
+	selectUserAccess              string
+	selectUserReservations        string
+	selectUserReservationsCount   string
+	selectUserReservationsOwner   string
+	selectUserHasReservation      string
+	selectOtherAccessCount        string
+	selectAccessEntries           string // Filtered, paged list of the entire ACL
+	selectAccessEntriesCount      string
+	selectReservationEntries      string // Filtered, paged list of the reservations of all users
+	selectReservationEntriesCount string
+	upsertUserAccess              string
+	deleteUserAccess              string
+	deleteUserAccessProvisioned   string
+	deleteTopicAccess             string
+	deleteAllAccess               string
 
 	// Token queries
 	selectToken                string
@@ -394,12 +439,13 @@ type queries struct {
 	deleteExcessTokens         string
 
 	// Tier queries
-	insertTier          string
-	selectTiers         string
-	selectTierByCode    string
-	selectTierByPriceID string
-	updateTier          string
-	deleteTier          string
+	insertTier           string
+	selectTiers          string
+	selectTierByCode     string
+	selectTierByPriceID  string
+	updateTier           string
+	deleteTier           string
+	selectTierUsersCount string
 
 	// Phone queries
 	selectPhoneNumbers string

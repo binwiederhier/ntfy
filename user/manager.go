@@ -578,6 +578,88 @@ func (a *Manager) Users() ([]*User, error) {
 	return a.readUsers(rows)
 }
 
+// UsersPage returns a page of users matching the filter, sorted like Users, along with the total
+// number of matching users, and the grants and reservations of the users on the page.
+func (a *Manager) UsersPage(filter *UserFilter) (*UsersPage, error) {
+	search, limit := toSQLSearchPattern(filter.Search), toSQLLimit(filter.Limit)
+	rows, err := a.db.ReadOnly().Query(a.queries.selectUsersPage, search, limit, filter.Offset)
+	if err != nil {
+		return nil, err
+	}
+	users, err := a.readUsers(rows)
+	if err != nil {
+		return nil, err
+	}
+	total, err := a.queryCount(a.queries.selectUsersPageCount, search)
+	if err != nil {
+		return nil, err
+	}
+	grants, reservations, err := a.usersPageAccess(users, search, limit, filter.Offset)
+	if err != nil {
+		return nil, err
+	}
+	return &UsersPage{
+		Users:        users,
+		Total:        total,
+		Grants:       grants,
+		Reservations: reservations,
+	}, nil
+}
+
+// usersPageAccess loads the grants and reservations of the users on a UsersPage page. The query
+// re-selects the page in a CTE (instead of an IN list of user IDs), so the SQL text is static.
+func (a *Manager) usersPageAccess(users []*User, search string, limit int64, offset int) (map[string][]Grant, map[string][]Reservation, error) {
+	rows, err := a.db.ReadOnly().Query(a.queries.selectUsersPageAccess, search, limit, offset)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	onPage := make(map[string]bool, len(users))
+	for _, u := range users {
+		onPage[u.ID] = true
+	}
+	grants := make(map[string][]Grant)
+	reservations := make(map[string][]Reservation)
+	everyone := make(map[string]Permission) // Owner user ID + "/" + topic -> Everyone permission of a reservation
+	for rows.Next() {
+		var userID, topic, ownerID string
+		var read, write, provisioned bool
+		if err := rows.Scan(&userID, &topic, &read, &write, &provisioned, &ownerID); err != nil {
+			return nil, nil, err
+		}
+		topic = fromSQLWildcard(topic)
+		permission := NewPermission(read, write)
+		if onPage[userID] {
+			grants[userID] = append(grants[userID], Grant{
+				TopicPattern: topic,
+				Permission:   permission,
+				Provisioned:  provisioned,
+			})
+		}
+		if ownerID != "" && ownerID == userID {
+			reservations[userID] = append(reservations[userID], Reservation{
+				Topic: topic,
+				Owner: permission,
+			})
+		} else if ownerID != "" && userID == everyoneID {
+			everyone[ownerID+"/"+topic] = permission
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+	// Attach the Everyone permission to each reservation; a missing Everyone row means deny-all
+	for userID, userReservations := range reservations {
+		for i := range userReservations {
+			userReservations[i].Everyone = everyone[userID+"/"+userReservations[i].Topic]
+		}
+		slices.SortFunc(userReservations, func(a, b Reservation) int {
+			return strings.Compare(a.Topic, b.Topic)
+		})
+	}
+	return grants, reservations, nil
+}
+
 // UsersCount returns the number of users in the database
 func (a *Manager) UsersCount() (int64, error) {
 	rows, err := a.db.ReadOnly().Query(a.queries.selectUserCount)
@@ -590,6 +672,15 @@ func (a *Manager) UsersCount() (int64, error) {
 	}
 	var count int64
 	if err := rows.Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// queryCount runs a "SELECT COUNT(*) ..." query against a read replica
+func (a *Manager) queryCount(query string, args ...any) (int64, error) {
+	var count int64
+	if err := a.db.ReadOnly().QueryRow(query, args...).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -863,6 +954,72 @@ func (a *Manager) AllGrants() (map[string][]Grant, error) {
 		})
 	}
 	return grants, nil
+}
+
+// AccessEntries returns a page of the access control list matching the filter, sorted by topic
+// and username, along with the total number of matching entries.
+func (a *Manager) AccessEntries(filter *AccessFilter) ([]*AccessEntry, int64, error) {
+	topicSearch, userSearch := toSQLSearchPattern(toSQLWildcard(filter.Search)), toSQLSearchPattern(filter.Search)
+	rows, err := a.db.ReadOnly().Query(a.queries.selectAccessEntries, topicSearch, userSearch, toSQLLimit(filter.Limit), filter.Offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	entries := make([]*AccessEntry, 0)
+	for rows.Next() {
+		var username, topic, owner string
+		var read, write, provisioned bool
+		if err := rows.Scan(&username, &topic, &read, &write, &owner, &provisioned); err != nil {
+			return nil, 0, err
+		}
+		entries = append(entries, &AccessEntry{
+			Username:     username,
+			TopicPattern: fromSQLWildcard(topic),
+			Permission:   NewPermission(read, write),
+			Owner:        owner,
+			Provisioned:  provisioned,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	total, err := a.queryCount(a.queries.selectAccessEntriesCount, topicSearch, userSearch)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entries, total, nil
+}
+
+// ReservationEntries returns a page of the topic reservations of all users matching the filter,
+// sorted by topic, along with the total number of matching reservations.
+func (a *Manager) ReservationEntries(filter *AccessFilter) ([]*ReservationEntry, int64, error) {
+	topicSearch, userSearch := toSQLSearchPattern(toSQLWildcard(filter.Search)), toSQLSearchPattern(filter.Search)
+	rows, err := a.db.ReadOnly().Query(a.queries.selectReservationEntries, Everyone, topicSearch, userSearch, toSQLLimit(filter.Limit), filter.Offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	entries := make([]*ReservationEntry, 0)
+	for rows.Next() {
+		var username, topic string
+		var everyoneRead, everyoneWrite bool
+		if err := rows.Scan(&username, &topic, &everyoneRead, &everyoneWrite); err != nil {
+			return nil, 0, err
+		}
+		entries = append(entries, &ReservationEntry{
+			Username: username,
+			Topic:    fromSQLWildcard(topic),
+			Everyone: NewPermission(everyoneRead, everyoneWrite),
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	total, err := a.queryCount(a.queries.selectReservationEntriesCount, topicSearch, userSearch)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entries, total, nil
 }
 
 // Grants returns all user-specific access control entries
@@ -1383,6 +1540,28 @@ func (a *Manager) Tiers() ([]*Tier, error) {
 		tiers = append(tiers, tier)
 	}
 	return tiers, nil
+}
+
+// TierUsersCount returns the number of users per tier code, including tiers without users
+func (a *Manager) TierUsersCount() (map[string]int64, error) {
+	rows, err := a.db.ReadOnly().Query(a.queries.selectTierUsersCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	counts := make(map[string]int64)
+	for rows.Next() {
+		var code string
+		var count int64
+		if err := rows.Scan(&code, &count); err != nil {
+			return nil, err
+		}
+		counts[code] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return counts, nil
 }
 
 // Tier returns a Tier based on the code, or ErrTierNotFound if it does not exist

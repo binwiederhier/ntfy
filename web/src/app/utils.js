@@ -10,6 +10,10 @@ import emojisMapped from "./emojisMapped";
 import { THEME, DATE_FORMAT, TIME_FORMAT } from "./Prefs";
 
 export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
+export const usersUrl = (baseUrl) => `${baseUrl}/v1/users`;
+export const usersAccessUrl = (baseUrl) => `${baseUrl}/v1/users/access`;
+export const usersReservationsUrl = (baseUrl) => `${baseUrl}/v1/users/reservations`;
+export const adminTiersUrl = (baseUrl) => `${baseUrl}/v1/admin/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;

@@ -2130,6 +2130,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Support SMTP servers that only offer LOGIN auth (e.g. OVH, Outlook) for sending emails ([#930](https://github.com/binwiederhier/ntfy/issues/930)/[#1530](https://github.com/binwiederhier/ntfy/pull/1530), thanks to [@wunter8](https://github.com/wunter8) for reporting and [@santanoce](https://github.com/santanoce) for the initial implementation)
 
+* Admin page in the web app to manage users, the access control list and tiers, with search and pagination ([#1526](https://github.com/binwiederhier/ntfy/pull/1526))
+
 **Bug fixes + maintenance:**
 
 * Fix `Dockerfile-build` failing to build: use Go 1.26 and add the `cluster` package ([#1962](https://github.com/binwiederhier/ntfy/issues/1962), thanks to [@ElectricTea](https://github.com/ElectricTea) for reporting)

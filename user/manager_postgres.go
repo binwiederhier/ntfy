@@ -66,6 +66,20 @@ const (
 				ELSE 2
 			END, user_name
 	`
+	postgresSelectUsersPageQuery = `
+		SELECT u.id, u.user_name, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stats_messages, u.stats_emails, u.stats_calls, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, u.deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
+		FROM "user" u
+		LEFT JOIN tier t on t.id = u.tier_id
+		WHERE LOWER(u.user_name) LIKE $1 ESCAPE '\'
+		ORDER BY
+			CASE u.role
+				WHEN 'admin' THEN 1
+				WHEN 'anonymous' THEN 3
+				ELSE 2
+			END, u.user_name
+		LIMIT $2 OFFSET $3
+	`
+	postgresSelectUsersPageCountQuery     = `SELECT COUNT(*) FROM "user" WHERE LOWER(user_name) LIKE $1 ESCAPE '\'`
 	postgresSelectUserCountQuery          = `SELECT COUNT(*) FROM "user"`
 	postgresSelectUserIDFromUsernameQuery = `SELECT id FROM "user" WHERE user_name = $1`
 	postgresInsertUserQuery               = `INSERT INTO "user" (id, user_name, pass, role, sync_topic, provisioned, created) VALUES ($1, $2, $3, $4, $5, $6, $7)`
@@ -94,6 +108,56 @@ const (
 		SELECT u.user_name, a.topic, a.read, a.write
 		FROM user_access a
 		JOIN "user" u ON u.id = a.user_id
+	`
+	postgresSelectUsersPageAccessQuery = `
+		WITH page AS (
+			SELECT id
+			FROM "user"
+			WHERE LOWER(user_name) LIKE $1 ESCAPE '\'
+			ORDER BY
+				CASE role
+					WHEN 'admin' THEN 1
+					WHEN 'anonymous' THEN 3
+					ELSE 2
+				END, user_name
+			LIMIT $2 OFFSET $3
+		)
+		SELECT a.user_id, a.topic, a.read, a.write, a.provisioned, COALESCE(a.owner_user_id, '')
+		FROM user_access a
+		WHERE a.user_id IN (SELECT id FROM page) OR a.owner_user_id IN (SELECT id FROM page)
+		ORDER BY LENGTH(a.topic) DESC, CASE WHEN a.write THEN 1 ELSE 0 END DESC, CASE WHEN a.read THEN 1 ELSE 0 END DESC, a.topic
+	`
+	postgresSelectAccessEntriesQuery = `
+		SELECT u.user_name, a.topic, a.read, a.write, COALESCE(o.user_name, ''), a.provisioned
+		FROM user_access a
+		JOIN "user" u ON u.id = a.user_id
+		LEFT JOIN "user" o ON o.id = a.owner_user_id
+		WHERE LOWER(a.topic) LIKE $1 ESCAPE '\' OR LOWER(u.user_name) LIKE $2 ESCAPE '\'
+		ORDER BY a.topic, CASE WHEN u.role = 'anonymous' THEN 1 ELSE 0 END, u.user_name
+		LIMIT $3 OFFSET $4
+	`
+	postgresSelectAccessEntriesCountQuery = `
+		SELECT COUNT(*)
+		FROM user_access a
+		JOIN "user" u ON u.id = a.user_id
+		WHERE LOWER(a.topic) LIKE $1 ESCAPE '\' OR LOWER(u.user_name) LIKE $2 ESCAPE '\'
+	`
+	postgresSelectReservationEntriesQuery = `
+		SELECT o.user_name, a.topic, COALESCE(e.read, false), COALESCE(e.write, false)
+		FROM user_access a
+		JOIN "user" o ON o.id = a.user_id
+		LEFT JOIN user_access e ON e.topic = a.topic AND e.user_id = (SELECT id FROM "user" WHERE user_name = $1)
+		WHERE a.user_id = a.owner_user_id
+		  AND (LOWER(a.topic) LIKE $2 ESCAPE '\' OR LOWER(o.user_name) LIKE $3 ESCAPE '\')
+		ORDER BY a.topic
+		LIMIT $4 OFFSET $5
+	`
+	postgresSelectReservationEntriesCountQuery = `
+		SELECT COUNT(*)
+		FROM user_access a
+		JOIN "user" o ON o.id = a.user_id
+		WHERE a.user_id = a.owner_user_id
+		  AND (LOWER(a.topic) LIKE $1 ESCAPE '\' OR LOWER(o.user_name) LIKE $2 ESCAPE '\')
 	`
 	postgresSelectUserAllAccessQuery = `
 		SELECT user_id, topic, read, write, provisioned
@@ -219,6 +283,12 @@ const (
 		FROM tier
 		WHERE (stripe_monthly_price_id = $1 OR stripe_yearly_price_id = $2)
 	`
+	postgresSelectTierUsersCountQuery = `
+		SELECT t.code, COUNT(u.id)
+		FROM tier t
+		LEFT JOIN "user" u ON u.tier_id = t.id
+		GROUP BY t.code
+	`
 	postgresDeleteTierQuery = `DELETE FROM tier WHERE code = $1`
 
 	// Phone queries
@@ -278,6 +348,14 @@ var postgresQueries = queries{
 	selectUsernames:                postgresSelectUsernamesQuery,
 	selectUsers:                    postgresSelectUsersQuery,
 	selectUserCount:                postgresSelectUserCountQuery,
+	selectUsersPage:                postgresSelectUsersPageQuery,
+	selectUsersPageCount:           postgresSelectUsersPageCountQuery,
+	selectUsersPageAccess:          postgresSelectUsersPageAccessQuery,
+	selectAccessEntries:            postgresSelectAccessEntriesQuery,
+	selectAccessEntriesCount:       postgresSelectAccessEntriesCountQuery,
+	selectReservationEntries:       postgresSelectReservationEntriesQuery,
+	selectReservationEntriesCount:  postgresSelectReservationEntriesCountQuery,
+	selectTierUsersCount:           postgresSelectTierUsersCountQuery,
 	selectUserIDFromUsername:       postgresSelectUserIDFromUsernameQuery,
 	insertUser:                     postgresInsertUserQuery,
 	updateUserPass:                 postgresUpdateUserPassQuery,

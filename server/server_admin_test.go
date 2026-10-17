@@ -364,6 +364,39 @@ func TestUser_AddRemove_Failures(t *testing.T) {
 	})
 }
 
+func TestUser_ChangeRemoveProvisionedUser(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		conf := newTestConfigWithAuthFile(t, databaseURL)
+		conf.AuthUsers = []*user.User{
+			{Name: "philuser", Hash: "$2a$10$U4WSIYY6evyGmZaraavM2e2JeVG6EMGUKN1uUwufUeeRd4Jpg6cGC", Role: user.RoleUser}, // philuser:philpass
+		}
+		s := newTestServer(t, conf)
+		defer s.closeDatabases()
+
+		// Create admin
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+
+		// Cannot delete provisioned user
+		rr := request(t, s, "DELETE", "/v1/users", `{"username": "philuser"}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 409, rr.Code)
+		require.Equal(t, 40905, toHTTPError(t, rr.Body.String()).Code)
+
+		// Cannot change password of provisioned user
+		rr = request(t, s, "PUT", "/v1/users", `{"username": "philuser", "password": "newpass"}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 409, rr.Code)
+		require.Equal(t, 40905, toHTTPError(t, rr.Body.String()).Code)
+
+		// User is still there, with the old password
+		u, err := s.userManager.Authenticate("philuser", "philpass")
+		require.Nil(t, err)
+		require.Equal(t, "philuser", u.Name)
+	})
+}
+
 func TestAccess_AllowReset(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)

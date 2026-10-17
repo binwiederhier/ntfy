@@ -23,10 +23,10 @@ It also lets ntfy start with a warning on a newer database schema, so later roll
 
 * Fix reconnects with `since=<message ID>` reading every message of the topic from the database, which overloaded ntfy.sh's database right after the v2.31.0 upgrade; the message cache gets a new index: (topic, published, id) on PostgreSQL, (topic, published, time) on SQLite ([#2058](https://github.com/binwiederhier/ntfy/pull/2058))
 * Start with a warning instead of failing when the database schema is newer than this version of ntfy supports, so a rollback or a rolling cluster upgrade needs no manual schema change ([#2059](https://github.com/binwiederhier/ntfy/pull/2059))
-* Web app: Fix the wrong topic opening when subscribed to the same topic on two different servers ([#858](https://github.com/binwiederhier/ntfy/issues/858))
-* Web app: Fix the "Upgrade to ntfy Pro" banner covering the bottom of a long topic list ([#1007](https://github.com/binwiederhier/ntfy/issues/1007))
-* Web app: The "Notifications are disabled" and "Notifications are blocked" warnings can now be closed ([#1220](https://github.com/binwiederhier/ntfy/issues/1220))
-* Web app: Fix a crash when opening the subscribe dialog before the topic list has loaded, e.g. while another tab holds the browser database ([#2014](https://github.com/binwiederhier/ntfy/issues/2014), [#1881](https://github.com/binwiederhier/ntfy/issues/1881))
+* Web app: Fix the wrong topic opening when subscribed to the same topic on two different servers ([#858](https://github.com/binwiederhier/ntfy/issues/858), thanks to [@emigrating](https://github.com/emigrating) for reporting)
+* Web app: Fix the "Upgrade to ntfy Pro" banner covering the bottom of a long topic list ([#1007](https://github.com/binwiederhier/ntfy/issues/1007), thanks to [@RuinTD](https://github.com/RuinTD) for reporting)
+* Web app: The "Notifications are disabled" and "Notifications are blocked" warnings can now be closed ([#1220](https://github.com/binwiederhier/ntfy/issues/1220), thanks to [@jeremiah-k](https://github.com/jeremiah-k) for reporting)
+* Web app: Fix a crash when opening the subscribe dialog before the topic list has loaded, e.g. while another tab holds the browser database ([#2014](https://github.com/binwiederhier/ntfy/issues/2014), [#1881](https://github.com/binwiederhier/ntfy/issues/1881), thanks to [@Lawrence81](https://github.com/Lawrence81) and [@controlstrip](https://github.com/controlstrip) for reporting)
 
 **Upgrade notes:**
 
@@ -2198,6 +2198,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
+
+**Bug fixes + maintenance:**
+
+* Fix template files (`?tpl=<name>`) ignoring the priority sent with the request when the file has no `priority` key ([#2045](https://github.com/binwiederhier/ntfy/issues/2045), thanks to [@6801318d8d](https://github.com/6801318d8d) for reporting)
+* Return HTTP 409 instead of 500 when deleting or changing the password of a user provisioned via `auth-users` through the admin API ([#2062](https://github.com/binwiederhier/ntfy/issues/2062), thanks to [@daniloamiranda](https://github.com/daniloamiranda) for reporting)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

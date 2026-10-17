@@ -63,8 +63,8 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	visitors          map[string]*visitor // ip:<ip> or user:<user>
-	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	visitors          map[string]*visitorBucket // ip:<ip> or user:<user>
+	ban               *ban.Service              // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
@@ -335,7 +335,7 @@ func New(conf *Config) (*Server, error) {
 		userManager:     userManager,
 		messages:        messages,
 		messagesHistory: []int64{messages},
-		visitors:        make(map[string]*visitor),
+		visitors:        make(map[string]*visitorBucket),
 		stripe:          stripe,
 	}
 	// Everything from here on needs the server itself: the price cache calls a method on it, and
@@ -2279,18 +2279,22 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	}
 }
 
+// visitor returns the per-request visitor for the given IP and user (may be nil): the request's user on top
+// of the shared rate-limit bucket. The bucket's own user is only ever the tier'd user it is keyed by; IP-keyed
+// buckets are shared by untiered users and anonymous requests, so the user must not be stored on them.
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id := visitorID(ip, user, s.config)
-	v, exists := s.visitors[id]
+	b, exists := s.visitors[id]
 	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, ip, user)
-		return s.visitors[id]
+		b = newVisitorBucket(s.config, s.messageCache, s.userManager, ip, user)
+		s.visitors[id] = b
+	} else {
+		b.Keepalive()
+		b.setUser(user) // Always update with the latest user (tier may have changed); no-op for IP-keyed buckets
 	}
-	v.Keepalive()
-	v.SetUser(user) // Always update with the latest user, may be nil!
-	return v
+	return b.visitor(user)
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {

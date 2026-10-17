@@ -52,13 +52,24 @@ const (
 	visitorEmailLimitBurstMax  = 150
 )
 
-// visitor represents an API user, and its associated rate.Limiter used for rate limiting
+// visitor is the per-request view of a visitorBucket: the rate-limit bucket is shared by all requests from
+// the same IP prefix (or the same tier'd user), but the user is the one authenticated for THIS request. The
+// user must never live on the shared bucket: IP-keyed buckets are shared by untiered accounts and anonymous
+// requests alike, so two overlapping requests from one IP would otherwise observe each other's user and be
+// authorized as it (see Server.visitor). Each request gets its own visitor, so its user needs no lock.
 type visitor struct {
+	*visitorBucket
+	user *user.User // Authenticated user of this request, or nil
+}
+
+// visitorBucket represents an API user, and its associated rate.Limiter used for rate limiting. It is shared
+// by all requests with the same visitorID, and is only ever handed out wrapped in a visitor.
+type visitorBucket struct {
 	config               *Config
 	messageCache         *message.Cache
 	userManager          *user.Manager      // May be nil
 	ip                   netip.Addr         // Visitor IP address
-	user                 *user.User         // Only set if authenticated user, otherwise nil
+	user                 *user.User         // Tier'd user the bucket is keyed by (see visitorID); nil for IP-keyed buckets
 	requestLimiter       *rate.Limiter      // Rate limiter for (almost) all requests (including messages)
 	messagesLimiter      *util.FixedLimiter // Rate limiter for messages
 	emailsLimiter        *util.RateLimiter  // Rate limiter for emails
@@ -118,14 +129,21 @@ const (
 	visitorLimitBasisTier = visitorLimitBasis("tier")
 )
 
+// newVisitor creates a new bucket for the given IP and user, and returns this request's view of it
 func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
+	return newVisitorBucket(conf, messageCache, userManager, ip, user).visitor(user)
+}
+
+// newVisitorBucket creates a bucket keyed by the given IP, or by the user if it has a tier (see visitorID)
+func newVisitorBucket(conf *Config, messageCache *message.Cache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitorBucket {
+	user = visitorBucketUser(user)
 	var messages, emails, calls int64
 	if user != nil {
 		messages = user.Stats.Messages
 		emails = user.Stats.Emails
 		calls = user.Stats.Calls
 	}
-	v := &visitor{
+	v := &visitorBucket{
 		config:               conf,
 		messageCache:         messageCache,
 		userManager:          userManager, // May be nil
@@ -147,13 +165,39 @@ func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Man
 	return v
 }
 
+// visitor returns this request's view of the bucket, carrying the request's own user
+func (v *visitorBucket) visitor(u *user.User) *visitor {
+	return &visitor{visitorBucket: v, user: u}
+}
+
+// Context returns the bucket's log context plus the fields of this request's user
 func (v *visitor) Context() log.Context {
+	fields := v.visitorBucket.Context()
+	if v.user != nil {
+		fields["user_id"] = v.user.ID
+		fields["user_name"] = v.user.Name
+		if v.user.Tier != nil {
+			for field, value := range v.user.Tier.Context() {
+				fields[field] = value
+			}
+		}
+		if v.user.Billing.StripeCustomerID != "" {
+			fields["stripe_customer_id"] = v.user.Billing.StripeCustomerID
+		}
+		if v.user.Billing.StripeSubscriptionID != "" {
+			fields["stripe_subscription_id"] = v.user.Billing.StripeSubscriptionID
+		}
+	}
+	return fields
+}
+
+func (v *visitorBucket) Context() log.Context {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.contextNoLock()
 }
 
-func (v *visitor) contextNoLock() log.Context {
+func (v *visitorBucket) contextNoLock() log.Context {
 	info := v.infoLightNoLock()
 	fields := log.Context{
 		"visitor_id":                 visitorID(v.ip, v.user, v.config),
@@ -180,21 +224,6 @@ func (v *visitor) contextNoLock() log.Context {
 	if v.topicCreationLimiter != nil {
 		fields["visitor_topic_creations_remaining"] = int64(math.Floor(v.topicCreationLimiter.Tokens()))
 	}
-	if v.user != nil {
-		fields["user_id"] = v.user.ID
-		fields["user_name"] = v.user.Name
-		if v.user.Tier != nil {
-			for field, value := range v.user.Tier.Context() {
-				fields[field] = value
-			}
-		}
-		if v.user.Billing.StripeCustomerID != "" {
-			fields["stripe_customer_id"] = v.user.Billing.StripeCustomerID
-		}
-		if v.user.Billing.StripeSubscriptionID != "" {
-			fields["stripe_subscription_id"] = v.user.Billing.StripeSubscriptionID
-		}
-	}
 	return fields
 }
 
@@ -209,43 +238,43 @@ func visitorExtendedInfoContext(info *visitorInfo) log.Context {
 	}
 
 }
-func (v *visitor) RequestAllowed() bool {
+func (v *visitorBucket) RequestAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	return v.requestLimiter.Allow()
 }
 
-func (v *visitor) FirebaseAllowed() bool {
+func (v *visitorBucket) FirebaseAllowed() bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return !time.Now().Before(v.firebase)
 }
 
-func (v *visitor) FirebaseTemporarilyDeny() {
+func (v *visitorBucket) FirebaseTemporarilyDeny() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.firebase = time.Now().Add(v.config.FirebaseQuotaExceededPenaltyDuration)
 }
 
-func (v *visitor) MessageAllowed() bool {
+func (v *visitorBucket) MessageAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	return v.messagesLimiter.Allow()
 }
 
-func (v *visitor) EmailAllowed() bool {
+func (v *visitorBucket) EmailAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	return v.emailsLimiter.Allow()
 }
 
-func (v *visitor) CallAllowed() bool {
+func (v *visitorBucket) CallAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	return v.callsLimiter.Allow()
 }
 
-func (v *visitor) SubscriptionAllowed() bool {
+func (v *visitorBucket) SubscriptionAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	return v.subscriptionLimiter.Allow()
@@ -253,7 +282,7 @@ func (v *visitor) SubscriptionAllowed() bool {
 
 // TopicCreationAllowed returns true if the visitor is allowed to cause a new topic to be
 // inserted into the server's in-memory topic map. Returns true if no limiter is configured.
-func (v *visitor) TopicCreationAllowed() bool {
+func (v *visitorBucket) TopicCreationAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	if v.topicCreationLimiter == nil {
@@ -263,7 +292,7 @@ func (v *visitor) TopicCreationAllowed() bool {
 }
 
 // AuthAllowed returns true if an auth request can be attempted (> 1 token available)
-func (v *visitor) AuthAllowed() bool {
+func (v *visitorBucket) AuthAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	if v.authLimiter == nil {
@@ -273,7 +302,7 @@ func (v *visitor) AuthAllowed() bool {
 }
 
 // AuthFailed records an auth failure
-func (v *visitor) AuthFailed() {
+func (v *visitorBucket) AuthFailed() {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	if v.authLimiter != nil {
@@ -283,7 +312,7 @@ func (v *visitor) AuthFailed() {
 
 // AccountActionAllowed returns true if a rate-limited account action (signup or password-reset
 // request) is currently allowed for this visitor
-func (v *visitor) AccountActionAllowed() bool {
+func (v *visitorBucket) AccountActionAllowed() bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	if v.accountLimiter == nil || (v.accountLimiter != nil && v.accountLimiter.Tokens() < 1) {
@@ -294,7 +323,7 @@ func (v *visitor) AccountActionAllowed() bool {
 
 // AccountActionPerformed decreases the account limiter. This is to be called after a rate-limited
 // account action (signup or password-reset request).
-func (v *visitor) AccountActionPerformed() {
+func (v *visitorBucket) AccountActionPerformed() {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	if v.accountLimiter != nil {
@@ -302,37 +331,37 @@ func (v *visitor) AccountActionPerformed() {
 	}
 }
 
-func (v *visitor) BandwidthAllowed(bytes int64) bool {
+func (v *visitorBucket) BandwidthAllowed(bytes int64) bool {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	return v.bandwidthLimiter.AllowN(bytes)
 }
 
-func (v *visitor) RemoveSubscription() {
+func (v *visitorBucket) RemoveSubscription() {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	v.subscriptionLimiter.AllowN(-1)
 }
 
-func (v *visitor) Keepalive() {
+func (v *visitorBucket) Keepalive() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.seen = time.Now()
 }
 
-func (v *visitor) BandwidthLimiter() util.Limiter {
+func (v *visitorBucket) BandwidthLimiter() util.Limiter {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	return v.bandwidthLimiter
 }
 
-func (v *visitor) Stale() bool {
+func (v *visitorBucket) Stale() bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return time.Since(v.seen) > visitorExpungeAfter
 }
 
-func (v *visitor) Stats() *user.Stats {
+func (v *visitorBucket) Stats() *user.Stats {
 	v.mu.RLock() // limiters could be replaced!
 	defer v.mu.RUnlock()
 	return &user.Stats{
@@ -346,7 +375,7 @@ func (v *visitor) Stats() *user.Stats {
 // persisted seeds its deltas are measured against, because the caller zeroes the user's
 // database row in the same pass (in a cluster that row is reset once, by the leader). Only the
 // stats resetter calls this.
-func (v *visitor) ResetStats() {
+func (v *visitorBucket) ResetStats() {
 	v.mu.Lock() // Also protects statsPersisted
 	defer v.mu.Unlock()
 	v.emailsLimiter.Reset()
@@ -357,13 +386,13 @@ func (v *visitor) ResetStats() {
 
 // EnqueueUserStatsDelta enqueues the visitor's not-yet-persisted stats increments to the user
 // manager's write queue. Deltas add up across cluster nodes (see Manager.EnqueueUserStats).
-func (v *visitor) EnqueueUserStatsDelta() {
+func (v *visitorBucket) EnqueueUserStatsDelta() {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.enqueueUserStatsDeltaNoLock()
 }
 
-func (v *visitor) enqueueUserStatsDeltaNoLock() {
+func (v *visitorBucket) enqueueUserStatsDeltaNoLock() {
 	u := v.user // Pinned for the whole function: SetUser(nil) must not turn this into a nil deref
 	if v.userManager == nil || u == nil {
 		return
@@ -385,15 +414,13 @@ func (v *visitor) enqueueUserStatsDeltaNoLock() {
 	v.userManager.EnqueueUserStats(u.ID, &delta)
 }
 
-// User returns the visitor user, or nil if there is none
+// User returns the user authenticated for this request, or nil if there is none
 func (v *visitor) User() *user.User {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
 	return v.user // May be nil
 }
 
 // IP returns the visitor IP address
-func (v *visitor) IP() netip.Addr {
+func (v *visitorBucket) IP() netip.Addr {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.ip
@@ -401,15 +428,21 @@ func (v *visitor) IP() netip.Addr {
 
 // Authenticated returns true if a user successfully authenticated
 func (v *visitor) Authenticated() bool {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
 	return v.user != nil
 }
 
-// SetUser sets the visitors user to the given value
+// SetUser sets the user of this request. It does not touch the shared bucket; only Server.visitor may change
+// the tier'd user a bucket is keyed by (see visitorBucket.setUser)
 func (v *visitor) SetUser(u *user.User) {
+	v.user = u // u may be nil!
+}
+
+// setUser updates the tier'd user the bucket is keyed by, resetting the limiters if its tier changed. IP-keyed
+// buckets carry no user (see visitorBucketUser), so this is a no-op for them.
+func (v *visitorBucket) setUser(u *user.User) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	u = visitorBucketUser(u)
 	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
 	if shouldResetLimiters && v.user != nil && v.user.Tier != nil {
 		// Flush increments counted against the old limiters, under the old account, before they
@@ -431,15 +464,13 @@ func (v *visitor) SetUser(u *user.User) {
 // MaybeUserID returns the user ID of the visitor (if any). If this is an anonymous visitor,
 // an empty string is returned.
 func (v *visitor) MaybeUserID() string {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
 	if v.user != nil {
 		return v.user.ID
 	}
 	return ""
 }
 
-func (v *visitor) resetLimitersNoLock(messages, emails, calls int64) {
+func (v *visitorBucket) resetLimitersNoLock(messages, emails, calls int64) {
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
 	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)
@@ -462,13 +493,13 @@ func (v *visitor) resetLimitersNoLock(messages, emails, calls int64) {
 	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor")          // Must be after function, because contextNoLock() describes rate limiters
 }
 
-func (v *visitor) Limits() *visitorLimits {
+func (v *visitorBucket) Limits() *visitorLimits {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.limitsNoLock()
 }
 
-func (v *visitor) limitsNoLock() *visitorLimits {
+func (v *visitorBucket) limitsNoLock() *visitorLimits {
 	if v.user != nil && v.user.Tier != nil {
 		return tierBasedVisitorLimits(v.config, v.user.Tier)
 	}
@@ -522,9 +553,9 @@ func configBasedVisitorLimits(conf *Config) *visitorLimits {
 }
 
 func (v *visitor) Info() (*visitorInfo, error) {
-	v.mu.RLock()
+	v.visitorBucket.mu.RLock()
 	info := v.infoLightNoLock()
-	v.mu.RUnlock()
+	v.visitorBucket.mu.RUnlock()
 
 	// Attachment stats from database
 	var attachmentsBytesUsed int64
@@ -555,7 +586,7 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	return info, nil
 }
 
-func (v *visitor) infoLightNoLock() *visitorInfo {
+func (v *visitorBucket) infoLightNoLock() *visitorInfo {
 	messages := v.messagesLimiter.Value()
 	emails := v.emailsLimiter.Value()
 	calls := v.callsLimiter.Value()
@@ -590,7 +621,7 @@ func dailyLimitToRate(limit int64) rate.Limit {
 
 // visitorID returns a unique identifier for a visitor based on user or IP, using configurable prefix bits for IPv4/IPv6
 func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
-	if u != nil && u.Tier != nil {
+	if visitorBucketUser(u) != nil {
 		return fmt.Sprintf("user:%s", u.ID)
 	}
 	if ip.Is4() {
@@ -599,4 +630,13 @@ func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
 		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv6).Masked().Addr()
 	}
 	return fmt.Sprintf("ip:%s", ip.String())
+}
+
+// visitorBucketUser returns the user a bucket may be keyed by, which is only ever a tier'd user. Untiered
+// users share the IP-keyed bucket with anonymous requests, so the bucket must not carry them.
+func visitorBucketUser(u *user.User) *user.User {
+	if u != nil && u.Tier != nil {
+		return u
+	}
+	return nil
 }

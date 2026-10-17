@@ -3561,14 +3561,14 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
-		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
+		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor.visitorBucket)
 
 		// Publish message, observe rate visitor tokens being decreased
 		response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
 		require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
 		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.messagesLimiter.Value())
-		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
+		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor.visitorBucket)
 
 		// Expire visitor
 		s.visitors["ip:1.2.3.4"].seen = time.Now().Add(-1 * 25 * time.Hour)
@@ -5677,6 +5677,34 @@ func TestServer_BanFeed_SuccessfulRequestsNotBanned(t *testing.T) {
 	}
 	s.ban.Close() // Flush any buffered bans (there should be none) before asserting no file
 	require.NoFileExists(t, banFile)
+}
+
+func TestServer_Visitor_UserIsPerRequest(t *testing.T) {
+	// Regression for the auth race (untiered users and anonymous requests share one IP-keyed
+	// visitor): visitor() used to overwrite the user on the shared object, so a concurrent
+	// anonymous request from the same IP could be authorized as another request's user, and
+	// vice versa. The user must be per request; only the rate limiters are shared.
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	require.Nil(t, s.userManager.AddUser("phil", "phil12345", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+
+	// The concurrent requests, made deterministic
+	authed := s.visitor(ip, u)
+	anon := s.visitor(ip, nil)
+	require.NotNil(t, authed.User())
+	require.Equal(t, u.ID, authed.User().ID)
+	require.Nil(t, anon.User())
+	authedAgain := s.visitor(ip, u)
+	require.Nil(t, anon.User())
+	require.NotNil(t, authedAgain.User())
+	require.Equal(t, u.ID, authedAgain.User().ID)
+
+	// Rate limiters are still shared per IP
+	for authed.SubscriptionAllowed() {
+	}
+	require.False(t, anon.SubscriptionAllowed())
 }
 
 func TestServer_StopFlushesBatchedMessages(t *testing.T) {

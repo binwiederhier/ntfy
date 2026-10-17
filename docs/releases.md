@@ -2199,6 +2199,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
 
+**Security:**
+
+* Fix an authentication race where a request could be authorized as another request's user. Requests from one visitor bucket (untiered accounts and anonymous access are keyed by client IP) shared a single mutable user field, so two overlapping requests from the same bucket could observe each other's identity: an anonymous request could mint a token for or read a private topic of a concurrently-active user, and a user's own concurrent requests could be rejected as unauthenticated. The authenticated user is now carried per request rather than on the shared rate-limit bucket ([#1051](https://github.com/binwiederhier/ntfy/issues/1051))
+
 **Bug fixes + maintenance:**
 
 * Fix template files (`?tpl=<name>`) ignoring the priority sent with the request when the file has no `priority` key ([#2045](https://github.com/binwiederhier/ntfy/issues/2045), thanks to [@6801318d8d](https://github.com/6801318d8d) for reporting)

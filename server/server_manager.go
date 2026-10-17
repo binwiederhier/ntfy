@@ -13,9 +13,9 @@ func (s *Server) execManager() {
 	// WARNING: Make sure to only selectively lock with the mutex, and be aware that this
 	//          there is no mutex for the entire function.
 
-	// Prune all the things. In-memory state is pruned on every node; jobs touching shared
-	// databases (and the web push job, which also sends expiry-warning notifications) run on
-	// the cluster leader only. In a single-node setup, IsLeader is always true.
+	// Prune all the things. In-memory state is pruned on every node; jobs touching the shared
+	// database (and the web push job, which also sends expiry warnings) run on the cluster
+	// leader only. Without clustering, IsLeader is always true.
 	s.pruneVisitors()
 	if s.cluster.IsLeader() {
 		s.maybeResetSharedStats()

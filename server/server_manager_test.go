@@ -43,3 +43,35 @@ func TestServer_Manager_ExpiresDeliveries(t *testing.T) {
 	_, ok := topics[0].DeliveredAt("old")
 	require.False(t, ok)
 }
+
+func TestServer_Manager_SharedJobsRunOnLeaderOnly(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A passive (non-leader) node must not prune the shared database. The stored message
+		// total is written by every node, as a delta, so another node's count survives
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		b := &fakeCluster{}
+		b.setLeader(false)
+		s.cluster = b
+
+		// Publish a message and expire it, and store a total as another node would have
+		rr := request(t, s, "POST", "/mytopic", "hi", nil)
+		require.Equal(t, 200, rr.Code)
+		m := toMessage(t, rr.Body.String())
+		require.Nil(t, s.messageCache.ExpireMessages("mytopic"))
+		require.Nil(t, s.messageCache.AddStats(500))
+
+		// Not the leader: nothing shared is touched
+		s.execManager()
+		_, err := s.messageCache.Message(m.ID)
+		require.Nil(t, err)
+		messages, err := s.messageCache.Stats()
+		require.Nil(t, err)
+		require.GreaterOrEqual(t, messages, int64(500))
+
+		// Leader: expired messages are pruned
+		b.setLeader(true)
+		s.execManager()
+		_, err = s.messageCache.Message(m.ID)
+		require.Equal(t, model.ErrMessageNotFound, err)
+	})
+}

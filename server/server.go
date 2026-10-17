@@ -1661,6 +1661,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		meterPollBandwidth = true
 		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
+	w.Header().Set("Incremental", "?1") // Ask proxies to forward the stream without buffering (RFC 10036)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	subscriberIDs := make([]int, 0)
@@ -2372,6 +2373,9 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 		s.messagesHistory = s.messagesHistory[1:]
 	}
 	s.mu.Unlock()
+	if !s.cluster.IsLeader() {
+		return // Overwritten, not added to: a second writer would replace the total with its own count
+	}
 	if err := s.messageCache.UpdateStats(messagesCount); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
 	}

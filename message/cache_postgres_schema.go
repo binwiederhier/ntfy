@@ -6,7 +6,7 @@ import (
 
 // Initial PostgreSQL schema
 const (
-	postgresCurrentSchemaVersion = 17
+	postgresCurrentSchemaVersion = 18
 	postgresCreateTablesQuery    = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
@@ -40,6 +40,7 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_message_mid ON message (mid);
 		CREATE INDEX IF NOT EXISTS idx_message_sequence_id ON message (sequence_id);
 		CREATE INDEX IF NOT EXISTS idx_message_topic_published_time ON message (topic, published, time, id);
+		CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id);
 		CREATE INDEX IF NOT EXISTS idx_message_published_expires ON message (published, expires);
 		CREATE INDEX IF NOT EXISTS idx_message_attachment_expires ON message (attachment_expires) WHERE attachment_deleted = FALSE;
 		CREATE INDEX IF NOT EXISTS idx_message_sender_attachment_expires ON message (sender, attachment_expires) WHERE user_id = '';
@@ -64,8 +65,13 @@ const (
 		ALTER TABLE message ADD COLUMN IF NOT EXISTS claimed_at BIGINT NOT NULL DEFAULT 0;
 	`
 
-	// 16 -> 17
-	postgresMigrate16To17AddAppleQuery = `
+	// 16 -> 17: serves the rows after a since=<id> marker; ntfy.sh got it by hand on 2026-10-16, which IF NOT EXISTS keeps
+	postgresMigrate16To17CreateIndexQuery = `
+		CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id);
+	`
+
+	// 17 -> 18: adds the apple column for the X-Apple-* headers
+	postgresMigrate17To18AddAppleQuery = `
 		ALTER TABLE message ADD COLUMN IF NOT EXISTS apple TEXT NOT NULL DEFAULT('');
 	`
 )
@@ -78,6 +84,7 @@ var (
 	postgresMigrations = map[int]schema.MigrateFunc{
 		14: schema.AsMigrateFunc(postgresMigrate14To15CreateIndexQuery),
 		15: schema.AsMigrateFunc(postgresMigrate15To16AddClaimedAtQuery),
-		16: schema.AsMigrateFunc(postgresMigrate16To17AddAppleQuery),
+		16: schema.AsMigrateFunc(postgresMigrate16To17CreateIndexQuery),
+		17: schema.AsMigrateFunc(postgresMigrate17To18AddAppleQuery),
 	}
 )

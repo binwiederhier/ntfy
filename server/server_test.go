@@ -1074,6 +1074,25 @@ func TestServer_PollWithQueryFilters(t *testing.T) {
 	})
 }
 
+func TestServer_SubscribeIncrementalHeader(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// Streaming responses ask proxies not to buffer them (RFC 10036)
+		for _, format := range []string{"sse", "json", "raw"} {
+			rr := httptest.NewRecorder()
+			subscribeCancel := subscribe(t, s, "/mytopic/"+format, rr)
+			subscribeCancel()
+			require.Equal(t, "?1", rr.Header().Get("Incremental"), format)
+		}
+
+		// Polling returns all messages at once
+		rr := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Equal(t, "", rr.Header().Get("Incremental"))
+	})
+}
+
 func TestServer_SubscribeWithQueryFilters(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()
@@ -4544,13 +4563,13 @@ func TestServer_MessageTemplate_FromNamedTemplate_Alertmanager(t *testing.T) {
 	s := &Server{config: NewConfig()}
 	s.config.TemplateDir = "templates"
 	m := &model.Message{}
-	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", alertmanagerFiringJSON))
+	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", alertmanagerFiringJSON, ""))
 	require.NotContains(t, m.Message, "Ends at:")
 
 	resolvedJSON := strings.ReplaceAll(alertmanagerFiringJSON, `"status": "firing"`, `"status": "resolved"`)
 	resolvedJSON = strings.Replace(resolvedJSON, "0001-01-01T00:00:00Z", "2025-07-17T07:30:00Z", 1)
 	m = &model.Message{}
-	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", resolvedJSON))
+	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", resolvedJSON, ""))
 	require.Contains(t, m.Message, "Starts at: 2025-07-17T07:00:00Z\nEnds at: 2025-07-17T07:30:00Z")
 }
 
@@ -4788,6 +4807,49 @@ priority: '{{if eq .level "critical"}}5{{else if eq .level "warning"}}4{{else}}3
 		require.Equal(t, 200, response.Code)
 		m = toMessage(t, response.Body.String())
 		require.Equal(t, 3, m.Priority)
+	})
+}
+
+func TestServer_MessageTemplate_Priority_FromRequestWithTemplateFile(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+		c := newTestConfig(t, databaseURL)
+		c.TemplateDir = t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(c.TemplateDir, "no-priority.yml"), []byte(`
+title: "Test {{.a}}"
+message: "Value {{.a}}"
+`), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(c.TemplateDir, "with-priority.yml"), []byte(`
+message: "Value {{.a}}"
+priority: "5"
+`), 0644))
+		s := newTestServer(t, c)
+
+		// Template file without priority falls back to the request priority (#2045)
+		response := request(t, s, "POST", "/mytopic?tpl=no-priority&p=2&ta=warning", `{"a":1}`, nil)
+		require.Equal(t, 200, response.Code)
+		m := toMessage(t, response.Body.String())
+		require.Equal(t, "Test 1", m.Title)
+		require.Equal(t, "Value 1", m.Message)
+		require.Equal(t, 2, m.Priority)
+		require.Equal(t, []string{"warning"}, m.Tags)
+
+		// Header works the same way
+		response = request(t, s, "POST", "/mytopic", `{"a":1}`, map[string]string{
+			"X-Template": "no-priority",
+			"X-Priority": "high",
+		})
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, 4, toMessage(t, response.Body.String()).Priority)
+
+		// Invalid request priority is rejected
+		response = request(t, s, "POST", "/mytopic?tpl=no-priority&p=invalid", `{"a":1}`, nil)
+		require.Equal(t, 400, response.Code)
+
+		// Priority from the template file wins over the request priority
+		response = request(t, s, "POST", "/mytopic?tpl=with-priority&p=2", `{"a":1}`, nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, 5, toMessage(t, response.Body.String()).Priority)
 	})
 }
 

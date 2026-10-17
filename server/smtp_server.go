@@ -138,7 +138,6 @@ func (s *smtpSession) Rcpt(to string) error {
 
 func (s *smtpSession) Data(r io.Reader) error {
 	return s.withFailCount(func() error {
-		conf := s.backend.config
 		b, err := io.ReadAll(r) // Protected by MaxMessageBytes
 		if err != nil {
 			return err
@@ -158,9 +157,6 @@ func (s *smtpSession) Data(r io.Reader) error {
 			return err
 		}
 		body = strings.TrimSpace(body)
-		if len(body) > conf.MessageSizeLimit {
-			body = body[:conf.MessageSizeLimit]
-		}
 		m := model.NewDefaultMessage(s.topic, body)
 		subject := strings.TrimSpace(msg.Header.Get("Subject"))
 		if subject != "" {

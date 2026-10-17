@@ -236,23 +236,45 @@ func maybeTruncateFCMMessage(m *messaging.Message) *messaging.Message {
 // createAPNSAlertConfig creates an APNS config for iOS notifications that show up as an alert (only relevant for iOS).
 // We must set the Alert struct ("alert"), and we need to set MutableContent ("mutable-content"), so the Notification Service
 // Extension in iOS can modify the message.
+//
+// We also set an explicit sound for user-visible alerts. Omitting aps.sound makes iOS treat the notification as silent;
+// on iOS 26.2+ that has been observed to leave notifications muted and can interfere with other apps' notification audio
+// (see https://github.com/binwiederhier/ntfy/issues/1562). Priority 1 ("min") stays silent by design.
 func createAPNSAlertConfig(m *model.Message, data map[string]string) *messaging.APNSConfig {
 	apnsData := make(map[string]any)
 	for k, v := range data {
 		apnsData[k] = v
 	}
+	aps := &messaging.Aps{
+		MutableContent: true,
+		Alert: &messaging.ApsAlert{
+			Title: m.Title,
+			Body:  maybeTruncateAPNSBodyMessage(m.Message),
+		},
+	}
+	setAPNSAlertSound(aps, m.Priority)
 	return &messaging.APNSConfig{
 		Payload: &messaging.APNSPayload{
 			CustomData: apnsData,
-			Aps: &messaging.Aps{
-				MutableContent: true,
-				Alert: &messaging.ApsAlert{
-					Title: m.Title,
-					Body:  maybeTruncateAPNSBodyMessage(m.Message),
-				},
-			},
+			Aps:        aps,
 		},
 	}
+}
+
+// setAPNSAlertSound attaches the appropriate iOS notification sound for the given priority.
+//   - priority 1 (min): no sound (silent, matches Android "min" behavior)
+//   - all other priorities (including default/0 and max/5): system default sound
+//
+// Note: we intentionally use a plain "default" sound string rather than CriticalSound for
+// priority 5. Critical alerts require a special iOS entitlement the ntfy app may not have;
+// sending a critical sound dictionary without that entitlement can fail to play audio.
+// Explicit aps.sound is what fixes silent notifications on iOS 26.2+ (#1562).
+func setAPNSAlertSound(aps *messaging.Aps, priority int) {
+	if priority == 1 {
+		// Explicit silent: leave Sound unset.
+		return
+	}
+	aps.Sound = "default"
 }
 
 // createAPNSBackgroundConfig creates an APNS config for a silent background message (only relevant for iOS). Apple only

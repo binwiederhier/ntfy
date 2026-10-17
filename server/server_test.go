@@ -974,6 +974,25 @@ func TestServer_PollWithQueryFilters(t *testing.T) {
 	})
 }
 
+func TestServer_SubscribeIncrementalHeader(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// Streaming responses ask proxies not to buffer them (RFC 10036)
+		for _, format := range []string{"sse", "json", "raw"} {
+			rr := httptest.NewRecorder()
+			subscribeCancel := subscribe(t, s, "/mytopic/"+format, rr)
+			subscribeCancel()
+			require.Equal(t, "?1", rr.Header().Get("Incremental"), format)
+		}
+
+		// Polling returns all messages at once
+		rr := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Equal(t, "", rr.Header().Get("Incremental"))
+	})
+}
+
 func TestServer_SubscribeWithQueryFilters(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()

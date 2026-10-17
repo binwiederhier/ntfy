@@ -2193,6 +2193,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.32.0 (UNRELEASED)
+
+**Features:**
+
+* Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

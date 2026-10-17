@@ -168,9 +168,9 @@ const (
 	defaultAttachmentMessage = "You received a file: %s" // Used if message body is empty, and there is an attachment
 	encodingBase64           = "base64"                  // Used mainly for binary UnifiedPush messages
 	jsonBodyBytesLimit       = 131072                    // Max number of bytes for a request bodys (unless MessageLimit is higher)
-	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
-	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
-	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+	unifiedPushTopicPrefix   = "up"
+	unifiedPushTopicLength   = 14 // Length of UnifiedPush topics, including the "up" part
+	messagesHistoryMax       = 10 // Number of message count values to keep in memory
 
 	// stopTimeout bounds the entire shutdown. The stores wait for their own background work
 	// (the attachment sync loop queries the database), and none of those waits has a deadline,
@@ -984,6 +984,10 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
+	attachmentsAllowed := !isUnifiedPushTopicID(t.ID) && !unifiedpush
+	if !attachmentsAllowed && m.Attachment != nil {
+		return nil, errHTTPBadRequestAttachmentsDisallowed.With(m)
+	}
 	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
@@ -1019,7 +1023,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if cache {
 		m.Expires = time.Unix(m.Time, 0).Add(v.Limits().MessageExpiryDuration).Unix()
 	}
-	if err := s.handlePublishBody(r, v, m, body, template, unifiedpush, priorityStr); err != nil {
+	if err := s.handlePublishBody(r, v, m, body, template, unifiedpush, attachmentsAllowed, priorityStr); err != nil {
 		return nil, err
 	}
 	if m.Message == "" {
@@ -1408,10 +1412,10 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 //     If file.txt is <= 4096 (message limit) and valid UTF-8, treat it as a message
 //  7. curl -T file.txt ntfy.sh/mytopic
 //     In all other cases, mostly if file.txt is > message limit, treat it as an attachment
-func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *model.Message, body *util.PeekedReadCloser, template templateMode, unifiedpush bool, priorityStr string) error {
+func (s *Server) handlePublishBody(r *http.Request, v *visitor, m *model.Message, body *util.PeekedReadCloser, template templateMode, unifiedpush bool, attachmentsAllowed bool, priorityStr string) error {
 	if m.Event == model.PollRequestEvent { // Case 1
 		return s.handleBodyDiscard(body)
-	} else if unifiedpush {
+	} else if unifiedpush || !attachmentsAllowed {
 		return s.handleBodyAsMessageAutoDetect(m, body) // Case 2
 	} else if m.Attachment != nil && m.Attachment.URL != "" {
 		return s.handleBodyAsTextMessage(m, body) // Case 3
@@ -1810,6 +1814,10 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 // - or the topic is not reserved, and v.user has write access
 //
 // This only applies to UnifiedPush topics ("up...").
+func isUnifiedPushTopicID(topicID string) bool {
+	return strings.HasPrefix(topicID, unifiedPushTopicPrefix) && len(topicID) == unifiedPushTopicLength
+}
+
 func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic) error {
 	// Bail out if not enabled
 	if !s.config.VisitorSubscriberRateLimiting {
@@ -1819,10 +1827,11 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	// Make a list of topics that we'll actually set the RateVisitor on
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
+		if isUnifiedPushTopicID(t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
+
 	if len(eligibleRateTopics) == 0 {
 		return nil
 	}

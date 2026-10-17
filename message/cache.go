@@ -41,7 +41,14 @@ const (
 	insertMessageColumns = 24
 )
 
-var errNoRows = errors.New("no rows found")
+const (
+	recentReplayWindow = time.Minute // A time-based replay from this close to now reads the primary (see messagesSinceTime)
+)
+
+var (
+	errNoRows             = errors.New("no rows found")
+	errSinceIDNeedsMarker = errors.New("since=<id> needs ResolveMarker and MessagesAfterMarker")
+)
 
 // queries holds the database-specific SQL queries
 type queries struct {
@@ -55,6 +62,8 @@ type queries struct {
 	selectMessageRowID               string
 	selectMessagesSinceID            string
 	selectMessagesSinceIDScheduled   string
+	selectRecentRowIDs               string
+	selectMessagesAfterRowID         string
 	selectMessagesLatest             string
 	selectMessagesDue                string
 	claimMessagesDue                 string // Postgres-only: claims due rows and stamps claimed_at; empty for SQLite/mem
@@ -82,6 +91,14 @@ type Cache struct {
 	// claimTimeout is how long this node's claim on a due message holds off the others; it is a
 	// field only so tests can shorten it
 	claimTimeout time.Duration
+}
+
+// Marker is a resolved since=<mid> marker (see ResolveMarker): its row id and publish time, and
+// the database that knew it, which the replay is read from
+type Marker struct {
+	rowID int64
+	time  int64
+	db    *sql.DB // The primary, if the replica did not know the marker yet: it lacks the newest rows too
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
@@ -222,7 +239,8 @@ func (c *Cache) Messages(topic string, since model.SinceMarker, scheduled bool) 
 
 // MessagesCapped returns cached messages for a topic, oldest first, keeping the newest messages
 // that fit in maxBytes worth of Message.Size (0 = no budget). The bool reports whether older messages
-// were dropped, so the caller can tell the client that what it got is incomplete.
+// were dropped, so the caller can tell the client that what it got is incomplete. A since=<id>
+// marker is rejected: it goes through ResolveMarker and MessagesAfterMarker instead.
 func (c *Cache) MessagesCapped(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
 	if since.IsNone() {
 		return make([]*model.Message, 0), false, nil
@@ -230,15 +248,21 @@ func (c *Cache) MessagesCapped(topic string, since model.SinceMarker, scheduled 
 		messages, err := c.messagesLatest(topic)
 		return messages, false, err
 	} else if since.IsID() {
-		return c.messagesSinceID(topic, since, scheduled, maxBytes)
+		return nil, false, errSinceIDNeedsMarker
 	}
 	return c.messagesSinceTime(topic, since, scheduled, maxBytes)
 }
 
+// messagesSinceTime reads a time-based replay. A recent one (the fallback for a since=<id>
+// marker the cache does not know yet) reads the primary: what a lagging replica lacks went out
+// live before the client arrived, so the tail does not resend it either.
 func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
 	var rows *sql.Rows
 	var err error
 	rdb := c.db.ReadOnly()
+	if time.Since(since.Time()) < recentReplayWindow {
+		rdb = c.db.Primary()
+	}
 	if scheduled {
 		rows, err = rdb.Query(c.queries.selectMessagesSinceTimeScheduled, topic, since.Time().Unix())
 	} else {
@@ -250,17 +274,38 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 	return readMessagesCapped(rows, maxBytes)
 }
 
-func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
-	rowID, err := c.resolveMessageRowID(since.ID())
-	if err != nil {
-		return nil, false, err
+// ResolveMarker looks up a since=<mid> marker once, for replaying any number of topics after it
+// (see MessagesAfterMarker); nil if the cache does not know it (not written yet, or expired)
+func (c *Cache) ResolveMarker(mid string) (*Marker, error) {
+	rowID, markerTime, rdb, err := c.resolveMarker(mid)
+	if err != nil || rowID == 0 {
+		return nil, err
 	}
+	return &Marker{rowID: rowID, time: markerTime, db: rdb}, nil
+}
+
+// MessagesAfterMarker is MessagesCapped for a resolved since=<mid> marker. The query matches
+// "id > marker row id OR (time >= marker time AND id <> marker row id)":
+//   - id > marker row id: the rows written after the marker, the usual case
+//   - time >= marker time: rows published in the marker's second or later but written before it.
+//     Nodes write their batches independently, and late when one is cut off from the database,
+//     so the marker itself may have been written late, after messages published later than it.
+//   - id <> marker row id: the marker matches its own time, and the client has it
+//
+// Example: the client's marker M was published at 12:00:05 on a node cut off from the database
+// and written when it came back, as row 900; N was published at 12:00:07 on another node and
+// written right away, as row 850. "id > 900" misses N, "time >= 12:00:05" finds it.
+//
+// The cost is a duplicate for each message published in the marker's second before it; clients
+// drop duplicates by id. Times are whole seconds on purpose: they come from each node's clock,
+// and a second hides clock skew between nodes that milliseconds would turn into losses.
+func (c *Cache) MessagesAfterMarker(topic string, marker *Marker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
 	var rows *sql.Rows
-	rdb := c.db.ReadOnly()
+	var err error
 	if scheduled {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceIDScheduled, topic, rowID)
+		rows, err = marker.db.Query(c.queries.selectMessagesSinceIDScheduled, topic, marker.rowID, marker.time)
 	} else {
-		rows, err = rdb.Query(c.queries.selectMessagesSinceID, topic, rowID)
+		rows, err = marker.db.Query(c.queries.selectMessagesSinceID, topic, marker.rowID, marker.time)
 	}
 	if err != nil {
 		return nil, false, err
@@ -268,33 +313,36 @@ func (c *Cache) messagesSinceID(topic string, since model.SinceMarker, scheduled
 	return readMessagesCapped(rows, maxBytes)
 }
 
-// resolveMessageRowID resolves a since=<mid> marker to the row id used as the replay cut-off.
-// It asks the replica first and, only if the mid is unknown there, the primary: a client that
-// reconnects right after receiving a message can be ahead of replication, and without the retry
-// its unknown mid resolved to 0 and replayed the topic's entire retained history. A mid unknown
-// to the primary as well (e.g. expired) returns 0, which deliberately keeps that full replay.
-func (c *Cache) resolveMessageRowID(mid string) (int64, error) {
+// resolveMarker resolves a since=<mid> marker to its row id and time, the replay cut-offs, and
+// the database handle to read the replay from. It asks the replica first and, only if the mid is
+// unknown there, the primary: a client that reconnects right after receiving a message can be
+// ahead of replication. The replay is then read from the primary as well: what the replica lacks
+// went out live before the client arrived, so the tail does not resend it either. A marker
+// unknown to both (not written yet, or expired) resolves to 0, 0, which replays the topic's
+// entire retained history; the server avoids that for markers it saw go out (sinceForTopic).
+func (c *Cache) resolveMarker(mid string) (int64, int64, *sql.DB, error) {
 	rdb := c.db.ReadOnly()
-	rowID, err := c.resolveMessageRowIDOn(rdb, mid)
+	rowID, markerTime, err := c.resolveMarkerOn(rdb, mid)
 	if err != nil {
-		return 0, err
+		return 0, 0, rdb, err
 	}
 	if rowID == 0 && rdb != c.db.Primary() {
-		return c.resolveMessageRowIDOn(c.db.Primary(), mid)
+		rowID, markerTime, err = c.resolveMarkerOn(c.db.Primary(), mid)
+		return rowID, markerTime, c.db.Primary(), err
 	}
-	return rowID, nil
+	return rowID, markerTime, rdb, nil
 }
 
-// resolveMessageRowIDOn looks the mid up on one database handle; 0 means unknown
-func (c *Cache) resolveMessageRowIDOn(h *sql.DB, mid string) (int64, error) {
-	var rowID int64
-	err := h.QueryRow(c.queries.selectMessageRowID, mid).Scan(&rowID)
+// resolveMarkerOn looks the mid up on one database handle; 0 means unknown
+func (c *Cache) resolveMarkerOn(h *sql.DB, mid string) (int64, int64, error) {
+	var rowID, markerTime int64
+	err := h.QueryRow(c.queries.selectMessageRowID, mid).Scan(&rowID, &markerTime)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, nil
+		return 0, 0, nil
 	} else if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return rowID, nil
+	return rowID, markerTime, nil
 }
 
 func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {
@@ -358,6 +406,39 @@ func (c *Cache) Message(id string) (*model.Message, error) {
 		return nil, model.ErrMessageNotFound
 	}
 	return readMessage(rows)
+}
+
+// Tail returns a tail that starts after the last message written so far. The gaps between the
+// last tailPageSize row ids start out as holes: a row id handed out but not committed yet, below
+// one that already is, must not be skipped.
+//
+// Example: the last row ids are 108, 106, 105 and 103. Walking them oldest first, 103 only sets
+// the cursor (the gap below the oldest is unknown), 105 adds hole 104, 106 adds nothing, and 108
+// adds hole 107. The tail starts at 108 with holes {104, 107}: if 107 was another node's write
+// that commits a moment later, the first read returns it; if 104 was rolled back, it never shows
+// up and the hole expires after tailHoleTimeout.
+func (c *Cache) Tail() (*Tail, error) {
+	rows, err := c.db.Primary().Query(c.queries.selectRecentRowIDs, tailPageSize)
+	if err != nil {
+		return nil, err
+	}
+	rowIDs, err := readRowIDs(rows)
+	if err != nil {
+		return nil, err
+	}
+	t := &Tail{
+		cache: c,
+		holes: make(map[int64]time.Time),
+		done:  make(chan struct{}),
+	}
+	now := time.Now()
+	for _, rowID := range slices.Backward(rowIDs) {
+		if t.cursor > 0 {
+			t.addHoles(t.cursor, rowID, now)
+		}
+		t.cursor = rowID
+	}
+	return t, nil
 }
 
 // UpdateMessageTime updates the time column for a message by ID. This is only used for testing.
@@ -618,11 +699,12 @@ func readMessages(rows *sql.Rows) ([]*model.Message, error) {
 	return messages, nil
 }
 
-func readMessage(rows *sql.Rows) (*model.Message, error) {
+// readMessage reads one message row; extra receives the columns selected after the message columns
+func readMessage(rows *sql.Rows, extra ...any) (*model.Message, error) {
 	var timestamp, expires, attachmentSize, attachmentExpires int64
 	var priority int
 	var id, sequenceID, event, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, contentType, encoding string
-	err := rows.Scan(
+	dest := []any{
 		&id,
 		&sequenceID,
 		&timestamp,
@@ -645,8 +727,8 @@ func readMessage(rows *sql.Rows) (*model.Message, error) {
 		&user,
 		&contentType,
 		&encoding,
-	)
-	if err != nil {
+	}
+	if err := rows.Scan(append(dest, extra...)...); err != nil {
 		return nil, err
 	}
 	var tags []string
@@ -693,6 +775,19 @@ func readMessage(rows *sql.Rows) (*model.Message, error) {
 		ContentType: contentType,
 		Encoding:    encoding,
 	}, nil
+}
+
+func readRowIDs(rows *sql.Rows) ([]int64, error) {
+	defer rows.Close()
+	rowIDs := make([]int64, 0)
+	for rows.Next() {
+		var rowID int64
+		if err := rows.Scan(&rowID); err != nil {
+			return nil, err
+		}
+		rowIDs = append(rowIDs, rowID)
+	}
+	return rowIDs, rows.Err()
 }
 
 func readStrings(rows *sql.Rows) ([]string, error) {

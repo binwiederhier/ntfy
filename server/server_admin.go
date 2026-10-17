@@ -103,11 +103,15 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 			return errHTTPForbidden
 		}
 		if req.Hash != "" {
-			if err := s.userManager.ChangePassword(req.Username, req.Hash, true); err != nil {
+			if err := s.userManager.ChangePassword(req.Username, req.Hash, true); errors.Is(err, user.ErrProvisionedUserChange) {
+				return errHTTPConflictProvisionedUserChange
+			} else if err != nil {
 				return err
 			}
 		} else if req.Password != "" {
-			if err := s.userManager.ChangePassword(req.Username, req.Password, false); err != nil {
+			if err := s.userManager.ChangePassword(req.Username, req.Password, false); errors.Is(err, user.ErrProvisionedUserChange) {
+				return errHTTPConflictProvisionedUserChange
+			} else if err != nil {
 				return err
 			}
 		}
@@ -146,7 +150,9 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	} else if !u.IsUser() {
 		return errHTTPUnauthorized.Wrap("can only remove regular users from API")
 	}
-	if err := s.userManager.RemoveUser(req.Username); err != nil {
+	if err := s.userManager.RemoveUser(req.Username); errors.Is(err, user.ErrProvisionedUserChange) {
+		return errHTTPConflictProvisionedUserChange
+	} else if err != nil {
 		return err
 	}
 	if err := s.killUserSubscriber(u, "*"); err != nil { // FIXME super inefficient

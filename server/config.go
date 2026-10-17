@@ -13,6 +13,7 @@ import (
 	"heckel.io/ntfy/v2/cluster/quota"
 
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/user"
 )
 
@@ -33,6 +34,7 @@ const (
 	DefaultStripePriceCacheDuration             = 3 * time.Hour          // Time to keep Stripe prices cached in memory before a refresh is needed
 	DefaultClusterBatchLinger                   = 500 * time.Millisecond // How long fan-out messages wait to form a per-peer batch (experimental clustering)
 	DefaultTopicStoreUpdateInterval             = 5 * time.Minute        // Per-topic throttle for shared liveness records (cluster mode; keeps the topic table off the hot path)
+	DefaultClusterRole                          = cluster.RoleActive     // Active nodes take client traffic, lead and fence (experimental clustering)
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -140,6 +142,7 @@ type Config struct {
 	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<experimental-cluster-listen>")
 	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
+	ClusterRole                          cluster.Role  // Active (default) or passive: a passive node never leads and never fences
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
@@ -263,6 +266,7 @@ func NewConfig() *Config {
 		ClusterAdvertiseURL:                  "",
 		ClusterSecret:                        "",
 		ClusterBatchLinger:                   DefaultClusterBatchLinger,
+		ClusterRole:                          DefaultClusterRole,
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,

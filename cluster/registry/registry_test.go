@@ -26,7 +26,7 @@ func TestRegistry_NewDoesNotRegister(t *testing.T) {
 	// This keeps read-only uses (ops tooling, future admin endpoints) side-effect free.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Equal(t, 0, countRows(t, pool, "node-1"))
 	require.Nil(t, r1.Register())
@@ -36,10 +36,10 @@ func TestRegistry_NewDoesNotRegister(t *testing.T) {
 func TestRegistry_RegisterAndPeers(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r1.Register())
-	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
+	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r2.Register())
 	// Each node sees the other, never itself
@@ -57,13 +57,13 @@ func TestRegistry_RegisterAndPeers(t *testing.T) {
 func TestRegistry_ReRegisterUpdatesAdvertiseURL(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	// The same node comes back under a new address; the upsert replaces the row
-	old, err := New(pool, "node-2", "http://old:2587", time.Minute)
+	old, err := New(pool, "node-2", "http://old:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, old.Register())
-	renewed, err := New(pool, "node-2", "http://new:2587", time.Minute)
+	renewed, err := New(pool, "node-2", "http://new:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, renewed.Register())
 	peers, err := r1.Refresh()
@@ -77,10 +77,10 @@ func TestRegistry_PeersIsTheLastRefresh(t *testing.T) {
 	// stays invisible until the next one (the heartbeat's job)
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Empty(t, r1.Peers())
-	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
+	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r2.Register())
 	require.Empty(t, r1.Peers())
@@ -92,7 +92,7 @@ func TestRegistry_PeersIsTheLastRefresh(t *testing.T) {
 func TestRegistry_TTLExcludesSilentNodes(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	// A node whose heartbeat is older than the TTL does not count as live
 	insertNodeAt(t, pool, "node-silent", "http://10.0.0.9:2587", time.Now().Add(-2*time.Minute))
@@ -104,7 +104,7 @@ func TestRegistry_TTLExcludesSilentNodes(t *testing.T) {
 func TestRegistry_PruneDeletesLongDeadOnly(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	// One node beyond the 3x TTL grace period, one merely stale
 	insertNodeAt(t, pool, "node-long-dead", "http://10.0.0.8:2587", time.Now().Add(-4*time.Minute))
@@ -117,7 +117,7 @@ func TestRegistry_PruneDeletesLongDeadOnly(t *testing.T) {
 func TestRegistry_Deregister(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r1.Register())
 	require.Equal(t, 1, countRows(t, pool, "node-1"))
@@ -131,9 +131,9 @@ func TestRegistry_PeersSurvivesDatabaseOutage(t *testing.T) {
 	// neither waits on the database nor logs a warning per message.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
-	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
+	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r2.Register())
 	_, err = r1.Refresh()
@@ -163,7 +163,7 @@ func TestRegistry_ConcurrentCreate(t *testing.T) {
 				return
 			}
 			defer pool.DB.Close()
-			_, err = New(db.New(pool, nil), fmt.Sprintf("node-%d", i), "http://127.0.0.1:1", time.Second)
+			_, err = New(db.New(pool, nil), fmt.Sprintf("node-%d", i), "http://127.0.0.1:1", RoleActive, time.Second)
 			errs <- err
 		}(i)
 	}
@@ -177,26 +177,30 @@ func TestRegistry_SchemaVersionWritten(t *testing.T) {
 	// so future table changes can be applied as migrations.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	_, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	_, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, pool.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, schemaStoreKey).Scan(&version))
 	require.Equal(t, schemaVersion, version)
 	// Setup is idempotent: a second node boots against the migrated schema
-	_, err = New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
+	_, err = New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 }
 
-func TestRegistry_SchemaVersionFromTheFuture(t *testing.T) {
-	// A node running older code must refuse to touch a schema migrated by newer code
+func TestRegistry_OlderNodeStartsOnNewerSchema(t *testing.T) {
+	// During a rolling upgrade, a node still running older code shares a schema migrated by a
+	// newer node: it starts (migrations are additive, see package schema) and leaves the version alone
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	_, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	_, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	_, err = pool.Exec(`UPDATE schema_version SET version = 99 WHERE store = $1`, schemaStoreKey)
 	require.Nil(t, err)
-	_, err = New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
-	require.Error(t, err)
+	_, err = New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
+	require.Nil(t, err)
+	var version int
+	require.Nil(t, pool.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, schemaStoreKey).Scan(&version))
+	require.Equal(t, 99, version)
 }
 
 // insertNodeAt registers a fake node with a chosen heartbeat. Register() stamps the database
@@ -218,14 +222,14 @@ func TestRegistry_RefreshReplacesSnapshot(t *testing.T) {
 	// Refresh (called by the mesh heartbeat) sees a newly joined node and replaces the snapshot
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r1, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r1.Register())
 	_, err = r1.Refresh()
 	require.Nil(t, err)
 	require.Len(t, r1.Peers(), 0) // Snapshot taken while alone
 
-	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", time.Minute)
+	r2, err := New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r2.Register())
 	require.Len(t, r1.Peers(), 0) // Still the old snapshot
@@ -285,14 +289,15 @@ func waitForLeader(t *testing.T, r *Registry, others ...*Registry) {
 func TestRegistry_LowestLiveNodeLeads(t *testing.T) {
 	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
-	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
-	c, err := New(pool, "app3", "http://10.0.0.3:2587", leaderTestTTL)
+	c, err := New(pool, "app3", "http://10.0.0.3:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
-	// Nobody leads before the hold-off has elapsed
-	tick(t, a, b, c)
+	// app2 and app3 register first; app1 sees them live and waits out the hold-off (app2, alone
+	// when it first ticked, may lead meanwhile, never at the same time)
+	tick(t, b, c, a)
 	require.False(t, a.IsLeader())
 	waitForLeader(t, a, b, c)
 	require.False(t, b.IsLeader())
@@ -302,9 +307,9 @@ func TestRegistry_LowestLiveNodeLeads(t *testing.T) {
 func TestRegistry_LeaderFailoverHasAGapNotAnOverlap(t *testing.T) {
 	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
-	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
 	waitForLeader(t, a, b)
 	// app1 stops heartbeating (crashed, or cut off from the database). Only app2 ticks now, so
@@ -326,10 +331,10 @@ func TestRegistry_ReturningLowerNodePreemptsWithoutOverlap(t *testing.T) {
 	// own belief can no longer be alive.
 	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
 	waitForLeader(t, b)
-	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
 	tick(t, a)
 	require.False(t, a.IsLeader(), "a returning lower-id node must wait out the hold-off")
@@ -351,7 +356,7 @@ func TestRegistry_PartitionedLeaderStepsDown(t *testing.T) {
 	t.Parallel() // Own schema and own registries, so these run alongside each other
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
 	waitForLeader(t, a)
 	require.Nil(t, pool.Close()) // The database is gone for this node
@@ -374,7 +379,7 @@ func TestRegistry_LivenessIsDecidedByTheDatabaseClock(t *testing.T) {
 	// as an hour-fast node would have written it still counts as live, and one from an hour-slow
 	// node does not.
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	r, err := New(pool, "node-1", "http://10.0.0.1:2587", time.Minute)
+	r, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, r.Register())
 	var skew int64
@@ -396,11 +401,11 @@ func TestRegistry_HeartbeatWithoutObservingIsNotLeadership(t *testing.T) {
 	// keeps leading while a returning lower-id node earns its own hold-off, and both believe.
 	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
 	waitForLeader(t, b)
 
-	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
 	deadline := time.Now().Add(leaderTestWait)
 	for time.Now().Before(deadline) {
@@ -423,9 +428,9 @@ func TestRegistry_FrozenLeaderMustReEarnTheHoldOff(t *testing.T) {
 	// leaders, measured at 436ms in a two-process run before this was fixed.
 	t.Parallel() // Own schema and own registries, so these run alongside each other
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	a, err := New(pool, "app1", "http://10.0.0.1:2587", leaderTestTTL)
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
-	b, err := New(pool, "app2", "http://10.0.0.2:2587", leaderTestTTL)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
 	waitForLeader(t, a, b)
 
@@ -478,7 +483,7 @@ func TestRegistry_ViewIsOnlyFreshAfterARecentRefresh(t *testing.T) {
 	// membership outwards (the member list the LB agents read) needs to know the difference.
 	t.Parallel()
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	r, err := New(pool, "node-a", "http://127.0.0.1:1", leaderTestTTL)
+	r, err := New(pool, "node-a", "http://127.0.0.1:1", RoleActive, leaderTestTTL)
 	require.Nil(t, err)
 	require.False(t, r.Fresh(), "a registry that has never read the database is not fresh")
 
@@ -493,4 +498,169 @@ func TestRegistry_ViewIsOnlyFreshAfterARecentRefresh(t *testing.T) {
 		time.Sleep(leaderTestPoll)
 	}
 	require.False(t, r.Fresh(), "the view never went stale")
+}
+
+func TestRegistry_RoleRoundTrips(t *testing.T) {
+	// Every node writes its role with each heartbeat, so peers read it from the snapshot they
+	// already take, and a node restarted with another role is seen with the new one
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	active, err := New(pool, "node-1", "http://10.0.0.1:2587", RoleActive, time.Minute)
+	require.Nil(t, err)
+	passive, err := New(pool, "node-2", "http://10.0.0.2:2587", RolePassive, time.Minute)
+	require.Nil(t, err)
+	tick(t, active, passive, active) // Again, so the first node's snapshot includes the second
+	require.Len(t, active.Peers(), 1)
+	require.Equal(t, RolePassive, active.Peers()[0].Role)
+	require.Len(t, passive.Peers(), 1)
+	require.Equal(t, RoleActive, passive.Peers()[0].Role)
+
+	// The same node comes back as active; the upsert replaces its role
+	restarted, err := New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
+	require.Nil(t, err)
+	require.Nil(t, restarted.Register())
+	peers, err := active.Refresh()
+	require.Nil(t, err)
+	require.Len(t, peers, 1)
+	require.Equal(t, RoleActive, peers[0].Role)
+}
+
+func TestRegistry_MigratesFromVersion1(t *testing.T) {
+	// Deployments that created the table before roles existed upgrade in place; their rows were
+	// all written by nodes that knew nothing of roles, so they read as active
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	_, err := pool.Exec(`CREATE TABLE node_registry (node_id TEXT PRIMARY KEY, advertise_url TEXT NOT NULL, last_heartbeat BIGINT NOT NULL)`)
+	require.Nil(t, err)
+	_, err = pool.Exec(`CREATE TABLE schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`)
+	require.Nil(t, err)
+	_, err = pool.Exec(`INSERT INTO schema_version (store, version) VALUES ($1, 1)`, schemaStoreKey)
+	require.Nil(t, err)
+	insertNodeAt(t, pool, "node-old", "http://10.0.0.9:2587", time.Now())
+
+	r, err := New(pool, "node-1", "http://10.0.0.1:2587", RolePassive, time.Minute)
+	require.Nil(t, err)
+	require.Nil(t, r.Register())
+	peers, err := r.Refresh()
+	require.Nil(t, err)
+	require.Len(t, peers, 1)
+	require.Equal(t, RoleActive, peers[0].Role)
+	var version int
+	require.Nil(t, pool.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, schemaStoreKey).Scan(&version))
+	require.Equal(t, 2, version)
+}
+
+func TestRegistry_PassiveNodeNeverLeadsAlone(t *testing.T) {
+	// A passive node is not behind the load balancer, so the singleton jobs must not move there,
+	// not even when it is the only live node: no leader is better than a hidden one
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RolePassive, leaderTestTTL)
+	require.Nil(t, err)
+	tickPastHoldoff(t, func() {
+		require.False(t, a.IsLeader(), "a passive node believed it leads")
+	}, a)
+}
+
+func TestRegistry_NoLeaderWhenOnlyPassiveNodesAreLive(t *testing.T) {
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RolePassive, leaderTestTTL)
+	require.Nil(t, err)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RolePassive, leaderTestTTL)
+	require.Nil(t, err)
+	tickPastHoldoff(t, func() {
+		require.False(t, a.IsLeader() || b.IsLeader(), "a passive node believed it leads")
+	}, a, b)
+}
+
+func TestRegistry_PassiveNodeNeverLeadsWithActivePeers(t *testing.T) {
+	// The passive node has the lowest id, which alone would make it the leader
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RolePassive, leaderTestTTL)
+	require.Nil(t, err)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	tickPastHoldoff(t, func() {
+		require.False(t, a.IsLeader(), "a passive node believed it leads")
+	}, a, b)
+	require.True(t, b.IsLeader(), "the only active node never took over")
+}
+
+func TestRegistry_MixedRegistryLowestActiveLeads(t *testing.T) {
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RolePassive, leaderTestTTL)
+	require.Nil(t, err)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RolePassive, leaderTestTTL)
+	require.Nil(t, err)
+	c, err := New(pool, "app3", "http://10.0.0.3:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	d, err := New(pool, "app4", "http://10.0.0.4:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	waitForLeader(t, c, a, b, d)
+	require.False(t, a.IsLeader())
+	require.False(t, b.IsLeader())
+	require.False(t, d.IsLeader())
+}
+
+// tickPastHoldoff drives the registries for longer than any takeover takes (liveness window
+// plus hold-off, plus a TTL of margin), calling check after every tick
+func tickPastHoldoff(t *testing.T, check func(), rs ...*Registry) {
+	t.Helper()
+	deadline := time.Now().Add(2*leaderTestTTL + leaderTestHoldoff)
+	for time.Now().Before(deadline) {
+		tick(t, rs...)
+		check()
+		time.Sleep(leaderTestPoll)
+	}
+}
+
+func TestRegistry_AloneLeadsRightAway(t *testing.T) {
+	// The hold-off keeps a previous leader's belief from overlapping with the next one. A node
+	// that sees no other active node, live or recently live, has nobody to overlap with: it
+	// leads at once, so a restarted single node does not pause its scheduled jobs for a minute
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	tick(t, a)
+	require.True(t, a.IsLeader())
+}
+
+func TestRegistry_OnlyPassivePeersLeadsRightAway(t *testing.T) {
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	b, err := New(pool, "app0", "http://10.0.0.2:2587", RolePassive, leaderTestTTL) // Lower id, but passive
+	require.Nil(t, err)
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	tick(t, b, a)
+	require.True(t, a.IsLeader())
+	require.False(t, b.IsLeader())
+}
+
+func TestRegistry_RecentlyLiveActivePeerMeansHoldOff(t *testing.T) {
+	// Another active node stopped heartbeating a moment ago: it may still believe it leads
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	insertNodeAt(t, pool, "app0", "http://10.0.0.9:2587", time.Now().Add(-2*leaderTestTTL)) // Stale, but recent
+	tick(t, a)
+	require.False(t, a.IsLeader())
+	waitForLeader(t, a)
+}
+
+func TestRegistry_PruneKeepsRecentlyLiveActiveNodes(t *testing.T) {
+	// A crashed leader's row must outlive the window in which a new node still holds off for it,
+	// or Prune would let the next node lead while the old one may still believe it does
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	insertNodeAt(t, pool, "app0", "http://10.0.0.9:2587", time.Now().Add(-a.lease()-a.holdoff()+leaderTestTTL))
+	require.Nil(t, a.Prune())
+	require.Equal(t, 1, countRows(t, pool, "app0"))
+	tick(t, a)
+	require.False(t, a.IsLeader())
 }

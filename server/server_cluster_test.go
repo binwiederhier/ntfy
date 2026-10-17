@@ -33,6 +33,8 @@ type fakeCluster struct {
 	announced  []string
 	notLeader  bool
 	notHealthy bool
+	notReady   bool
+	role       cluster.Role // Empty means active
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -48,6 +50,27 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.announced = append(b.announced, state.AddedTopics...)
+}
+
+func (b *fakeCluster) Ready() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return !b.notReady
+}
+
+func (b *fakeCluster) setReady(ready bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.notReady = !ready
+}
+
+func (b *fakeCluster) Role() cluster.Role {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.role == "" {
+		return cluster.RoleActive
+	}
+	return b.role
 }
 
 func (b *fakeCluster) Healthy() bool {
@@ -160,6 +183,77 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 		defer mu.Unlock()
 		return len(received) == 1
 	})
+}
+
+func TestServer_Cluster_Role(t *testing.T) {
+	// The configured role reaches the cluster, which reports it to the LB agents
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:1" // Enables clustering; not bound since Run() is not called
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	conf.ClusterRole = cluster.RolePassive
+	s := newTestServer(t, conf)
+	members := s.cluster.Members()
+	require.Len(t, members, 1)
+	require.Equal(t, cluster.RolePassive, members[0].Role)
+}
+
+func TestServer_Cluster_ActiveWithPassivePeer(t *testing.T) {
+	// The setup for trying clustering beside production: the production server is the only
+	// active node, a second one runs passive. The active one leads right away, both deliver
+	// each other's messages, and only the active one leads.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string, role cluster.Role) *Server {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		require.Nil(t, err)
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = listener.Addr().String()
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://" + listener.Addr().String()
+		conf.ClusterRole = role
+		s := newTestServer(t, conf)
+		srv := &http.Server{Handler: s.cluster}
+		go srv.Serve(listener)
+		t.Cleanup(func() { srv.Close() })
+		return s
+	}
+	passive := newNode("node-a", cluster.RolePassive) // Lower id, but passive
+	started := time.Now()
+	active := newNode("node-b", cluster.RoleActive)
+	waitFor(t, func() bool { return active.cluster.IsLeader() })
+	require.Less(t, time.Since(started), 5*time.Second) // Not after a one-minute hold-off
+	require.False(t, passive.cluster.IsLeader())
+
+	// Both nodes know each other before publishing, or the fan-out has no peer to go to
+	waitFor(t, func() bool { return len(active.cluster.Members()) == 2 && len(passive.cluster.Members()) == 2 })
+	receive := func(s *Server, topic string) func() []string {
+		topics, err := s.topicsFromIDs(nil, topic)
+		require.Nil(t, err)
+		var mu sync.Mutex
+		received := make([]string, 0)
+		topics[0].Subscribe(func(_ *visitor, m *model.Message) error {
+			mu.Lock()
+			defer mu.Unlock()
+			received = append(received, m.Message)
+			return nil
+		}, "", func() {})
+		return func() []string {
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]string{}, received...)
+		}
+	}
+	onPassive := receive(passive, "toward-passive")
+	onActive := receive(active, "toward-active")
+	require.Equal(t, 200, request(t, active, "PUT", "/toward-passive", "from active", nil).Code)
+	require.Equal(t, 200, request(t, passive, "PUT", "/toward-active", "from passive", nil).Code)
+	waitFor(t, func() bool { return len(onPassive()) == 1 && len(onActive()) == 1 })
+	require.Equal(t, []string{"from active"}, onPassive())
+	require.Equal(t, []string{"from passive"}, onActive())
+	require.Equal(t, 200, request(t, active, "GET", "/v1/health", "", nil).Code)
 }
 
 func TestServer_Cluster_EndToEnd(t *testing.T) {
@@ -361,7 +455,7 @@ func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
 
 func TestServer_Cluster_HealthReflectsCluster(t *testing.T) {
 	// A node whose registry heartbeat went stale no longer receives forwarded messages, so
-	// health checks must pull it from rotation (the fail-open policy lives in the checker)
+	// health reports it (load balancers check /v1/ready, see TestServer_Cluster_Ready)
 	s := newTestServer(t, newTestConfig(t, ""))
 	cl := &fakeCluster{}
 	s.cluster = cl
@@ -786,6 +880,33 @@ func TestServer_Cluster_MessageStatsNotReaddedAfterRestart(t *testing.T) {
 func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
 	// Called by the cluster when this node lost its registration while peers are healthy:
 	// every local subscriber connection must end, so clients reconnect to a healthy node
+	conf := newTestConfig(t, "")
+	conf.CacheDuration = 0 // No cache, so no tail: nothing else gets messages to the subscribers
+	s := newTestServer(t, conf)
+	done := make(chan struct{})
+	go func() {
+		rr := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/mytopic/json", nil)
+		s.handle(rr, req)
+		close(done)
+	}()
+	waitFor(t, func() bool {
+		topics := topicsSnapshot(s)
+		t, ok := topics["mytopic"]
+		return ok && t.SubscribersCount() == 1
+	})
+	s.maybeCloseLocalSubscribers()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("subscriber connection still open")
+	}
+}
+
+func TestServer_Cluster_IsolatedNodeKeepsSubscribersWhileTheTailReads(t *testing.T) {
+	// Peers may have dropped this node, but as long as its tail reads the database its
+	// subscribers still get every message, a little late. Closing them would send them to
+	// nodes that are just as slow (a slow database is what makes heartbeats fail), in a storm.
 	s := newTestServer(t, newTestConfig(t, ""))
 	done := make(chan struct{})
 	go func() {
@@ -799,11 +920,12 @@ func TestServer_Cluster_IsolatedNodeClosesSubscribers(t *testing.T) {
 		t, ok := topics["mytopic"]
 		return ok && t.SubscribersCount() == 1
 	})
-	s.closeLocalSubscribers()
+	waitFor(t, func() bool { return !s.tail.LastRead().IsZero() })
+	s.maybeCloseLocalSubscribers()
 	select {
 	case <-done:
-	case <-time.After(3 * time.Second):
-		t.Fatal("subscriber connection still open")
+		t.Fatal("subscriber connection closed although the tail reads")
+	case <-time.After(2 * time.Second):
 	}
 }
 
@@ -851,7 +973,7 @@ func TestServer_Cluster_RemoteRateVisitorAssignmentRefreshes(t *testing.T) {
 }
 
 func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) {
-	// The mesh's isolation loop calls back into the server (closeLocalSubscribers, which takes
+	// The mesh's isolation loop calls back into the server (maybeCloseLocalSubscribers, which takes
 	// s.mu). Stop must not hold s.mu while it waits for that loop, or a callback already
 	// waiting for the lock deadlocks shutdown before the message cache is drained.
 	s, err := New(newTestConfig(t, ""))
@@ -877,7 +999,7 @@ func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) 
 		IsolatedFunc: func() {
 			once.Do(func() { close(entered) })
 			<-release
-			s.closeLocalSubscribers()
+			s.maybeCloseLocalSubscribers()
 		},
 	}, pool, func(*model.Message) {})
 	require.NoError(t, err)
@@ -977,39 +1099,6 @@ func TestServer_Cluster_ReauthorizesLiveSubscribers(t *testing.T) {
 	}
 }
 
-func TestServer_Cluster_GapClosesSubscribersSoTheyReplay(t *testing.T) {
-	// A peer that could not deliver to this node reports the topics it lost; those subscribers
-	// must be closed, because a client sitting on an open connection has no way to notice the
-	// hole. On reconnect it asks for since=<last id> and the cache fills it in.
-	s := newTestServer(t, newTestConfig(t, ""))
-	topics, err := s.topicsFromIDs(nil, "gapped", "fine")
-	require.Nil(t, err)
-	var gappedOnce, fineOnce sync.Once
-	gappedClosed, fineClosed := make(chan struct{}), make(chan struct{})
-	noop := func(*visitor, *model.Message) error { return nil }
-	topics[0].Subscribe(noop, "", func() { gappedOnce.Do(func() { close(gappedClosed) }) })
-	topics[1].Subscribe(noop, "", func() { fineOnce.Do(func() { close(fineClosed) }) })
-
-	s.closeGappedSubscribers([]string{"gapped"})
-	select {
-	case <-gappedClosed:
-	case <-time.After(time.Second):
-		t.Fatal("subscriber of the gapped topic was not closed")
-	}
-	select {
-	case <-fineClosed:
-		t.Fatal("subscriber of an unaffected topic was closed")
-	default:
-	}
-	// Too many gaps to enumerate: everything is closed
-	s.closeGappedSubscribers([]string{cluster.GapAllTopics})
-	select {
-	case <-fineClosed:
-	case <-time.After(time.Second):
-		t.Fatal("subscriber was not closed on a cluster-wide gap")
-	}
-}
-
 func TestServer_Cluster_SharedStatsResetSurvivesALeaderlessMidnight(t *testing.T) {
 	// The shared reset used to run only if a leader existed at the scheduled instant, so a
 	// failover around midnight (where the leader hold-off is by design) skipped it for the
@@ -1050,102 +1139,50 @@ func TestServer_Cluster_SharedStatsResetSurvivesALeaderlessMidnight(t *testing.T
 	require.Equal(t, int64(2), stats())
 }
 
-func TestServer_Cluster_GapReplaysTheMessageTheClientCannotAskFor(t *testing.T) {
-	// Closing the subscriber is not a repair. A peer drops message A for a topic, the queue
-	// drains, message B on the same topic is delivered, and only then does the gap report
-	// arrive. The client reconnects with since=B, whose row id is higher than A's, and the
-	// catch-up window starts shortly before B, so nothing ever replays A. The report carries
-	// the time of the oldest lost message instead, and this node replays that range itself.
+func TestServer_Cluster_HealthReportsRole(t *testing.T) {
+	// A passive node is healthy: role and health are separate answers
 	s := newTestServer(t, newTestConfig(t, ""))
-	s.catchUpDelay = 100 * time.Millisecond
-	lost := newMessageWithTimestamp("mytopic", "lost in fan-out", time.Now().Add(-10*time.Second).Unix())
-	arrived := newMessageWithTimestamp("mytopic", "arrived fine", time.Now().Unix())
-	require.Nil(t, s.messageCache.AddMessages([]*model.Message{lost, arrived}))
-	topics, err := s.topicsFromIDs(nil, "mytopic")
-	require.Nil(t, err)
-	received := make(chan *model.Message, 10)
-	topics[0].Subscribe(func(_ *visitor, m *model.Message) error {
-		received <- m
-		return nil
-	}, "", func() {})
-
-	s.handleDeliveryGap([]string{"mytopic"}, lost.Time)
-
-	// topic.Publish delivers asynchronously, so the range arrives in no particular order
-	deadline := time.After(5 * time.Second)
-	for {
-		select {
-		case m := <-received:
-			if m.ID == lost.ID { // The hole, replayed without the client asking
-				return
-			}
-		case <-deadline:
-			t.Fatal("the lost message was never replayed")
-		}
-	}
+	s.cluster = &fakeCluster{role: cluster.RolePassive}
+	rr := request(t, s, "GET", "/v1/health", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"healthy":true,"role":"passive"}`, rr.Body.String())
 }
 
-func TestServer_Cluster_UndatedGapStillClosesSubscribers(t *testing.T) {
-	// A peer that does not date its report (one running an older build) gets the old
-	// behaviour: close the subscribers and let their clients replay with since=
+func TestServer_Cluster_Ready(t *testing.T) {
+	// Readiness is what a load balancer checks; the cluster decides it (see Cluster.Ready)
 	s := newTestServer(t, newTestConfig(t, ""))
-	topics, err := s.topicsFromIDs(nil, "mytopic")
-	require.Nil(t, err)
-	var once sync.Once
-	closed := make(chan struct{})
-	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, "", func() {
-		once.Do(func() { close(closed) })
-	})
+	cl := &fakeCluster{}
+	s.cluster = cl
+	rr := request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
 
-	s.handleDeliveryGap([]string{"mytopic"}, 0)
-
-	select {
-	case <-closed:
-	case <-time.After(time.Second):
-		t.Fatal("subscriber of an undated gap was not closed")
-	}
+	cl.setReady(false)
+	cl.mu.Lock()
+	cl.role = cluster.RolePassive
+	cl.mu.Unlock()
+	rr = request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 503, rr.Code)
+	require.JSONEq(t, `{"ready":false,"role":"passive"}`, rr.Body.String())
 }
 
-func TestServer_Cluster_StaleGapClosesSubscribersInsteadOfReplaying(t *testing.T) {
-	// A gap that went unreported for a long time (the peer was unreachable, so the report kept
-	// failing) is exactly the case where the clients' own markers are correct: they received
-	// nothing in the meantime. Replaying that range server-side would re-send minutes of
-	// messages to everyone, so past the cap this falls back to closing them.
+func TestServer_Cluster_HealthIsTheHeartbeat(t *testing.T) {
+	// The only active node with a stale heartbeat (database unreachable) is unhealthy, which
+	// monitoring should see, but stays ready, since there is nowhere better for its clients
 	s := newTestServer(t, newTestConfig(t, ""))
-	topics, err := s.topicsFromIDs(nil, "mytopic")
-	require.Nil(t, err)
-	var once sync.Once
-	closed := make(chan struct{})
-	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, "", func() {
-		once.Do(func() { close(closed) })
-	})
-
-	s.handleDeliveryGap([]string{"mytopic"}, time.Now().Add(-2*gapReplayMaxAge).Unix())
-
-	select {
-	case <-closed:
-	case <-time.After(time.Second):
-		t.Fatal("subscriber of a stale gap was not closed")
-	}
+	cl := &fakeCluster{}
+	s.cluster = cl
+	cl.setHealthy(false)
+	rr := request(t, s, "GET", "/v1/health", "", nil)
+	require.Equal(t, 503, rr.Code)
+	require.JSONEq(t, `{"healthy":false,"role":"active"}`, rr.Body.String())
+	rr = request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
 }
 
-func TestServer_Cluster_DatedGapForAllTopicsClosesSubscribers(t *testing.T) {
-	// "Every topic" is not a range anyone can replay: too many topics to enumerate means too
-	// many to read back, so the subscribers are closed even though the report is dated
+func TestServer_ReadyWithoutClustering(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t, ""))
-	topics, err := s.topicsFromIDs(nil, "mytopic")
-	require.Nil(t, err)
-	var once sync.Once
-	closed := make(chan struct{})
-	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, "", func() {
-		once.Do(func() { close(closed) })
-	})
-
-	s.handleDeliveryGap([]string{cluster.GapAllTopics}, time.Now().Unix())
-
-	select {
-	case <-closed:
-	case <-time.After(time.Second):
-		t.Fatal("subscriber was not closed on a dated cluster-wide gap")
-	}
+	rr := request(t, s, "GET", "/v1/ready", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
 }

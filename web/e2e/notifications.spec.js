@@ -1,4 +1,4 @@
-import { test, expect, openTopicMenu, subscribe } from "./fixtures.js";
+import { test, expect, openTopicMenu, selectPref, subscribe } from "./fixtures.js";
 import { baseURL, unique } from "./env.js";
 
 // A 1x1 PNG, so the attachment is rendered as an image
@@ -6,7 +6,21 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
 let topic;
 
+// Browser notifications the app showed, recorded by the init script in beforeEach
+const shown = (page) => page.evaluate(() => window.shownNotifications.map((n) => n.body));
+
 test.beforeEach(async ({ page }) => {
+  // Record browser notifications instead of showing them; headless Chrome can't show them anyway
+  await page.addInitScript(() => {
+    window.shownNotifications = [];
+    if (!window.ServiceWorkerRegistration) {
+      return; // E.g. about:blank
+    }
+    ServiceWorkerRegistration.prototype.showNotification = async (title, options) => {
+      window.shownNotifications.push({ title, body: options?.body });
+    };
+  });
+
   // Fake timers (time still flows), so a test can jump to the poller's next 5-minute run. The
   // poller's startup sweep (after 2s) is fired right away, so it can't race live deliveries:
   // a message it stores first is never marked unread (see addNotifications).
@@ -156,6 +170,33 @@ test("a poll racing the WebSocket keeps the message unread", async ({ page, requ
   await expect(page).toHaveTitle("(1) ntfy");
 });
 
+test("a message the poll stores before the WebSocket is still unread", async ({ page, request }) => {
+  // The poll stores it as read; the WebSocket delivery that follows replaces it, unread, and notifies
+  // Hold live messages until the poll has stored the message
+  const held = [];
+  let release;
+  await page.routeWebSocket(/\/ws(\?|$)/, (ws) => {
+    const server = ws.connectToServer();
+    server.onMessage((m) => (JSON.parse(m).event === "message" && !release ? held.push(() => ws.send(m)) : ws.send(m)));
+  });
+  await page.reload();
+  await page.clock.runFor(2000);
+  const other = unique("other");
+  await subscribe(page, other);
+
+  await request.post(`/${topic}`, { data: "poll first" });
+  await expect.poll(() => held.length).toBe(1);
+  const polled = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith(`/${topic}/json`));
+  await page.clock.fastForward("05:00");
+  expect(await (await polled).text()).toContain("poll first");
+  await page.waitForTimeout(1000); // Let the poller store what it fetched
+  release = true;
+  held.forEach((send) => send());
+
+  await expect(page).toHaveTitle("(1) ntfy");
+  await expect.poll(() => shown(page)).toEqual(["poll first"]);
+});
+
 test("all notifications view shows every topic", async ({ page, request }) => {
   const other = unique("other");
   await subscribe(page, other);
@@ -171,4 +212,83 @@ test("notifications survive a reload", async ({ page, request }) => {
   await expect(page.getByText("still here")).toBeVisible();
   await page.reload();
   await expect(page.getByText("still here")).toBeVisible();
+});
+
+test("messages published before subscribing are shown", async ({ page, request }) => {
+  const other = unique("earlier");
+  await request.post(`/${other}`, { data: "published earlier" });
+  await subscribe(page, other);
+  await expect(page.getByText("published earlier")).toBeVisible();
+});
+
+test.describe("sequences", () => {
+  test("an update replaces the message", async ({ page, request }) => {
+    await request.post(`/${topic}/download`, { data: "Downloading" });
+    const items = page.getByRole("listitem", { name: "Notification" });
+    await expect(items).toHaveText(/Downloading/);
+    await request.post(`/${topic}/download`, { data: "Download complete" });
+    await expect(items).toHaveText(/Download complete/);
+    await expect(items).toHaveCount(1);
+  });
+
+  test("an update the WebSocket missed replaces the message", async ({ page, request }) => {
+    await request.post(`/${topic}/download`, { data: "Downloading" });
+    const items = page.getByRole("listitem", { name: "Notification" });
+    await expect(items).toHaveText(/Downloading/);
+
+    // Drop live messages, so only the poller's 5-minute catch-up sees the update
+    await page.routeWebSocket(/\/ws(\?|$)/, (ws) => {
+      const server = ws.connectToServer();
+      server.onMessage((m) => JSON.parse(m).event !== "message" && ws.send(m));
+    });
+    await page.reload();
+    await page.clock.runFor(2000);
+    await request.post(`/${topic}/download`, { data: "Download complete" });
+    const polled = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith(`/${topic}/json`));
+    await page.clock.fastForward("05:00");
+    await polled;
+    await expect(items.first()).toHaveText(/Download complete/);
+    await expect(items).toHaveCount(1);
+  });
+
+  test("deleting removes the message", async ({ page, request }) => {
+    await request.post(`/${topic}/download`, { data: "Downloading" });
+    await expect(page.getByText("Downloading")).toBeVisible();
+    await request.delete(`/${topic}/download`);
+    await expect(page.getByRole("listitem", { name: "Notification" })).toHaveCount(0);
+  });
+
+  test("clearing marks the message as read", async ({ page, request }) => {
+    const other = unique("other");
+    await subscribe(page, other);
+    await request.post(`/${topic}/download`, { data: "Downloading" });
+    await expect(page).toHaveTitle("(1) ntfy");
+    await request.put(`/${topic}/download/clear`);
+    await expect(page).toHaveTitle("ntfy");
+  });
+});
+
+test.describe("browser notifications", () => {
+  test("a new message is shown", async ({ page, request }) => {
+    await request.post(`/${topic}`, { data: "pop up" });
+    await expect.poll(() => shown(page)).toEqual(["pop up"]);
+  });
+
+  test("not for a muted topic", async ({ page, request }) => {
+    const other = unique("other");
+    await subscribe(page, other);
+    await openTopicMenu(page, topic);
+    await page.getByRole("menuitem", { name: "Mute notifications" }).click();
+    await request.post(`/${topic}`, { data: "muted" });
+    await request.post(`/${other}`, { data: "not muted" });
+    await expect.poll(() => shown(page)).toEqual(["not muted"]);
+  });
+
+  test("not below the minimum priority", async ({ page, request }) => {
+    await page.getByRole("button", { name: "Settings" }).click();
+    await selectPref(page, "Minimum priority", "High priority and higher");
+    await request.post(`/${topic}`, { headers: { Priority: "3" }, data: "default priority" });
+    await request.post(`/${topic}`, { headers: { Priority: "4" }, data: "high priority" });
+    await expect.poll(() => shown(page)).toEqual(["high priority"]);
+  });
 });

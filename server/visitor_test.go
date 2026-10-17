@@ -113,3 +113,26 @@ func TestVisitor_ReseedBucketsFromUsageOnCreation(t *testing.T) {
 	require.True(t, v.BandwidthAllowed(600))
 	require.False(t, v.BandwidthAllowed(50))
 }
+
+func TestVisitor_SetUser_DoesNotChargeAnonymousUsage(t *testing.T) {
+	// A user who gets a tier takes over their IP-keyed visitor (e.g. the billing callback). What
+	// that visitor counted anonymously must not land on the account.
+	c := newTestConfigWithAuthFile(t, "")
+	c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "test", MessageLimit: 100}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	for i := 0; i < 3; i++ {
+		require.True(t, v.MessageAllowed())
+	}
+
+	v.SetUser(u)
+	time.Sleep(500 * time.Millisecond)
+	u, err = s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, int64(0), u.Stats.Messages)
+}

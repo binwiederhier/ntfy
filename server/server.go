@@ -83,10 +83,10 @@ type Server struct {
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	quota             *quota.Tracker                      // Cluster-wide visitor usage counters; nil when not clustered (limiters stay purely local)
 	topicStore        *topicstore.Store                   // Shared per-topic state (rate visitors, liveness); nil when not clustered
-	catchUpDelay      time.Duration                       // When the catch-up replay runs after a since= subscribe (see server_catchup.go)
 	closeChan         chan bool
-	stopOnce          sync.Once   // Makes Stop idempotent (double close panics otherwise)
-	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
+	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
+	stopOnce          sync.Once     // Makes Stop idempotent (double close panics otherwise)
+	stopped           atomic.Bool   // Set by Stop; read by Run, which must not start listeners afterwards
 	mu                sync.RWMutex
 }
 
@@ -120,6 +120,7 @@ var (
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
+	apiReadyPath                                         = "/v1/ready"
 	apiVersionPath                                       = "/v1/version"
 	apiConfigPath                                        = "/v1/config"
 	apiStatsPath                                         = "/v1/stats"
@@ -343,7 +344,6 @@ func New(conf *Config) (*Server, error) {
 		userManager:     userManager,
 		messages:        messages,
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		catchUpDelay:    conf.CacheBatchTimeout + conf.ClusterBatchLinger + catchUpMargin,
 		messagesHistory: []int64{messages},
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
@@ -356,12 +356,12 @@ func New(conf *Config) (*Server, error) {
 		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
 		NodeID:          cluster.NodeID(conf.ClusterNodeID),
 		AdvertiseURL:    advertiseURL,
+		Role:            conf.ClusterRole,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
 		CancelFunc:      s.applySubscriberCancel,
 		TopicsAddedFunc: s.clearRateVisitorMisses,
-		GapFunc:         s.handleDeliveryGap,
-		IsolatedFunc:    s.closeLocalSubscribers,
+		IsolatedFunc:    s.maybeCloseLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
@@ -389,6 +389,14 @@ func New(conf *Config) (*Server, error) {
 	// topicsFromIDs for topics created later), which lets them drop a cached rate-visitor miss
 	for _, t := range s.topics {
 		t.onFirstSubscriber = s.topicAnnouncer(t.ID)
+	}
+	if conf.CacheDuration > 0 {
+		tail, err := messageCache.Tail()
+		if err != nil {
+			return nil, err
+		}
+		s.tail = tail
+		go s.runTail()
 	}
 	return s, nil
 }
@@ -593,6 +601,9 @@ func (s *Server) stop() {
 	if s.httpClusterServer != nil {
 		s.httpClusterServer.Close()
 	}
+	if s.tail != nil {
+		s.tail.Close() // Before the databases close under it
+	}
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -697,6 +708,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
 		return s.handleHealth(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiReadyPath {
+		return s.handleReady(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiVersionPath {
 		return s.ensureAdmin(s.handleVersion)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiConfigPath {
@@ -847,13 +860,23 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node;
-	// 503 lets status-code LB checks pull it (checkers must fail open, see cluster.Cluster)
+	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node. For
+	// monitoring; load balancers check /v1/ready, which keeps the only active node in
 	healthy := s.cluster.Healthy()
 	if !healthy {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy})
+	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy, Role: s.cluster.Role()})
+}
+
+// handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
+// Ready). A passive node is healthy (see handleHealth) but never ready.
+func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	ready := s.cluster.Ready()
+	if !ready {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	return s.writeJSON(w, &apiReadyResponse{Ready: ready, Role: s.cluster.Role()})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -1739,10 +1762,9 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		meterPollBandwidth = true
 		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
+	w.Header().Set("Incremental", "?1") // Ask proxies to forward the stream without buffering (RFC 10036)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	deduper := newReplayDeduper(since.ID())
-	sub = deduper.wrap(sub) // Before subscribing, so live messages are remembered too
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
@@ -1759,25 +1781,12 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
-	var catchUp <-chan time.Time
-	if needsCatchUp(since) {
-		catchUp = time.After(s.catchUpDelay)
-	} else {
-		deduper.stop()
-	}
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-r.Context().Done():
 			return nil
-		case <-catchUp:
-			catchUp = nil
-			err := s.sendOldMessages(w, topics, s.catchUpSince(since), scheduled, v, sub)
-			deduper.stop()
-			if err != nil {
-				return err
-			}
 		case <-time.After(s.config.KeepaliveInterval):
 			ev := logvr(v, r).Tag(tagSubscribe)
 			if len(topics) == 1 {
@@ -1908,8 +1917,6 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
-	deduper := newReplayDeduper(since.ID())
-	sub = deduper.wrap(sub) // Before subscribing, so live messages are remembered too
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
@@ -1925,19 +1932,6 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
-	}
-	if needsCatchUp(since) {
-		g.Go(func() error {
-			defer deduper.stop()
-			select {
-			case <-gctx.Done():
-				return nil
-			case <-time.After(s.catchUpDelay):
-				return s.sendOldMessages(w, topics, s.catchUpSince(since), scheduled, v, sub)
-			}
-		})
-	} else {
-		deduper.stop()
 	}
 	err = g.Wait()
 	if err != nil && websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNoStatusReceived) {
@@ -2049,10 +2043,24 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	if since.IsNone() {
 		return nil
 	}
+	var marker *message.Marker
+	if since.IsID() {
+		var err error
+		if marker, err = s.messageCache.ResolveMarker(since.ID()); err != nil {
+			return err
+		}
+	}
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
-		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
+		var topicMessages []*model.Message
+		var topicTruncated bool
+		var err error
+		if marker != nil {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesAfterMarker(t.ID, marker, scheduled, s.config.MessagePollSizeLimit)
+		} else {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesCapped(t.ID, sinceForTopic(t, since), scheduled, s.config.MessagePollSizeLimit)
+		}
 		if err != nil {
 			return err
 		}

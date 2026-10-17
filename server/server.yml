@@ -61,23 +61,31 @@
 #
 # database-url: <connection-string>
 
-# If "experimental-cluster-listen" is set, clustering is implicitly enabled: this node registers itself in
-# the PostgreSQL node registry and fans published messages out to the other cluster nodes over
-# HTTP, so subscribers connected to any node receive messages published to any other node.
-# Requires "database-url" and "experimental-cluster-secret".
+# EXPERIMENTAL: Clustering options. Setting "experimental-cluster-listen" runs this server as one
+# node of a cluster that shares a PostgreSQL database. This is not ready for production. The
+# "experimental-" prefix means these option names may still change.
 #
 # - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes talk to.
 #   Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners never
 #   serve the fan-out endpoint.
 # - experimental-cluster-node-id is a stable per-node identifier (e.g. the hostname); required.
-# - experimental-cluster-advertise-url is the base URL peer nodes use to reach this node's fan-out listener;
-#   it defaults to "http://<experimental-cluster-listen>". It must be set explicitly if experimental-cluster-listen binds
-#   a wildcard address (e.g. ":2587").
-# - experimental-cluster-secret authenticates node-to-node fan-out requests; it must be identical on all
-#   nodes.
-# - experimental-cluster-batch-linger is how long fan-out messages may wait to form a batch per peer node,
-#   trading up to that much cross-node delivery latency for a bounded request rate between
-#   nodes. Set to 0 to send each message immediately.
+# - experimental-cluster-advertise-url is the base URL peer nodes use to reach this node's
+#   fan-out listener; it defaults to "http://<experimental-cluster-listen>". It must be set
+#   explicitly if the listen address binds a wildcard address (e.g. ":2587").
+# - experimental-cluster-secret authenticates node-to-node fan-out requests; it must be
+#   identical on all nodes.
+# - experimental-cluster-batch-linger is how long fan-out messages may wait to form a batch per
+#   peer node, trading up to that much cross-node delivery latency for a bounded request rate
+#   between nodes. Set to 0 to send each message immediately.
+# - experimental-cluster-role is "active" (default) or "passive". A passive node is meant to run
+#   outside the load balancer (e.g. to observe a new node under real load): it receives fan-out
+#   and serves clients that connect to it directly, but it never leads the cluster's singleton
+#   jobs, and it never closes its subscribers to send them elsewhere. Active nodes do not count
+#   it as a place to send theirs either. The member list reports each node's role, so load
+#   balancer agents can route to active nodes only.
+#
+# Clustering also requires "database-url": the shared PostgreSQL database carries the durable
+# state and the cluster's own coordination tables.
 #
 # SECURITY: The fan-out endpoint injects messages into arbitrary topics. The shared secret
 # protects it, and it is only served on the dedicated cluster listener -- but you should still
@@ -88,6 +96,7 @@
 # experimental-cluster-advertise-url: "http://<experimental-cluster-listen>"
 # experimental-cluster-secret: <secret>
 # experimental-cluster-batch-linger: 500ms
+# experimental-cluster-role: active
 
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.

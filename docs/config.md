@@ -525,7 +525,8 @@ The following config options are relevant to attachments:
 * `attachment-cache-dir` is the cache directory for attached files, or an S3 URL for object storage
 * `attachment-total-size-limit` is the size limit of the attachment storage (default: 5G)
 * `attachment-file-size-limit` is the per-file attachment size limit (e.g. 300k, 2M, 100M, default: 15M)
-* `attachment-expiry-duration` is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h, default: 3h)
+* `attachment-expiry-duration` is the duration after which uploaded attachments will be deleted (e.g. 3h, 20h, default: 3h). Attachments never outlive
+  their message, so this is capped at `cache-duration`; set `cache-duration` at least as high if you want longer-lived attachments.
 
 !!! warning
     ntfy takes full control over the attachment directory or S3 bucket. Files that match the message ID format without
@@ -1037,7 +1038,7 @@ you can set the `X-Email` header to [send messages via e-mail](publish.md#e-mail
     On ntfy.sh, anonymous email sending was disabled due to abuse. To use the email notification feature, 
     you must verify your email in the web app's [Account section](https://ntfy.sh/account). 
 
-As of today, only SMTP servers with PLAIN auth and STARTLS are supported. To enable e-mail sending, you must set the 
+As of today, only SMTP servers with PLAIN or LOGIN auth and STARTTLS are supported. To enable e-mail sending, you must set the
 following settings:
 
 * `base-url` is the root URL for the ntfy server; this is needed for e-mail footer
@@ -2246,12 +2247,14 @@ A few important notes:
   shared secret, so bind it to a private network interface and firewall it to the peer nodes.
 * `experimental-cluster-node-id` must be **stable across restarts** (use the hostname). A node restarting under the same ID
   reuses its registry entry.
-* **Health checks:** `/v1/health` returns non-200 when a node has lost contact with the database, so your load
-  balancer can take it out of rotation. Your health checker should fail open (never remove all nodes at once):
-  during a full database outage, all nodes report unhealthy while message delivery keeps working.
-* Cross-node delivery is fire-and-forget. If a node briefly cannot reach a peer, live subscribers on that peer
-  catch up automatically via [`since=`](subscribe/api.md#fetch-cached-messages) when they reconnect, as they
-  would after any connection loss.
+* **Health checks:** point your load balancer at `/v1/ready`, not `/v1/health` (see [Health checks](#health-checks)).
+  An unhealthy active node stops being ready while another active node can take its clients; your health checker
+  should still fail open (never remove all nodes at once): during a full database outage, all nodes report unhealthy
+  while message delivery keeps working.
+* Cross-node delivery is fire-and-forget. A message a node does not receive from its peer still reaches its
+  subscribers: every node also reads new messages from the database and delivers those its subscribers have not
+  had, a little later than live delivery. Messages published with `cache: no` are not in the database, so for
+  those cross-node delivery is best effort.
 * Some limiters deliberately remain per-node: active subscription counts (connections are per-node by nature),
   and the topic-creation, signup and login-failure limiters (they protect node-local resources).
 
@@ -2276,7 +2279,20 @@ A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint
 If a non-200 HTTP status code is returned or if the returned `healthy` field is `false` the ntfy service should be considered as unhealthy.
 
 ```json
-{"healthy":true}
+{"healthy":true,"role":"active"}
+```
+
+Without clustering, the server is healthy whenever it answers; the endpoint does not check the database. With clustering
+(experimental, see the `experimental-cluster-*` options), it is unhealthy while its cluster heartbeat, a database write every
+few seconds, has failed for 30 seconds.
+
+For load balancers, use `/v1/ready` instead: it returns 200 only if the server should receive clients. Without
+clustering that is always the case. With clustering, a passive node is never ready, and an unhealthy active node is not ready
+while another active node can take its clients. The only active node stays ready even when it is unhealthy, since there is
+nowhere better for its clients.
+
+```json
+{"ready":true,"role":"active"}
 ```
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
@@ -2406,11 +2422,12 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
 | `database-url`                             | `NTFY_DATABASE_URL`                             | *string (connection URL)*                           | -                 | PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/ntfy`). If set, uses PostgreSQL for all database-backed stores (message cache, user manager, web push) instead of SQLite. See [database options](#database-options). |
-| `experimental-cluster-node-id`                          | `NTFY_EXPERIMENTAL_CLUSTER_NODE_ID`                          | *string*                                            | -                 | Stable per-node identifier (e.g. the hostname); required for [clustering](#clustering-experimental)                                                                                                                                     |
-| `experimental-cluster-listen`                           | `NTFY_EXPERIMENTAL_CLUSTER_LISTEN`                           | `[host]:port`                                       | -                 | Private listen address for node-to-node traffic; setting it enables [clustering](#clustering-experimental)                                                                                                                              |
-| `experimental-cluster-advertise-url`                    | `NTFY_EXPERIMENTAL_CLUSTER_ADVERTISE_URL`                    | *URL*                                               | `http://<experimental-cluster-listen>` | URL under which the other cluster nodes reach this node's cluster listener                                                                                                                                                      |
-| `experimental-cluster-secret`                           | `NTFY_EXPERIMENTAL_CLUSTER_SECRET`                           | *string*                                            | -                 | Shared secret authenticating node-to-node traffic; required for [clustering](#clustering-experimental), must match on all nodes                                                                                                          |
-| `experimental-cluster-batch-linger`                     | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`                     | *duration*                                          | `500ms`           | How long messages wait to form a node-to-node delivery batch; `0` sends immediately                                                                                                                                                     |
+| `experimental-cluster-node-id`             | `NTFY_EXPERIMENTAL_CLUSTER_NODE_ID`             | *string*                                            | -                 | Experimental, not ready for production. Stable per-node identifier (e.g. the hostname).                                                                                                                                                 |
+| `experimental-cluster-listen`              | `NTFY_EXPERIMENTAL_CLUSTER_LISTEN`              | `[host]:port`                                       | -                 | Experimental, not ready for production. Private listen address for node-to-node traffic; setting it enables clustering (requires `database-url`).                                                                                        |
+| `experimental-cluster-advertise-url`       | `NTFY_EXPERIMENTAL_CLUSTER_ADVERTISE_URL`       | *URL*                                               | `http://<experimental-cluster-listen>` | Experimental, not ready for production. URL under which other nodes reach this node's cluster listener.                                                                                             |
+| `experimental-cluster-secret`              | `NTFY_EXPERIMENTAL_CLUSTER_SECRET`              | *string*                                            | -                 | Experimental, not ready for production. Shared secret authenticating node-to-node traffic; must match on all nodes.                                                                                                                      |
+| `experimental-cluster-batch-linger`        | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
+| `experimental-cluster-role`                | `NTFY_EXPERIMENTAL_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |
@@ -2426,7 +2443,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `attachment-cache-dir`                     | `NTFY_ATTACHMENT_CACHE_DIR`                     | *directory or S3 URL*                               | -                 | Cache directory for attached files, or S3 URL for object storage (format: `s3://KEY:SECRET@BUCKET[/PREFIX]?region=REGION[&endpoint=ENDPOINT][&disable_http2=true]`).                                                                    |
 | `attachment-total-size-limit`              | `NTFY_ATTACHMENT_TOTAL_SIZE_LIMIT`              | *size*                                              | 5G                | Limit of the on-disk attachment cache directory. If the limits is exceeded, new attachments will be rejected.                                                                                                                           |
 | `attachment-file-size-limit`               | `NTFY_ATTACHMENT_FILE_SIZE_LIMIT`               | *size*                                              | 15M               | Per-file attachment size limit (e.g. 300k, 2M, 100M). Larger attachment will be rejected.                                                                                                                                               |
-| `attachment-expiry-duration`               | `NTFY_ATTACHMENT_EXPIRY_DURATION`               | *duration*                                          | 3h                | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Strongly affects `visitor-attachment-total-size-limit`.                                                                                                       |
+| `attachment-expiry-duration`               | `NTFY_ATTACHMENT_EXPIRY_DURATION`               | *duration*                                          | 3h                | Duration after which uploaded attachments will be deleted (e.g. 3h, 20h). Capped at `cache-duration`. Strongly affects `visitor-attachment-total-size-limit`.                                                                                                       |
 | `smtp-sender-addr`                         | `NTFY_SMTP_SENDER_ADDR`                         | `host:port`                                         | -                 | SMTP server address to allow email sending                                                                                                                                                                                              |
 | `smtp-sender-user`                         | `NTFY_SMTP_SENDER_USER`                         | *string*                                            | -                 | SMTP user; only used if e-mail sending is enabled                                                                                                                                                                                       |
 | `smtp-sender-pass`                         | `NTFY_SMTP_SENDER_PASS`                         | *string*                                            | -                 | SMTP password; only used if e-mail sending is enabled                                                                                                                                                                                   |

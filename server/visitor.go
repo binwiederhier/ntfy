@@ -147,7 +147,7 @@ func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Man
 		accountLimiter:       nil, // Set in resetLimiters, may be nil
 		authLimiter:          nil, // Set in resetLimiters, may be nil
 	}
-	v.resetLimitersNoLock(messages, emails, calls, false)
+	v.resetLimitersNoLock(messages, emails, calls)
 	return v
 }
 
@@ -438,6 +438,10 @@ func (v *visitor) Stats() *user.Stats {
 	}
 }
 
+// ResetStats zeroes the visitor's in-memory stats at the daily rollover, and with them the
+// persisted seeds its deltas are measured against, because the caller zeroes the user's
+// database row in the same pass (in a cluster that row is reset once, by the leader). Only the
+// stats resetter calls this.
 func (v *visitor) ResetStats() {
 	v.mu.Lock() // Also protects statsPersisted
 	defer v.mu.Unlock()
@@ -456,7 +460,8 @@ func (v *visitor) EnqueueUserStatsDelta() {
 }
 
 func (v *visitor) enqueueUserStatsDeltaNoLock() {
-	if v.userManager == nil || v.user == nil {
+	u := v.user // Pinned for the whole function: SetUser(nil) must not turn this into a nil deref
+	if v.userManager == nil || u == nil {
 		return
 	}
 	current := user.Stats{
@@ -473,7 +478,7 @@ func (v *visitor) enqueueUserStatsDeltaNoLock() {
 		return
 	}
 	v.statsPersisted = current
-	v.userManager.EnqueueUserStats(v.user.ID, &delta)
+	v.userManager.EnqueueUserStats(u.ID, &delta)
 }
 
 // QuotaKey returns the visitor's usage-tracking identity key ("ip:<addr>" or "user:<id>")
@@ -509,14 +514,21 @@ func (v *visitor) SetUser(u *user.User) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
-	v.user = u                                           // u may be nil!
+	if shouldResetLimiters && v.user != nil && v.user.Tier != nil {
+		// Flush increments counted against the old limiters, under the old account, before they
+		// are replaced below; the rebuilt limiters are re-seeded from the new user's persisted
+		// stats. Usage of an IP-keyed visitor (no user, or no tier) is never persisted, so it must
+		// not land on the new account.
+		v.enqueueUserStatsDeltaNoLock()
+	}
+	v.user = u // u may be nil!
 	v.quotaKey = quota.Key(visitorID(v.ip, u, v.config))
 	if shouldResetLimiters {
 		var messages, emails, calls int64
 		if u != nil {
 			messages, emails, calls = u.Stats.Messages, u.Stats.Emails, u.Stats.Calls
 		}
-		v.resetLimitersNoLock(messages, emails, calls, true)
+		v.resetLimitersNoLock(messages, emails, calls)
 	}
 }
 
@@ -531,12 +543,7 @@ func (v *visitor) MaybeUserID() string {
 	return ""
 }
 
-func (v *visitor) resetLimitersNoLock(messages, emails, calls int64, enqueueUpdate bool) {
-	if enqueueUpdate {
-		// Flush increments counted against the old limiters before they are replaced below;
-		// the rebuilt limiters are re-seeded from the user's persisted stats
-		v.enqueueUserStatsDeltaNoLock()
-	}
+func (v *visitor) resetLimitersNoLock(messages, emails, calls int64) {
 	limits := v.limitsNoLock()
 	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
 	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)

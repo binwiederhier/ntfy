@@ -56,6 +56,7 @@ func (s *Server) execManager() {
 					if ev.IsTrace() {
 						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, util.FormatTime(lastAccess))
 					}
+					t.ExpireDelivered()
 					subscribers += subs
 				}
 			}

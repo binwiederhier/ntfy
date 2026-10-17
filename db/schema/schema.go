@@ -2,6 +2,12 @@
 // store's schema inside a single transaction. On PostgreSQL, all stores share one database, so
 // versions live in a shared schema_version table keyed by store name. On SQLite, every store is
 // its own database file, so the version lives in the schemaVersion table keyed by id = 1.
+//
+// An older version of ntfy runs on a newer schema (after a rollback, or as an old node during a
+// rolling cluster upgrade), so migrations must be additive: new tables, indexes, and columns that
+// are nullable or have a default. Never drop or rename a column, add a NOT NULL column without a
+// default, or change what existing data means. A change that cannot be additive takes two
+// releases: the first adds the new shape and keeps the old one working, a later one removes the old.
 package schema
 
 import (
@@ -66,7 +72,9 @@ func Migrate(db *sql.DB, dialect Dialect, store string, targetVersion int, creat
 		return tx.Commit()
 	}
 	if version > targetVersion {
-		return fmt.Errorf("unexpected %s schema version %d, this version of ntfy supports up to %d", store, version, targetVersion)
+		// Migrations are additive (see package doc), so this version still works on the newer schema
+		log.Tag(tag).Warn("The %s database schema version %d is newer than this version of ntfy supports (%d); continuing, since schema changes are backwards compatible", store, version, targetVersion)
+		return tx.Commit()
 	}
 	for v := version; v < targetVersion; v++ {
 		migrate, ok := migrations[v]

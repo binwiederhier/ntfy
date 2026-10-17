@@ -2,13 +2,13 @@ package cluster
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,6 +19,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -41,6 +42,7 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 		Enabled:           true,
 		NodeID:            NodeID(nodeID),
 		AdvertiseURL:      advertiseURL,
+		Role:              RoleActive,
 		Secret:            testSecret,
 		HeartbeatInterval: 100 * time.Millisecond,
 		// The liveness window AND the leadership hold-off. One second is the floor: heartbeats
@@ -57,7 +59,12 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 // heartbeat caches the peer list. The fake never refreshes its heartbeat.
 func registerFakePeer(t testing.TB, pool *db.DB, nodeID NodeID, url string) {
 	t.Helper()
-	reg, err := registry.New(pool, string(nodeID), url, time.Minute)
+	registerFakePeerWithRole(t, pool, nodeID, url, RoleActive)
+}
+
+func registerFakePeerWithRole(t testing.TB, pool *db.DB, nodeID NodeID, url string, role Role) {
+	t.Helper()
+	reg, err := registry.New(pool, string(nodeID), url, role, time.Minute)
 	require.Nil(t, err)
 	require.Nil(t, reg.Register())
 }
@@ -469,7 +476,24 @@ func TestMesh_NoIsolatedFuncWhenAPeerAnswers200WithoutBeingNtfy(t *testing.T) {
 	isolatedTest(t, http.StatusOK, "<html>hello from some proxy</html>", false)
 }
 
+func TestMesh_ActiveNodeDoesNotFenceForPassivePeer(t *testing.T) {
+	// A passive peer is not behind the load balancer, so it is not somewhere better for these
+	// clients: closing them would only send them back through the LB, a reconnect storm for
+	// nothing. Only a healthy active peer justifies fencing.
+	isolatedTestWithRoles(t, RoleActive, RolePassive, http.StatusOK, `{"healthy":true}`, false)
+}
+
+func TestMesh_PassiveNodeNeverFences(t *testing.T) {
+	// Nothing routes a passive node's clients anywhere else (they connected to it directly), so
+	// it keeps them even when it lost its registration and an active peer is healthy
+	isolatedTestWithRoles(t, RolePassive, RoleActive, http.StatusOK, `{"healthy":true}`, false)
+}
+
 func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wantIsolated bool) {
+	isolatedTestWithRoles(t, RoleActive, RoleActive, peerHealthStatus, peerHealthBody, wantIsolated)
+}
+
+func isolatedTestWithRoles(t *testing.T, role, peerRole Role, peerHealthStatus int, peerHealthBody string, wantIsolated bool) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == HealthPath {
@@ -484,11 +508,12 @@ func isolatedTest(t *testing.T, peerHealthStatus int, peerHealthBody string, wan
 	pool := db.New(host, nil)
 	var isolated atomic.Int32
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.Role = role
 	conf.NodeTTL = time.Second // The floor: a shorter TTL truncates the SQL liveness cutoff to zero
 	conf.IsolatedFunc = func() { isolated.Add(1) }
 	// Registered last: the fake peer never heartbeats again, so its row must still be fresh
 	// when the mesh takes its first peer snapshot
-	registerFakePeer(t, openTestPool(t, schemaDSN), "node-peer", peer.URL)
+	registerFakePeerWithRole(t, openTestPool(t, schemaDSN), "node-peer", peer.URL, peerRole)
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
@@ -625,171 +650,82 @@ func TestMesh_MembersOfAnIsolatedNodeAreNotReportedHealthy(t *testing.T) {
 	}
 }
 
-// postState delivers a state envelope to a mesh's peer API, as a peer would.
-func postState(c *meshCluster, origin NodeID, state *apiState) *httptest.ResponseRecorder {
-	body, err := json.Marshal(state)
-	if err != nil {
-		panic(err)
-	}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest("POST", StatePath, bytes.NewReader(body))
-	req.Header.Set(secretHeader, testSecret)
-	req.Header.Set(originHeader, string(origin))
-	c.ServeHTTP(rr, req)
-	return rr
-}
-
-func TestMesh_UndeliveredBatchIsReportedAsAGap(t *testing.T) {
-	// A batch the peer rejects is lost: its subscribers there would sit on an open connection
-	// missing a message. The peer must be told which topics, so it can make those clients
-	// replay. The report is retried until it lands, since an unreachable peer is the usual
-	// reason for a gap in the first place.
+func TestMesh_ReadyWithoutAnActivePeer(t *testing.T) {
+	// The only active node (a production server with passive peers beside it) stays ready when
+	// its heartbeat fails: there is nowhere better for its clients, so a load balancer must not
+	// pull it
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	var mu sync.Mutex
-	var gaps []string
-	rejectState := true
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == MessagePath {
-			w.WriteHeader(http.StatusInternalServerError) // Every batch is rejected
-			return
-		}
-		mu.Lock()
-		defer mu.Unlock()
-		if rejectState { // The first gap report fails too
-			rejectState = false
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		body, err := io.ReadAll(r.Body)
-		require.Nil(t, err)
-		var state apiState
-		require.Nil(t, json.Unmarshal(body, &state))
-		gaps = append(gaps, state.Gaps...)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-	registerFakePeer(t, pool, "node-b", srv.URL)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	registerFakePeerWithRole(t, pool, "node-passive", "http://192.168.1.51:2587", RolePassive)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	require.Nil(t, mesh.ForwardMessage(model.NewDefaultMessage("gapped-topic", "lost")))
 	waitFor(t, func() bool {
-		mu.Lock()
-		defer mu.Unlock()
-		return len(gaps) > 0
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.knownPeers) == 1
 	})
-	mu.Lock()
-	defer mu.Unlock()
-	require.Equal(t, []string{"gapped-topic"}, gaps) // Reported once, after one failed attempt
+	require.Nil(t, pool.Close()) // Heartbeats fail from here on
+	waitFor(t, func() bool { return !mesh.Healthy() })
+	require.True(t, mesh.Ready())
 }
 
-func TestMesh_ReportedGapInvokesGapFunc(t *testing.T) {
-	// The receiving side hands the gapped topics to the server, which closes their subscribers
+func TestMesh_NotReadyWhenAnActivePeerCanTakeOver(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	var mu sync.Mutex
-	var received []string
-	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.GapFunc = func(topics []string, _ int64) {
-		mu.Lock()
-		defer mu.Unlock()
-		received = append(received, topics...)
-	}
+	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, func() bool {
+		mesh.mu.Lock()
+		defer mesh.mu.Unlock()
+		return len(mesh.knownPeers) == 1
+	})
+	require.True(t, mesh.Ready())
+	require.Nil(t, pool.Close())
+	waitFor(t, func() bool { return !mesh.Healthy() })
+	require.False(t, mesh.Ready())
+}
+
+func TestMesh_PassiveNodeWithoutAnActivePeerWarns(t *testing.T) {
+	// A passive node is never ready (load balancers send it nobody) and never leads, so on its own
+	// it is almost certainly a misconfiguration
+	var out bytes.Buffer
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	rr := postState(mesh, "node-b", &apiState{Gaps: []string{"topic-1", "topic-2"}})
-	require.Equal(t, 200, rr.Code)
-	mu.Lock()
-	defer mu.Unlock()
-	require.Equal(t, []string{"topic-1", "topic-2"}, received)
+	require.Contains(t, out.String(), "no active node is live")
 }
 
-func TestMesh_ManyGappedTopicsCollapseToAll(t *testing.T) {
-	// A peer that was unreachable for a while can have gaps in more topics than are worth
-	// enumerating; past the cap the report degenerates to "every topic"
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	pool := openTestPool(t, schemaDSN)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+func TestMesh_PassiveNodeWithAnActivePeerDoesNotWarn(t *testing.T) {
+	var out bytes.Buffer
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
+	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	for i := 0; i <= gapMaxTopics; i++ {
-		mesh.recordGap("node-b", []string{fmt.Sprintf("topic-%d", i)}, time.Now().Unix())
-	}
-	mesh.mu.Lock()
-	defer mesh.mu.Unlock()
-	require.Equal(t, []string{GapAllTopics}, mesh.gaps["node-b"].topics)
+	require.NotContains(t, out.String(), "no active node is live")
 }
 
-func TestMesh_GapReportCarriesTheOldestLostMessageTime(t *testing.T) {
-	// Closing the peer's subscribers only helps if their clients can work out what they missed,
-	// and they cannot: a client that received a newer message on the same topic reconnects with
-	// that newer marker and never asks for the older hole. The report therefore dates the gap
-	// with the oldest message in it, so the peer can replay exactly that range.
+func TestMesh_PassiveNodeIsNeverReady(t *testing.T) {
+	// A passive node is healthy, but takes no clients from a load balancer, alone or not
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
-	var mu sync.Mutex
-	var reported apiState
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == MessagePath {
-			w.WriteHeader(http.StatusInternalServerError) // Every batch is rejected
-			return
-		}
-		body, err := io.ReadAll(r.Body)
-		require.Nil(t, err)
-		var state apiState
-		require.Nil(t, json.Unmarshal(body, &state))
-		if len(state.Gaps) > 0 {
-			mu.Lock()
-			reported = state
-			mu.Unlock()
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-	registerFakePeer(t, pool, "node-b", srv.URL)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	conf := newTestMeshConfig("node-a", "http://192.168.1.10:2587")
+	conf.Role = RolePassive
+	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-
-	oldest := model.NewDefaultMessage("gapped-topic", "lost first")
-	oldest.Time = time.Now().Add(-30 * time.Second).Unix()
-	newest := model.NewDefaultMessage("gapped-topic", "lost second")
-	require.Nil(t, mesh.ForwardMessage(newest))
-	require.Nil(t, mesh.ForwardMessage(oldest))
-	// The two may be reported in one batch or in two, so wait for the oldest to show up: a
-	// report that only ever carries the newer time would never satisfy this
-	waitFor(t, func() bool {
-		mu.Lock()
-		defer mu.Unlock()
-		return reported.GapSince == oldest.Time
-	})
-
-	mu.Lock()
-	defer mu.Unlock()
-	require.Equal(t, []string{"gapped-topic"}, reported.Gaps)
-}
-
-func TestMesh_GapKeepsTheOldestOfSeveralLostMessages(t *testing.T) {
-	// Gaps for one peer accumulate between heartbeats, from failed batches and from messages
-	// dropped on a full queue. The report has to date the whole accumulation at its oldest
-	// message, or the replay starts after the first hole.
-	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	pool := openTestPool(t, schemaDSN)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
-	require.Nil(t, err)
-	defer mesh.Close()
-	older := time.Now().Add(-45 * time.Second).Unix()
-	newer := time.Now().Unix()
-
-	mesh.recordGap("node-b", []string{"topic-1"}, older)
-	mesh.recordGap("node-b", []string{"topic-2"}, newer)
-	mesh.recordGap("node-c", []string{"topic-3"}, newer)
-	mesh.recordGap("node-c", []string{"topic-4"}, older)
-
-	mesh.mu.Lock()
-	defer mesh.mu.Unlock()
-	require.Equal(t, older, mesh.gaps["node-b"].since) // Oldest wins, whichever order they arrive in
-	require.Equal(t, older, mesh.gaps["node-c"].since)
+	require.True(t, mesh.Healthy())
+	require.False(t, mesh.Ready())
 }

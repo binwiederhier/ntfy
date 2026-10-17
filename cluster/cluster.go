@@ -6,9 +6,11 @@ package cluster
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/model"
 )
@@ -23,7 +25,8 @@ const (
 	// incremental updates.
 	StatePath = "/v1/cluster/state"
 	// MembersPath lists the live cluster members (this node plus its live peers), for the
-	// load balancers' agents: each LB maintains its own upstream list from it.
+	// load balancers' agents: each LB maintains its own upstream list from it, with the
+	// active members only.
 	MembersPath = "/v1/cluster/members"
 	// HealthPath reports a node's cluster health to its PEERS (200 healthy, 503 not): a node
 	// that lost its registration probes it to find out whether anywhere better exists for its
@@ -38,6 +41,15 @@ const (
 // config); a "peer" is another node as seen from this one (Peers, peerQueue, peerState). A peer
 // IS a node, which is why peer values carry a NodeID.
 type NodeID string
+
+// Role is a node's part in the cluster; the registry owns it because leadership is derived there
+type Role = registry.Role
+
+// Node roles (see registry.Role)
+const (
+	RoleActive  = registry.RoleActive
+	RolePassive = registry.RolePassive
+)
 
 const (
 	// secretHeader carries the shared secret authenticating node-to-node fan-out requests.
@@ -70,6 +82,7 @@ const (
 type Member struct {
 	NodeID       NodeID `json:"node_id"`
 	AdvertiseURL string `json:"advertise_url"`
+	Role         Role   `json:"role"` // Agents route client traffic to active nodes only
 	Healthy      bool   `json:"healthy"`
 }
 
@@ -98,6 +111,12 @@ type Cluster interface {
 	// fail open (never pull ALL nodes): during a full database outage every node reports
 	// unhealthy while the mesh keeps delivering on stale peer caches.
 	Healthy() bool
+	// Ready reports whether a load balancer should send clients here: an active node that is
+	// Healthy, or that is not but has no other active node to take its clients. The only active
+	// node stays ready with a stale heartbeat, since pulling it would leave clients nowhere to go.
+	Ready() bool
+	// Role reports this node's configured role (active, or passive)
+	Role() Role
 	// Close stops the cluster and releases its resources.
 	Close() error
 }
@@ -116,6 +135,11 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 	}
 	if conf.NodeID == "" {
 		return nil, errors.New("cluster mode requires a stable node ID (set experimental-cluster-node-id)")
+	}
+	if conf.Role == "" {
+		conf.Role = RoleActive
+	} else if !conf.Role.Valid() {
+		return nil, fmt.Errorf("invalid cluster role %q (set experimental-cluster-role to %s or %s)", conf.Role, RoleActive, RolePassive)
 	}
 	if conf.HeartbeatInterval == 0 {
 		conf.HeartbeatInterval = defaultHeartbeatInterval

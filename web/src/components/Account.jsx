@@ -682,6 +682,7 @@ const PhoneNumbers = () => {
         <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.75 }}>
           {account?.phone_numbers?.map((phoneNumber) => (
             <Chip
+              key={phoneNumber}
               label={
                 <Tooltip title={t("common_copy_to_clipboard")}>
                   <span>{phoneNumber}</span>

@@ -50,7 +50,7 @@ const (
 // database using the "create" function. Both versions follow from the steps: the target is the
 // version after the last step (see targetVersionOf), the minimum the version after the newest
 // breaking step, or 1 (see package doc).
-func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migrations map[int]Migration) error {
+func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migrations map[MigrationKey]Migration) error {
 	if dialect != Postgres && dialect != SQLite {
 		return fmt.Errorf("unsupported schema dialect %d", dialect)
 	}
@@ -97,7 +97,7 @@ func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migr
 		return tx.Commit()
 	}
 	for v := version; v < targetVersion; v++ {
-		step, ok := migrations[v]
+		step, ok := migrations[MigrationKey{From: v, To: v + 1}]
 		if !ok {
 			return fmt.Errorf("cannot find %s migration step from version %d to %d", store, v, v+1)
 		}
@@ -112,34 +112,38 @@ func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migr
 	return tx.Commit()
 }
 
-// targetVersionOf returns the schema version a store's steps lead to: the version after the last
-// step, or 1 without steps. The steps must be contiguous, so a forgotten one fails at startup.
-func targetVersionOf(migrations map[int]Migration) (int, error) {
+// targetVersionOf returns the schema version a store's steps lead to: the last step's To, or 1
+// without steps. Steps go one version at a time and must be contiguous, so a forgotten or
+// mis-keyed one fails at startup.
+func targetVersionOf(migrations map[MigrationKey]Migration) (int, error) {
 	if len(migrations) == 0 {
 		return 1, nil
 	}
 	first, last := math.MaxInt, 0
-	for v := range migrations {
-		first, last = min(first, v), max(last, v)
+	for k := range migrations {
+		if k.To != k.From+1 {
+			return 0, fmt.Errorf("migration step from version %d to %d is invalid, a step goes one version at a time", k.From, k.To)
+		}
+		first, last = min(first, k.From), max(last, k.To)
 	}
 	if first < 1 {
-		return 0, fmt.Errorf("migration step %d is invalid, steps start at version 1", first)
+		return 0, fmt.Errorf("migration step from version %d is invalid, steps start at version 1", first)
 	}
 	for v := first; v < last; v++ {
-		if _, ok := migrations[v]; !ok {
+		if _, ok := migrations[MigrationKey{From: v, To: v + 1}]; !ok {
 			return 0, fmt.Errorf("missing migration step from version %d to %d", v, v+1)
 		}
 	}
-	return last + 1, nil
+	return last, nil
 }
 
 // minVersionOf returns the oldest schema version whose code still runs on the schema the steps
-// lead to: the version after the newest breaking step, or 1 if no step is breaking
-func minVersionOf(migrations map[int]Migration) int {
+// lead to: the To of the newest breaking step, or 1 if no step is breaking
+func minVersionOf(migrations map[MigrationKey]Migration) int {
 	minVersion := 1
-	for v, step := range migrations {
-		if step.Breaking && v+1 > minVersion {
-			minVersion = v + 1
+	for k, step := range migrations {
+		if step.Breaking && k.To > minVersion {
+			minVersion = k.To
 		}
 	}
 	return minVersion

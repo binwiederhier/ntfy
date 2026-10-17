@@ -78,8 +78,8 @@ var (
 
 	// migrations maps a schema version to the migration upgrading it to the next version.
 	// Always append migrations at the end, never insert in the middle.
-	migrations = map[int]schema.Migration{
-		1: schema.Query(fmt.Sprintf(`ALTER TABLE node_registry ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT '%s'`, RoleActive)),
+	migrations = map[schema.MigrationKey]schema.Migration{
+		{From: 1, To: 2}: schema.Query(fmt.Sprintf(`ALTER TABLE node_registry ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT '%s'`, RoleActive)),
 	}
 )
 

@@ -65,12 +65,12 @@ func TestMigrate_AppliesMigrationSteps(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
 		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, nil))
 		// A newer version of the code migrates 1 -> 3 step by step, in order
-		migrations := map[int]schema.Migration{
-			1: schema.Func(func(tx *sql.Tx) error {
+		migrations := map[schema.MigrationKey]schema.Migration{
+			{From: 1, To: 2}: schema.Func(func(tx *sql.Tx) error {
 				_, err := tx.Exec(`ALTER TABLE things ADD COLUMN color TEXT NOT NULL DEFAULT ''`)
 				return err
 			}),
-			2: schema.Func(func(tx *sql.Tx) error {
+			{From: 2, To: 3}: schema.Func(func(tx *sql.Tx) error {
 				_, err := tx.Exec(`ALTER TABLE things ADD COLUMN size INT NOT NULL DEFAULT 0`)
 				return err
 			}),
@@ -88,9 +88,9 @@ func TestMigrate_TargetVersionFollowsSteps(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
 		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, nil))
 		require.Equal(t, 1, storeVersion(t, d, dialect, "things"))
-		migrations := map[int]schema.Migration{
-			1: schema.Query(`ALTER TABLE things ADD COLUMN color TEXT NOT NULL DEFAULT ''`),
-			2: schema.Query(`ALTER TABLE things ADD COLUMN size INT NOT NULL DEFAULT 0`),
+		migrations := map[schema.MigrationKey]schema.Migration{
+			{From: 1, To: 2}: schema.Query(`ALTER TABLE things ADD COLUMN color TEXT NOT NULL DEFAULT ''`),
+			{From: 2, To: 3}: schema.Query(`ALTER TABLE things ADD COLUMN size INT NOT NULL DEFAULT 0`),
 		}
 		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, migrations))
 		require.Equal(t, 3, storeVersion(t, d, dialect, "things"))
@@ -102,7 +102,7 @@ func TestMigrate_TargetVersionFollowsSteps(t *testing.T) {
 func TestMigrate_GapInStepsFails(t *testing.T) {
 	// A missing step in the middle fails before anything is created or migrated
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
-		err := schema.Migrate(d, dialect, "things", testCreate, map[int]schema.Migration{1: schema.Nop, 3: schema.Nop})
+		err := schema.Migrate(d, dialect, "things", testCreate, map[schema.MigrationKey]schema.Migration{{From: 1, To: 2}: schema.Nop, {From: 3, To: 4}: schema.Nop})
 		require.ErrorContains(t, err, "missing migration step from version 2 to 3")
 		_, err = d.Exec(`INSERT INTO things (id, name) VALUES ('a', 'thing a')`)
 		require.Error(t, err) // Not created
@@ -112,9 +112,9 @@ func TestMigrate_GapInStepsFails(t *testing.T) {
 func TestMigrate_ClosureCarriesConfig(t *testing.T) {
 	// Migrations needing config take it via closure at map-construction time; there is no
 	// params plumbing in the framework itself
-	migrationsFor := func(defaultName string) map[int]schema.Migration {
-		return map[int]schema.Migration{
-			1: schema.Query(fmt.Sprintf(`ALTER TABLE things ADD COLUMN nick TEXT NOT NULL DEFAULT '%s'`, defaultName)),
+	migrationsFor := func(defaultName string) map[schema.MigrationKey]schema.Migration {
+		return map[schema.MigrationKey]schema.Migration{
+			{From: 1, To: 2}: schema.Query(fmt.Sprintf(`ALTER TABLE things ADD COLUMN nick TEXT NOT NULL DEFAULT '%s'`, defaultName)),
 		}
 	}
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
@@ -151,7 +151,7 @@ func TestMigrate_NewerVersionWarnsAndStarts(t *testing.T) {
 func TestMigrate_BreakingNewerSchemaFails(t *testing.T) {
 	// A breaking migration raises the store's minimum version: older code must not run on it
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
-		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[int]schema.Migration{1: schema.Nop, 2: schema.Breaking(schema.Nop)}))
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[schema.MigrationKey]schema.Migration{{From: 1, To: 2}: schema.Nop, {From: 2, To: 3}: schema.Breaking(schema.Nop)}))
 		err := schema.Migrate(d, dialect, "things", testCreate, stepsTo(2))
 		require.ErrorContains(t, err, "things database schema version 3 needs ntfy that supports at least version 3, this version supports up to 2")
 	})
@@ -161,9 +161,9 @@ func TestMigrate_BreakingStepRaisesMinVersion(t *testing.T) {
 	// The minimum version follows from the steps: the version after the newest breaking step
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
 		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, nil))
-		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[int]schema.Migration{
-			1: schema.Breaking(schema.Nop),
-			2: schema.Nop,
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[schema.MigrationKey]schema.Migration{
+			{From: 1, To: 2}: schema.Breaking(schema.Nop),
+			{From: 2, To: 3}: schema.Nop,
 		}))
 		require.Equal(t, 2, storeMinVersion(t, d, dialect, "things"))
 	})
@@ -172,9 +172,9 @@ func TestMigrate_BreakingStepRaisesMinVersion(t *testing.T) {
 func TestMigrate_FreshCreateTakesMinVersionFromSteps(t *testing.T) {
 	// A fresh database is created at the target version directly, but its minimum still comes from the steps
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
-		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[int]schema.Migration{
-			1: schema.Nop,
-			2: schema.Breaking(schema.Nop),
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[schema.MigrationKey]schema.Migration{
+			{From: 1, To: 2}: schema.Nop,
+			{From: 2, To: 3}: schema.Breaking(schema.Nop),
 		}))
 		require.Equal(t, 3, storeMinVersion(t, d, dialect, "things"))
 	})
@@ -200,7 +200,7 @@ func TestMigrate_AddsMinVersionToAnExistingVersionTable(t *testing.T) {
 		require.Nil(t, err)
 
 		// A breaking migration to version 2 locks out code that supports only version 1
-		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[int]schema.Migration{1: schema.Breaking(schema.Nop)}))
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[schema.MigrationKey]schema.Migration{{From: 1, To: 2}: schema.Breaking(schema.Nop)}))
 		require.Equal(t, 2, storeMinVersion(t, d, dialect, "things"))
 		require.Error(t, schema.Migrate(d, dialect, "things", testCreate, nil))
 	})
@@ -210,7 +210,7 @@ func TestMigrate_VersionTableCreatedWhenMissing(t *testing.T) {
 	// A database without a version table gets one with both columns, filled from the steps
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
 		require.Empty(t, versionTableColumns(t, d, dialect))
-		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[int]schema.Migration{1: schema.Nop, 2: schema.Breaking(schema.Nop)}))
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[schema.MigrationKey]schema.Migration{{From: 1, To: 2}: schema.Nop, {From: 2, To: 3}: schema.Breaking(schema.Nop)}))
 		require.ElementsMatch(t, []string{versionTableKeyColumn(dialect), "version", "min_version"}, versionTableColumns(t, d, dialect))
 		require.Equal(t, 3, storeVersion(t, d, dialect, "things"))
 		require.Equal(t, 3, storeMinVersion(t, d, dialect, "things"))
@@ -240,7 +240,7 @@ func TestMigrate_OldVersionTableGetsMinVersion(t *testing.T) {
 func TestMigrate_CurrentVersionTableIsLeftAlone(t *testing.T) {
 	// A version table that already has min_version is not altered again, and its values stay
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
-		migrations := map[int]schema.Migration{1: schema.Breaking(schema.Nop)}
+		migrations := map[schema.MigrationKey]schema.Migration{{From: 1, To: 2}: schema.Breaking(schema.Nop)}
 		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, migrations))
 		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, migrations))
 		require.ElementsMatch(t, []string{versionTableKeyColumn(dialect), "version", "min_version"}, versionTableColumns(t, d, dialect))
@@ -252,7 +252,7 @@ func TestMigrate_CurrentVersionTableIsLeftAlone(t *testing.T) {
 func TestMigrate_MissingStepFails(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
 		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, nil))
-		err := schema.Migrate(d, dialect, "things", testCreate, map[int]schema.Migration{2: schema.Nop}) // No step 1 -> 2 registered
+		err := schema.Migrate(d, dialect, "things", testCreate, map[schema.MigrationKey]schema.Migration{{From: 2, To: 3}: schema.Nop}) // No step 1 -> 2 registered
 		require.ErrorContains(t, err, "cannot find things migration step from version 1 to 2")
 	})
 }
@@ -281,8 +281,8 @@ func TestMigrate_SQLiteReadsExistingSchemaVersionTable(t *testing.T) {
 	require.Nil(t, err)
 	_, err = d.Exec(`INSERT INTO schemaVersion VALUES (1, 1)`)
 	require.Nil(t, err)
-	migrations := map[int]schema.Migration{
-		1: schema.Func(func(tx *sql.Tx) error {
+	migrations := map[schema.MigrationKey]schema.Migration{
+		{From: 1, To: 2}: schema.Func(func(tx *sql.Tx) error {
 			_, err := tx.Exec(`ALTER TABLE things ADD COLUMN color TEXT NOT NULL DEFAULT ''`)
 			return err
 		}),
@@ -366,10 +366,10 @@ func versionTableKeyColumn(dialect schema.Dialect) string {
 }
 
 // stepsTo returns no-op steps leading to the given schema version
-func stepsTo(version int) map[int]schema.Migration {
-	migrations := make(map[int]schema.Migration)
+func stepsTo(version int) map[schema.MigrationKey]schema.Migration {
+	migrations := make(map[schema.MigrationKey]schema.Migration)
 	for v := 1; v < version; v++ {
-		migrations[v] = schema.Nop
+		migrations[schema.MigrationKey{From: v, To: v + 1}] = schema.Nop
 	}
 	return migrations
 }

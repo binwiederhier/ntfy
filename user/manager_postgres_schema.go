@@ -128,9 +128,9 @@ var (
 
 	// postgresMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
-	postgresMigrations = map[int]schema.Migration{
-		6: schema.Query(postgresMigrate6To7UpdateQueries),
-		7: schema.Query(postgresMigrate7To8UpdateQueries),
-		8: schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
+	postgresMigrations = map[schema.MigrationKey]schema.Migration{
+		{From: 6, To: 7}: schema.Query(postgresMigrate6To7UpdateQueries),
+		{From: 7, To: 8}: schema.Query(postgresMigrate7To8UpdateQueries),
+		{From: 8, To: 9}: schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
 	}
 )

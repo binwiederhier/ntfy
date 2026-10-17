@@ -183,30 +183,30 @@ var (
 // sqliteMigrations returns the migration steps, keyed by the version they upgrade FROM. The
 // cache duration is carried into the 9 -> 10 step via closure (it backfills "expires" from it).
 // Always append migrations at the end, never insert in the middle.
-func sqliteMigrations(cacheDuration time.Duration) map[int]schema.Migration {
-	return map[int]schema.Migration{
-		1: schema.Query(sqliteMigrate1To2AlterMessagesTableQuery),
-		2: schema.Query(sqliteMigrate2To3AlterMessagesTableQuery),
-		3: schema.Query(sqliteMigrate3To4AlterMessagesTableQuery),
-		4: schema.Query(sqliteMigrate4To5AlterMessagesTableQuery),
-		5: schema.Query(sqliteMigrate5To6AlterMessagesTableQuery),
-		6: schema.Query(sqliteMigrate6To7AlterMessagesTableQuery),
-		7: schema.Query(sqliteMigrate7To8AlterMessagesTableQuery),
-		8: schema.Query(sqliteMigrate8To9AlterMessagesTableQuery),
-		9: schema.Func(func(tx *sql.Tx) error {
+func sqliteMigrations(cacheDuration time.Duration) map[schema.MigrationKey]schema.Migration {
+	return map[schema.MigrationKey]schema.Migration{
+		{From: 1, To: 2}: schema.Query(sqliteMigrate1To2AlterMessagesTableQuery),
+		{From: 2, To: 3}: schema.Query(sqliteMigrate2To3AlterMessagesTableQuery),
+		{From: 3, To: 4}: schema.Query(sqliteMigrate3To4AlterMessagesTableQuery),
+		{From: 4, To: 5}: schema.Query(sqliteMigrate4To5AlterMessagesTableQuery),
+		{From: 5, To: 6}: schema.Query(sqliteMigrate5To6AlterMessagesTableQuery),
+		{From: 6, To: 7}: schema.Query(sqliteMigrate6To7AlterMessagesTableQuery),
+		{From: 7, To: 8}: schema.Query(sqliteMigrate7To8AlterMessagesTableQuery),
+		{From: 8, To: 9}: schema.Query(sqliteMigrate8To9AlterMessagesTableQuery),
+		{From: 9, To: 10}: schema.Func(func(tx *sql.Tx) error {
 			if _, err := tx.Exec(sqliteMigrate9To10AlterMessagesTableQuery); err != nil {
 				return err
 			}
 			_, err := tx.Exec(sqliteMigrate9To10UpdateMessageExpiryQuery, int64(cacheDuration.Seconds()))
 			return err
 		}),
-		10: schema.Query(sqliteMigrate10To11AlterMessagesTableQuery),
-		11: schema.Query(sqliteMigrate11To12AlterMessagesTableQuery),
-		12: schema.Query(sqliteMigrate12To13AlterMessagesTableQuery),
-		13: schema.Query(sqliteMigrate13To14AlterMessagesTableQuery),
-		14: schema.Nop, // Corresponds to Postgres migration
-		15: schema.Nop, // 15 -> 16 adds the Postgres claim column; SQLite is single-node
-		16: schema.Query(sqliteMigrate16To17CreateIndexQuery),
+		{From: 10, To: 11}: schema.Query(sqliteMigrate10To11AlterMessagesTableQuery),
+		{From: 11, To: 12}: schema.Query(sqliteMigrate11To12AlterMessagesTableQuery),
+		{From: 12, To: 13}: schema.Query(sqliteMigrate12To13AlterMessagesTableQuery),
+		{From: 13, To: 14}: schema.Query(sqliteMigrate13To14AlterMessagesTableQuery),
+		{From: 14, To: 15}: schema.Nop, // Corresponds to Postgres migration
+		{From: 15, To: 16}: schema.Nop, // 15 -> 16 adds the Postgres claim column; SQLite is single-node
+		{From: 16, To: 17}: schema.Query(sqliteMigrate16To17CreateIndexQuery),
 	}
 }
 

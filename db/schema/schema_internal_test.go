@@ -27,7 +27,7 @@ func TestMinVersionOf(t *testing.T) {
 	}
 }
 
-func TestTargetVersion(t *testing.T) {
+func TestTargetVersionOf(t *testing.T) {
 	cases := []struct {
 		name       string
 		migrations map[int]Migration
@@ -39,16 +39,16 @@ func TestTargetVersion(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			version, err := TargetVersion(c.migrations)
+			version, err := targetVersionOf(c.migrations)
 			require.Nil(t, err)
 			require.Equal(t, c.expected, version)
 		})
 	}
 }
 
-func TestTargetVersion_Invalid(t *testing.T) {
-	_, err := TargetVersion(map[int]Migration{1: Nop, 3: Nop, 4: Nop})
+func TestTargetVersionOf_Invalid(t *testing.T) {
+	_, err := targetVersionOf(map[int]Migration{1: Nop, 3: Nop, 4: Nop})
 	require.ErrorContains(t, err, "missing migration step from version 2 to 3")
-	_, err = TargetVersion(map[int]Migration{0: Nop, 1: Nop})
+	_, err = targetVersionOf(map[int]Migration{0: Nop, 1: Nop})
 	require.ErrorContains(t, err, "migration step 0 is invalid")
 }

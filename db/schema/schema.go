@@ -45,13 +45,13 @@ const (
 
 // Migrate creates or upgrades the named store's schema in one transaction, or creates a new
 // database using the "create" function. Both versions follow from the steps: the target is the
-// version after the last step (see TargetVersion), the minimum the version after the newest
+// version after the last step (see targetVersionOf), the minimum the version after the newest
 // breaking step, or 1 (see package doc).
 func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migrations map[int]Migration) error {
 	if dialect != Postgres && dialect != SQLite {
 		return fmt.Errorf("unsupported schema dialect %d", dialect)
 	}
-	targetVersion, err := TargetVersion(migrations)
+	targetVersion, err := targetVersionOf(migrations)
 	if err != nil {
 		return fmt.Errorf("invalid %s migration steps: %w", store, err)
 	}
@@ -109,9 +109,9 @@ func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migr
 	return tx.Commit()
 }
 
-// TargetVersion returns the schema version a store's steps lead to: the version after the last
+// targetVersionOf returns the schema version a store's steps lead to: the version after the last
 // step, or 1 without steps. The steps must be contiguous, so a forgotten one fails at startup.
-func TargetVersion(migrations map[int]Migration) (int, error) {
+func targetVersionOf(migrations map[int]Migration) (int, error) {
 	if len(migrations) == 0 {
 		return 1, nil
 	}

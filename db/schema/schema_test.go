@@ -206,6 +206,49 @@ func TestMigrate_AddsMinVersionToAnExistingVersionTable(t *testing.T) {
 	})
 }
 
+func TestMigrate_VersionTableCreatedWhenMissing(t *testing.T) {
+	// A database without a version table gets one with both columns, filled from the steps
+	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
+		require.Empty(t, versionTableColumns(t, d, dialect))
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, map[int]schema.Migration{1: schema.Nop, 2: schema.Breaking(schema.Nop)}))
+		require.ElementsMatch(t, []string{versionTableKeyColumn(dialect), "version", "min_version"}, versionTableColumns(t, d, dialect))
+		require.Equal(t, 3, storeVersion(t, d, dialect, "things"))
+		require.Equal(t, 3, storeMinVersion(t, d, dialect, "things"))
+	})
+}
+
+func TestMigrate_OldVersionTableGetsMinVersion(t *testing.T) {
+	// A version table from before min_version (ntfy <= v2.31) gets the column; the stored version
+	// is kept, and the minimum defaults to 1
+	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
+		createOld, insertOld := `CREATE TABLE schema_version (store TEXT PRIMARY KEY, version INT NOT NULL)`, `INSERT INTO schema_version (store, version) VALUES ('things', 2)`
+		if dialect == schema.SQLite {
+			createOld, insertOld = `CREATE TABLE schemaVersion (id INT PRIMARY KEY, version INT NOT NULL)`, `INSERT INTO schemaVersion (id, version) VALUES (1, 2)`
+		}
+		for _, query := range []string{testCreateQuery, createOld, insertOld} {
+			_, err := d.Exec(query)
+			require.Nil(t, err)
+		}
+		require.ElementsMatch(t, []string{versionTableKeyColumn(dialect), "version"}, versionTableColumns(t, d, dialect))
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, stepsTo(2)))
+		require.ElementsMatch(t, []string{versionTableKeyColumn(dialect), "version", "min_version"}, versionTableColumns(t, d, dialect))
+		require.Equal(t, 2, storeVersion(t, d, dialect, "things"))
+		require.Equal(t, 1, storeMinVersion(t, d, dialect, "things"))
+	})
+}
+
+func TestMigrate_CurrentVersionTableIsLeftAlone(t *testing.T) {
+	// A version table that already has min_version is not altered again, and its values stay
+	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
+		migrations := map[int]schema.Migration{1: schema.Breaking(schema.Nop)}
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, migrations))
+		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, migrations))
+		require.ElementsMatch(t, []string{versionTableKeyColumn(dialect), "version", "min_version"}, versionTableColumns(t, d, dialect))
+		require.Equal(t, 2, storeVersion(t, d, dialect, "things"))
+		require.Equal(t, 2, storeMinVersion(t, d, dialect, "things"))
+	})
+}
+
 func TestMigrate_MissingStepFails(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d *sql.DB, dialect schema.Dialect) {
 		require.Nil(t, schema.Migrate(d, dialect, "things", testCreate, nil))
@@ -292,6 +335,34 @@ func storeVersion(t *testing.T, d *sql.DB, dialect schema.Dialect, store string)
 		require.Nil(t, d.QueryRow(`SELECT version FROM schemaVersion WHERE id = 1`).Scan(&version), fmt.Sprintf("store %s", store))
 	}
 	return version
+}
+
+// versionTableColumns returns the version table's column names, or none if it does not exist
+func versionTableColumns(t *testing.T, d *sql.DB, dialect schema.Dialect) []string {
+	t.Helper()
+	query := `SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'schema_version'`
+	if dialect == schema.SQLite {
+		query = `SELECT name FROM pragma_table_info('schemaVersion')`
+	}
+	rows, err := d.Query(query)
+	require.Nil(t, err)
+	defer rows.Close()
+	columns := make([]string, 0)
+	for rows.Next() {
+		var column string
+		require.Nil(t, rows.Scan(&column))
+		columns = append(columns, column)
+	}
+	require.Nil(t, rows.Err())
+	return columns
+}
+
+// versionTableKeyColumn returns the version table's key: one row per store on Postgres, one row on SQLite
+func versionTableKeyColumn(dialect schema.Dialect) string {
+	if dialect == schema.Postgres {
+		return "store"
+	}
+	return "id"
 }
 
 // stepsTo returns no-op steps leading to the given schema version

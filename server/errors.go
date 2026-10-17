@@ -152,6 +152,11 @@ var (
 	errHTTPBadRequestTitleTooLarge                   = &errHTTP{40057, http.StatusBadRequest, "invalid request: title is too large", "https://ntfy.sh/docs/publish/#limitations", nil}
 	errHTTPBadRequestTagsTooLarge                    = &errHTTP{40058, http.StatusBadRequest, "invalid request: tags are too large", "https://ntfy.sh/docs/publish/#limitations", nil}
 	errHTTPBadRequestTimezoneInvalid                 = &errHTTP{40059, http.StatusBadRequest, "invalid request: invalid timezone", "https://ntfy.sh/docs/publish/#scheduled-delivery", nil}
+	errHTTPBadRequestTierReservationsLimit           = &errHTTP{40060, http.StatusBadRequest, "invalid request: user has more topic reservations than the tier allows, remove reservations first", "", nil}
+	errHTTPBadRequestAccessAdminUser                 = &errHTTP{40061, http.StatusBadRequest, "invalid request: admins can access all topics, access control entries are not allowed", "", nil}
+	errHTTPBadRequestPaginationInvalid               = &errHTTP{40062, http.StatusBadRequest, "invalid request: limit and offset must be non-negative integers", "", nil}
+	errHTTPBadRequestTierCodeInvalid                 = &errHTTP{40063, http.StatusBadRequest, "invalid request: tier code invalid, or tier name missing", "", nil}
+	errHTTPBadRequestNoTopicReservation              = &errHTTP{40064, http.StatusBadRequest, "invalid request: topic is not reserved by this user", "", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}
@@ -163,6 +168,10 @@ var (
 	errHTTPConflictProvisionedTokenChange            = &errHTTP{40906, http.StatusConflict, "conflict: cannot change or delete provisioned token", "", nil}
 	errHTTPConflictEmailExists                       = &errHTTP{40907, http.StatusConflict, "conflict: email address already exists", "", nil}
 	errHTTPConflictEmailPrimaryElsewhere             = &errHTTP{40908, http.StatusConflict, "conflict: email address is the primary email on another account", "", nil}
+	errHTTPConflictProvisionedAccessChange           = &errHTTP{40909, http.StatusConflict, "conflict: cannot change or delete provisioned access control entry", "", nil}
+	errHTTPConflictReservationAccessChange           = &errHTTP{40910, http.StatusConflict, "conflict: topic is reserved, change or remove the reservation instead", "", nil}
+	errHTTPConflictTierExists                        = &errHTTP{40911, http.StatusConflict, "conflict: tier already exists", "", nil}
+	errHTTPConflictTierInUse                         = &errHTTP{40912, http.StatusConflict, "conflict: tier is still assigned to users", "", nil}
 	errHTTPGonePhoneVerificationExpired              = &errHTTP{41001, http.StatusGone, "phone number verification expired or does not exist", "", nil}
 	errHTTPEntityTooLargeAttachment                  = &errHTTP{41301, http.StatusRequestEntityTooLarge, "attachment too large, or bandwidth limit reached", "https://ntfy.sh/docs/publish/#limitations", nil}
 	errHTTPEntityTooLargeMatrixRequest               = &errHTTP{41302, http.StatusRequestEntityTooLarge, "Matrix request is larger than the max allowed length", "", nil}

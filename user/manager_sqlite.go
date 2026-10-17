@@ -70,6 +70,20 @@ const (
 				ELSE 2
 			END, user
 	`
+	sqliteSelectUsersPageQuery = `
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stats_messages, u.stats_emails, u.stats_calls, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
+		FROM user u
+		LEFT JOIN tier t on t.id = u.tier_id
+		WHERE LOWER(u.user) LIKE ? ESCAPE '\'
+		ORDER BY
+			CASE u.role
+				WHEN 'admin' THEN 1
+				WHEN 'anonymous' THEN 3
+				ELSE 2
+			END, u.user
+		LIMIT ? OFFSET ?
+	`
+	sqliteSelectUsersPageCountQuery     = `SELECT COUNT(*) FROM user WHERE LOWER(user) LIKE ? ESCAPE '\'`
 	sqliteSelectUserCountQuery          = `SELECT COUNT(*) FROM user`
 	sqliteSelectUserIDFromUsernameQuery = `SELECT id FROM user WHERE user = ?`
 	sqliteInsertUserQuery               = `INSERT INTO user (id, user, pass, role, sync_topic, provisioned, created) VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -98,6 +112,57 @@ const (
 		SELECT u.user, a.topic, a.read, a.write
 		FROM user_access a
 		JOIN user u ON u.id = a.user_id
+	`
+	sqliteSelectUsersPageAccessQuery = `
+		WITH page AS (
+			SELECT id
+			FROM user
+			WHERE LOWER(user) LIKE ? ESCAPE '\'
+			ORDER BY
+				CASE role
+					WHEN 'admin' THEN 1
+					WHEN 'anonymous' THEN 3
+					ELSE 2
+				END, user
+			LIMIT ? OFFSET ?
+		)
+		SELECT a.user_id, a.topic, a.read, a.write, a.provisioned, COALESCE(a.owner_user_id, '')
+		FROM user_access a
+		WHERE a.user_id IN (SELECT id FROM page) OR a.owner_user_id IN (SELECT id FROM page)
+		ORDER BY LENGTH(a.topic) DESC, a.write DESC, a.read DESC, a.topic
+	`
+	// owner_user_id is declared INT (but holds TEXT user IDs); the CAST lets the owner join use the primary key index
+	sqliteSelectAccessEntriesQuery = `
+		SELECT u.user, a.topic, a.read, a.write, COALESCE(o.user, ''), a.provisioned
+		FROM user_access a
+		JOIN user u ON u.id = a.user_id
+		LEFT JOIN user o ON o.id = CAST(a.owner_user_id AS TEXT)
+		WHERE LOWER(a.topic) LIKE ? ESCAPE '\' OR LOWER(u.user) LIKE ? ESCAPE '\'
+		ORDER BY a.topic, CASE WHEN u.role = 'anonymous' THEN 1 ELSE 0 END, u.user
+		LIMIT ? OFFSET ?
+	`
+	sqliteSelectAccessEntriesCountQuery = `
+		SELECT COUNT(*)
+		FROM user_access a
+		JOIN user u ON u.id = a.user_id
+		WHERE LOWER(a.topic) LIKE ? ESCAPE '\' OR LOWER(u.user) LIKE ? ESCAPE '\'
+	`
+	sqliteSelectReservationEntriesQuery = `
+		SELECT o.user, a.topic, COALESCE(e.read, 0), COALESCE(e.write, 0)
+		FROM user_access a
+		JOIN user o ON o.id = a.user_id
+		LEFT JOIN user_access e ON e.topic = a.topic AND e.user_id = (SELECT id FROM user WHERE user = ?)
+		WHERE a.user_id = a.owner_user_id
+		  AND (LOWER(a.topic) LIKE ? ESCAPE '\' OR LOWER(o.user) LIKE ? ESCAPE '\')
+		ORDER BY a.topic
+		LIMIT ? OFFSET ?
+	`
+	sqliteSelectReservationEntriesCountQuery = `
+		SELECT COUNT(*)
+		FROM user_access a
+		JOIN user o ON o.id = a.user_id
+		WHERE a.user_id = a.owner_user_id
+		  AND (LOWER(a.topic) LIKE ? ESCAPE '\' OR LOWER(o.user) LIKE ? ESCAPE '\')
 	`
 	sqliteSelectUserAllAccessQuery = `
 		SELECT user_id, topic, read, write, provisioned
@@ -216,6 +281,12 @@ const (
 		FROM tier
 		WHERE (stripe_monthly_price_id = ? OR stripe_yearly_price_id = ?)
 	`
+	sqliteSelectTierUsersCountQuery = `
+		SELECT t.code, COUNT(u.id)
+		FROM tier t
+		LEFT JOIN user u ON u.tier_id = t.id
+		GROUP BY t.code
+	`
 	sqliteDeleteTierQuery = `DELETE FROM tier WHERE code = ?`
 
 	// Phone queries
@@ -274,6 +345,14 @@ var sqliteQueries = queries{
 	selectUsernames:                sqliteSelectUsernamesQuery,
 	selectUsers:                    sqliteSelectUsersQuery,
 	selectUserCount:                sqliteSelectUserCountQuery,
+	selectUsersPage:                sqliteSelectUsersPageQuery,
+	selectUsersPageCount:           sqliteSelectUsersPageCountQuery,
+	selectUsersPageAccess:          sqliteSelectUsersPageAccessQuery,
+	selectAccessEntries:            sqliteSelectAccessEntriesQuery,
+	selectAccessEntriesCount:       sqliteSelectAccessEntriesCountQuery,
+	selectReservationEntries:       sqliteSelectReservationEntriesQuery,
+	selectReservationEntriesCount:  sqliteSelectReservationEntriesCountQuery,
+	selectTierUsersCount:           sqliteSelectTierUsersCountQuery,
 	selectUserIDFromUsername:       sqliteSelectUserIDFromUsernameQuery,
 	insertUser:                     sqliteInsertUserQuery,
 	updateUserPass:                 sqliteUpdateUserPassQuery,

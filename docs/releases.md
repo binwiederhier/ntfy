@@ -2193,6 +2193,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.31.2 (UNRELEASED)
+
+**Features:**
+
+* Admin page in the web app to manage users, the access control list, topic reservations and tiers, with search and pagination ([#1526](https://github.com/binwiederhier/ntfy/pull/1526))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

@@ -175,15 +175,66 @@ type apiUserAddOrUpdateRequest struct {
 }
 
 type apiUserResponse struct {
-	Username string                  `json:"username"`
-	Role     string                  `json:"role"`
-	Tier     string                  `json:"tier,omitempty"`
-	Grants   []*apiUserGrantResponse `json:"grants,omitempty"`
+	Username      string                        `json:"username"`
+	Role          string                        `json:"role"`
+	Tier          string                        `json:"tier,omitempty"`
+	Grants        []*apiUserGrantResponse       `json:"grants,omitempty"` // Includes the entries of the user's own reservations
+	Reservations  []*apiUserReservationResponse `json:"reservations,omitempty"`
+	Provisioned   bool                          `json:"provisioned,omitempty"`    // Defined in the server config, cannot be changed via the API
+	BillingStatus string                        `json:"billing_status,omitempty"` // Stripe subscription status, if any
 }
 
 type apiUserGrantResponse struct {
-	Topic      string `json:"topic"` // This may be a pattern
-	Permission string `json:"permission"`
+	Topic       string `json:"topic"` // This may be a pattern
+	Permission  string `json:"permission"`
+	Provisioned bool   `json:"provisioned,omitempty"`
+}
+
+type apiUserReservationResponse struct {
+	Topic    string `json:"topic"`
+	Everyone string `json:"everyone"`
+}
+
+type apiAccessEntryResponse struct {
+	Username    string `json:"username"` // May be Everyone (*)
+	Topic       string `json:"topic"`    // This may be a pattern
+	Permission  string `json:"permission"`
+	Owner       string `json:"owner,omitempty"` // Username of the user who reserved the topic
+	Provisioned bool   `json:"provisioned,omitempty"`
+}
+
+type apiReservationEntryResponse struct {
+	Username string `json:"username"`
+	Topic    string `json:"topic"`
+	Everyone string `json:"everyone"`
+}
+
+type apiReservationRequest struct {
+	Username string `json:"username"`
+	Topic    string `json:"topic"`
+	Everyone string `json:"everyone"` // Only for PUT
+}
+
+// apiAdminTier is used for both requests and responses of the admin tier API. Durations are in seconds.
+type apiAdminTier struct {
+	Code                     string `json:"code"`
+	Name                     string `json:"name"`
+	MessagesLimit            int64  `json:"messages_limit"`
+	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
+	EmailsLimit              int64  `json:"emails_limit"`
+	CallsLimit               int64  `json:"calls_limit"`
+	ReservationsLimit        int64  `json:"reservations_limit"`
+	AttachmentFileSizeLimit  int64  `json:"attachment_file_size_limit"`
+	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
+	AttachmentExpiryDuration int64  `json:"attachment_expiry_duration"`
+	AttachmentBandwidthLimit int64  `json:"attachment_bandwidth_limit"`
+	StripeMonthlyPriceID     string `json:"stripe_monthly_price_id,omitempty"`
+	StripeYearlyPriceID      string `json:"stripe_yearly_price_id,omitempty"`
+	Users                    int64  `json:"users"` // Response only: number of users on this tier
+}
+
+type apiAdminTierDeleteRequest struct {
+	Code string `json:"code"`
 }
 
 type apiUserDeleteRequest struct {

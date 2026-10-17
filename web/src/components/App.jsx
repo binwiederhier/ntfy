@@ -20,6 +20,7 @@ import Messaging from "./Messaging";
 import Login from "./Login";
 import Signup from "./Signup";
 import Account from "./Account";
+import Admin from "./Admin";
 import EmailVerify from "./EmailVerify";
 import PasswordReset from "./PasswordReset";
 import PasswordResetRequest from "./PasswordResetRequest";
@@ -88,6 +89,7 @@ const App = () => {
                   <Route element={<Layout />}>
                     <Route path={routes.app} element={<AllSubscriptions />} />
                     <Route path={routes.account} element={<Account />} />
+                    <Route path={routes.admin} element={<Admin />} />
                     <Route path={routes.settings} element={<Preferences />} />
                     <Route path={routes.subscription} element={<SingleSubscription />} />
                     <Route path={routes.subscriptionExternal} element={<SingleSubscription />} />

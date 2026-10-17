@@ -121,6 +121,8 @@ var (
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
+	apiUsersReservationsPath                             = "/v1/users/reservations"
+	apiAdminTiersPath                                    = "/v1/admin/tiers"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountLoginPath                                  = "/v1/account/login"
 	apiAccountTokenPath                                  = "/v1/account/token"
@@ -677,8 +679,24 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureAdmin(s.handleUsersDelete)(w, r, v)
 	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersAccessPath {
+		return s.ensureAdmin(s.handleAccessGet)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersReservationsPath {
+		return s.ensureAdmin(s.handleReservationsGet)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersReservationsPath {
+		return s.ensureAdmin(s.handleReservationsUpdate)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersReservationsPath {
+		return s.ensureAdmin(s.handleReservationsDelete)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiAdminTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersGet)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiAdminTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersAdd)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiAdminTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersUpdate)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiAdminTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {

@@ -3561,6 +3561,185 @@ func TestManager_AccountReadsUsePrimary(t *testing.T) {
 	require.Len(t, pendingEmails, 1)
 }
 
+func TestManager_UsersPage(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddTier(&Tier{Code: "pro", Name: "Pro", ReservationLimit: 10}))
+		require.Nil(t, a.AddUser("phil", "phil", RoleAdmin, false))
+		for i := 0; i < 25; i++ {
+			require.Nil(t, a.AddUser(fmt.Sprintf("user%02d", i), "pass", RoleUser, false))
+		}
+		require.Nil(t, a.AddUser("some_one", "pass", RoleUser, false))
+		require.Nil(t, a.AddUser("somexone", "pass", RoleUser, false))
+		require.Nil(t, a.ChangeTier("user01", "pro"))
+		require.Nil(t, a.AllowAccess("user01", "grant1", PermissionRead))
+		require.Nil(t, a.AddReservation("user01", "reserved1", PermissionDenyAll, 0))
+		require.Nil(t, a.AddReservation("user01", "reserved2", PermissionRead, 0))
+		require.Nil(t, a.AllowAccess("user02", "grant2", PermissionReadWrite))
+
+		// First page: admins first, then users sorted by name
+		page, err := a.UsersPage(&UserFilter{Limit: 10})
+		require.Nil(t, err)
+		require.Equal(t, int64(29), page.Total) // 28 + Everyone
+		require.Len(t, page.Users, 10)
+		require.Equal(t, "phil", page.Users[0].Name)
+		require.Equal(t, "some_one", page.Users[1].Name)
+		require.Equal(t, "somexone", page.Users[2].Name)
+		require.Equal(t, "user00", page.Users[3].Name)
+		require.Equal(t, "user01", page.Users[4].Name)
+		require.Equal(t, "pro", page.Users[4].Tier.Code)
+
+		// Grants and reservations are loaded only for the users on the page
+		user01 := page.Users[4].ID
+		require.Len(t, page.Grants[user01], 3) // grant1 + 2 reservation rows
+		require.Equal(t, []Reservation{
+			{Topic: "reserved1", Owner: PermissionReadWrite, Everyone: PermissionDenyAll},
+			{Topic: "reserved2", Owner: PermissionReadWrite, Everyone: PermissionRead},
+		}, page.Reservations[user01])
+		require.Len(t, page.Grants[page.Users[5].ID], 1) // user02
+		require.Equal(t, "grant2", page.Grants[page.Users[5].ID][0].TopicPattern)
+
+		// Second and last page
+		page, err = a.UsersPage(&UserFilter{Limit: 10, Offset: 10})
+		require.Nil(t, err)
+		require.Len(t, page.Users, 10)
+		require.Equal(t, "user07", page.Users[0].Name)
+		require.Nil(t, page.Grants[user01])
+		page, err = a.UsersPage(&UserFilter{Limit: 10, Offset: 20})
+		require.Nil(t, err)
+		require.Len(t, page.Users, 9)
+		require.Equal(t, Everyone, page.Users[8].Name)
+
+		// No limit returns everything
+		page, err = a.UsersPage(&UserFilter{})
+		require.Nil(t, err)
+		require.Len(t, page.Users, 29)
+
+		// Search is a case-insensitive substring match, and "_" is not a wildcard
+		page, err = a.UsersPage(&UserFilter{Search: "ER1", Limit: 5})
+		require.Nil(t, err)
+		require.Equal(t, int64(10), page.Total) // user10 .. user19
+		require.Len(t, page.Users, 5)
+		require.Equal(t, "user10", page.Users[0].Name)
+		page, err = a.UsersPage(&UserFilter{Search: "e_o"})
+		require.Nil(t, err)
+		require.Equal(t, int64(1), page.Total)
+		require.Equal(t, "some_one", page.Users[0].Name)
+		page, err = a.UsersPage(&UserFilter{Search: "%"})
+		require.Nil(t, err)
+		require.Equal(t, int64(0), page.Total)
+		require.Len(t, page.Users, 0)
+	})
+}
+
+func TestManager_AccessEntries(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newManager(&Config{
+			DefaultAccess:       PermissionDenyAll,
+			BcryptCost:          bcrypt.MinCost,
+			QueueWriterInterval: DefaultUserStatsQueueWriterInterval,
+			ProvisionEnabled:    true,
+			Users: []*User{
+				{Name: "provisioned", Hash: "$2a$10$YLiO8U21sX1uhZamTLJXHuxgVC0Z/GKISibrKCLohPgtG7yIxSk4C", Role: RoleUser},
+			},
+			Access: map[string][]*Grant{
+				"provisioned": {{TopicPattern: "prov_*", Permission: PermissionRead}},
+			},
+		})
+		t.Cleanup(func() { a.Close() })
+		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+		require.Nil(t, a.AddUser("emma", "emma", RoleUser, false))
+		require.Nil(t, a.AllowAccess("ben", "alerts", PermissionReadWrite))
+		require.Nil(t, a.AllowAccess(Everyone, "announce*", PermissionRead))
+		require.Nil(t, a.AddReservation("emma", "emmas_topic", PermissionDenyAll, 0))
+
+		// Everything, sorted by topic and then username (Everyone last)
+		entries, total, err := a.AccessEntries(&AccessFilter{})
+		require.Nil(t, err)
+		require.Equal(t, int64(5), total)
+		require.Equal(t, []*AccessEntry{
+			{Username: "ben", TopicPattern: "alerts", Permission: PermissionReadWrite},
+			{Username: Everyone, TopicPattern: "announce*", Permission: PermissionRead},
+			{Username: "emma", TopicPattern: "emmas_topic", Permission: PermissionReadWrite, Owner: "emma"},
+			{Username: Everyone, TopicPattern: "emmas_topic", Permission: PermissionDenyAll, Owner: "emma"},
+			{Username: "provisioned", TopicPattern: "prov_*", Permission: PermissionRead, Provisioned: true},
+		}, entries)
+
+		// Paging
+		entries, total, err = a.AccessEntries(&AccessFilter{Limit: 2, Offset: 2})
+		require.Nil(t, err)
+		require.Equal(t, int64(5), total)
+		require.Len(t, entries, 2)
+		require.Equal(t, "emmas_topic", entries[0].TopicPattern)
+
+		// Search matches topic or username; "_" is matched literally
+		entries, total, err = a.AccessEntries(&AccessFilter{Search: "s_t"})
+		require.Nil(t, err)
+		require.Equal(t, int64(2), total)
+		require.Equal(t, "emmas_topic", entries[0].TopicPattern)
+		entries, total, err = a.AccessEntries(&AccessFilter{Search: "BEN"})
+		require.Nil(t, err)
+		require.Equal(t, int64(1), total)
+		require.Equal(t, "alerts", entries[0].TopicPattern)
+		entries, _, err = a.AccessEntries(&AccessFilter{Search: "prov_*"})
+		require.Nil(t, err)
+		require.Len(t, entries, 1)
+	})
+}
+
+func TestManager_TierUsersCount(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddTier(&Tier{Code: "pro", Name: "Pro"}))
+		require.Nil(t, a.AddTier(&Tier{Code: "empty", Name: "Empty"}))
+		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+		require.Nil(t, a.AddUser("emma", "emma", RoleUser, false))
+		require.Nil(t, a.ChangeTier("ben", "pro"))
+		require.Nil(t, a.ChangeTier("emma", "pro"))
+
+		counts, err := a.TierUsersCount()
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"pro": 2, "empty": 0}, counts)
+	})
+}
+
+func TestManager_ReservationEntries(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+		require.Nil(t, a.AddUser("emma", "emma", RoleUser, false))
+		require.Nil(t, a.AddReservation("ben", "bens_topic", PermissionRead, 0))
+		require.Nil(t, a.AddReservation("emma", "alerts", PermissionDenyAll, 0))
+		require.Nil(t, a.AddReservation("emma", "emmas_topic", PermissionReadWrite, 0))
+		require.Nil(t, a.AllowAccess("ben", "granted", PermissionRead))   // Not a reservation
+		require.Nil(t, a.AllowAccess(Everyone, "public", PermissionRead)) // Not a reservation
+
+		// All reservations, sorted by topic
+		entries, total, err := a.ReservationEntries(&AccessFilter{})
+		require.Nil(t, err)
+		require.Equal(t, int64(3), total)
+		require.Equal(t, []*ReservationEntry{
+			{Username: "emma", Topic: "alerts", Everyone: PermissionDenyAll},
+			{Username: "ben", Topic: "bens_topic", Everyone: PermissionRead},
+			{Username: "emma", Topic: "emmas_topic", Everyone: PermissionReadWrite},
+		}, entries)
+
+		// Paging, and search by topic or username
+		entries, total, err = a.ReservationEntries(&AccessFilter{Limit: 1, Offset: 1})
+		require.Nil(t, err)
+		require.Equal(t, int64(3), total)
+		require.Equal(t, "bens_topic", entries[0].Topic)
+		entries, total, err = a.ReservationEntries(&AccessFilter{Search: "EMMA"})
+		require.Nil(t, err)
+		require.Equal(t, int64(2), total)
+		require.Len(t, entries, 2)
+		entries, total, err = a.ReservationEntries(&AccessFilter{Search: "s_t"})
+		require.Nil(t, err)
+		require.Equal(t, int64(2), total) // bens_topic, emmas_topic
+		require.Equal(t, "bens_topic", entries[0].Topic)
+	})
+}
+
 func TestManager_EnqueueStats_DeltasAccumulate(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		conf := &Config{

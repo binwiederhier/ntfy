@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"math"
 	"regexp"
 	"strings"
 
@@ -22,6 +23,7 @@ var (
 	allowedTopicPatternRegex = regexp.MustCompile(`^[-_*A-Za-z0-9]{1,64}$`) // Adds '*' for wildcards!
 	allowedTierRegex         = regexp.MustCompile(`^[-_A-Za-z0-9]{1,64}$`)
 	allowedTokenRegex        = regexp.MustCompile(`^tk_[-_A-Za-z0-9]{29}$`) // Must be tokenLength-len(tokenPrefix)
+	sqlLikeEscaper           = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 )
 
 // AllowedRole returns true if the given role can be used for new users
@@ -130,4 +132,18 @@ func escapeUnderscore(s string) string {
 
 func unescapeUnderscore(s string) string {
 	return strings.ReplaceAll(s, "\\_", "_")
+}
+
+// toSQLSearchPattern converts a search string to a case-insensitive "contains" LIKE pattern (to be
+// compared against a LOWER()ed column), escaping LIKE wildcards so they are matched literally.
+func toSQLSearchPattern(s string) string {
+	return "%" + sqlLikeEscaper.Replace(strings.ToLower(s)) + "%"
+}
+
+// toSQLLimit converts a page limit to a SQL LIMIT value; zero or negative means no limit
+func toSQLLimit(limit int) int64 {
+	if limit <= 0 {
+		return math.MaxInt32
+	}
+	return int64(limit)
 }

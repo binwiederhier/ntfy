@@ -242,6 +242,10 @@ type Config struct {
 	BuildVersion                         string        // Injected by App
 	BuildDate                            string        // Injected by App
 	BuildCommit                          string        // Injected by App
+	LegalName                            string `yaml:"legal-name" json:"legal_name"`
+    LegalEmail                           string `yaml:"legal-email" json:"legal_email"`
+    PrivacyPolicyURL                     string `yaml:"privacy-policy-url" json:"privacy_policy_url"`
+    LegalNoticeURL                       string `yaml:"legal-notice-url" json:"legal_notice_url"`
 }
 
 // NewConfig instantiates a default new server config
@@ -356,6 +360,10 @@ func NewConfig() *Config {
 		BuildVersion:                         "",
 		BuildDate:                            "",
 		BuildCommit:                          "",
+		LegalName:                            "",
+		LegalEmail:                           "",
+		PrivacyPolicyURL:                     "",
+		LegalNoticeURL:                       "",
 	}
 }
 

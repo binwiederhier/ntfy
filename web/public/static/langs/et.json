@@ -459,5 +459,10 @@
     "account_basics_emails_no_primary_warning": "Tagamaks, et saada peale salasõna unustamist/kaotamist vajadusel taastada ligipääsu oma kasutajakontole põhiline e-posti aadress.",
     "account_basics_emails_dialog_title": "Lisa e-posti aadress",
     "account_basics_emails_dialog_description": "Sisesta kasutajakontole lisatav e-posti aadress. Kinnitamaks, et tegemist on sinu e-posti aadressiga saadame sinna kinnituslingi.",
-    "account_usage_emails_none": "Selle kasutajakontoga seotud teavitusi pole võimalik saata"
+    "account_usage_emails_none": "Selle kasutajakontoga seotud teavitusi pole võimalik saata",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Nimi",
+    "prefs_legal_email": "E-post",
+    "prefs_legal_notice": "Õigusteave",
+    "prefs_privacy_policy": "Privaatsuspoliitika"
 }

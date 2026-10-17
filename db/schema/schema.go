@@ -115,12 +115,12 @@ func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migr
 // targetVersion returns the schema version the steps lead to: the last step's To, or 1
 // without steps. Steps go one version at a time and must be contiguous, so a forgotten or
 // mis-keyed one fails at startup.
-func (migrations Migrations) targetVersion() (int, error) {
-	if len(migrations) == 0 {
+func (m Migrations) targetVersion() (int, error) {
+	if len(m) == 0 {
 		return 1, nil
 	}
 	first, last := math.MaxInt, 0
-	for k := range migrations {
+	for k := range m {
 		if k.To != k.From+1 {
 			return 0, fmt.Errorf("migration step from version %d to %d is invalid, a step goes one version at a time", k.From, k.To)
 		}
@@ -130,7 +130,7 @@ func (migrations Migrations) targetVersion() (int, error) {
 		return 0, fmt.Errorf("migration step from version %d is invalid, steps start at version 1", first)
 	}
 	for v := first; v < last; v++ {
-		if _, ok := migrations[MigrationKey{From: v, To: v + 1}]; !ok {
+		if _, ok := m[MigrationKey{From: v, To: v + 1}]; !ok {
 			return 0, fmt.Errorf("missing migration step from version %d to %d", v, v+1)
 		}
 	}
@@ -139,9 +139,9 @@ func (migrations Migrations) targetVersion() (int, error) {
 
 // minVersion returns the oldest schema version whose code still runs on the schema the steps
 // lead to: the To of the newest breaking step, or 1 if no step is breaking
-func (migrations Migrations) minVersion() int {
+func (m Migrations) minVersion() int {
 	minVersion := 1
-	for k, step := range migrations {
+	for k, step := range m {
 		if step.Breaking && k.To > minVersion {
 			minVersion = k.To
 		}

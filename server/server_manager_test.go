@@ -46,8 +46,8 @@ func TestServer_Manager_ExpiresDeliveries(t *testing.T) {
 
 func TestServer_Manager_SharedJobsRunOnLeaderOnly(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		// A passive (non-leader) node must not prune the shared database, nor overwrite the
-		// stored message total with its own count, which only covers its own publishes
+		// A passive (non-leader) node must not prune the shared database. The stored message
+		// total is written by every node, as a delta, so another node's count survives
 		s := newTestServer(t, newTestConfig(t, databaseURL))
 		b := &fakeCluster{}
 		b.setLeader(false)
@@ -58,7 +58,7 @@ func TestServer_Manager_SharedJobsRunOnLeaderOnly(t *testing.T) {
 		require.Equal(t, 200, rr.Code)
 		m := toMessage(t, rr.Body.String())
 		require.Nil(t, s.messageCache.ExpireMessages("mytopic"))
-		require.Nil(t, s.messageCache.UpdateStats(500))
+		require.Nil(t, s.messageCache.AddStats(500))
 
 		// Not the leader: nothing shared is touched
 		s.execManager()
@@ -66,15 +66,12 @@ func TestServer_Manager_SharedJobsRunOnLeaderOnly(t *testing.T) {
 		require.Nil(t, err)
 		messages, err := s.messageCache.Stats()
 		require.Nil(t, err)
-		require.Equal(t, int64(500), messages)
+		require.GreaterOrEqual(t, messages, int64(500))
 
-		// Leader: expired messages are pruned and the total is written
+		// Leader: expired messages are pruned
 		b.setLeader(true)
 		s.execManager()
 		_, err = s.messageCache.Message(m.ID)
 		require.Equal(t, model.ErrMessageNotFound, err)
-		messages, err = s.messageCache.Stats()
-		require.Nil(t, err)
-		require.Equal(t, s.messages, messages)
 	})
 }

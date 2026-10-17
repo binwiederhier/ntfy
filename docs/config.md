@@ -2212,6 +2212,52 @@ applies the prefix):
     bantime = 1h
     ```
 
+## Clustering (experimental)
+ntfy can run as a **cluster of stateless nodes** behind a load balancer or DNS round-robin, so you can scale
+horizontally and survive single-node failures. Clustering is **experimental** and requires:
+
+* **PostgreSQL** as the database backend (`database-url`, see [database options](#database-options)); the shared
+  database carries all durable state (messages, users, web push) plus the cluster coordination tables.
+* **Shared attachment storage** if you use [attachments](#attachments): per-node cache directories cannot serve
+  files uploaded via another node.
+
+Clustering is enabled by setting `experimental-cluster-listen`. Nodes discover each other through the shared database and
+deliver published messages to subscribers on any node directly over a private HTTP listener. Messages, delayed
+messages, [rate limits and daily quotas](#rate-limiting), UnifiedPush subscriber-based rate limiting, and access
+control all behave as if the cluster were one server: a visitor spreading requests across N nodes does not get
+N times the limits, scheduled messages are delivered exactly once, and revoking access disconnects subscribers
+on every node.
+
+Example config for a node (all nodes are identical except `experimental-cluster-node-id`, `experimental-cluster-listen` and
+`experimental-cluster-advertise-url`):
+
+``` yaml
+base-url: "https://ntfy.example.com"
+database-url: "postgres://user:pass@dbhost:5432/ntfy"
+
+experimental-cluster-node-id: "node-1"                       # stable identity, e.g. the hostname
+experimental-cluster-listen: "10.0.0.5:2587"                 # private network interface!
+experimental-cluster-advertise-url: "http://10.0.0.5:2587"   # how the other nodes reach this one
+experimental-cluster-secret: "long-random-shared-secret"     # must match on all nodes
+```
+
+A few important notes:
+
+* **The cluster listener must not be publicly reachable.** It accepts message injections from anyone with the
+  shared secret, so bind it to a private network interface and firewall it to the peer nodes.
+* `experimental-cluster-node-id` must be **stable across restarts** (use the hostname). A node restarting under the same ID
+  reuses its registry entry.
+* **Health checks:** point your load balancer at `/v1/ready`, not `/v1/health` (see [Health checks](#health-checks)).
+  An unhealthy active node stops being ready while another active node can take its clients; your health checker
+  should still fail open (never remove all nodes at once): during a full database outage, all nodes report unhealthy
+  while message delivery keeps working.
+* Cross-node delivery is fire-and-forget. A message a node does not receive from its peer still reaches its
+  subscribers: every node also reads new messages from the database and delivers those its subscribers have not
+  had, a little later than live delivery. Messages published with `cache: no` are not in the database, so for
+  those cross-node delivery is best effort.
+* Some limiters deliberately remain per-node: active subscription counts (connections are per-node by nature),
+  and the topic-creation, signup and login-failure limiters (they protect node-local resources).
+
 ## IPv6 support
 ntfy fully supports IPv6, though there are a few things to keep in mind.
 

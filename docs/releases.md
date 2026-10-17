@@ -2198,6 +2198,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
+* **Experimental clustering (branch `cluster3`):** ntfy can run as a cluster of stateless nodes behind a shared PostgreSQL database. Nodes discover each other via a node registry, deliver published messages to subscribers on any node over a private peer mesh (`experimental-cluster-listen`, `experimental-cluster-node-id`, `experimental-cluster-advertise-url`, `experimental-cluster-secret`), and elect a leader for singleton background jobs. Scheduled (delayed) messages are claimed by exactly one node, daily visitor quotas (messages, emails, calls) and the request/bandwidth budgets are enforced cluster-wide, UnifiedPush subscriber-based rate limiting works across nodes, and reservation takeover / access revocation disconnect subscribers on all nodes
 
 **Bug fixes + maintenance:**
 

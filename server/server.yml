@@ -62,13 +62,12 @@
 # database-url: <connection-string>
 
 # EXPERIMENTAL: Clustering options. Setting "experimental-cluster-listen" runs this server as one
-# node of a cluster that shares a PostgreSQL database. This is not ready for production: dropped
-# node-to-node batches are not recovered yet, and rate limits and quotas are enforced per node,
-# not across the cluster. The "experimental-" prefix means these option names may still change.
+# node of a cluster that shares a PostgreSQL database. This is not ready for production. The
+# "experimental-" prefix means these option names may still change.
 #
-# - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes
-#   talk to. Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners
-#   never serve the fan-out endpoint. Setting it is what enables clustering.
+# - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes talk to.
+#   Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners never
+#   serve the fan-out endpoint.
 # - experimental-cluster-node-id is a stable per-node identifier (e.g. the hostname); required.
 # - experimental-cluster-advertise-url is the base URL peer nodes use to reach this node's
 #   fan-out listener; it defaults to "http://<experimental-cluster-listen>". It must be set
@@ -94,7 +93,7 @@
 #
 # experimental-cluster-listen: <ip:port>
 # experimental-cluster-node-id: <hostname>
-# experimental-cluster-advertise-url: "http://<ip:port>"
+# experimental-cluster-advertise-url: "http://<experimental-cluster-listen>"
 # experimental-cluster-secret: <secret>
 # experimental-cluster-batch-linger: 500ms
 # experimental-cluster-role: active

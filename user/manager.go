@@ -101,6 +101,14 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 	return manager, nil
 }
 
+// ReloadAccessCache refreshes the in-memory access cache for the given users (all users when
+// none are named) from the primary database. No-op when the cache is disabled. Callers that
+// learn about an ACL change made elsewhere (another cluster node revoking access) use it to
+// avoid serving a stale permission until the periodic reload.
+func (a *Manager) ReloadAccessCache(usernames ...string) error {
+	return a.maybeReloadAccessCache(usernames...)
+}
+
 // maybeReloadAccessCache refreshes the in-memory access cache from the
 // primary database. No-op when the cache is disabled. With no usernames it
 // does a full bulk reload; with one or more it refreshes only those users'
@@ -441,6 +449,15 @@ func (a *Manager) ResetStats() error {
 	}
 	a.statsQueue = make(map[string]*Stats)
 	return nil
+}
+
+// ResetStatsQueue drops the queued stats deltas without touching the database. Nodes that do
+// not run the shared daily reset (only one node in a cluster does) use it so yesterday's
+// increments cannot be added on top of the freshly zeroed rows.
+func (a *Manager) ResetStatsQueue() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.statsQueue = make(map[string]*Stats)
 }
 
 // EnqueueUserStats adds the given stats *delta* to a queue which writes out user stats

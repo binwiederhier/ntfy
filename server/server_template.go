@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v2"
+	"heckel.io/ntfy/v2/action"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/template/gotext"
 	"heckel.io/ntfy/v2/util"
@@ -113,7 +114,115 @@ func (s *Server) renderTemplateFromFile(ctx context.Context, m *model.Message, t
 			return errHTTPBadRequestPriorityInvalid
 		}
 	}
+	if tpl.Tags != nil {
+		if m.Tags, err = s.renderTemplateTags(ctx, templateName, tpl.Tags, peekedBody); err != nil {
+			return err
+		}
+	}
+	if tpl.Click != nil {
+		if m.Click, err = s.renderTemplate(ctx, templateName+" (click)", *tpl.Click, peekedBody); err != nil {
+			return err
+		}
+	}
+	if tpl.Icon != nil {
+		if m.Icon, err = s.renderTemplate(ctx, templateName+" (icon)", *tpl.Icon, peekedBody); err != nil {
+			return err
+		} else if m.Icon != "" && !urlRegex.MatchString(m.Icon) {
+			return errHTTPBadRequestIconURLInvalid
+		}
+	}
+	if tpl.Markdown {
+		m.ContentType = contentTypeMarkdown
+	}
+	if tpl.Actions != nil {
+		if m.Actions, err = s.renderTemplateActions(ctx, templateName, tpl.Actions, peekedBody); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// renderTemplateTags renders each tag of a template file, dropping tags that render to an empty string,
+// so that a tag can be made conditional, e.g. {{ if .critical }}warning{{ end }}.
+func (s *Server) renderTemplateTags(ctx context.Context, templateName string, tags []string, peekedBody string) ([]string, error) {
+	rendered := make([]string, 0, len(tags))
+	tagsSize := 0
+	for _, tag := range tags {
+		r, err := s.renderTemplate(ctx, templateName+" (tags)", tag, peekedBody)
+		if err != nil {
+			return nil, err
+		} else if r == "" {
+			continue
+		}
+		rendered = append(rendered, r)
+		tagsSize += len(r)
+	}
+	if tagsSize > messageTagsSizeLimit {
+		return nil, errHTTPBadRequestTagsTooLarge
+	}
+	return rendered, nil
+}
+
+// renderTemplateActions renders every string value of a template file's actions (including header and
+// extras values), and then parses and validates the result like the JSON actions of a published message.
+func (s *Server) renderTemplateActions(ctx context.Context, templateName string, actions []map[string]any, peekedBody string) ([]*model.Action, error) {
+	rendered := make([]any, 0, len(actions))
+	for _, a := range actions {
+		r, err := s.renderTemplateValue(ctx, templateName+" (actions)", a, peekedBody)
+		if err != nil {
+			return nil, err
+		}
+		rendered = append(rendered, r)
+	}
+	actionsJSON, err := json.Marshal(rendered)
+	if err != nil {
+		return nil, errHTTPBadRequestActionsInvalid.Wrap("%s", err.Error())
+	}
+	parsed, err := action.Parse(string(actionsJSON))
+	if err != nil {
+		return nil, errHTTPBadRequestActionsInvalid.Wrap("%s", err.Error())
+	}
+	return parsed, nil
+}
+
+// renderTemplateValue renders all strings in a value decoded from YAML, descending into maps and lists.
+// YAML maps are converted to map[string]any, so the result can be marshalled to JSON.
+func (s *Server) renderTemplateValue(ctx context.Context, name string, value any, peekedBody string) (any, error) {
+	switch v := value.(type) {
+	case string:
+		return s.renderTemplate(ctx, name, v, peekedBody)
+	case map[string]any:
+		rendered := make(map[string]any, len(v))
+		for key, child := range v {
+			r, err := s.renderTemplateValue(ctx, name, child, peekedBody)
+			if err != nil {
+				return nil, err
+			}
+			rendered[key] = r
+		}
+		return rendered, nil
+	case map[any]any:
+		rendered := make(map[string]any, len(v))
+		for key, child := range v {
+			r, err := s.renderTemplateValue(ctx, name, child, peekedBody)
+			if err != nil {
+				return nil, err
+			}
+			rendered[fmt.Sprint(key)] = r
+		}
+		return rendered, nil
+	case []any:
+		rendered := make([]any, 0, len(v))
+		for _, child := range v {
+			r, err := s.renderTemplateValue(ctx, name, child, peekedBody)
+			if err != nil {
+				return nil, err
+			}
+			rendered = append(rendered, r)
+		}
+		return rendered, nil
+	}
+	return value, nil
 }
 
 // renderTemplateFromParams transforms the JSON message body according to the inline template in the

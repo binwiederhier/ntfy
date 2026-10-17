@@ -2197,6 +2197,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
+* Template files can now set `tags`, `click`, `icon`, `actions` and `markdown`, in addition to `title`, `message` and `priority` ([#1797](https://github.com/binwiederhier/ntfy/issues/1797), thanks to [@yds](https://github.com/yds) for the suggestion)
 * Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
 
 **Bug fixes + maintenance:**

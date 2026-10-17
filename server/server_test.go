@@ -4694,6 +4694,82 @@ priority: "5"
 	})
 }
 
+func TestServer_MessageTemplate_FileWithAllFields(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+		c := newTestConfig(t, databaseURL)
+		c.TemplateDir = t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(c.TemplateDir, "gitea.yml"), []byte(`
+title: "{{.repository.name}} commit: {{.head_commit.id | trunc 7}}"
+message: "{{.head_commit.message}}"
+tags:
+  - memo
+  - "{{.repository.name}}"
+  - "{{ if false }}dropped when empty{{ end }}"
+click: "{{.head_commit.url}}"
+icon: "{{.repository.avatar_url}}"
+markdown: true
+actions:
+  - action: view
+    label: "Compare {{.repository.name}}"
+    url: "{{.compare_url}}"
+    clear: true
+  - action: http
+    label: Ack
+    url: https://ntfy.example.com/ack
+    headers:
+      X-Commit: "{{.head_commit.id}}"
+`), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(c.TemplateDir, "bad-icon.yml"), []byte(`
+message: "hi"
+icon: "{{.repository.name}}"
+`), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(c.TemplateDir, "bad-action.yml"), []byte(`
+message: "hi"
+actions:
+  - action: view
+    label: "No URL"
+`), 0644))
+		s := newTestServer(t, c)
+
+		// All fields are rendered from the template file (#1797)
+		body := `{"repository":{"name":"ntfy","avatar_url":"https://example.com/ntfy.png"},"compare_url":"https://example.com/compare/abc","head_commit":{"id":"0123456789abcdef","message":"Fix things","url":"https://example.com/commit/0123456789abcdef"}}`
+		response := request(t, s, "POST", "/mytopic?tpl=gitea", body, nil)
+		require.Equal(t, 200, response.Code, response.Body.String())
+		m := toMessage(t, response.Body.String())
+		require.Equal(t, "ntfy commit: 0123456", m.Title)
+		require.Equal(t, "Fix things", m.Message)
+		require.Equal(t, []string{"memo", "ntfy"}, m.Tags)
+		require.Equal(t, "https://example.com/commit/0123456789abcdef", m.Click)
+		require.Equal(t, "https://example.com/ntfy.png", m.Icon)
+		require.Equal(t, "text/markdown", m.ContentType)
+		require.Len(t, m.Actions, 2)
+		require.Equal(t, "view", m.Actions[0].Action)
+		require.Equal(t, "Compare ntfy", m.Actions[0].Label)
+		require.Equal(t, "https://example.com/compare/abc", m.Actions[0].URL)
+		require.True(t, m.Actions[0].Clear)
+		require.Equal(t, "http", m.Actions[1].Action)
+		require.Equal(t, map[string]string{"X-Commit": "0123456789abcdef"}, m.Actions[1].Headers)
+
+		// Template file fields override the request
+		response = request(t, s, "POST", "/mytopic?tpl=gitea&tags=prod&click=https://example.com/other", body, nil)
+		require.Equal(t, 200, response.Code)
+		m = toMessage(t, response.Body.String())
+		require.Equal(t, []string{"memo", "ntfy"}, m.Tags)
+		require.Equal(t, "https://example.com/commit/0123456789abcdef", m.Click)
+
+		// Rendered icon must be a URL
+		response = request(t, s, "POST", "/mytopic?tpl=bad-icon", body, nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40021, toHTTPError(t, response.Body.String()).Code)
+
+		// Rendered actions are validated
+		response = request(t, s, "POST", "/mytopic?tpl=bad-action", body, nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40018, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
 func TestServer_DeleteMessage(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()

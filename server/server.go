@@ -1609,6 +1609,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		meterPollBandwidth = true
 		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
+	w.Header().Set("Incremental", "?1") // Ask proxies to forward the stream without buffering (RFC 10036)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	subscriberIDs := make([]int, 0)

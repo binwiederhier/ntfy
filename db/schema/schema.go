@@ -11,7 +11,10 @@
 //
 // If a breaking migration is unavoidable, mark its step with Breaking: the store's minimum version
 // (the oldest schema version whose code still runs on the schema) becomes the step's result, and
-// older code then refuses to start instead of misreading the data.
+// older code then refuses to start instead of misreading the data. The minimum is only checked
+// when a store starts: nodes already running older code keep going, and code from before the
+// minimum existed never checks it. So a breaking migration also needs a deploy that stops or
+// upgrades every node running older code first; it cannot be rolled out node by node.
 package schema
 
 import (

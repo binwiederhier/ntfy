@@ -13,7 +13,7 @@ const (
 
 // MigrateFunc applies one schema change inside the setup transaction: the initial creation of
 // a store's tables, or one step upgrading a store from version N to N+1. Migrations needing
-// config capture it via closure, e.g. func migrations(cacheDuration time.Duration) map[MigrationKey]Migration.
+// config capture it via closure, e.g. func migrations(cacheDuration time.Duration) Migrations.
 type MigrateFunc func(tx *sql.Tx) error
 
 // AsMigrateFunc converts a simple query to a migration function
@@ -35,6 +35,10 @@ type Migration struct {
 	Migrate  MigrateFunc
 	Breaking bool // Older code cannot run on the result (see package doc): the store's minimum version becomes the step's To
 }
+
+// Migrations are a store's migration steps, keyed by the versions each upgrades between. Steps go
+// one version at a time without gaps, which Migrate checks at startup.
+type Migrations map[MigrationKey]Migration
 
 // Nop is a migration step that does nothing, for versions where a dialect has no work to do (e.g.
 // when only the other dialect's schema changed)

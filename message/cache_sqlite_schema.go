@@ -183,8 +183,8 @@ var (
 // sqliteMigrations returns the migration steps, keyed by the version they upgrade FROM. The
 // cache duration is carried into the 9 -> 10 step via closure (it backfills "expires" from it).
 // Always append migrations at the end, never insert in the middle.
-func sqliteMigrations(cacheDuration time.Duration) map[schema.MigrationKey]schema.Migration {
-	return map[schema.MigrationKey]schema.Migration{
+func sqliteMigrations(cacheDuration time.Duration) schema.Migrations {
+	return schema.Migrations{
 		{From: 1, To: 2}: schema.Query(sqliteMigrate1To2AlterMessagesTableQuery),
 		{From: 2, To: 3}: schema.Query(sqliteMigrate2To3AlterMessagesTableQuery),
 		{From: 3, To: 4}: schema.Query(sqliteMigrate3To4AlterMessagesTableQuery),

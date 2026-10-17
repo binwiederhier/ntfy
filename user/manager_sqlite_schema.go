@@ -369,7 +369,7 @@ var (
 
 	// sqliteMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
-	sqliteMigrations = map[schema.MigrationKey]schema.Migration{
+	sqliteMigrations = schema.Migrations{
 		{From: 1, To: 2}: schema.Func(sqliteMigrateFrom1),
 		{From: 2, To: 3}: schema.Query(sqliteMigrate2To3UpdateQueries),
 		{From: 3, To: 4}: schema.Query(sqliteMigrate3To4UpdateQueries),

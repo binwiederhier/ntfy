@@ -48,13 +48,13 @@ const (
 
 // Migrate creates or upgrades the named store's schema in one transaction, or creates a new
 // database using the "create" function. Both versions follow from the steps: the target is the
-// version after the last step (see targetVersionOf), the minimum the version after the newest
+// version after the last step (see Migrations.targetVersion), the minimum the version after the newest
 // breaking step, or 1 (see package doc).
-func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migrations map[MigrationKey]Migration) error {
+func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migrations Migrations) error {
 	if dialect != Postgres && dialect != SQLite {
 		return fmt.Errorf("unsupported schema dialect %d", dialect)
 	}
-	targetVersion, err := targetVersionOf(migrations)
+	targetVersion, err := migrations.targetVersion()
 	if err != nil {
 		return fmt.Errorf("invalid %s migration steps: %w", store, err)
 	}
@@ -70,7 +70,7 @@ func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migr
 			return fmt.Errorf("cannot acquire %s schema advisory lock: %w", store, err)
 		}
 	}
-	minVersion := minVersionOf(migrations)
+	minVersion := migrations.minVersion()
 	if err := ensureVersionTable(tx, dialect); err != nil {
 		return err
 	}
@@ -112,10 +112,10 @@ func Migrate(db *sql.DB, dialect Dialect, store string, create MigrateFunc, migr
 	return tx.Commit()
 }
 
-// targetVersionOf returns the schema version a store's steps lead to: the last step's To, or 1
+// targetVersion returns the schema version the steps lead to: the last step's To, or 1
 // without steps. Steps go one version at a time and must be contiguous, so a forgotten or
 // mis-keyed one fails at startup.
-func targetVersionOf(migrations map[MigrationKey]Migration) (int, error) {
+func (migrations Migrations) targetVersion() (int, error) {
 	if len(migrations) == 0 {
 		return 1, nil
 	}
@@ -137,9 +137,9 @@ func targetVersionOf(migrations map[MigrationKey]Migration) (int, error) {
 	return last, nil
 }
 
-// minVersionOf returns the oldest schema version whose code still runs on the schema the steps
+// minVersion returns the oldest schema version whose code still runs on the schema the steps
 // lead to: the To of the newest breaking step, or 1 if no step is breaking
-func minVersionOf(migrations map[MigrationKey]Migration) int {
+func (migrations Migrations) minVersion() int {
 	minVersion := 1
 	for k, step := range migrations {
 		if step.Breaking && k.To > minVersion {

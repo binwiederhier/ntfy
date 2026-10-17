@@ -6,11 +6,29 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.31.1 | Oct 16, 2026  |
+| ntfy server      | v2.32.0 | Oct 18, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+### ntfy server v2.32.0
+Released October 18, 2026
+
+This release prepares ntfy.sh for a passive cluster node: jobs that write to the shared database run only on the
+cluster leader, and each database store now records the oldest schema version it works with. Streaming subscriptions
+also tell proxies not to buffer them.
+
+**Features:**
+
+* Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
+
+**Bug fixes + maintenance:**
+
+* Fix template files (`?tpl=<name>`) ignoring the priority sent with the request when the file has no `priority` key ([#2045](https://github.com/binwiederhier/ntfy/issues/2045), thanks to [@6801318d8d](https://github.com/6801318d8d) for reporting)
+* Return HTTP 409 instead of 500 when deleting or changing the password of a user provisioned via `auth-users` through the admin API ([#2062](https://github.com/binwiederhier/ntfy/issues/2062), thanks to [@daniloamiranda](https://github.com/daniloamiranda) for reporting)
+* Run the shared-database housekeeping (pruning expired messages, attachments and tokens, web push expiry warnings, writing the published-messages total) on the cluster leader only, so a passive node no longer overwrites the total with its own count (experimental clustering)
+* Record the oldest schema version each database store still works with, so an older ntfy refuses to start on a database that a newer version migrated in a breaking way, instead of misreading it; none of today's migrations are breaking ([#2060](https://github.com/binwiederhier/ntfy/pull/2060))
 
 ### ntfy server v2.31.1
 Released October 16, 2026
@@ -2192,18 +2210,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.32.0 (UNRELEASED)
-
-**Features:**
-
-* Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
-
-**Bug fixes + maintenance:**
-
-* Fix template files (`?tpl=<name>`) ignoring the priority sent with the request when the file has no `priority` key ([#2045](https://github.com/binwiederhier/ntfy/issues/2045), thanks to [@6801318d8d](https://github.com/6801318d8d) for reporting)
-* Return HTTP 409 instead of 500 when deleting or changing the password of a user provisioned via `auth-users` through the admin API ([#2062](https://github.com/binwiederhier/ntfy/issues/2062), thanks to [@daniloamiranda](https://github.com/daniloamiranda) for reporting)
-* Run the shared-database housekeeping (pruning expired messages, attachments and tokens, web push expiry warnings, writing the published-messages total) on the cluster leader only, so a passive node no longer overwrites the total with its own count (experimental clustering)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

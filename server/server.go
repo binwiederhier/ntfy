@@ -349,6 +349,7 @@ func New(conf *Config) (*Server, error) {
 		Role:            conf.ClusterRole,
 		Secret:          conf.ClusterSecret,
 		BatchLinger:     conf.ClusterBatchLinger,
+		CancelFunc:      s.applySubscriberCancel,
 		IsolatedFunc:    s.maybeCloseLocalSubscribers,
 		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)

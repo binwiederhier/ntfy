@@ -2,6 +2,7 @@ package server
 
 import (
 	"math/rand"
+	"slices"
 	"sync"
 	"time"
 
@@ -253,6 +254,19 @@ func (t *topic) CancelSubscriberUser(userID string) {
 			return
 		}
 	}
+}
+
+// SubscriberUserIDs returns the distinct non-empty user IDs of this topic's subscribers
+func (t *topic) SubscriberUserIDs() []string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	userIDs := make([]string, 0, len(t.subscribers))
+	for _, s := range t.subscribers {
+		if s.userID != "" && !slices.Contains(userIDs, s.userID) {
+			userIDs = append(userIDs, s.userID)
+		}
+	}
+	return userIDs
 }
 
 func (t *topic) cancelUserSubscriber(s *topicSubscriber) {

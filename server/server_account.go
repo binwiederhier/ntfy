@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/twilio"
@@ -554,6 +555,8 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 		return err
 	}
 	t.CancelSubscribersExceptUser(u.ID)
+	// The topic/subscriber registry is per-node; peer nodes must kick their subscribers too
+	s.cluster.BroadcastState(&cluster.State{SubscriberCancels: []*cluster.SubscriberCancel{{Topic: t.ID, ExceptUserID: u.ID}}})
 	return s.writeJSON(w, newSuccessResponse())
 }
 

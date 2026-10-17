@@ -14,6 +14,10 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
+const (
+	contentTypeMarkdown = "text/markdown"
+)
+
 var (
 	mimeDecoder mime.WordDecoder
 
@@ -202,7 +206,7 @@ func maybeIgnoreSpecialHeader(name, value string) string {
 func isMarkdownContentType(contentType string) bool {
 	mediaType, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		return strings.ToLower(contentType) == "text/markdown"
+		return strings.ToLower(contentType) == contentTypeMarkdown
 	}
-	return strings.ToLower(mediaType) == "text/markdown"
+	return strings.ToLower(mediaType) == contentTypeMarkdown
 }

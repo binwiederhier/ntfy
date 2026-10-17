@@ -129,7 +129,7 @@ func (t templateMode) FileName() string {
 	return ""
 }
 
-// templateFile represents a template file with title, message, and priority
+// templateFile represents a template file with title, message, priority, tags, click, icon, markdown, and actions
 // It is used for file-based templates, e.g. grafana, influxdb, etc.
 //
 // Example YAML:
@@ -140,9 +140,14 @@ func (t templateMode) FileName() string {
 //		   It can be multiline.
 //	  priority: '{{ if eq .status "Error" }}5{{ else }}3{{ end }}'
 type templateFile struct {
-	Title    *string `yaml:"title"`
-	Message  *string `yaml:"message"`
-	Priority *string `yaml:"priority"`
+	Title    *string          `yaml:"title"`
+	Message  *string          `yaml:"message"`
+	Priority *string          `yaml:"priority"`
+	Tags     []string         `yaml:"tags"`
+	Click    *string          `yaml:"click"`
+	Icon     *string          `yaml:"icon"`
+	Markdown bool             `yaml:"markdown"`
+	Actions  []map[string]any `yaml:"actions"`
 }
 
 type apiHealthResponse struct {

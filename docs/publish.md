@@ -3004,8 +3004,18 @@ and set the `X-Template` header or query parameter to the name of the template f
 For example, if you have a template file `/etc/ntfy/templates/myapp.yml`, you can set the header `X-Template: myapp` or
 the query parameter `?template=myapp` to use it.
 
-Template files must have the `.yml` (not: `.yaml`!) extension and must be formatted as YAML. They may contain `title`, `message`, and `priority` keys,
-which are interpreted as Go templates.
+Template files must have the `.yml` (not: `.yaml`!) extension and must be formatted as YAML. They may contain the following keys,
+which are interpreted as Go templates:
+
+* `title`, `message` and `priority`
+* `tags`: a list of [tags](#tags-emojis), tags that render to an empty string are dropped
+* `click`: the [click action](#click-action) URL
+* `icon`: the [icon](#icons) URL
+* `actions`: a list of [action buttons](#action-buttons), in the same format as in the [JSON publishing](#publish-as-json) API
+* `markdown`: `true` to render the message as [Markdown](#markdown-formatting) (not a template)
+
+Keys set in the template file override the corresponding request parameters. Note that YAML values starting with `{{`
+must be quoted, e.g. `click: "{{ .url }}"`.
 
 Here's an **example custom template**:
 
@@ -3097,6 +3107,26 @@ header or query parameter:
             'content' => '{"status":"firing","type":"cpu","server":"ntfy.sh","percent":99}'
         ]
     ]));
+    ```
+
+Here's another example using tags, a click action, an icon and action buttons, e.g. for a Gitea push webhook:
+
+=== "Custom template (/etc/ntfy/templates/gitea.yml)"
+    ```yaml
+    title: "{{ .repository.name }}: {{ .head_commit.id | trunc 10 }}"
+    message: |
+      {{ .head_commit.message }}
+
+      Author: {{ .head_commit.author.name }}
+    tags:
+      - memo
+      - "{{ .repository.name }}"
+    click: "{{ .head_commit.url }}"
+    icon: "{{ .repository.avatar_url }}"
+    actions:
+      - action: view
+        label: Compare
+        url: "{{ .compare_url }}"
     ```
 
 Which will result in a notification that looks like this:

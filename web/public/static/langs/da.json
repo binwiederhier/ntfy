@@ -380,5 +380,10 @@
     "account_basics_phone_numbers_dialog_channel_sms": "SMS",
     "account_delete_dialog_billing_warning": "Hvis du sletter din konto, så annulleres dit abonnement med det samme. Du vil ikke længere have adgang til faktureringspanelet.",
     "prefs_notifications_min_priority_description_max": "Vis notifikationer, hvis prioritet er 5 (maks.)",
-    "account_upgrade_dialog_reservations_warning_other": "Det valgte niveau tillader færre reserverede emner end dit nuværende niveau. Før du ændrer dit niveau, <strong>slet venligst mindst {{count}} reservationer</strong>. Du kan fjerne reservationer i <Link>Indstillinger</Link>."
+    "account_upgrade_dialog_reservations_warning_other": "Det valgte niveau tillader færre reserverede emner end dit nuværende niveau. Før du ændrer dit niveau, <strong>slet venligst mindst {{count}} reservationer</strong>. Du kan fjerne reservationer i <Link>Indstillinger</Link>.",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Navn",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Juridisk meddelelse",
+    "prefs_privacy_policy": "Privatlivspolitik"
 }

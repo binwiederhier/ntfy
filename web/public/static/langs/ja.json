@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "事前割り当て",
     "account_usage_emails_none": "このアカウントではメール通知を送信できません",
     "prefs_users_dialog_base_url_invalid": "URL形式が不正です。 http:// あるいは https:// から始まる必要があります",
-    "prefs_users_dialog_base_url_exists": "このサービスURLにはユーザーが既に存在します"
+    "prefs_users_dialog_base_url_exists": "このサービスURLにはユーザーが既に存在します",
+    "prefs_legal_contact_title": "連絡先：",
+    "prefs_legal_name": "名前",
+    "prefs_legal_email": "メールアドレス",
+    "prefs_legal_notice": "法的通知",
+    "prefs_privacy_policy": "プライバシーポリシー"
 }

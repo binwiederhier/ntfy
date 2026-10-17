@@ -362,7 +362,7 @@ func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager
 	// Migrations must run before the startup queries: the 5 -> 6 table rebuilds rely on
 	// foreign keys being OFF, which is only guaranteed on fresh connections (the foreign_keys
 	// pragma is enabled as part of the builtin startup queries below)
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations); err != nil {
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations); err != nil {
 		return nil, err
 	}
 	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {

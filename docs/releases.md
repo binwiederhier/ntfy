@@ -2193,6 +2193,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.32.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Fix template files (`?tpl=<name>`) ignoring the priority sent with the request when the file has no `priority` key ([#2045](https://github.com/binwiederhier/ntfy/issues/2045), thanks to [@6801318d8d](https://github.com/6801318d8d) for reporting)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

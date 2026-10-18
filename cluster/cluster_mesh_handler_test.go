@@ -270,11 +270,11 @@ func TestMesh_Status_OneWayLinkFailure(t *testing.T) {
 	require.NotZero(t, testutil.ToFloat64(metrics.ClusterPeerLastSendSuccess.WithLabelValues("status-b")))
 
 	// And over HTTP, the way the CLI reads it
-	fetched, err := FetchStatus(context.Background(), srvB.URL, testSecret)
+	fetched, err := NewClient(testSecret, "").Status(context.Background(), srvB.URL)
 	require.Nil(t, err)
 	require.Equal(t, NodeID("status-b"), fetched.NodeID)
 	require.GreaterOrEqual(t, peerStatus(fetched, "status-a").Out.BatchesFailed, int64(1))
-	_, err = FetchStatus(context.Background(), srvB.URL, "wrong")
+	_, err = NewClient("wrong", "").Status(context.Background(), srvB.URL)
 	require.ErrorContains(t, err, "401")
 }
 

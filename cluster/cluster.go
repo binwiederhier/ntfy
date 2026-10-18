@@ -5,11 +5,8 @@
 package cluster
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -154,28 +151,4 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 		conf.NodeTTL = defaultNodeTTL
 	}
 	return newMeshCluster(conf, pool, deliver)
-}
-
-// FetchStatus reads a node's Status from its cluster listener (baseURL, e.g. http://10.0.0.5:2587),
-// authenticated with the shared secret. The CLI uses it; this package owns both ends of the format.
-func FetchStatus(ctx context.Context, baseURL, secret string) (*Status, error) {
-	url := statusURL(baseURL)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(secretHeader, secret)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("cluster status request to %s failed with HTTP %d", url, resp.StatusCode)
-	}
-	var status Status
-	if err := json.NewDecoder(io.LimitReader(resp.Body, statusMaxBytes)).Decode(&status); err != nil {
-		return nil, err
-	}
-	return &status, nil
 }

@@ -97,6 +97,7 @@ type Peer struct {
 	NodeID       string
 	AdvertiseURL string
 	Role         Role
+	HeartbeatAt  time.Time // When the peer last heartbeated, on this node's clock (database clock age at read time)
 }
 
 // Registry is the node membership table (control plane): each node upserts its own row with a
@@ -295,6 +296,7 @@ func (r *Registry) queryLiveNodes() ([]*Peer, string, bool, error) {
 		if err := rows.Scan(&p.NodeID, &p.AdvertiseURL, &p.Role, &age); err != nil {
 			return nil, "", false, err
 		}
+		p.HeartbeatAt = time.Now().Add(-time.Duration(age) * time.Second)
 		if p.NodeID != r.nodeID && p.Role == RoleActive {
 			otherActive = true
 		}

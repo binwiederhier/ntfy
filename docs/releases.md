@@ -2213,6 +2213,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.33.0 (UNRELEASED)
 
+**Features:**
+
+* Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
+
 **Security:**
 
 * Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response

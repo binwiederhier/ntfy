@@ -68,6 +68,7 @@ func (c *meshCluster) handleMessage(origin NodeID, w http.ResponseWriter, r *htt
 		return
 	}
 	log.Tag(tag).Debug("Received batch of %d message(s) from peer %s", received, origin)
+	c.recordReceived(origin, received)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -101,6 +102,14 @@ func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(c.Members()); err != nil {
 		log.Tag(tag).Err(err).Warn("Cannot write member list")
+	}
+}
+
+// handleStatus serves this node's view of the cluster to operators (see Status)
+func (c *meshCluster) handleStatus(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", contentTypeJSON)
+	if err := json.NewEncoder(w).Encode(c.Status()); err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot write cluster status")
 	}
 }
 

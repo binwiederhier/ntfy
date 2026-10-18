@@ -2251,6 +2251,30 @@ nowhere better for its clients.
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
 
+### Cluster status
+With clustering (experimental), `/v1/health` only covers a node's own database heartbeat. A link between two nodes that
+works in one direction only, e.g. because a firewall drops the cluster port one way, keeps both nodes healthy while
+messages published on one of them reach the other only late, through the database. To see each node's view of its
+peers, run `ntfy cluster status` on the node. It reads `experimental-cluster-listen` and `experimental-cluster-secret`
+from the server config, and shows per peer the message batches sent there and received from there:
+
+```
+$ ntfy cluster status
+Node nyc3-app-2: passive, not leader, healthy
+
+PEER        ROLE    LIVE  HEARTBEAT  SENT OK  FAILED  QUEUED  DROPPED  LAST SENT  RECEIVED  LAST RECEIVED
+nyc3-app-1  active  yes   2s ago     0        219     0       0        never      5120      1s ago
+
+Problems:
+  nyc3-app-1: no batch accepted, 219 failed; last error 10s ago: Post "http://10.108.0.2:2587/v1/cluster/message": context deadline exceeded
+```
+
+`ntfy cluster status --json` prints the same as JSON. It is served on the cluster listener at `/v1/cluster/status`,
+authenticated with the cluster secret in the `X-Cluster-Secret` header. With [metrics](#monitoring) enabled, the same
+counters are exported per peer: `ntfy_cluster_peer_batches_sent_total{peer,result}` (`result` is `ok` or `error`),
+`ntfy_cluster_peer_batches_received_total{peer}`, and `ntfy_cluster_peer_last_send_success_timestamp_seconds{peer}`. An
+alert on no successful send to a live peer for a few minutes catches a broken link.
+
 ## Monitoring
 If configured, ntfy can expose a `/metrics` endpoint for [Prometheus](https://prometheus.io/), which can then be used to
 create dashboards and alerts (e.g. via [Grafana](https://grafana.com/)).

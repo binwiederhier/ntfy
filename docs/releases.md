@@ -2211,6 +2211,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.33.0 (UNRELEASED)
+
+**Security:**
+
+* Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

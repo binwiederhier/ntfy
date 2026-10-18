@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
@@ -760,4 +762,74 @@ func findPeerStatus(status *Status, nodeID NodeID) *PeerStatus {
 		}
 	}
 	return nil
+}
+
+func TestMesh_PeerMetrics_SeededForNewPeer(t *testing.T) {
+	// A peer whose sends all fail must still have a last-success series (0 = never), or an alert on
+	// its age has no sample: exactly the new node behind a one-way firewall (review of #2074)
+	mesh := &meshCluster{stats: make(map[NodeID]*peerStats)}
+	mesh.updatePeerStatsNoLock(map[NodeID]*registry.Peer{"node-never-ok": {NodeID: "node-never-ok"}})
+	mesh.recordSent("node-never-ok", 1, errors.New("connection refused"))
+	series := peerMetricSeries(t, "node-never-ok")
+	require.Contains(t, series, `ntfy_cluster_peer_last_send_success_timestamp_seconds{}`)
+	require.Contains(t, series, `ntfy_cluster_peer_batches_sent_total{result="ok"}`)
+	require.Contains(t, series, `ntfy_cluster_peer_batches_sent_total{result="error"}`)
+	require.Contains(t, series, `ntfy_cluster_peer_batches_received_total{}`)
+
+	// Seeding happens once: a later refresh does not reset a recorded success
+	mesh.recordSent("node-never-ok", 1, nil)
+	mesh.updatePeerStatsNoLock(map[NodeID]*registry.Peer{"node-never-ok": {NodeID: "node-never-ok"}})
+	require.NotZero(t, peerMetricValue(t, "ntfy_cluster_peer_last_send_success_timestamp_seconds", "node-never-ok"))
+}
+
+func TestMesh_PeerMetrics_RemovedWhenPeerForgotten(t *testing.T) {
+	// When a departed peer is forgotten, its labeled series go too, so retired IDs are not exported forever
+	mesh := &meshCluster{stats: make(map[NodeID]*peerStats)}
+	mesh.recordSent("node-retired", 1, nil)
+	mesh.recordReceived("node-retired", 1)
+	mesh.stats["node-retired"].lastSeen = time.Now().Add(-peerStatsRetention - time.Hour).Unix()
+	mesh.updatePeerStatsNoLock(map[NodeID]*registry.Peer{})
+	require.NotContains(t, mesh.stats, NodeID("node-retired"))
+	require.Empty(t, peerMetricSeries(t, "node-retired"))
+}
+
+// peerMetricSeries returns the metric series carrying the given peer label, as name{other labels}
+func peerMetricSeries(t *testing.T, peer string) []string {
+	families, err := prometheus.DefaultGatherer.Gather()
+	require.Nil(t, err)
+	series := make([]string, 0)
+	for _, family := range families {
+		for _, m := range family.Metric {
+			matches, other := false, ""
+			for _, label := range m.Label {
+				if label.GetName() == "peer" {
+					matches = label.GetValue() == peer
+				} else {
+					other += fmt.Sprintf("%s=%q", label.GetName(), label.GetValue())
+				}
+			}
+			if matches {
+				series = append(series, fmt.Sprintf("%s{%s}", family.GetName(), other))
+			}
+		}
+	}
+	return series
+}
+
+func peerMetricValue(t *testing.T, name, peer string) float64 {
+	families, err := prometheus.DefaultGatherer.Gather()
+	require.Nil(t, err)
+	for _, family := range families {
+		if family.GetName() != name {
+			continue
+		}
+		for _, m := range family.Metric {
+			for _, label := range m.Label {
+				if label.GetName() == "peer" && label.GetValue() == peer {
+					return m.GetGauge().GetValue()
+				}
+			}
+		}
+	}
+	return 0
 }

@@ -89,6 +89,7 @@ type PeerOutbound struct {
 	LastOK        int64  `json:"last_ok,omitempty"`
 	LastError     string `json:"last_error,omitempty"`
 	LastErrorAt   int64  `json:"last_error_at,omitempty"`
+	LastFailed    bool   `json:"last_failed,omitempty"` // The most recent batch failed; timestamps cannot order outcomes within one second
 }
 
 // PeerInbound counts the message batches this node received from a peer since it started

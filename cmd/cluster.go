@@ -178,7 +178,7 @@ func clusterStatusProblems(status *cluster.Status, from cluster.NodeID) []string
 		lastError := fmt.Sprintf("last error %s: %s", clusterStatusAge(status.Time, p.Out.LastErrorAt), p.Out.LastError)
 		if p.Out.BatchesFailed > 0 && p.Out.BatchesOK == 0 {
 			problems = append(problems, fmt.Sprintf("%s: no batch accepted, %d failed; %s", label, p.Out.BatchesFailed, lastError))
-		} else if p.Out.BatchesFailed > 0 && p.Out.LastErrorAt > p.Out.LastOK {
+		} else if p.Out.BatchesFailed > 0 && p.Out.LastFailed {
 			problems = append(problems, fmt.Sprintf("%s: the last batch failed (%d of %d failed); %s", label, p.Out.BatchesFailed, p.Out.BatchesFailed+p.Out.BatchesOK, lastError))
 		}
 		if p.Out.Dropped > 0 {

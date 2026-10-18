@@ -2313,9 +2313,10 @@ A peer that left the registry is listed as not live with when it was last seen, 
 `ntfy cluster status --json` prints the same as JSON. It is served on the cluster listener at `/v1/cluster/status`,
 authenticated with the cluster secret in the `X-Cluster-Secret` header. With [metrics](#monitoring) enabled, the same
 counters are exported per peer: `ntfy_cluster_peer_batches_sent_total{peer,result}` (`result` is `ok` or `error`),
-`ntfy_cluster_peer_batches_received_total{peer}`, and `ntfy_cluster_peer_last_send_success_timestamp_seconds{peer}`. A peer's series start at zero when it is first seen (a last-success time of 0 means never) and are
-removed once it has been gone for 24 hours. To alert on a broken link, look at failures rather than at the last-success
-time, since a node with nothing to send never succeeds either:
+`ntfy_cluster_peer_batches_received_total{peer}`, and `ntfy_cluster_peer_last_send_success_timestamp_seconds{peer}`. A
+peer's series start at zero when it is first seen (a last-success time of 0 means never) and are removed once it has
+been gone for 24 hours. To alert on a broken link, look at failures rather than at the last-success time, since a node
+with nothing to send never succeeds either:
 
 ```
 increase(ntfy_cluster_peer_batches_sent_total{result="error"}[5m]) > 0

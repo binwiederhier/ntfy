@@ -32,15 +32,39 @@ var testClusterStatus = &cluster.Status{
 }
 
 func newTestClusterStatusServer(t *testing.T) string {
+	return newTestClusterStatusServerFor(t, func() *cluster.Status { return testClusterStatus })
+}
+
+func newTestClusterStatusServerFor(t *testing.T, status func() *cluster.Status) string {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != cluster.StatusPath || r.Header.Get("X-Cluster-Secret") != "s3cret" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		require.Nil(t, json.NewEncoder(w).Encode(testClusterStatus))
+		require.Nil(t, json.NewEncoder(w).Encode(status()))
 	}))
 	t.Cleanup(srv.Close)
 	return strings.TrimPrefix(srv.URL, "http://")
+}
+
+// newTestClusterPair serves two nodes' views of a one-way link: app-2 cannot reach app-1, app-1 reaches app-2
+func newTestClusterPair(t *testing.T) (app2Addr string) {
+	var app1Addr string
+	app2Addr = newTestClusterStatusServerFor(t, func() *cluster.Status {
+		return &cluster.Status{NodeID: "nyc3-app-2", Role: cluster.RolePassive, Healthy: true, Time: 1792330000, Peers: []*cluster.PeerStatus{{
+			NodeID: "nyc3-app-1", AdvertiseURL: "http://" + app1Addr, Role: cluster.RoleActive, Live: true, HeartbeatAge: 2,
+			Out: cluster.PeerOutbound{BatchesFailed: 219, LastError: "context deadline exceeded", LastErrorAt: 1792329990},
+			In:  cluster.PeerInbound{Batches: 5120, Messages: 828000, LastAt: 1792329999},
+		}}}
+	})
+	app1Addr = newTestClusterStatusServerFor(t, func() *cluster.Status {
+		return &cluster.Status{NodeID: "nyc3-app-1", Role: cluster.RoleActive, Leader: true, Healthy: true, Time: 1792330000, Peers: []*cluster.PeerStatus{{
+			NodeID: "nyc3-app-2", AdvertiseURL: "http://" + app2Addr, Role: cluster.RolePassive, Live: true, HeartbeatAge: 1,
+			Out: cluster.PeerOutbound{BatchesOK: 5120, Messages: 828000, LastOK: 1792329999},
+			In:  cluster.PeerInbound{},
+		}}}
+	})
+	return app2Addr
 }
 
 func TestCLI_Cluster_Status(t *testing.T) {
@@ -88,4 +112,46 @@ func TestCLI_Cluster_Status_NotEnabled(t *testing.T) {
 	app, _, _, _ := newTestApp()
 	err := app.Run([]string{"ntfy", "cluster", "status"})
 	require.ErrorContains(t, err, "clustering is not enabled")
+}
+
+func TestCLI_Cluster_StatusAll(t *testing.T) {
+	// Every node's view side by side: the one-way link shows as failures on one side and nothing
+	// received on the other, from a single command on either node
+	addr := newTestClusterPair(t)
+	app, _, stdout, _ := newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status", "--all"}))
+	out := stdout.String()
+	require.Regexp(t, `nyc3-app-1\s+active\s+yes`, out) // Leader
+	require.Regexp(t, `nyc3-app-2\s+passive\s+no`, out)
+	require.Regexp(t, `nyc3-app-1 -> nyc3-app-2\s+5120\s+0\s+1s ago\s+5120`, out)
+	require.Regexp(t, `nyc3-app-2 -> nyc3-app-1\s+0\s+219\s+never\s+0\s+never`, out)
+	require.Contains(t, out, "nyc3-app-2 -> nyc3-app-1: no batch accepted, 219 failed")
+}
+
+func TestCLI_Cluster_StatusAll_PeerUnreachable(t *testing.T) {
+	// A peer whose status cannot be fetched is reported, the rest is still printed
+	addr := newTestClusterStatusServerFor(t, func() *cluster.Status {
+		return &cluster.Status{NodeID: "nyc3-app-1", Role: cluster.RoleActive, Leader: true, Healthy: true, Time: 1792330000, Peers: []*cluster.PeerStatus{{
+			NodeID: "nyc3-app-2", AdvertiseURL: "http://127.0.0.1:1", Role: cluster.RolePassive, Live: true,
+			Out: cluster.PeerOutbound{BatchesOK: 10, LastOK: 1792329999},
+		}}}
+	})
+	app, _, stdout, _ := newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status", "--all"}))
+	out := stdout.String()
+	require.Regexp(t, `nyc3-app-1 -> nyc3-app-2\s+10\s+0\s+1s ago\s+\?`, out)
+	require.Contains(t, out, "nyc3-app-2: cannot fetch its status")
+}
+
+func TestCLI_Cluster_StatusAll_JSON(t *testing.T) {
+	addr := newTestClusterPair(t)
+	app, _, stdout, _ := newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status", "--all", "--json"}))
+	var nodes []*clusterNodeStatus
+	require.Nil(t, json.Unmarshal(stdout.Bytes(), &nodes))
+	require.Len(t, nodes, 2)
+	require.Equal(t, cluster.NodeID("nyc3-app-1"), nodes[0].NodeID)
+	require.Equal(t, int64(5120), nodes[0].Status.Peers[0].Out.BatchesOK)
+	require.Equal(t, cluster.NodeID("nyc3-app-2"), nodes[1].NodeID)
+	require.Equal(t, int64(219), nodes[1].Status.Peers[0].Out.BatchesFailed)
 }

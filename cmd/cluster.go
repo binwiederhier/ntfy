@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -19,7 +21,8 @@ import (
 )
 
 const (
-	clusterStatusTimeout = 10 * time.Second
+	clusterStatusTimeout     = 10 * time.Second
+	clusterStatusPeerTimeout = 5 * time.Second
 )
 
 func init() {
@@ -36,7 +39,7 @@ var flagsCluster = append(
 var cmdCluster = &cli.Command{
 	Name:      "cluster",
 	Usage:     "Show the state of an experimental cluster node",
-	UsageText: "ntfy cluster status [--json]",
+	UsageText: "ntfy cluster status [--all] [--json]",
 	Flags:     flagsCluster,
 	Before:    initConfigFileInputSourceFunc("config", flagsCluster, initLogFunc),
 	Category:  categoryServer,
@@ -44,10 +47,11 @@ var cmdCluster = &cli.Command{
 		{
 			Name:      "status",
 			Usage:     "Shows this node's view of the cluster",
-			UsageText: "ntfy cluster status [--json]",
+			UsageText: "ntfy cluster status [--all] [--json]",
 			Action:    execClusterStatus,
 			Flags: []cli.Flag{
 				&cli.BoolFlag{Name: "json", Usage: "print the status as JSON"},
+				&cli.BoolFlag{Name: "all", Usage: "also fetch every live peer's view, and show all links between the nodes"},
 			},
 			Description: `Show this node's view of the cluster, as served on its cluster listener: its role and
 leadership, and per peer the message batches it sent there and received from there.
@@ -57,12 +61,23 @@ shows as failed batches on the sending node and nothing received on the other on
 not show in /v1/health. Run this on the node itself: it reads experimental-cluster-listen and
 experimental-cluster-secret from the server config.
 
+With --all, it also fetches every live peer's view (from its advertised cluster URL) and shows
+each link between the nodes once, with what the sender sent and what the receiver received.
+
 Examples:
   ntfy cluster status          # Show peers and link problems
+  ntfy cluster status --all    # Show all nodes and every link between them
   ntfy cluster status --json   # Print the raw status, e.g. for scripts
 `,
 		},
 	},
+}
+
+// clusterNodeStatus is one node's view in "status --all": its status, or why it could not be fetched
+type clusterNodeStatus struct {
+	NodeID cluster.NodeID  `json:"node_id"`
+	Status *cluster.Status `json:"status,omitempty"`
+	Error  string          `json:"error,omitempty"`
 }
 
 func execClusterStatus(c *cli.Context) error {
@@ -79,6 +94,16 @@ func execClusterStatus(c *cli.Context) error {
 	status, err := cluster.FetchStatus(ctx, baseURL, c.String("experimental-cluster-secret"))
 	if err != nil {
 		return err
+	}
+	if c.Bool("all") {
+		nodes := fetchClusterNodeStatuses(status, c.String("experimental-cluster-secret"))
+		if c.Bool("json") {
+			encoder := json.NewEncoder(c.App.Writer)
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(nodes)
+		}
+		printClusterNodeStatuses(c.App.Writer, nodes)
+		return nil
 	}
 	if c.Bool("json") {
 		encoder := json.NewEncoder(c.App.Writer)
@@ -129,7 +154,7 @@ func printClusterStatus(w io.Writer, status *cluster.Status) {
 			p.Out.Queued, p.Out.Dropped, clusterStatusAge(status.Time, p.Out.LastOK), p.In.Batches, clusterStatusAge(status.Time, p.In.LastAt))
 	}
 	tw.Flush()
-	problems := clusterStatusProblems(status)
+	problems := clusterStatusProblems(status, "")
 	if len(problems) == 0 {
 		return
 	}
@@ -140,21 +165,26 @@ func printClusterStatus(w io.Writer, status *cluster.Status) {
 }
 
 // clusterStatusProblems lists what an operator should look at: outbound batches that fail
-// (one-way links show up here on the sending side), drops, and peers that left the registry
-func clusterStatusProblems(status *cluster.Status) []string {
+// (one-way links show up here on the sending side), drops, and peers that left the registry.
+// With from set, each line names the link ("from -> peer") instead of only the peer.
+func clusterStatusProblems(status *cluster.Status, from cluster.NodeID) []string {
 	problems := make([]string, 0)
 	for _, p := range status.Peers {
+		label := string(p.NodeID)
+		if from != "" {
+			label = fmt.Sprintf("%s -> %s", from, p.NodeID)
+		}
 		lastError := fmt.Sprintf("last error %s: %s", clusterStatusAge(status.Time, p.Out.LastErrorAt), p.Out.LastError)
 		if p.Out.BatchesFailed > 0 && p.Out.BatchesOK == 0 {
-			problems = append(problems, fmt.Sprintf("%s: no batch accepted, %d failed; %s", p.NodeID, p.Out.BatchesFailed, lastError))
+			problems = append(problems, fmt.Sprintf("%s: no batch accepted, %d failed; %s", label, p.Out.BatchesFailed, lastError))
 		} else if p.Out.BatchesFailed > 0 && p.Out.LastErrorAt > p.Out.LastOK {
-			problems = append(problems, fmt.Sprintf("%s: the last batch failed (%d of %d failed); %s", p.NodeID, p.Out.BatchesFailed, p.Out.BatchesFailed+p.Out.BatchesOK, lastError))
+			problems = append(problems, fmt.Sprintf("%s: the last batch failed (%d of %d failed); %s", label, p.Out.BatchesFailed, p.Out.BatchesFailed+p.Out.BatchesOK, lastError))
 		}
 		if p.Out.Dropped > 0 {
-			problems = append(problems, fmt.Sprintf("%s: %d message(s) dropped because its queue was full", p.NodeID, p.Out.Dropped))
+			problems = append(problems, fmt.Sprintf("%s: %d message(s) dropped because its queue was full", label, p.Out.Dropped))
 		}
 		if !p.Live {
-			problems = append(problems, fmt.Sprintf("%s: no longer in the registry (counters are from before it left)", p.NodeID))
+			problems = append(problems, fmt.Sprintf("%s: no longer in the registry (counters are from before it left)", label))
 		}
 	}
 	return problems
@@ -166,4 +196,99 @@ func clusterStatusAge(now, t int64) string {
 		return "never"
 	}
 	return (time.Duration(now-t) * time.Second).String() + " ago"
+}
+
+// fetchClusterNodeStatuses fetches every live peer's view next to this node's, in parallel. A peer
+// that does not answer is reported in its entry rather than failing the command.
+func fetchClusterNodeStatuses(local *cluster.Status, secret string) []*clusterNodeStatus {
+	nodes := []*clusterNodeStatus{{NodeID: local.NodeID, Status: local}}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for _, p := range local.Peers {
+		if !p.Live || p.AdvertiseURL == "" {
+			continue
+		}
+		wg.Add(1)
+		go func(p *cluster.PeerStatus) {
+			defer wg.Done()
+			node := &clusterNodeStatus{NodeID: p.NodeID}
+			ctx, cancel := context.WithTimeout(context.Background(), clusterStatusPeerTimeout)
+			defer cancel()
+			if status, err := cluster.FetchStatus(ctx, p.AdvertiseURL, secret); err != nil {
+				node.Error = err.Error()
+			} else {
+				node.Status = status
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			nodes = append(nodes, node)
+		}(p)
+	}
+	wg.Wait()
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].NodeID < nodes[j].NodeID
+	})
+	return nodes
+}
+
+// printClusterNodeStatuses prints the nodes, then every link once: what the sender sent, next to
+// what the receiver received from it ("?" if the receiver's view is not available)
+func printClusterNodeStatuses(w io.Writer, nodes []*clusterNodeStatus) {
+	byID := make(map[cluster.NodeID]*cluster.Status)
+	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "NODE\tROLE\tLEADER\tHEALTHY")
+	for _, node := range nodes {
+		if node.Status == nil {
+			fmt.Fprintf(tw, "%s\t?\t?\t?\n", node.NodeID)
+			continue
+		}
+		byID[node.NodeID] = node.Status
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", node.NodeID, node.Status.Role, clusterStatusYesNo(node.Status.Leader), clusterStatusYesNo(node.Status.Healthy))
+	}
+	tw.Flush()
+	fmt.Fprintln(w)
+	tw = tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "LINK\tSENT OK\tFAILED\tLAST SENT\tRECEIVED\tLAST RECEIVED")
+	problems := make([]string, 0)
+	for _, node := range nodes {
+		if node.Status == nil {
+			problems = append(problems, fmt.Sprintf("%s: cannot fetch its status: %s", node.NodeID, node.Error))
+			continue
+		}
+		for _, p := range node.Status.Peers {
+			received, lastReceived := "?", "?"
+			if peerStatus, ok := byID[p.NodeID]; ok {
+				in := clusterStatusInboundFrom(peerStatus, node.NodeID)
+				received, lastReceived = fmt.Sprintf("%d", in.Batches), clusterStatusAge(peerStatus.Time, in.LastAt)
+			}
+			fmt.Fprintf(tw, "%s -> %s\t%d\t%d\t%s\t%s\t%s\n", node.NodeID, p.NodeID, p.Out.BatchesOK, p.Out.BatchesFailed,
+				clusterStatusAge(node.Status.Time, p.Out.LastOK), received, lastReceived)
+		}
+		problems = append(problems, clusterStatusProblems(node.Status, node.NodeID)...)
+	}
+	tw.Flush()
+	if len(problems) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "\nProblems:")
+	for _, problem := range problems {
+		fmt.Fprintf(w, "  %s\n", problem)
+	}
+}
+
+// clusterStatusInboundFrom returns what a node received from the given peer, or nothing if it never did
+func clusterStatusInboundFrom(status *cluster.Status, from cluster.NodeID) cluster.PeerInbound {
+	for _, p := range status.Peers {
+		if p.NodeID == from {
+			return p.In
+		}
+	}
+	return cluster.PeerInbound{}
+}
+
+func clusterStatusYesNo(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
 }

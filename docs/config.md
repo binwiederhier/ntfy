@@ -2269,7 +2269,7 @@ Problems:
   nyc3-app-1: no batch accepted, 219 failed; last error 10s ago: Post "http://10.108.0.2:2587/v1/cluster/message": context deadline exceeded
 ```
 
-`ntfy cluster status --json` prints the same as JSON. It is served on the cluster listener at `/v1/cluster/status`,
+`ntfy cluster status --all` also fetches every live peer's view and lists each link between the nodes once, with what the sender sent next to what the receiver received, so a one-way link shows from either node. `ntfy cluster status --json` prints the same as JSON. It is served on the cluster listener at `/v1/cluster/status`,
 authenticated with the cluster secret in the `X-Cluster-Secret` header. With [metrics](#monitoring) enabled, the same
 counters are exported per peer: `ntfy_cluster_peer_batches_sent_total{peer,result}` (`result` is `ok` or `error`),
 `ntfy_cluster_peer_batches_received_total{peer}`, and `ntfy_cluster_peer_last_send_success_timestamp_seconds{peer}`. An

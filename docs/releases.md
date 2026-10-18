@@ -2216,6 +2216,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Security:**
 
 * Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
+* Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

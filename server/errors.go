@@ -153,6 +153,7 @@ var (
 	errHTTPBadRequestTagsTooLarge                    = &errHTTP{40058, http.StatusBadRequest, "invalid request: tags are too large", "https://ntfy.sh/docs/publish/#limitations", nil}
 	errHTTPBadRequestTimezoneInvalid                 = &errHTTP{40059, http.StatusBadRequest, "invalid request: invalid timezone", "https://ntfy.sh/docs/publish/#scheduled-delivery", nil}
 	errHTTPBadRequestPhoneVerificationCodeInvalid    = &errHTTP{40060, http.StatusBadRequest, "invalid request: phone number verification code invalid", "", nil}
+	errHTTPBadRequestTooManyTopics                   = &errHTTP{40061, http.StatusBadRequest, "invalid request: too many topics", "https://ntfy.sh/docs/subscribe/api/#subscribe-to-multiple-topics", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

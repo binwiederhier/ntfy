@@ -324,7 +324,8 @@ Available filters (all case-insensitive):
 
 ### Subscribe to multiple topics
 It's possible to subscribe to multiple topics in one HTTP call by providing a comma-separated list of topics 
-in the URL. This allows you to reduce the number of connections you have to maintain:
+in the URL. This allows you to reduce the number of connections you have to maintain. A single subscription can
+include up to 150 distinct topics; duplicate topics are ignored:
 
 ```
 $ curl -s ntfy.sh/mytopic1,mytopic2/json

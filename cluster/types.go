@@ -74,6 +74,7 @@ type PeerStatus struct {
 	Role         Role         `json:"role,omitempty"`
 	Live         bool         `json:"live"`
 	HeartbeatAge int64        `json:"heartbeat_age,omitempty"` // Seconds since the peer's last registry heartbeat, as of the last refresh
+	LastSeen     int64        `json:"last_seen,omitempty"`     // When this node last saw the peer in the registry (or first heard from it)
 	Out          PeerOutbound `json:"out"`
 	In           PeerInbound  `json:"in"`
 }
@@ -100,8 +101,9 @@ type PeerInbound struct {
 // peerStats counts the message batches exchanged with one peer, for Status. It outlives the peer's
 // queue, so a peer that left still shows what happened before it did.
 type peerStats struct {
-	out PeerOutbound // Queued is filled in when Status is built, from the live queue
-	in  PeerInbound
+	out      PeerOutbound // Queued is filled in when Status is built, from the live queue
+	in       PeerInbound
+	lastSeen int64 // Unix seconds; a peer gone for peerStatsRetention is forgotten
 }
 
 // apiHealth is the answer on HealthPath: written by handleHealth, read by peerHealthy, so this

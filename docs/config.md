@@ -2309,6 +2309,7 @@ Problems:
   nyc3-app-2 -> nyc3-app-1: no batch accepted, 219 failed; last error 10s ago: context deadline exceeded
 ```
 
+A peer that left the registry is listed as not live with when it was last seen, and is forgotten after 24 hours.
 `ntfy cluster status --json` prints the same as JSON. It is served on the cluster listener at `/v1/cluster/status`,
 authenticated with the cluster secret in the `X-Cluster-Secret` header. With [metrics](#monitoring) enabled, the same
 counters are exported per peer: `ntfy_cluster_peer_batches_sent_total{peer,result}` (`result` is `ok` or `error`),

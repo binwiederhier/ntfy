@@ -23,6 +23,7 @@ import (
 const (
 	clusterStatusTimeout     = 10 * time.Second
 	clusterStatusPeerTimeout = 5 * time.Second
+	clusterPeerLeftRecently  = 10 * time.Minute // A peer gone longer than this was likely removed on purpose
 )
 
 func init() {
@@ -146,7 +147,7 @@ func printClusterStatus(w io.Writer, status *cluster.Status) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "PEER\tROLE\tLIVE\tHEARTBEAT\tSENT OK\tFAILED\tQUEUED\tDROPPED\tLAST SENT\tRECEIVED\tLAST RECEIVED")
 	for _, p := range status.Peers {
-		live, heartbeat := "no", "-"
+		live, heartbeat := "no", "last seen "+clusterStatusAge(status.Time, p.LastSeen)
 		if p.Live {
 			live, heartbeat = "yes", fmt.Sprintf("%ds ago", p.HeartbeatAge)
 		}
@@ -183,8 +184,8 @@ func clusterStatusProblems(status *cluster.Status, from cluster.NodeID) []string
 		if p.Out.Dropped > 0 {
 			problems = append(problems, fmt.Sprintf("%s: %d message(s) dropped because its queue was full", label, p.Out.Dropped))
 		}
-		if !p.Live {
-			problems = append(problems, fmt.Sprintf("%s: no longer in the registry (counters are from before it left)", label))
+		if !p.Live && (p.LastSeen == 0 || status.Time-p.LastSeen <= int64(clusterPeerLeftRecently.Seconds())) {
+			problems = append(problems, fmt.Sprintf("%s: left the registry %s (counters are from before it left)", label, clusterStatusAge(status.Time, p.LastSeen)))
 		}
 	}
 	return problems

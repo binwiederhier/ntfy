@@ -729,3 +729,35 @@ func TestMesh_PassiveNodeIsNeverReady(t *testing.T) {
 	require.True(t, mesh.Healthy())
 	require.False(t, mesh.Ready())
 }
+
+func TestMesh_Status_PeerThatLeftShowsLastSeen(t *testing.T) {
+	// A peer that left the registry keeps its counters, marked not live, with the time it was last
+	// seen; after peerStatsRetention it is forgotten, so a decommissioned node does not linger
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), openTestPool(t, schemaDSN), func(m *model.Message) {})
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	before := time.Now().Unix()
+	mesh.reconcilePeers([]*registry.Peer{{NodeID: "node-b", AdvertiseURL: "http://127.0.0.1:1", Role: registry.RoleActive, HeartbeatAt: time.Now()}})
+	mesh.reconcilePeers(nil) // node-b left
+	b := findPeerStatus(mesh.Status(), "node-b")
+	require.NotNil(t, b)
+	require.False(t, b.Live)
+	require.GreaterOrEqual(t, b.LastSeen, before)
+
+	mesh.mu.Lock()
+	mesh.stats["node-b"].lastSeen = time.Now().Add(-peerStatsRetention - time.Minute).Unix()
+	mesh.mu.Unlock()
+	mesh.reconcilePeers(nil)
+	require.Nil(t, findPeerStatus(mesh.Status(), "node-b"))
+}
+
+func findPeerStatus(status *Status, nodeID NodeID) *PeerStatus {
+	for _, p := range status.Peers {
+		if p.NodeID == nodeID {
+			return p
+		}
+	}
+	return nil
+}

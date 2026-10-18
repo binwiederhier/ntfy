@@ -155,3 +155,23 @@ func TestCLI_Cluster_StatusAll_JSON(t *testing.T) {
 	require.Equal(t, cluster.NodeID("nyc3-app-2"), nodes[1].NodeID)
 	require.Equal(t, int64(219), nodes[1].Status.Peers[0].Out.BatchesFailed)
 }
+
+func TestCLI_Cluster_Status_PeerLeft(t *testing.T) {
+	// A peer that left recently is a problem; one that left long ago (decommissioned) is only listed
+	status := func(leftAgo int64) func() *cluster.Status {
+		return func() *cluster.Status {
+			return &cluster.Status{NodeID: "nyc3-app-1", Role: cluster.RoleActive, Leader: true, Healthy: true, Time: 1792330000, Peers: []*cluster.PeerStatus{{
+				NodeID: "nyc3-app-2", Live: false, LastSeen: 1792330000 - leftAgo, Out: cluster.PeerOutbound{BatchesOK: 10, LastOK: 1792330000 - leftAgo},
+			}}}
+		}
+	}
+	app, _, stdout, _ := newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", newTestClusterStatusServerFor(t, status(30)), "--experimental-cluster-secret", "s3cret", "status"}))
+	require.Contains(t, stdout.String(), "last seen 30s ago")
+	require.Contains(t, stdout.String(), "nyc3-app-2: left the registry 30s ago")
+
+	app, _, stdout, _ = newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", newTestClusterStatusServerFor(t, status(3*3600)), "--experimental-cluster-secret", "s3cret", "status"}))
+	require.Contains(t, stdout.String(), "last seen 3h0m0s ago")
+	require.NotContains(t, stdout.String(), "left the registry")
+}

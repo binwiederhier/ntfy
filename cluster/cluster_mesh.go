@@ -20,14 +20,15 @@ import (
 )
 
 const (
-	meshHTTPTimeout   = 5 * time.Second
-	peerHealthTimeout = 2 * time.Second // Per-peer health probe while this node is unhealthy
-	peerQueueSize     = 1024            // Bounded per-peer fan-out queue (drop on overflow)
-	batchMaxMessages  = 100             // Flush a batch early when it reaches this many messages
-	batchMaxBytes     = 256 * 1024      // Flush a batch early when it reaches this size
-	stateMaxBytes     = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
-	healthMaxBytes    = 4 * 1024        // Upper bound for a peer's health response
-	statusMaxBytes    = 1024 * 1024     // Upper bound for a node's status response
+	peerStatsRetention = 24 * time.Hour // How long a peer that left stays in Status
+	meshHTTPTimeout    = 5 * time.Second
+	peerHealthTimeout  = 2 * time.Second // Per-peer health probe while this node is unhealthy
+	peerQueueSize      = 1024            // Bounded per-peer fan-out queue (drop on overflow)
+	batchMaxMessages   = 100             // Flush a batch early when it reaches this many messages
+	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
+	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
+	healthMaxBytes     = 4 * 1024        // Upper bound for a peer's health response
+	statusMaxBytes     = 1024 * 1024     // Upper bound for a node's status response
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -223,7 +224,7 @@ func (c *meshCluster) Status() *Status {
 			ps = &PeerStatus{NodeID: nodeID} // Left the registry; its counters still tell what happened
 			peers[nodeID] = ps
 		}
-		ps.Out, ps.In = s.out, s.in
+		ps.Out, ps.In, ps.LastSeen = s.out, s.in, s.lastSeen
 	}
 	for nodeID, q := range c.queues {
 		if ps, ok := peers[nodeID]; ok {
@@ -378,6 +379,7 @@ func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
 		}
 	}
 	c.knownPeers = alive
+	c.updatePeerStatsNoLock(alive)
 	for nodeID, q := range c.queues {
 		if p, ok := alive[nodeID]; !ok || q.advertiseURL != p.AdvertiseURL {
 			q.queue.Close() // Flushes the remainder; the worker exits when the queue is drained
@@ -536,10 +538,24 @@ func (c *meshCluster) recordReceived(nodeID NodeID, messages int) {
 func (c *meshCluster) statsForNoLock(nodeID NodeID) *peerStats {
 	s, ok := c.stats[nodeID]
 	if !ok {
-		s = &peerStats{}
+		s = &peerStats{lastSeen: time.Now().Unix()} // First contact counts as seen, so it can expire
 		c.stats[nodeID] = s
 	}
 	return s
+}
+
+// updatePeerStatsNoLock marks the live peers as seen now, and forgets peers gone for longer than
+// peerStatsRetention, so a decommissioned node does not stay in Status. The caller must hold c.mu.
+func (c *meshCluster) updatePeerStatsNoLock(alive map[NodeID]*registry.Peer) {
+	now := time.Now().Unix()
+	for nodeID := range alive {
+		c.statsForNoLock(nodeID).lastSeen = now
+	}
+	for nodeID, s := range c.stats {
+		if _, ok := alive[nodeID]; !ok && now-s.lastSeen > int64(peerStatsRetention.Seconds()) {
+			delete(c.stats, nodeID)
+		}
+	}
 }
 
 // postToPeer POSTs a peer API payload, authenticated with the shared cluster secret. Failures

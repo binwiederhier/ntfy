@@ -2228,35 +2228,58 @@ ntfy fully supports IPv6, though there are a few things to keep in mind.
     The official ntfy.sh server supports IPv6. Check out ntfy.sh's [Ansible repository](https://github.com/binwiederhier/ntfy-ansible) for examples of how to
     configure [ntfy](https://github.com/binwiederhier/ntfy-ansible/tree/main/roles/ntfy), [nginx](https://github.com/binwiederhier/ntfy-ansible/tree/main/roles/nginx) and [fail2ban](https://github.com/binwiederhier/ntfy-ansible/tree/main/roles/fail2ban).
 
-## Health checks
-A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint returns a `json` response in the format shown below.
-If a non-200 HTTP status code is returned or if the returned `healthy` field is `false` the ntfy service should be considered as unhealthy.
+## Clustering (experimental)
+!!! warning
+    Clustering is **experimental and not ready for production**. Options, behavior and the database tables it uses may
+    still change between releases.
 
-```json
-{"healthy":true,"role":"active"}
+ntfy can run as several nodes sharing one PostgreSQL database, so that a message published on one node reaches
+subscribers on all of them. It requires **PostgreSQL** as the database backend (`database-url`, see
+[database options](#database-options)); the shared database holds all durable state (messages, users, web push) plus
+the tables the nodes coordinate through. If you use [attachments](#attachments), the nodes also need shared attachment
+storage, since a node's local cache directory cannot serve files uploaded via another node.
+
+Clustering is enabled by setting `experimental-cluster-listen`. Nodes find each other through the shared database and
+forward published messages to each other over a private HTTP listener. Every node also reads new messages from the
+database and delivers those its subscribers have not had yet, so a message a peer failed to forward still arrives, a
+little later. Scheduled (delayed) messages are claimed by one node, so each is sent once, and jobs that must run only
+once (pruning, web push expiry warnings, the published-messages total) run on the cluster leader only.
+
+Example config for a node (all nodes are identical except `experimental-cluster-node-id`, `experimental-cluster-listen`
+and `experimental-cluster-advertise-url`):
+
+``` yaml
+base-url: "https://ntfy.example.com"
+database-url: "postgres://user:pass@dbhost:5432/ntfy"
+
+experimental-cluster-node-id: "node-1"                       # stable identity, e.g. the hostname
+experimental-cluster-listen: "10.0.0.5:2587"                 # private network interface
+experimental-cluster-advertise-url: "http://10.0.0.5:2587"   # how the other nodes reach this one
+experimental-cluster-secret: "long-random-shared-secret"     # must match on all nodes
+experimental-cluster-role: "active"                          # or "passive", see below
 ```
 
-Without clustering, the server is healthy whenever it answers; the endpoint does not check the database. With clustering
-(experimental, see the `experimental-cluster-*` options), it is unhealthy while its cluster heartbeat, a database write every
-few seconds, has failed for 30 seconds.
+A few important notes:
 
-For load balancers, use `/v1/ready` instead: it returns 200 only if the server should receive clients. Without
-clustering that is always the case. With clustering, a passive node is never ready, and an unhealthy active node is not ready
-while another active node can take its clients. The only active node stays ready even when it is unhealthy, since there is
-nowhere better for its clients.
-
-```json
-{"ready":true,"role":"active"}
-```
-
-See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
+* **The cluster listener must not be publicly reachable.** It accepts messages from anyone with the shared secret, so
+  bind it to a private network interface. Every node must reach every other node's listener: a firewall that drops the
+  cluster port in one direction delays all messages that way to the database read (see [cluster status](#cluster-status)).
+* `experimental-cluster-node-id` must be **stable across restarts** (use the hostname).
+* **Active and passive nodes:** an `active` node serves clients behind the load balancer and can become the leader. A
+  `passive` node never leads and never becomes ready, so it stays out of the load balancer; use it for test clients
+  only, since while it is cut off from the database, its clients can miss messages published elsewhere.
+* **Health checks:** point your load balancer at `/v1/ready`, not `/v1/health` (see [Health checks](#health-checks)).
+* **Limits are per node.** Rate limits and daily quotas are counted on each node separately, so a visitor spreading
+  requests across N nodes gets N times the limits. Access changes (e.g. a revoked token) reach the other nodes when
+  their access cache reloads.
+* Messages published with `cache: no` are not in the database, so for those, delivery across nodes is best effort.
 
 ### Cluster status
-With clustering (experimental), `/v1/health` only covers a node's own database heartbeat. A link between two nodes that
-works in one direction only, e.g. because a firewall drops the cluster port one way, keeps both nodes healthy while
-messages published on one of them reach the other only late, through the database. To see each node's view of its
-peers, run `ntfy cluster status` on the node. It reads `experimental-cluster-listen` and `experimental-cluster-secret`
-from the server config, and shows per peer the message batches sent there and received from there:
+`/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,
+e.g. because a firewall drops the cluster port one way, keeps both nodes healthy while messages published on one of them
+reach the other only late, through the database. To see each node's view of its peers, run `ntfy cluster status` on the
+node. It reads `experimental-cluster-listen` and `experimental-cluster-secret` from the server config, and shows per
+peer the message batches sent there and received from there:
 
 ```
 $ ntfy cluster status
@@ -2269,11 +2292,51 @@ Problems:
   nyc3-app-1: no batch accepted, 219 failed; last error 10s ago: Post "http://10.108.0.2:2587/v1/cluster/message": context deadline exceeded
 ```
 
-`ntfy cluster status --all` also fetches every live peer's view and lists each link between the nodes once, with what the sender sent next to what the receiver received, so a one-way link shows from either node. `ntfy cluster status --json` prints the same as JSON. It is served on the cluster listener at `/v1/cluster/status`,
+`ntfy cluster status --all` also fetches every live peer's view and lists each link between the nodes once, with what
+the sender sent next to what the receiver received, so a one-way link shows from either node:
+
+```
+$ ntfy cluster status --all
+NODE        ROLE     LEADER  HEALTHY
+nyc3-app-1  active   yes     yes
+nyc3-app-2  passive  no      yes
+
+LINK                      SENT OK  FAILED  LAST SENT  RECEIVED  LAST RECEIVED
+nyc3-app-1 -> nyc3-app-2  5120     0       1s ago     5120      1s ago
+nyc3-app-2 -> nyc3-app-1  0        219     never      0         never
+
+Problems:
+  nyc3-app-2 -> nyc3-app-1: no batch accepted, 219 failed; last error 10s ago: context deadline exceeded
+```
+
+`ntfy cluster status --json` prints the same as JSON. It is served on the cluster listener at `/v1/cluster/status`,
 authenticated with the cluster secret in the `X-Cluster-Secret` header. With [metrics](#monitoring) enabled, the same
 counters are exported per peer: `ntfy_cluster_peer_batches_sent_total{peer,result}` (`result` is `ok` or `error`),
 `ntfy_cluster_peer_batches_received_total{peer}`, and `ntfy_cluster_peer_last_send_success_timestamp_seconds{peer}`. An
 alert on no successful send to a live peer for a few minutes catches a broken link.
+
+## Health checks
+A preliminary health check API endpoint is exposed at `/v1/health`. The endpoint returns a `json` response in the format shown below.
+If a non-200 HTTP status code is returned or if the returned `healthy` field is `false` the ntfy service should be considered as unhealthy.
+
+```json
+{"healthy":true,"role":"active"}
+```
+
+Without clustering, the server is healthy whenever it answers; the endpoint does not check the database. With clustering
+(experimental, see [Clustering](#clustering-experimental)), it is unhealthy while its cluster heartbeat, a database write every
+few seconds, has failed for 30 seconds.
+
+For load balancers, use `/v1/ready` instead: it returns 200 only if the server should receive clients. Without
+clustering that is always the case. With clustering, a passive node is never ready, and an unhealthy active node is not ready
+while another active node can take its clients. The only active node stays ready even when it is unhealthy, since there is
+nowhere better for its clients.
+
+```json
+{"ready":true,"role":"active"}
+```
+
+See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
 
 ## Monitoring
 If configured, ntfy can expose a `/metrics` endpoint for [Prometheus](https://prometheus.io/), which can then be used to

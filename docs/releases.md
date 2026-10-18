@@ -2198,6 +2198,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
+* Support [iOS critical alerts](publish.md#ios-critical-alerts) via the `X-Apple-(Critical|Sound|Volume)` headers: the publisher decides whether a message breaks through Focus, Do Not Disturb and the mute switch; without the header, max priority (5) messages are delivered as critical alerts ([#1235](https://github.com/binwiederhier/ntfy/issues/1235))
 
 **Bug fixes + maintenance:**
 

@@ -31,13 +31,13 @@ func TestPostgresQueries_GenericPlansUseOnlyIndexConditions(t *testing.T) {
 	// table, it finds cheap plans even for the queries that read whole topics on a real server.
 	_, err = d.Primary().Exec(`
 		INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions,
-			attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, published)
+			attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple, published)
 		SELECT 'm' || g, 'm' || g, 1792100000 + g / 5, 'message', 1792200000 + g, CASE
 				WHEN g % 100 < 6 THEN 'mytopic'
 				WHEN g % 100 < 30 THEN 'busy' || (g % 4)
 				ELSE 'small' || (g % 20000)
 			END,
-			'body', '', 3, '', '', '', '', '', '', 0, 0, '', '', '', '', '', TRUE
+			'body', '', 3, '', '', '', '', '', '', 0, 0, '', '', '', '', '', '', TRUE
 		FROM generate_series(1, 200000) g;
 		ANALYZE message`)
 	require.Nil(t, err)

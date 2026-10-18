@@ -129,8 +129,8 @@ func TestTail_FailedReadIsRetriedWhole(t *testing.T) {
 
 func insertMessageRow(t *testing.T, tx *sql.Tx, rowID int64, mid, body string) {
 	_, err := tx.Exec(`
-		INSERT INTO message (id, mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, published)
-		VALUES ($1, $2, $2, $3, 'message', 0, 'mytopic', $4, '', 0, '', '', '', '', '', '', 0, 0, '', '', '', '', '', TRUE)
+		INSERT INTO message (id, mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple, published)
+		VALUES ($1, $2, $2, $3, 'message', 0, 'mytopic', $4, '', 0, '', '', '', '', '', '', 0, 0, '', '', '', '', '', '', TRUE)
 	`, rowID, mid, time.Now().Unix(), body)
 	require.Nil(t, err)
 }

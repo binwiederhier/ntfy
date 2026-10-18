@@ -16,25 +16,25 @@ const (
 	// size: pgx prepares each distinct text server-side and keeps up to 512 per connection, and a
 	// multi-row INSERT per batch size left hundreds of multi-MB plans in every pooled backend.
 	postgresInsertMessagesQuery = `
-		INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user_id, content_type, encoding, published)
-		SELECT * FROM unnest($1::TEXT[], $2::TEXT[], $3::BIGINT[], $4::TEXT[], $5::BIGINT[], $6::TEXT[], $7::TEXT[], $8::TEXT[], $9::INT[], $10::TEXT[], $11::TEXT[], $12::TEXT[], $13::TEXT[], $14::TEXT[], $15::TEXT[], $16::BIGINT[], $17::BIGINT[], $18::TEXT[], $19::BOOLEAN[], $20::TEXT[], $21::TEXT[], $22::TEXT[], $23::TEXT[], $24::BOOLEAN[])
+		INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user_id, content_type, encoding, apple, published)
+		SELECT * FROM unnest($1::TEXT[], $2::TEXT[], $3::BIGINT[], $4::TEXT[], $5::BIGINT[], $6::TEXT[], $7::TEXT[], $8::TEXT[], $9::INT[], $10::TEXT[], $11::TEXT[], $12::TEXT[], $13::TEXT[], $14::TEXT[], $15::TEXT[], $16::BIGINT[], $17::BIGINT[], $18::TEXT[], $19::BOOLEAN[], $20::TEXT[], $21::TEXT[], $22::TEXT[], $23::TEXT[], $24::TEXT[], $25::BOOLEAN[])
 	`
 	postgresSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
 	postgresDeleteScheduledBySequenceIDQuery      = `DELETE FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
 	postgresUpdateMessagesForTopicExpiryQuery     = `UPDATE message SET expires = $1 WHERE topic = $2`
 	postgresSelectMessagesByIDQuery               = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM message
 		WHERE mid = $1
 	`
 	postgresSelectMessagesSinceTimeQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM message
 		WHERE topic = $1 AND time >= $2 AND published = TRUE
 		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesSinceTimeIncludeScheduledQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM message
 		WHERE topic = $1 AND time >= $2
 		ORDER BY time DESC, id DESC
@@ -46,7 +46,7 @@ const (
 	// row of the topic was read (incident 2026-10-16). "time + 0" keeps the second part off the time index,
 	// whose scan would start at the topic's oldest row.
 	postgresSelectMessagesSinceIDQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM (
 			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id <> $2
 			UNION ALL
@@ -55,7 +55,7 @@ const (
 		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesSinceIDIncludeScheduledQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM (
 			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id <> $2
 			UNION ALL
@@ -71,7 +71,7 @@ const (
 	// The parts are separate so that the primary key checks every condition, also in the plan made
 	// without the parameter values; as one OR, that plan read the whole table.
 	postgresSelectMessagesAfterRowIDQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, id, published
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple, id, published
 		FROM (
 			SELECT * FROM message WHERE id > $1
 			UNION ALL
@@ -81,14 +81,14 @@ const (
 		LIMIT $3
 	`
 	postgresSelectMessagesLatestQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM message
 		WHERE topic = $1 AND published = TRUE
 		ORDER BY time DESC, id DESC
 		LIMIT 1
 	`
 	postgresSelectMessagesDueQuery = `
-		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 		FROM message
 		WHERE time <= $1 AND published = FALSE
 		ORDER BY time, id
@@ -121,7 +121,7 @@ const (
 			FOR UPDATE SKIP LOCKED
 		)
 		UPDATE message SET claimed_at = $4 WHERE id IN (SELECT id FROM due)
-		RETURNING mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+		RETURNING mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, apple
 	`
 
 	postgresUpdateStatsQuery       = `UPDATE message_stats SET value = $1 WHERE key = 'messages'`

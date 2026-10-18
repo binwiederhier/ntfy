@@ -250,6 +250,89 @@ func TestToFirebaseMessage_Message_Normal_Not_Allowed(t *testing.T) {
 	require.Equal(t, "New message", fbm.APNS.Payload.Aps.Alert.Body)
 }
 
+func TestToFirebaseMessage_AppleCritical_Explicit(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "critical message")
+	m.Priority = 3 // Not max priority, the explicit header decides
+	m.Apple = &model.AppleOptions{
+		Critical: true,
+		Sound:    "warning",
+		Volume:   0.5,
+	}
+	fbm, err := toFirebaseMessage(m, nil)
+	require.Nil(t, err)
+	require.Equal(t, map[string]string{
+		"apns-push-type": "alert",
+		"apns-priority":  "10",
+	}, fbm.APNS.Headers)
+	require.Equal(t, &messaging.CriticalSound{
+		Critical: true,
+		Name:     "warning",
+		Volume:   0.5,
+	}, fbm.APNS.Payload.Aps.CriticalSound)
+	require.Equal(t, map[string]any{
+		"interruption-level": "critical",
+	}, fbm.APNS.Payload.Aps.CustomData)
+	require.Equal(t, `{"critical":true,"sound":"warning","volume":0.5}`, fbm.Data["apple"])
+}
+
+func TestToFirebaseMessage_AppleCritical_ExplicitFalseBeatsPriority(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "max priority, but explicitly not critical")
+	m.Priority = 5
+	m.Apple = &model.AppleOptions{
+		Critical: false,
+	}
+	fbm, err := toFirebaseMessage(m, nil)
+	require.Nil(t, err)
+	require.Nil(t, fbm.APNS.Headers)
+	require.Nil(t, fbm.APNS.Payload.Aps.CriticalSound)
+	require.Nil(t, fbm.APNS.Payload.Aps.CustomData)
+}
+
+func TestToFirebaseMessage_AppleCritical_PriorityFallback(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "max priority, no explicit header")
+	m.Priority = 5
+	fbm, err := toFirebaseMessage(m, nil)
+	require.Nil(t, err)
+	require.Equal(t, &messaging.CriticalSound{
+		Critical: true,
+		Name:     "default",
+		Volume:   1.0,
+	}, fbm.APNS.Payload.Aps.CriticalSound)
+	require.Equal(t, map[string]any{
+		"interruption-level": "critical",
+	}, fbm.APNS.Payload.Aps.CustomData)
+	require.NotContains(t, fbm.Data, "apple") // No explicit options, nothing to forward
+
+	// Priority 4 without header is not critical
+	m = model.NewDefaultMessage("mytopic", "high priority")
+	m.Priority = 4
+	fbm, err = toFirebaseMessage(m, nil)
+	require.Nil(t, err)
+	require.Nil(t, fbm.APNS.Payload.Aps.CriticalSound)
+}
+
+func TestToPollRequest_KeepsAppleOptions(t *testing.T) {
+	m := model.NewDefaultMessage("mytopic", "critical message on a protected topic")
+	m.Priority = 3
+	m.Apple = &model.AppleOptions{
+		Critical: true,
+		Volume:   0.8,
+	}
+	pr := toPollRequest(m)
+	require.Equal(t, m.Apple, pr.Apple)
+
+	// The poll request produced for a topic without anonymous read access stays critical
+	fbm, err := toFirebaseMessage(m, &testAuther{Allow: false})
+	require.Nil(t, err)
+	require.Equal(t, "poll_request", fbm.Data["event"])
+	require.Equal(t, &messaging.CriticalSound{
+		Critical: true,
+		Name:     "default",
+		Volume:   0.8,
+	}, fbm.APNS.Payload.Aps.CriticalSound)
+	require.Equal(t, `{"critical":true,"volume":0.8}`, fbm.Data["apple"])
+}
+
 func TestToFirebaseMessage_PollRequest(t *testing.T) {
 	m := model.NewPollRequestMessage("mytopic", "fOv6k1QbCzo6")
 	fbm, err := toFirebaseMessage(m, nil)

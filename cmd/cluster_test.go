@@ -175,3 +175,17 @@ func TestCLI_Cluster_Status_PeerLeft(t *testing.T) {
 	require.Contains(t, stdout.String(), "last seen 3h0m0s ago")
 	require.NotContains(t, stdout.String(), "left the registry")
 }
+
+func TestCLI_Cluster_StatusProblems_OutcomeOrderWithinOneSecond(t *testing.T) {
+	// Success and failure in the same Unix second: the recorded last outcome decides, not the timestamps
+	failedLast := &cluster.Status{Time: 100, Peers: []*cluster.PeerStatus{{
+		NodeID: "peer", Live: true,
+		Out: cluster.PeerOutbound{BatchesOK: 1, BatchesFailed: 1, LastOK: 100, LastErrorAt: 100, LastError: "connection refused", LastFailed: true},
+	}}}
+	require.NotEmpty(t, clusterStatusProblems(failedLast, ""))
+	recoveredLast := &cluster.Status{Time: 100, Peers: []*cluster.PeerStatus{{
+		NodeID: "peer", Live: true,
+		Out: cluster.PeerOutbound{BatchesOK: 1, BatchesFailed: 1, LastOK: 100, LastErrorAt: 100, LastError: "connection refused", LastFailed: false},
+	}}}
+	require.Empty(t, clusterStatusProblems(recoveredLast, ""))
+}

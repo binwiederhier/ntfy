@@ -512,12 +512,14 @@ func (c *meshCluster) recordSent(nodeID NodeID, messages int, err error) {
 		s.out.BatchesFailed++
 		s.out.LastError = err.Error()
 		s.out.LastErrorAt = now.Unix()
+		s.out.LastFailed = true
 		metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "error").Inc()
 		return
 	}
 	s.out.BatchesOK++
 	s.out.Messages += int64(messages)
 	s.out.LastOK = now.Unix()
+	s.out.LastFailed = false
 	metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "ok").Inc()
 	metrics.ClusterPeerLastSendSuccess.WithLabelValues(string(nodeID)).Set(float64(now.Unix()))
 }
@@ -540,6 +542,7 @@ func (c *meshCluster) statsForNoLock(nodeID NodeID) *peerStats {
 	if !ok {
 		s = &peerStats{lastSeen: time.Now().Unix()} // First contact counts as seen, so it can expire
 		c.stats[nodeID] = s
+		seedPeerMetrics(nodeID)
 	}
 	return s
 }
@@ -554,8 +557,26 @@ func (c *meshCluster) updatePeerStatsNoLock(alive map[NodeID]*registry.Peer) {
 	for nodeID, s := range c.stats {
 		if _, ok := alive[nodeID]; !ok && now-s.lastSeen > int64(peerStatsRetention.Seconds()) {
 			delete(c.stats, nodeID)
+			deletePeerMetrics(nodeID)
 		}
 	}
+}
+
+// seedPeerMetrics creates a new peer's labeled series at zero, so a peer that never succeeds still
+// has a last-success sample (0, never) for an alert on its age, and the counters have a baseline
+func seedPeerMetrics(nodeID NodeID) {
+	metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "ok")
+	metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "error")
+	metrics.ClusterPeerBatchesReceived.WithLabelValues(string(nodeID))
+	metrics.ClusterPeerLastSendSuccess.WithLabelValues(string(nodeID))
+}
+
+// deletePeerMetrics retires a forgotten peer's labeled series, so departed IDs are not exported forever
+func deletePeerMetrics(nodeID NodeID) {
+	metrics.ClusterPeerBatchesSent.DeleteLabelValues(string(nodeID), "ok")
+	metrics.ClusterPeerBatchesSent.DeleteLabelValues(string(nodeID), "error")
+	metrics.ClusterPeerBatchesReceived.DeleteLabelValues(string(nodeID))
+	metrics.ClusterPeerLastSendSuccess.DeleteLabelValues(string(nodeID))
 }
 
 // postToPeer POSTs a peer API payload, authenticated with the shared cluster secret. Failures

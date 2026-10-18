@@ -146,7 +146,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 	for _, p := range peers {
 		if !c.queueForNoLock(p).queue.TryEnqueue(data) {
 			metrics.ClusterQueueDropped.Inc()
-			c.statsForNoLock(NodeID(p.NodeID)).dropped++
+			c.statsForNoLock(NodeID(p.NodeID)).out.Dropped++
 			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
 		} else if ev := log.Tag(tag); ev.IsTrace() {
 			ev.Trace("Enqueued message %s (topic %s) for peer %s", msg.ID, msg.Topic, p.NodeID)
@@ -223,16 +223,7 @@ func (c *meshCluster) Status() *Status {
 			ps = &PeerStatus{NodeID: nodeID} // Left the registry; its counters still tell what happened
 			peers[nodeID] = ps
 		}
-		ps.Out = PeerOutbound{
-			BatchesOK:     s.batchesOK,
-			BatchesFailed: s.batchesFailed,
-			Messages:      s.messages,
-			Dropped:       s.dropped,
-			LastOK:        unixOrZero(s.lastOK),
-			LastError:     s.lastError,
-			LastErrorAt:   unixOrZero(s.lastErrorAt),
-		}
-		ps.In = PeerInbound{Batches: s.batchesIn, Messages: s.messagesIn, LastAt: unixOrZero(s.lastIn)}
+		ps.Out, ps.In = s.out, s.in
 	}
 	for nodeID, q := range c.queues {
 		if ps, ok := peers[nodeID]; ok {
@@ -516,15 +507,15 @@ func (c *meshCluster) recordSent(nodeID NodeID, messages int, err error) {
 	defer c.mu.Unlock()
 	s := c.statsForNoLock(nodeID)
 	if err != nil {
-		s.batchesFailed++
-		s.lastError = err.Error()
-		s.lastErrorAt = now
+		s.out.BatchesFailed++
+		s.out.LastError = err.Error()
+		s.out.LastErrorAt = now.Unix()
 		metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "error").Inc()
 		return
 	}
-	s.batchesOK++
-	s.messages += int64(messages)
-	s.lastOK = now
+	s.out.BatchesOK++
+	s.out.Messages += int64(messages)
+	s.out.LastOK = now.Unix()
 	metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "ok").Inc()
 	metrics.ClusterPeerLastSendSuccess.WithLabelValues(string(nodeID)).Set(float64(now.Unix()))
 }
@@ -534,9 +525,9 @@ func (c *meshCluster) recordReceived(nodeID NodeID, messages int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	s := c.statsForNoLock(nodeID)
-	s.batchesIn++
-	s.messagesIn += int64(messages)
-	s.lastIn = time.Now()
+	s.in.Batches++
+	s.in.Messages += int64(messages)
+	s.in.LastAt = time.Now().Unix()
 	metrics.ClusterPeerBatchesReceived.WithLabelValues(string(nodeID)).Inc()
 }
 

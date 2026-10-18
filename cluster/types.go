@@ -100,16 +100,8 @@ type PeerInbound struct {
 // peerStats counts the message batches exchanged with one peer, for Status. It outlives the peer's
 // queue, so a peer that left still shows what happened before it did.
 type peerStats struct {
-	batchesOK     int64
-	batchesFailed int64
-	messages      int64
-	dropped       int64
-	lastOK        time.Time
-	lastError     string
-	lastErrorAt   time.Time
-	batchesIn     int64
-	messagesIn    int64
-	lastIn        time.Time
+	out PeerOutbound // Queued is filled in when Status is built, from the live queue
+	in  PeerInbound
 }
 
 // apiHealth is the answer on HealthPath: written by handleHealth, read by peerHealthy, so this

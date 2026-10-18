@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/netip"
 	"strings"
-	"time"
 
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
@@ -26,14 +25,6 @@ func stateURL(advertiseURL string) string {
 // statusURL derives a node's status endpoint URL from its cluster base URL.
 func statusURL(baseURL string) string {
 	return strings.TrimRight(baseURL, "/") + StatusPath
-}
-
-// unixOrZero renders a time for Status: unix seconds, or 0 for never
-func unixOrZero(t time.Time) int64 {
-	if t.IsZero() {
-		return 0
-	}
-	return t.Unix()
 }
 
 // healthURL derives the peer's health endpoint URL from its advertise URL.

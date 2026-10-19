@@ -96,7 +96,11 @@ func TestServer_Manager_ReauthorizesSubscribers(t *testing.T) {
 		topics, err := s.topicsFromIDs(nil, "private")
 		require.Nil(t, err)
 		canceled := atomic.Bool{}
-		topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, alice.ID, func() { canceled.Store(true) })
+		topics[0].Subscribe(func(*visitor, *model.Message) error {
+			return nil
+		}, alice.ID, func() {
+			canceled.Store(true)
+		})
 
 		// Still allowed to read: nothing happens
 		s.execManager()

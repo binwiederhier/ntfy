@@ -171,6 +171,7 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+	subscribeTopicsLimit     = 150                       // Max distinct topics in one subscription; each one runs its own replay query (matches the ntfy.sh nginx edge rule)
 
 	// stopTimeout bounds the entire shutdown. The stores wait for their own background work
 	// (the attachment sync loop queries the database), and none of those waits has a deadline,
@@ -1971,7 +1972,11 @@ func (s *Server) topicsFromPath(v *visitor, path string) ([]*topic, string, erro
 	if len(parts) < 2 {
 		return nil, "", errHTTPBadRequestTopicInvalid
 	}
-	topicIDs := util.SplitNoEmpty(parts[1], ",")
+	// De-duplicate, or each repetition of a topic replays (and buffers) its cache again
+	topicIDs := util.Dedup(util.SplitNoEmpty(parts[1], ","))
+	if len(topicIDs) > subscribeTopicsLimit {
+		return nil, "", errHTTPBadRequestTooManyTopics
+	}
 	topics, err := s.topicsFromIDs(v, topicIDs...)
 	if err != nil {
 		return nil, "", err

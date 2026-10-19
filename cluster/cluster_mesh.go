@@ -1,12 +1,12 @@
 package cluster
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -19,13 +19,12 @@ import (
 )
 
 const (
-	meshHTTPTimeout   = 5 * time.Second
-	peerHealthTimeout = 2 * time.Second // Per-peer health probe while this node is unhealthy
-	peerQueueSize     = 1024            // Bounded per-peer fan-out queue (drop on overflow)
-	batchMaxMessages  = 100             // Flush a batch early when it reaches this many messages
-	batchMaxBytes     = 256 * 1024      // Flush a batch early when it reaches this size
-	stateMaxBytes     = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
-	healthMaxBytes    = 4 * 1024        // Upper bound for a peer's health response
+	peerStatsRetention = 24 * time.Hour  // How long a peer that left stays in Status
+	peerHealthTimeout  = 2 * time.Second // Per-peer health probe while this node is unhealthy
+	peerQueueSize      = 1024            // Bounded per-peer fan-out queue (drop on overflow)
+	batchMaxMessages   = 100             // Flush a batch early when it reaches this many messages
+	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
+	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -45,16 +44,17 @@ type meshCluster struct {
 	conf           *Config
 	deliver        DeliverFunc
 	registry       *registry.Registry
-	httpClient     *http.Client
+	client         *Client
 	mux            *http.ServeMux            // The internal peer API; Cluster is an http.Handler
 	queues         map[NodeID]*peerQueue     // per-peer send queues; reconciled against the registry
 	closed         bool                      // Guards against ForwardMessage spawning new workers after Close
 	knownPeers     map[NodeID]*registry.Peer // Peers seen in the last reconcile, for join/leave logging and fencing
+	stats          map[NodeID]*peerStats     // Per-peer batch counters for Status; kept after a peer leaves
 	lastRegistered time.Time                 // Last successful registry heartbeat, for Healthy
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
-	mu             sync.Mutex // Protects queues, closed, knownPeers and lastRegistered
+	mu             sync.Mutex // Protects queues, closed, knownPeers, stats and lastRegistered
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -90,10 +90,11 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		conf:           conf,
 		deliver:        deliver,
 		registry:       reg,
-		httpClient:     &http.Client{Timeout: meshHTTPTimeout},
+		client:         NewClient(conf.Secret, conf.NodeID),
 		queues:         make(map[NodeID]*peerQueue),
 		lastRegistered: time.Now(), // The synchronous Register above just succeeded
 		knownPeers:     make(map[NodeID]*registry.Peer),
+		stats:          make(map[NodeID]*peerStats),
 		ctx:            ctx,
 		cancel:         cancel,
 	}
@@ -102,6 +103,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	c.mux.HandleFunc("POST "+StatePath, c.authenticated(c.handleState))
 	c.mux.HandleFunc("GET "+MembersPath, c.secretAuthenticated(c.handleMembers))
 	c.mux.HandleFunc("GET "+HealthPath, c.secretAuthenticated(c.handleHealth))
+	c.mux.HandleFunc("GET "+StatusPath, c.secretAuthenticated(c.handleStatus))
 	c.wg.Add(2)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
@@ -141,6 +143,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 	for _, p := range peers {
 		if !c.queueForNoLock(p).queue.TryEnqueue(data) {
 			metrics.ClusterQueueDropped.Inc()
+			c.statsForNoLock(NodeID(p.NodeID)).out.Dropped++
 			log.Tag(tag).Warn("Fan-out queue for peer %s full, dropping message %s", p.NodeID, msg.ID)
 		} else if ev := log.Tag(tag); ev.IsTrace() {
 			ev.Trace("Enqueued message %s (topic %s) for peer %s", msg.ID, msg.Topic, p.NodeID)
@@ -170,7 +173,11 @@ func (c *meshCluster) BroadcastState(state *State) {
 	}
 	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), len(peers))
 	for _, p := range peers {
-		go c.postToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), contentTypeJSON, body)
+		go func(p *registry.Peer) {
+			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {
+				return c.client.SendState(c.ctx, p.AdvertiseURL, body)
+			})
+		}(p)
 	}
 }
 
@@ -186,6 +193,53 @@ func (c *meshCluster) Members() []Member {
 		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Role: p.Role, Healthy: fresh})
 	}
 	return members
+}
+
+// Status reports this node's view of the cluster (see Status): every live peer from the registry
+// snapshot, plus every peer this node exchanged batches with, each with both directions' counters.
+// A link that only works one way shows as failed batches on one side and nothing received on the other.
+func (c *meshCluster) Status() *Status {
+	now := time.Now()
+	status := &Status{
+		NodeID:  c.conf.NodeID,
+		Role:    c.conf.Role,
+		Leader:  c.IsLeader(),
+		Healthy: c.Healthy(),
+		Time:    now.Unix(),
+	}
+	peers := make(map[NodeID]*PeerStatus)
+	for _, p := range c.registry.Peers() {
+		peers[NodeID(p.NodeID)] = &PeerStatus{
+			NodeID:       NodeID(p.NodeID),
+			AdvertiseURL: p.AdvertiseURL,
+			Role:         p.Role,
+			Live:         true,
+			HeartbeatAge: int64(now.Sub(p.HeartbeatAt).Seconds()),
+		}
+	}
+	c.mu.Lock()
+	for nodeID, s := range c.stats {
+		ps, ok := peers[nodeID]
+		if !ok {
+			ps = &PeerStatus{NodeID: nodeID} // Left the registry; its counters still tell what happened
+			peers[nodeID] = ps
+		}
+		ps.Out, ps.In, ps.LastSeen = s.out, s.in, s.lastSeen
+	}
+	for nodeID, q := range c.queues {
+		if ps, ok := peers[nodeID]; ok {
+			ps.Out.Queued = q.queue.Len()
+		}
+	}
+	c.mu.Unlock()
+	status.Peers = make([]*PeerStatus, 0, len(peers))
+	for _, ps := range peers {
+		status.Peers = append(status.Peers, ps)
+	}
+	sort.Slice(status.Peers, func(i, j int) bool {
+		return status.Peers[i].NodeID < status.Peers[j].NodeID
+	})
+	return status
 }
 
 // IsLeader reports whether this node currently holds singleton-job leadership.
@@ -327,6 +381,7 @@ func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
 		}
 	}
 	c.knownPeers = alive
+	c.updatePeerStatsNoLock(alive)
 	for nodeID, q := range c.queues {
 		if p, ok := alive[nodeID]; !ok || q.advertiseURL != p.AdvertiseURL {
 			q.queue.Close() // Flushes the remainder; the worker exits when the queue is drained
@@ -388,24 +443,8 @@ func (c *meshCluster) maybeIsolated() {
 func (c *meshCluster) peerHealthy(url string) bool {
 	ctx, cancel := context.WithTimeout(c.ctx, peerHealthTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL(url), nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set(secretHeader, c.conf.Secret)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return false
-	}
-	var health apiHealth
-	if err := json.NewDecoder(io.LimitReader(resp.Body, healthMaxBytes)).Decode(&health); err != nil {
-		return false
-	}
-	return health.Healthy
+	healthy, err := c.client.Health(ctx, url)
+	return err == nil && healthy
 }
 
 // queueForNoLock returns the send queue for the given peer, creating it (and its delivery
@@ -438,39 +477,112 @@ func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	for lines := range q.queue.Dequeue() {
 		body := assembleMessageBody(lines)
 		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(lines), len(body), nodeID)
-		if err := c.postToPeer(nodeID, messageURL(q.advertiseURL), contentTypeNDJSON, body); err != nil {
+		err := c.sendToPeer(nodeID, messageURL(q.advertiseURL), func() error {
+			return c.client.SendMessages(c.ctx, q.advertiseURL, body)
+		})
+		if err != nil {
 			log.Tag(tag).Err(err).Warn("Batch to peer %s was lost", nodeID)
+		}
+		if c.ctx.Err() == nil { // A send aborted by shutdown says nothing about the link
+			c.recordSent(nodeID, len(lines), err)
 		}
 		metrics.ClusterBatchesSent.Inc()
 	}
 }
 
-// postToPeer POSTs a peer API payload, authenticated with the shared cluster secret. Failures
-// are logged, counted and returned; the caller decides what a failure means (a message batch
-// is dropped, state is retried on the next heartbeat).
-func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload []byte) error {
-	req, err := http.NewRequestWithContext(c.ctx, http.MethodPost, url, bytes.NewReader(payload))
+// recordSent counts a message batch sent to a peer, per peer, for Status and the metrics
+func (c *meshCluster) recordSent(nodeID NodeID, messages int, err error) {
+	now := time.Now()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := c.statsForNoLock(nodeID)
 	if err != nil {
-		metrics.ClusterSendErrors.Inc()
-		log.Tag(tag).Err(err).Warn("Failed to build request for peer %s", nodeID)
-		return err
+		s.out.BatchesFailed++
+		s.out.LastError = err.Error()
+		s.out.LastErrorAt = now.Unix()
+		s.out.LastFailed = true
+		metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "error").Inc()
+		return
 	}
-	req.Header.Set("Content-Type", contentType)
-	req.Header.Set(secretHeader, c.conf.Secret)
-	req.Header.Set(originHeader, string(c.conf.NodeID))
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
+	s.out.BatchesOK++
+	s.out.Messages += int64(messages)
+	s.out.LastOK = now.Unix()
+	s.out.LastFailed = false
+	metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "ok").Inc()
+	metrics.ClusterPeerLastSendSuccess.WithLabelValues(string(nodeID)).Set(float64(now.Unix()))
+}
+
+// recordReceived counts a message batch received from a peer, per peer, for Status and the metrics
+func (c *meshCluster) recordReceived(nodeID NodeID, messages int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	s := c.statsForNoLock(nodeID)
+	s.in.Batches++
+	s.in.Messages += int64(messages)
+	s.in.LastAt = time.Now().Unix()
+	metrics.ClusterPeerBatchesReceived.WithLabelValues(string(nodeID)).Inc()
+}
+
+// statsForNoLock returns the counters for the given peer, creating them on first use. The caller
+// must hold c.mu.
+func (c *meshCluster) statsForNoLock(nodeID NodeID) *peerStats {
+	s, ok := c.stats[nodeID]
+	if !ok {
+		s = &peerStats{lastSeen: time.Now().Unix()} // First contact counts as seen, so it can expire
+		c.stats[nodeID] = s
+		seedPeerMetrics(nodeID)
+	}
+	return s
+}
+
+// updatePeerStatsNoLock marks the live peers as seen now, and forgets peers gone for longer than
+// peerStatsRetention, so a decommissioned node does not stay in Status. The caller must hold c.mu.
+func (c *meshCluster) updatePeerStatsNoLock(alive map[NodeID]*registry.Peer) {
+	now := time.Now().Unix()
+	for nodeID := range alive {
+		c.statsForNoLock(nodeID).lastSeen = now
+	}
+	for nodeID, s := range c.stats {
+		if _, ok := alive[nodeID]; !ok && now-s.lastSeen > int64(peerStatsRetention.Seconds()) {
+			delete(c.stats, nodeID)
+			deletePeerMetrics(nodeID)
+		}
+	}
+}
+
+// seedPeerMetrics creates a new peer's labeled series at zero, so a peer that never succeeds still
+// has a last-success sample (0, never) for an alert on its age, and the counters have a baseline
+func seedPeerMetrics(nodeID NodeID) {
+	metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "ok")
+	metrics.ClusterPeerBatchesSent.WithLabelValues(string(nodeID), "error")
+	metrics.ClusterPeerBatchesReceived.WithLabelValues(string(nodeID))
+	metrics.ClusterPeerLastSendSuccess.WithLabelValues(string(nodeID))
+}
+
+// deletePeerMetrics retires a forgotten peer's labeled series, so departed IDs are not exported forever
+func deletePeerMetrics(nodeID NodeID) {
+	metrics.ClusterPeerBatchesSent.DeleteLabelValues(string(nodeID), "ok")
+	metrics.ClusterPeerBatchesSent.DeleteLabelValues(string(nodeID), "error")
+	metrics.ClusterPeerBatchesReceived.DeleteLabelValues(string(nodeID))
+	metrics.ClusterPeerLastSendSuccess.DeleteLabelValues(string(nodeID))
+}
+
+// sendToPeer runs one peer API POST (via the client, authenticated with the shared cluster
+// secret). Failures are logged, counted and returned; the caller decides what a failure means (a
+// message batch is dropped, state is retried on the next heartbeat).
+func (c *meshCluster) sendToPeer(nodeID NodeID, url string, send func() error) error {
+	err := send()
+	var httpErr *HTTPError
+	if errors.As(err, &httpErr) {
+		metrics.ClusterSendErrors.Inc()
+		log.Tag(tag).Warn("Peer %s (%s) rejected request with HTTP %d", nodeID, url, httpErr.StatusCode)
+		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, httpErr.StatusCode)
+	} else if err != nil {
 		if c.ctx.Err() == nil {
 			metrics.ClusterSendErrors.Inc()
 			log.Tag(tag).Err(err).Warn("Failed to send to peer %s (%s)", nodeID, url)
 		}
 		return err
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		metrics.ClusterSendErrors.Inc()
-		log.Tag(tag).Warn("Peer %s (%s) rejected request with HTTP %d", nodeID, url, resp.StatusCode)
-		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, resp.StatusCode)
 	}
 	return nil
 }

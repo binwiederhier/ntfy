@@ -545,7 +545,11 @@ func TestAccess_PeerCancelReloadsAccessAndCancels(t *testing.T) {
 	topics, err := b.topicsFromIDs(nil, "private")
 	require.Nil(t, err)
 	canceled := atomic.Bool{}
-	topics[0].Subscribe(func(*visitor, *model.Message) error { return nil }, alice.ID, func() { canceled.Store(true) })
+	topics[0].Subscribe(func(*visitor, *model.Message) error {
+		return nil
+	}, alice.ID, func() {
+		canceled.Store(true)
+	})
 
 	// Node A revokes; node B learns about it only through the relayed cancel
 	require.Nil(t, a.userManager.ResetAccess("alice", "private"))

@@ -38,11 +38,7 @@ const (
 	postgresDeleteSubscriptionTopicWithoutSubscriptionQuery = `DELETE FROM webpush_subscription_topic WHERE subscription_id NOT IN (SELECT id FROM webpush_subscription)`
 )
 
-// Schema version and queries
-const (
-	postgresCurrentSchemaVersion = 1
-)
-
+// Schema
 var (
 	postgresCreateTables = schema.AsMigrateFunc(`
 		CREATE TABLE IF NOT EXISTS webpush_subscription (
@@ -69,7 +65,7 @@ var (
 
 // NewPostgresStore creates a new PostgreSQL-backed web push store using an existing database connection pool.
 func NewPostgresStore(d *db.DB) (*Store, error) {
-	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, nil); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCreateTables, nil); err != nil {
 		return nil, err
 	}
 	return &Store{

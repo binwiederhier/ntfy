@@ -19,6 +19,9 @@ var expectedMetricNames = []string{
 	"ntfy_cluster_leader",
 	"ntfy_cluster_messages_forwarded_total",
 	"ntfy_cluster_messages_wasted_total",
+	"ntfy_cluster_peer_batches_received_total",
+	"ntfy_cluster_peer_batches_sent_total",
+	"ntfy_cluster_peer_last_send_success_timestamp_seconds",
 	"ntfy_cluster_peers",
 	"ntfy_cluster_queue_dropped_total",
 	"ntfy_cluster_send_errors_total",
@@ -46,7 +49,10 @@ var expectedMetricNames = []string{
 }
 
 func TestRegisteredMetricNames(t *testing.T) {
-	HTTPRequests.WithLabelValues("200", "20000", "GET").Inc()
+	HTTPRequests.WithLabelValues("200", "20000", "GET").Inc() // Vectors are only gathered once they have a series
+	ClusterPeerBatchesSent.WithLabelValues("node-b", "ok").Inc()
+	ClusterPeerBatchesReceived.WithLabelValues("node-b").Inc()
+	ClusterPeerLastSendSuccess.WithLabelValues("node-b").Set(1)
 	families, err := prometheus.DefaultGatherer.Gather()
 	require.Nil(t, err)
 	names := make([]string, 0)

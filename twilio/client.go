@@ -5,6 +5,7 @@ package twilio
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,7 +17,8 @@ import (
 )
 
 const (
-	tagTwilio = "twilio"
+	tagTwilio                  = "twilio"
+	verificationStatusApproved = "approved"
 )
 
 // Client is the Twilio API client
@@ -120,6 +122,15 @@ func (c *Client) CheckVerify(phoneNumber, code string) error {
 	response, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
+	}
+	// Twilio answers a wrong code with 200 OK too; only status "approved" means verified
+	var check verificationCheckResponse
+	if err := json.Unmarshal(response, &check); err != nil {
+		ev.Field("twilio_response", string(response)).Err(err).Warn("Cannot parse Twilio phone verification response")
+		return err
+	} else if check.Status != verificationStatusApproved {
+		ev.Field("twilio_verify_status", check.Status).Debug("Twilio phone verification code invalid")
+		return ErrVerificationCodeInvalid
 	}
 	if ev.IsTrace() {
 		ev.Field("twilio_response", string(response)).Trace("Received successful Twilio phone verification response")

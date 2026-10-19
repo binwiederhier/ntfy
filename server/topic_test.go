@@ -240,9 +240,12 @@ func TestTopic_SubscriberUserIDs(t *testing.T) {
 		return nil
 	}
 	to := newTopic("mytopic")
-	to.Subscribe(subFn, "", func() {})
-	to.Subscribe(subFn, "u_phil", func() {})
-	to.Subscribe(subFn, "u_phil", func() {})
-	to.Subscribe(subFn, "u_ben", func() {})
+	nopCancel := func() {
+		// The cancel callback is not under test here
+	}
+	to.Subscribe(subFn, "", nopCancel)
+	to.Subscribe(subFn, "u_phil", nopCancel)
+	to.Subscribe(subFn, "u_phil", nopCancel)
+	to.Subscribe(subFn, "u_ben", nopCancel)
 	require.ElementsMatch(t, []string{"u_phil", "u_ben"}, to.SubscriberUserIDs())
 }

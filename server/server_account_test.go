@@ -926,3 +926,65 @@ func TestAccount_TokenUpdate_NilUserRace_NoPanic(t *testing.T) {
 		require.Equal(t, 401, httpErr.HTTPCode)
 	})
 }
+
+// TestAccount_PhoneNumberAdd_WrongCode ensures that a wrong verification code is rejected, and
+// that the phone number is not added. Twilio answers a wrong code with 200 OK and status "pending".
+func TestAccount_PhoneNumberAdd_WrongCode(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		twilioVerifyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, err := io.ReadAll(r.Body)
+			require.Nil(t, err)
+			switch r.URL.Path {
+			case "/v2/Services/VA1234567890/Verifications":
+				w.WriteHeader(http.StatusCreated)
+				w.Write([]byte(`{"status":"pending","valid":false}`))
+			case "/v2/Services/VA1234567890/VerificationCheck":
+				if string(body) == "Code=123456&To=%2B12223334444" {
+					w.Write([]byte(`{"status":"approved","valid":true}`))
+				} else {
+					w.Write([]byte(`{"status":"pending","valid":false}`))
+				}
+			default:
+				t.Fatal("Unexpected path:", r.URL.Path)
+			}
+		}))
+		defer twilioVerifyServer.Close()
+
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.TwilioVerifyBaseURL = twilioVerifyServer.URL
+		c.TwilioCallsBaseURL = "http://127.0.0.1:1" // Never called
+		c.TwilioAccount = "AC1234567890"
+		c.TwilioAuthToken = "AAEAA1234567890"
+		c.TwilioPhoneNumber = "+1234567890"
+		c.TwilioVerifyService = "VA1234567890"
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "pro", MessageLimit: 10, CallLimit: 10}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+
+		// Send verification code, then submit a wrong code
+		rr := request(t, s, "PUT", "/v1/account/phone/verify", `{"number":"+12223334444","channel":"sms"}`, map[string]string{
+			"authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, rr.Code)
+		rr = request(t, s, "PUT", "/v1/account/phone", `{"number":"+12223334444","code":"000000"}`, map[string]string{
+			"authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 400, rr.Code)
+		require.Equal(t, 40060, toHTTPError(t, rr.Body.String()).Code)
+		phoneNumbers, err := s.userManager.PhoneNumbers(u.ID)
+		require.Nil(t, err)
+		require.Empty(t, phoneNumbers)
+
+		// The correct code still works
+		rr = request(t, s, "PUT", "/v1/account/phone", `{"number":"+12223334444","code":"123456"}`, map[string]string{
+			"authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, rr.Code)
+		phoneNumbers, err = s.userManager.PhoneNumbers(u.ID)
+		require.Nil(t, err)
+		require.Equal(t, []string{"+12223334444"}, phoneNumbers)
+	})
+}

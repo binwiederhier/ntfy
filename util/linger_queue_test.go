@@ -88,3 +88,18 @@ func waitForCond(t *testing.T, f func() bool) {
 	}
 	t.Fatal("timed out waiting for condition")
 }
+
+func TestLingerQueue_Len(t *testing.T) {
+	// Len counts everything enqueued and not yet emitted, including the batch being collected
+	q := util.NewLingerQueue[int](16, 100, 0, nil, time.Hour)
+	require.Equal(t, 0, q.Len())
+	require.True(t, q.TryEnqueue(1))
+	require.True(t, q.TryEnqueue(2))
+	require.True(t, q.TryEnqueue(3))
+	require.Equal(t, 3, q.Len())
+	q.Close()
+	require.Equal(t, []int{1, 2, 3}, <-q.Dequeue())
+	_, ok := <-q.Dequeue()
+	require.False(t, ok)
+	require.Equal(t, 0, q.Len())
+}

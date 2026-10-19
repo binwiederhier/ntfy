@@ -20,7 +20,6 @@ import (
 const (
 	tag            = "quota"
 	schemaStoreKey = "visitor_usage" // Store name in the shared schema_version table (see db/schema)
-	schemaVersion  = 2
 
 	// DefaultFlushInterval is the cadence for pushing counter deltas and pulling cluster
 	// totals. It bounds quota overshoot (~nodes x interval x per-node rate) and the latency
@@ -114,10 +113,10 @@ func New(conf *Config, pool *db.DB) (*Tracker, error) {
 		conf.FlushInterval = DefaultFlushInterval
 	}
 	t := newTracker(conf, pool)
-	migrations := map[int]schema.MigrateFunc{
-		1: schema.AsMigrateFunc(createDailyResetTable), // v1 -> v2: the daily-reset marker
+	migrations := schema.Migrations{
+		{From: 1, To: 2}: schema.Query(createDailyResetTable), // The daily-reset marker
 	}
-	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, schema.AsMigrateFunc(createTable), migrations); err != nil {
+	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schema.AsMigrateFunc(createTable), migrations); err != nil {
 		return nil, err
 	}
 	// Claim the current day without resetting anything: a node booting into a day that is

@@ -33,6 +33,7 @@ func TestServer_Twilio_Call_Add_Verify_Call_Delete_Success(t *testing.T) {
 				}
 				require.Equal(t, "Code=123456&To=%2B12223334444", string(body))
 				verified.Store(true)
+				w.Write([]byte(`{"status":"approved","valid":true}`))
 			} else {
 				t.Fatal("Unexpected path:", r.URL.Path)
 			}

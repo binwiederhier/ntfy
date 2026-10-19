@@ -56,6 +56,57 @@ type CancelFunc func(cancel *SubscriberCancel)
 // announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
 
+// Status is a node's view of the cluster, served on StatusPath. Times are unix seconds, 0 for never.
+type Status struct {
+	NodeID  NodeID        `json:"node_id"`
+	Role    Role          `json:"role"`
+	Leader  bool          `json:"leader"`
+	Healthy bool          `json:"healthy"`
+	Time    int64         `json:"time"` // When this view was taken, to judge the other timestamps by
+	Peers   []*PeerStatus `json:"peers"`
+}
+
+// PeerStatus is one peer as seen from this node: every live peer, plus any peer this node has
+// exchanged batches with since it started (Live false once it left the registry)
+type PeerStatus struct {
+	NodeID       NodeID       `json:"node_id"`
+	AdvertiseURL string       `json:"advertise_url,omitempty"`
+	Role         Role         `json:"role,omitempty"`
+	Live         bool         `json:"live"`
+	HeartbeatAge int64        `json:"heartbeat_age,omitempty"` // Seconds since the peer's last registry heartbeat, as of the last refresh
+	LastSeen     int64        `json:"last_seen,omitempty"`     // When this node last saw the peer in the registry (or first heard from it)
+	Out          PeerOutbound `json:"out"`
+	In           PeerInbound  `json:"in"`
+}
+
+// PeerOutbound counts the message batches this node sent to a peer since it started
+type PeerOutbound struct {
+	BatchesOK     int64  `json:"batches_ok"`
+	BatchesFailed int64  `json:"batches_failed"`
+	Messages      int64  `json:"messages"` // Messages in batches the peer accepted
+	Dropped       int64  `json:"dropped"`  // Messages dropped because the peer's queue was full
+	Queued        int    `json:"queued"`   // Messages waiting in the peer's queue right now
+	LastOK        int64  `json:"last_ok,omitempty"`
+	LastError     string `json:"last_error,omitempty"`
+	LastErrorAt   int64  `json:"last_error_at,omitempty"`
+	LastFailed    bool   `json:"last_failed,omitempty"` // The most recent batch failed; timestamps cannot order outcomes within one second
+}
+
+// PeerInbound counts the message batches this node received from a peer since it started
+type PeerInbound struct {
+	Batches  int64 `json:"batches"`
+	Messages int64 `json:"messages"`
+	LastAt   int64 `json:"last_at,omitempty"`
+}
+
+// peerStats counts the message batches exchanged with one peer, for Status. It outlives the peer's
+// queue, so a peer that left still shows what happened before it did.
+type peerStats struct {
+	out      PeerOutbound // Queued is filled in when Status is built, from the live queue
+	in       PeerInbound
+	lastSeen int64 // Unix seconds; a peer gone for peerStatsRetention is forgotten
+}
+
 // apiHealth is the answer on HealthPath: written by handleHealth, read by peerHealthy, so this
 // package owns both ends of it. The status code carries the same answer for anything that only
 // looks at that, but a peer reads the field, since a 200 from something that is not an ntfy

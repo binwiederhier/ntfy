@@ -201,6 +201,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Flock](https://github.com/HNF-FRN/flock) - Runs several Claude Desktop accounts side by side on Windows; its phone app starts and continues Claude Code sessions on the PC through end-to-end encrypted ntfy messages (JS)
 - [epokio](https://github.com/8rulerstar/epokio) - Alerts when an ML training run stalls, hits NaN or finishes, by reading its existing logs (Python)
 - [Pethost](https://pethost.dev/templates/ntfy/) - One-click ntfy server on Pethost, with an admin user made at the first start and anonymous access denied
+- [Sanctumd](https://github.com/Phioster/sanctum_daemon) - Android app for Jellyfin and the *arr stack; subscribes to ntfy topics for live pushes with images, priorities and action buttons (Kotlin)
 
 ## Blog + forum posts
 

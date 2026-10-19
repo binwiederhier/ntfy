@@ -659,6 +659,8 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 	if err := s.twilio.CheckVerify(req.Number, req.Code); err != nil {
 		if errors.Is(err, twilio.ErrVerificationExpired) {
 			return errHTTPGonePhoneVerificationExpired
+		} else if errors.Is(err, twilio.ErrVerificationCodeInvalid) {
+			return errHTTPBadRequestPhoneVerificationCodeInvalid
 		}
 		return err
 	}

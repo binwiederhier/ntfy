@@ -21,7 +21,6 @@ import (
 
 const (
 	schemaStoreKey = "topic" // Store name in the shared schema_version table (see db/schema)
-	schemaVersion  = 1
 
 	// RateVisitorTTL is how long after the rate visitor's last observed activity the
 	// assignment remains valid. Subscriber keepalives refresh it (throttled), so a connected
@@ -111,7 +110,7 @@ type Store struct {
 
 // New creates the store and sets up its schema
 func New(pool *db.DB) (*Store, error) {
-	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, schema.AsMigrateFunc(createTable), nil); err != nil {
+	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schema.AsMigrateFunc(createTable), nil); err != nil {
 		return nil, err
 	}
 	return &Store{pool: pool, now: time.Now}, nil

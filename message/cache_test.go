@@ -714,14 +714,14 @@ func TestStore_Stats(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, int64(0), messages)
 
-		// Update stats
-		require.Nil(t, s.UpdateStats(42))
+		// Add stats
+		require.Nil(t, s.AddStats(42))
 		messages, err = s.Stats()
 		require.Nil(t, err)
 		require.Equal(t, int64(42), messages)
 
-		// Update again (overwrites)
-		require.Nil(t, s.UpdateStats(100))
+		// Add again (increments)
+		require.Nil(t, s.AddStats(58))
 		messages, err = s.Stats()
 		require.Nil(t, err)
 		require.Equal(t, int64(100), messages)
@@ -1110,6 +1110,30 @@ func TestStore_AddMessage_InvalidUTF8BatchDoesNotDropValidMessages(t *testing.T)
 	})
 }
 
+func TestStore_AddStats_SumsAcrossNodes(t *testing.T) {
+	// The global message counter is written by every cluster node; writes must be additive
+	// increments, not absolute values, or nodes overwrite each other's counts
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	openStore := func() *message.Cache {
+		host, err := pg.Open(schemaDSN)
+		require.Nil(t, err)
+		d := db.New(host, nil)
+		store, err := message.NewPostgresStore(d, 0, 0)
+		require.Nil(t, err)
+		t.Cleanup(func() {
+			store.Close()
+		})
+		return store
+	}
+	a, b := openStore(), openStore()
+	require.Nil(t, a.AddStats(5))
+	require.Nil(t, b.AddStats(3))
+	require.Nil(t, a.AddStats(2))
+	messages, err := a.Stats()
+	require.Nil(t, err)
+	require.Equal(t, int64(10), messages)
+}
+
 func TestStore_CloseGivesUpOnAStuckBatchWrite(t *testing.T) {
 	// A wedged database must not make Close, and with it the entire shutdown, block forever.
 	// systemd would SIGKILL us eventually, but only after its stop timeout.
@@ -1280,7 +1304,9 @@ func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
 		d.MarkReplicasHealthyForTest() // Route ReadOnly() to the lagged replica deterministically
 		store, err := message.NewPostgresStore(d, 0, 0)
 		require.Nil(t, err)
-		t.Cleanup(func() { store.Close() })
+		t.Cleanup(func() {
+			store.Close()
+		})
 		return store
 	}
 	// The "replica" is a separate schema holding only the first 3 messages (fully lagged after

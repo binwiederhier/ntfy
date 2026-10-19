@@ -69,6 +69,7 @@ type Server struct {
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
+	messagesFlushed   int64                               // Value of the messages counter at the last stats flush; the difference is written as a delta
 	userManager       *user.Manager                       // Might be nil!
 	messageCache      *message.Cache                      // Database that stores the messages
 	webPush           *webpush.Store                      // Database that stores web push subscriptions
@@ -336,6 +337,7 @@ func New(conf *Config) (*Server, error) {
 		userManager:     userManager,
 		messages:        messages,
 		messagesHistory: []int64{messages},
+		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
 	}
@@ -2314,11 +2316,23 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 	if len(s.messagesHistory) > messagesHistoryMax {
 		s.messagesHistory = s.messagesHistory[1:]
 	}
+	snapshot, delta := s.messages, s.messages-s.messagesFlushed
 	s.mu.Unlock()
-	if !s.cluster.IsLeader() {
-		return // Overwritten, not added to: a second writer would replace the total with its own count
-	}
-	if err := s.messageCache.UpdateStats(messagesCount); err != nil {
+	// Write this node's delta and fold the cluster-wide total back in, so every node's counter
+	// (and /v1/stats) converges on the shared sum instead of overwriting it
+	if err := s.messageCache.AddStats(delta); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
+		return // Delta remains unflushed; retried on the next tick
 	}
+	total, err := s.messageCache.Stats()
+	if err != nil {
+		log.Tag(tagManager).Err(err).Warn("Cannot read messages stats")
+		total = snapshot // Keep the local view; only the flush marker moves
+	}
+	s.mu.Lock()
+	// The marker is the folded total (everything the database already has, incl. peer counts),
+	// so the next delta is only this node's new publishes; peer counts must never be re-added
+	s.messagesFlushed = total
+	s.messages = total + (s.messages - snapshot) // Publishes that arrived while flushing stay counted
+	s.mu.Unlock()
 }

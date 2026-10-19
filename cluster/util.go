@@ -22,6 +22,11 @@ func stateURL(advertiseURL string) string {
 	return strings.TrimRight(advertiseURL, "/") + StatePath
 }
 
+// statusURL derives a node's status endpoint URL from its cluster base URL.
+func statusURL(baseURL string) string {
+	return strings.TrimRight(baseURL, "/") + StatusPath
+}
+
 // healthURL derives the peer's health endpoint URL from its advertise URL.
 func healthURL(advertiseURL string) string {
 	return strings.TrimRight(advertiseURL, "/") + HealthPath

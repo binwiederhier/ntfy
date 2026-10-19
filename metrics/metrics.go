@@ -96,6 +96,15 @@ var (
 	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_leader",
 	})
+	ClusterPeerBatchesSent = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ntfy_cluster_peer_batches_sent_total", // Per peer, result "ok" or "error": a link that only fails shows up here
+	}, []string{"peer", "result"})
+	ClusterPeerBatchesReceived = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ntfy_cluster_peer_batches_received_total",
+	}, []string{"peer"})
+	ClusterPeerLastSendSuccess = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ntfy_cluster_peer_last_send_success_timestamp_seconds",
+	}, []string{"peer"})
 	TailMessagesLagSeconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_tail_messages_lag_seconds", // Age of the newest message of the last read; well above the write delay means it is behind
 	})
@@ -135,6 +144,9 @@ func init() {
 		ClusterQueueDropped,
 		ClusterMessagesWasted,
 		ClusterLeader,
+		ClusterPeerBatchesSent,
+		ClusterPeerBatchesReceived,
+		ClusterPeerLastSendSuccess,
 		TailMessagesLagSeconds,
 		TailMessagesRead,
 		TailMessagesMissed,

@@ -92,7 +92,7 @@ func execClusterStatus(c *cli.Context) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), clusterStatusTimeout)
 	defer cancel()
-	status, err := cluster.FetchStatus(ctx, baseURL, c.String("experimental-cluster-secret"))
+	status, err := cluster.NewClient(c.String("experimental-cluster-secret"), "").Status(ctx, baseURL)
 	if err != nil {
 		return err
 	}
@@ -203,6 +203,7 @@ func clusterStatusAge(now, t int64) string {
 // that does not answer is reported in its entry rather than failing the command.
 func fetchClusterNodeStatuses(local *cluster.Status, secret string) []*clusterNodeStatus {
 	nodes := []*clusterNodeStatus{{NodeID: local.NodeID, Status: local}}
+	client := cluster.NewClient(secret, "")
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for _, p := range local.Peers {
@@ -215,7 +216,7 @@ func fetchClusterNodeStatuses(local *cluster.Status, secret string) []*clusterNo
 			node := &clusterNodeStatus{NodeID: p.NodeID}
 			ctx, cancel := context.WithTimeout(context.Background(), clusterStatusPeerTimeout)
 			defer cancel()
-			if status, err := cluster.FetchStatus(ctx, p.AdvertiseURL, secret); err != nil {
+			if status, err := client.Status(ctx, p.AdvertiseURL); err != nil {
 				node.Error = err.Error()
 			} else {
 				node.Status = status

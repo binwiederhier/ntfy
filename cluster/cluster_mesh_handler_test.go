@@ -188,7 +188,7 @@ func TestMesh_MembersEndpointReportsRoles(t *testing.T) {
 
 func TestMesh_Status_RequiresSecret(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), openTestPool(t, schemaDSN), func(m *model.Message) {})
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), openTestPool(t, schemaDSN), discardMessage)
 	require.Nil(t, err)
 	defer mesh.Close()
 
@@ -221,15 +221,21 @@ func TestMesh_Status_OneWayLinkFailure(t *testing.T) {
 
 	var receivedB atomic.Int32
 	var meshB *meshCluster
-	srvB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { meshB.ServeHTTP(w, r) }))
+	srvB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		meshB.ServeHTTP(w, r)
+	}))
 	defer srvB.Close()
-	meshA, err := newMeshCluster(newTestMeshConfig("status-a", deadURL), openTestPool(t, schemaDSN), func(m *model.Message) {})
+	meshA, err := newMeshCluster(newTestMeshConfig("status-a", deadURL), openTestPool(t, schemaDSN), discardMessage)
 	require.Nil(t, err)
 	defer meshA.Close()
-	meshB, err = newMeshCluster(newTestMeshConfig("status-b", srvB.URL), openTestPool(t, schemaDSN), func(m *model.Message) { receivedB.Add(1) })
+	meshB, err = newMeshCluster(newTestMeshConfig("status-b", srvB.URL), openTestPool(t, schemaDSN), func(m *model.Message) {
+		receivedB.Add(1)
+	})
 	require.Nil(t, err)
 	defer meshB.Close()
-	waitFor(t, func() bool { return len(meshA.registry.Peers()) == 1 && len(meshB.registry.Peers()) == 1 })
+	waitFor(t, func() bool {
+		return len(meshA.registry.Peers()) == 1 && len(meshB.registry.Peers()) == 1
+	})
 
 	sentErrorsBefore := testutil.ToFloat64(metrics.ClusterPeerBatchesSent.WithLabelValues("status-a", "error"))
 	receivedBefore := testutil.ToFloat64(metrics.ClusterPeerBatchesReceived.WithLabelValues("status-a"))
@@ -270,11 +276,11 @@ func TestMesh_Status_OneWayLinkFailure(t *testing.T) {
 	require.NotZero(t, testutil.ToFloat64(metrics.ClusterPeerLastSendSuccess.WithLabelValues("status-b")))
 
 	// And over HTTP, the way the CLI reads it
-	fetched, err := FetchStatus(context.Background(), srvB.URL, testSecret)
+	fetched, err := NewClient(testSecret, "").Status(context.Background(), srvB.URL)
 	require.Nil(t, err)
 	require.Equal(t, NodeID("status-b"), fetched.NodeID)
 	require.GreaterOrEqual(t, peerStatus(fetched, "status-a").Out.BatchesFailed, int64(1))
-	_, err = FetchStatus(context.Background(), srvB.URL, "wrong")
+	_, err = NewClient("wrong", "").Status(context.Background(), srvB.URL)
 	require.ErrorContains(t, err, "401")
 }
 

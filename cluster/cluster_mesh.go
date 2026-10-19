@@ -1,11 +1,10 @@
 package cluster
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"sync"
@@ -20,15 +19,12 @@ import (
 )
 
 const (
-	peerStatsRetention = 24 * time.Hour // How long a peer that left stays in Status
-	meshHTTPTimeout    = 5 * time.Second
+	peerStatsRetention = 24 * time.Hour  // How long a peer that left stays in Status
 	peerHealthTimeout  = 2 * time.Second // Per-peer health probe while this node is unhealthy
 	peerQueueSize      = 1024            // Bounded per-peer fan-out queue (drop on overflow)
 	batchMaxMessages   = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
-	healthMaxBytes     = 4 * 1024        // Upper bound for a peer's health response
-	statusMaxBytes     = 1024 * 1024     // Upper bound for a node's status response
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -48,7 +44,7 @@ type meshCluster struct {
 	conf           *Config
 	deliver        DeliverFunc
 	registry       *registry.Registry
-	httpClient     *http.Client
+	client         *Client
 	mux            *http.ServeMux            // The internal peer API; Cluster is an http.Handler
 	queues         map[NodeID]*peerQueue     // per-peer send queues; reconciled against the registry
 	closed         bool                      // Guards against ForwardMessage spawning new workers after Close
@@ -94,7 +90,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		conf:           conf,
 		deliver:        deliver,
 		registry:       reg,
-		httpClient:     &http.Client{Timeout: meshHTTPTimeout},
+		client:         NewClient(conf.Secret, conf.NodeID),
 		queues:         make(map[NodeID]*peerQueue),
 		lastRegistered: time.Now(), // The synchronous Register above just succeeded
 		knownPeers:     make(map[NodeID]*registry.Peer),
@@ -177,7 +173,11 @@ func (c *meshCluster) BroadcastState(state *State) {
 	}
 	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), len(peers))
 	for _, p := range peers {
-		go c.postToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), contentTypeJSON, body)
+		go func(p *registry.Peer) {
+			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {
+				return c.client.SendState(c.ctx, p.AdvertiseURL, body)
+			})
+		}(p)
 	}
 }
 
@@ -236,7 +236,9 @@ func (c *meshCluster) Status() *Status {
 	for _, ps := range peers {
 		status.Peers = append(status.Peers, ps)
 	}
-	sort.Slice(status.Peers, func(i, j int) bool { return status.Peers[i].NodeID < status.Peers[j].NodeID })
+	sort.Slice(status.Peers, func(i, j int) bool {
+		return status.Peers[i].NodeID < status.Peers[j].NodeID
+	})
 	return status
 }
 
@@ -441,24 +443,8 @@ func (c *meshCluster) maybeIsolated() {
 func (c *meshCluster) peerHealthy(url string) bool {
 	ctx, cancel := context.WithTimeout(c.ctx, peerHealthTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL(url), nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set(secretHeader, c.conf.Secret)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return false
-	}
-	var health apiHealth
-	if err := json.NewDecoder(io.LimitReader(resp.Body, healthMaxBytes)).Decode(&health); err != nil {
-		return false
-	}
-	return health.Healthy
+	healthy, err := c.client.Health(ctx, url)
+	return err == nil && healthy
 }
 
 // queueForNoLock returns the send queue for the given peer, creating it (and its delivery
@@ -491,7 +477,9 @@ func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	for lines := range q.queue.Dequeue() {
 		body := assembleMessageBody(lines)
 		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(lines), len(body), nodeID)
-		err := c.postToPeer(nodeID, messageURL(q.advertiseURL), contentTypeNDJSON, body)
+		err := c.sendToPeer(nodeID, messageURL(q.advertiseURL), func() error {
+			return c.client.SendMessages(c.ctx, q.advertiseURL, body)
+		})
 		if err != nil {
 			log.Tag(tag).Err(err).Warn("Batch to peer %s was lost", nodeID)
 		}
@@ -579,32 +567,22 @@ func deletePeerMetrics(nodeID NodeID) {
 	metrics.ClusterPeerLastSendSuccess.DeleteLabelValues(string(nodeID))
 }
 
-// postToPeer POSTs a peer API payload, authenticated with the shared cluster secret. Failures
-// are logged, counted and returned; the caller decides what a failure means (a message batch
-// is dropped, state is retried on the next heartbeat).
-func (c *meshCluster) postToPeer(nodeID NodeID, url, contentType string, payload []byte) error {
-	req, err := http.NewRequestWithContext(c.ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
+// sendToPeer runs one peer API POST (via the client, authenticated with the shared cluster
+// secret). Failures are logged, counted and returned; the caller decides what a failure means (a
+// message batch is dropped, state is retried on the next heartbeat).
+func (c *meshCluster) sendToPeer(nodeID NodeID, url string, send func() error) error {
+	err := send()
+	var httpErr *HTTPError
+	if errors.As(err, &httpErr) {
 		metrics.ClusterSendErrors.Inc()
-		log.Tag(tag).Err(err).Warn("Failed to build request for peer %s", nodeID)
-		return err
-	}
-	req.Header.Set("Content-Type", contentType)
-	req.Header.Set(secretHeader, c.conf.Secret)
-	req.Header.Set(originHeader, string(c.conf.NodeID))
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
+		log.Tag(tag).Warn("Peer %s (%s) rejected request with HTTP %d", nodeID, url, httpErr.StatusCode)
+		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, httpErr.StatusCode)
+	} else if err != nil {
 		if c.ctx.Err() == nil {
 			metrics.ClusterSendErrors.Inc()
 			log.Tag(tag).Err(err).Warn("Failed to send to peer %s (%s)", nodeID, url)
 		}
 		return err
-	}
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		metrics.ClusterSendErrors.Inc()
-		log.Tag(tag).Warn("Peer %s (%s) rejected request with HTTP %d", nodeID, url, resp.StatusCode)
-		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, resp.StatusCode)
 	}
 	return nil
 }

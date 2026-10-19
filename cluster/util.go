@@ -6,31 +6,10 @@ import (
 	"encoding/json"
 	"io"
 	"net/netip"
-	"strings"
 
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
-
-// messageURL derives the peer's message endpoint URL from its advertise URL.
-func messageURL(advertiseURL string) string {
-	return strings.TrimRight(advertiseURL, "/") + MessagePath
-}
-
-// stateURL derives the peer's state endpoint URL from its advertise URL.
-func stateURL(advertiseURL string) string {
-	return strings.TrimRight(advertiseURL, "/") + StatePath
-}
-
-// statusURL derives a node's status endpoint URL from its cluster base URL.
-func statusURL(baseURL string) string {
-	return strings.TrimRight(baseURL, "/") + StatusPath
-}
-
-// healthURL derives the peer's health endpoint URL from its advertise URL.
-func healthURL(advertiseURL string) string {
-	return strings.TrimRight(advertiseURL, "/") + HealthPath
-}
 
 // marshalMessage serializes one message and its non-JSON fields (Sender, User) as an
 // apiMessage line. Lines are marshaled once per publish and shared across all per-peer

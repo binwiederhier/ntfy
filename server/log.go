@@ -31,6 +31,7 @@ const (
 	tagWebsocket = "websocket"
 	tagMatrix    = "matrix"
 	tagWebPush   = "webpush"
+	tagCluster   = "cluster"
 )
 
 var (

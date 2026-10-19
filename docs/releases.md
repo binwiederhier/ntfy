@@ -2216,6 +2216,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
+* **Experimental clustering (branch `cluster3`):** ntfy can run as a cluster of stateless nodes behind a shared PostgreSQL database. Nodes discover each other via a node registry, deliver published messages to subscribers on any node over a private peer mesh (`experimental-cluster-listen`, `experimental-cluster-node-id`, `experimental-cluster-advertise-url`, `experimental-cluster-secret`), and elect a leader for singleton background jobs. Scheduled (delayed) messages are claimed by exactly one node, daily visitor quotas (messages, emails, calls) and the request/bandwidth budgets are enforced cluster-wide, UnifiedPush subscriber-based rate limiting works across nodes, and reservation takeover / access revocation disconnect subscribers on all nodes
 
 **Security:**
 

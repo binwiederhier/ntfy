@@ -13,7 +13,9 @@ import (
 	"heckel.io/ntfy/v2/webpush"
 )
 
-const testWebPushEndpoint = "https://updates.push.services.mozilla.com/wpush/v1/AAABBCCCDDEEEFFF"
+const (
+	testWebPushEndpoint = "https://updates.push.services.mozilla.com/wpush/v1/AAABBCCCDDEEEFFF"
+)
 
 // Schema layout as written by ntfy releases before the db/schema framework; used to verify
 // that existing databases open cleanly without an adoption step

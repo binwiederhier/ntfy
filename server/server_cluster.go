@@ -3,10 +3,33 @@ package server
 import (
 	"time"
 
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
+
+// topicAnnouncer returns the first-subscriber hook for a topic: it tells peer nodes that this
+// node now has a subscriber for it, so they can drop a cached rate-visitor miss (see
+// Cluster.BroadcastState). Delivery does not depend on it; every message goes to every peer.
+func (s *Server) topicAnnouncer(id string) func() {
+	return func() {
+		s.cluster.BroadcastState(&cluster.State{AddedTopics: []string{id}})
+	}
+}
+
+// clearRateVisitorMisses drops cached rate-visitor misses for topics that just gained a subscriber
+// on a peer. The peer persists the rate visitor before announcing the topic, so the next publish
+// here finds it instead of answering 507 from the stale miss for up to rateVisitorMissTTL.
+func (s *Server) clearRateVisitorMisses(topics []string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, id := range topics {
+		if t, ok := s.topics[id]; ok {
+			t.ClearRateVisitorMiss()
+		}
+	}
+}
 
 // deliverFromBus delivers a message received from a peer node (via the cluster) to this
 // node's local subscribers. It is the receive-side counterpart to Cluster.ForwardMessage: local

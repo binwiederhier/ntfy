@@ -2223,6 +2223,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
 * Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
 
+**Bug fixes + maintenance:**
+
+* Count published messages from every cluster node: each node adds its own publishes to the stored total instead of the leader overwriting it with its own count (experimental clustering)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

@@ -245,12 +245,37 @@ func TestClient_CheckVerify_Success(t *testing.T) {
 		b, err := io.ReadAll(r.Body)
 		require.Nil(t, err)
 		body = string(b)
+		w.Write([]byte(`{"status":"approved","valid":true}`))
 	}))
 	defer server.Close()
 
 	c := NewClient(testConfig(server.URL))
 	require.Nil(t, c.CheckVerify("+12223334444", "123456"))
 	require.Equal(t, "Code=123456&To=%2B12223334444", body)
+}
+
+// TestClient_CheckVerify_WrongCode ensures that a wrong code is rejected. Twilio answers
+// a wrong code with 200 OK and status "pending", so the status code alone is not enough.
+func TestClient_CheckVerify_WrongCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status":"pending","valid":false}`))
+	}))
+	defer server.Close()
+
+	c := NewClient(testConfig(server.URL))
+	err := c.CheckVerify("+12223334444", "000000")
+	require.Error(t, err)
+	require.True(t, errors.Is(err, ErrVerificationCodeInvalid))
+}
+
+func TestClient_CheckVerify_InvalidResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`not json`))
+	}))
+	defer server.Close()
+
+	c := NewClient(testConfig(server.URL))
+	require.Error(t, c.CheckVerify("+12223334444", "123456"))
 }
 
 // TestClient_CheckVerify_Expired ensures that a 404 from the Twilio Verify API is

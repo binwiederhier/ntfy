@@ -61,7 +61,6 @@ const (
 	leaseFactor   = 1
 	holdoffFactor = 2
 
-	schemaVersion  = 2
 	schemaStoreKey = "node_registry"
 )
 
@@ -79,8 +78,8 @@ var (
 
 	// migrations maps a schema version to the migration upgrading it to the next version.
 	// Always append migrations at the end, never insert in the middle.
-	migrations = map[int]schema.MigrateFunc{
-		1: schema.AsMigrateFunc(fmt.Sprintf(`ALTER TABLE node_registry ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT '%s'`, RoleActive)),
+	migrations = schema.Migrations{
+		{From: 1, To: 2}: schema.Query(fmt.Sprintf(`ALTER TABLE node_registry ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT '%s'`, RoleActive)),
 	}
 )
 
@@ -98,6 +97,7 @@ type Peer struct {
 	NodeID       string
 	AdvertiseURL string
 	Role         Role
+	HeartbeatAt  time.Time // When the peer last heartbeated, on this node's clock (database clock age at read time)
 }
 
 // Registry is the node membership table (control plane): each node upserts its own row with a
@@ -127,7 +127,7 @@ type Registry struct {
 // does NOT register the node: joining the cluster is an explicit Register call, owned by the
 // caller, so read-only uses of the registry stay side-effect free.
 func New(pool *db.DB, nodeID, advertiseURL string, role Role, ttl time.Duration) (*Registry, error) {
-	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, schemaVersion, createTable, migrations); err != nil {
+	if err := schema.Migrate(pool.Primary(), schema.Postgres, schemaStoreKey, createTable, migrations); err != nil {
 		return nil, err
 	}
 	return &Registry{
@@ -296,6 +296,7 @@ func (r *Registry) queryLiveNodes() ([]*Peer, string, bool, error) {
 		if err := rows.Scan(&p.NodeID, &p.AdvertiseURL, &p.Role, &age); err != nil {
 			return nil, "", false, err
 		}
+		p.HeartbeatAt = time.Now().Add(-time.Duration(age) * time.Second)
 		if p.NodeID != r.nodeID && p.Role == RoleActive {
 			otherActive = true
 		}

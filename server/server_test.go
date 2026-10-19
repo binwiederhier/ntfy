@@ -3031,6 +3031,46 @@ func TestServer_PollSizeLimit(t *testing.T) {
 	})
 }
 
+func TestServer_SubscribeDuplicateTopics(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A repeated topic must be replayed once, not once per repetition. Using more copies than
+		// subscribeTopicsLimit also checks that duplicates do not count against the limit.
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil).Code)
+		}
+		topics := strings.TrimSuffix(strings.Repeat("mytopic,", subscribeTopicsLimit+1), ",")
+
+		response := request(t, s, "GET", "/"+topics+"/json?poll=1&since=all", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, 3, len(toMessages(t, response.Body.String())))
+
+		response = request(t, s, "GET", "/"+topics+"/sse?poll=1&since=all", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, 3, strings.Count(response.Body.String(), "data: "))
+	})
+}
+
+func TestServer_SubscribeTooManyTopics(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		ids := make([]string, 0)
+		for i := 0; i < subscribeTopicsLimit+1; i++ {
+			ids = append(ids, fmt.Sprintf("topic%d", i))
+		}
+		topics := strings.Join(ids, ",")
+		for _, path := range []string{"/json?poll=1", "/sse?poll=1", "/raw?poll=1"} {
+			response := request(t, s, "GET", "/"+topics+path, "", nil)
+			require.Equal(t, 400, response.Code, path)
+			require.Equal(t, 40061, toHTTPError(t, response.Body.String()).Code, path)
+		}
+
+		// WebSocket errors carry only the status code, no JSON body
+		response := request(t, s, "GET", "/"+topics+"/ws", "", map[string]string{"Upgrade": "websocket", "Connection": "Upgrade"})
+		require.Equal(t, 400, response.Code)
+	})
+}
+
 func TestServer_PollSizeLimitCountsTitle(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		// Title is user-controlled and has no length limit of its own, so it has to count against

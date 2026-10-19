@@ -2,6 +2,7 @@ package util
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -28,6 +29,7 @@ type LingerQueue[T any] struct {
 	maxSize int           // max cumulative size per batch; 0 = no size cap
 	size    func(T) int   // element size function; nil = no size cap
 	linger  time.Duration // max time the first element of a batch waits; 0 = emit immediately
+	pending atomic.Int64  // Enqueued and not yet emitted, for Len
 	closed  bool
 	mu      sync.Mutex // Protects closed, and guards TryEnqueue's send against Close's close(in)
 }
@@ -56,12 +58,19 @@ func (q *LingerQueue[T]) TryEnqueue(t T) bool {
 	if q.closed {
 		return false
 	}
+	q.pending.Add(1) // Before the send: the batching loop may emit it (and subtract) right away
 	select {
 	case q.in <- t:
 		return true
 	default:
+		q.pending.Add(-1)
 		return false
 	}
+}
+
+// Len returns the number of elements enqueued and not yet emitted, including a batch being collected
+func (q *LingerQueue[T]) Len() int {
+	return int(q.pending.Load())
 }
 
 // Dequeue returns the channel emitting batches. It is closed after Close, once the remaining
@@ -130,6 +139,7 @@ func (q *LingerQueue[T]) run() {
 			}
 		}
 		q.out <- batch
+		q.pending.Add(-int64(len(batch)))
 		if closed {
 			return
 		}

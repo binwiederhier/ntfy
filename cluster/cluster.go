@@ -32,6 +32,9 @@ const (
 	// that lost its registration probes it to find out whether anywhere better exists for its
 	// subscribers. The server's public /v1/health is a separate endpoint for load balancers.
 	HealthPath = "/v1/cluster/health"
+	// StatusPath reports this node's view of the cluster for operators: its role and leadership,
+	// and per peer what it sent there and received from there (see Status)
+	StatusPath = "/v1/cluster/status"
 )
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer

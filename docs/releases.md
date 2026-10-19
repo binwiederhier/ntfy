@@ -6,13 +6,31 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.31.1 | Oct 16, 2026  |
+| ntfy server      | v2.32.0 | Oct 18, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
 
-### ntfy server v2.31.1
+## ntfy server v2.32.0
+Released October 18, 2026
+
+This release prepares ntfy.sh for a passive cluster node: jobs that write to the shared database run only on the
+cluster leader, and each database store now records the oldest schema version it works with. Streaming subscriptions
+also tell proxies not to buffer them.
+
+**Features:**
+
+* Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
+
+**Bug fixes + maintenance:**
+
+* Fix template files (`?tpl=<name>`) ignoring the priority sent with the request when the file has no `priority` key ([#2045](https://github.com/binwiederhier/ntfy/issues/2045), thanks to [@6801318d8d](https://github.com/6801318d8d) for reporting)
+* Return HTTP 409 instead of 500 when deleting or changing the password of a user provisioned via `auth-users` through the admin API ([#2062](https://github.com/binwiederhier/ntfy/issues/2062), thanks to [@daniloamiranda](https://github.com/daniloamiranda) for reporting)
+* Run the shared-database housekeeping (pruning expired messages, attachments and tokens, web push expiry warnings, writing the published-messages total) on the cluster leader only, so a passive node no longer overwrites the total with its own count (experimental clustering)
+* Record the oldest schema version each database store still works with, so an older ntfy refuses to start on a database that a newer version migrated in a breaking way, instead of misreading it; none of today's migrations are breaking ([#2060](https://github.com/binwiederhier/ntfy/pull/2060))
+
+## ntfy server v2.31.1
 Released October 16, 2026
 
 This release fixes the database load that made us roll back ntfy.sh from v2.31.0: reconnecting with `since=<message ID>`
@@ -32,7 +50,7 @@ It also lets ntfy start with a warning on a newer database schema, so later roll
 
 * This release changes the message database schema (version 16 to 17: an index for `since=<message ID>` reconnects). Downgrading to v2.31.0 or earlier afterwards requires setting the version back by hand first: `UPDATE schema_version SET version = 16 WHERE store = 'message'` on PostgreSQL, or `UPDATE schemaVersion SET version = 16 WHERE id = 1` in the SQLite `cache-file`. From this release on, a newer schema only logs a warning ([#2059](https://github.com/binwiederhier/ntfy/pull/2059))
 
-### ntfy server v2.31.0
+## ntfy server v2.31.0
 Released October 16, 2026
 
 This release fixes messages that could be lost when a client reconnects, e.g. a phone switching networks, right when
@@ -57,7 +75,7 @@ clustering work with node roles.
 * A reconnect with `since=<message ID>` now also returns the messages published in the same second as that message, so none are skipped when several servers write out of order. The ntfy apps and web app drop these by ID; your own scripts may see a few duplicates ([#2040](https://github.com/binwiederhier/ntfy/pull/2040))
 * Experimental clustering only: this release changes the cluster's node registry schema (version 1 to 2). Downgrading a clustered server to v2.30.0 afterwards requires setting the version back by hand first: `UPDATE schema_version SET version = 1 WHERE store = 'node_registry'` ([#2049](https://github.com/binwiederhier/ntfy/pull/2049))
 
-### ntfy server v2.30.0
+## ntfy server v2.30.0
 Released October 12, 2026
 
 This release links attachments in email notifications, adds SMTP LOGIN auth (e.g. for OVH and Outlook), and fixes the
@@ -83,7 +101,7 @@ ntfy servers sharing one PostgreSQL database. Clustering is not ready for produc
 
 * Document recommended PostgreSQL pool settings for busy servers ([#2011](https://github.com/binwiederhier/ntfy/pull/2011))
 
-### ntfy server v2.29.0
+## ntfy server v2.29.0
 Released October 7, 2026
 
 This release fixes how ntfy writes messages to the cache under load. On ntfy.sh, every top of the hour brought a
@@ -112,7 +130,7 @@ v2.28.0, plus timezone and RFC 3339 support for delayed notifications.
 * Build with Go 1.27; the minimum Go version to build from source is now 1.26
 * Groundwork for horizontal scaling: merged the first building blocks for running multiple ntfy servers as a cluster (node registry, util primitives, reserved experimental config options); clustering is not usable yet ([#1991](https://github.com/binwiederhier/ntfy/pull/1991), [#1997](https://github.com/binwiederhier/ntfy/pull/1997), [#2001](https://github.com/binwiederhier/ntfy/pull/2001), [#2003](https://github.com/binwiederhier/ntfy/pull/2003))
 
-### ntfy server v2.28.0
+## ntfy server v2.28.0
 Released August 27, 2026
 
 This is a hardening release. A single topic on ntfy.sh was polled continuously with `poll=1` and no
@@ -127,7 +145,7 @@ digging into it.
 * Cap a single cache replay at 10 MB of messages per topic. A poll without a `since` cursor returns a topic's entire cache, which was previously unbounded and could reach tens of megabytes on a busy topic, so one request could allocate that much on the server. The newest messages that fit are kept and a truncated response carries an `X-Messages-Truncated: 1` header
 * `visitor-attachment-daily-bandwidth-limit` now also covers messages replayed from the message cache by poll requests, not just attachment traffic. A poll without a `since` cursor returns a topic's entire cache, so a topic that is cheap to fill can be re-read for many times its own size; polls beyond the budget are rejected with HTTP 429 (error code 42905) before anything is written. **Note that heavy pollers now consume the same budget as attachment downloads**, so operators serving both may want to raise the limit
 
-### ntfy server v2.27.0
+## ntfy server v2.27.0
 Released August 4, 2026
 
 This release lets you sign in with your verified email address instead of your username, which should help if you ever
@@ -186,7 +204,7 @@ especially when paired with increaseing the server-side `keepalive-interval` in 
 * Fix subscription icons disappearing after a few days due to Android clearing cache ([#1322](https://github.com/binwiederhier/ntfy/issues/1322), thanks to [@mcanning](https://github.com/mcanning) for reporting)
 * Fix UnifiedPush `failed_reason` being sent as an enum instead of a string, which caused an exception in receiving apps that read it as a string extra ([ntfy-android#182](https://github.com/binwiederhier/ntfy-android/pull/182), thanks to [@p1gp1g](https://github.com/p1gp1g) for the contribution)
 
-### ntfy server v2.26.3
+## ntfy server v2.26.3
 Released July 20, 2026
 
 This is a hotfix release, useful pretty much only for ntfy.sh. It was adds the ability to track abusive IPs more
@@ -198,7 +216,7 @@ offenders instantly. See [ban-feed](config.md#ban-feed) for details.
 
 * Add an abuse ban-feed: when enabled via `ban-file`, ntfy tracks a weighted strike budget per visitor and appends abusive IPs to a file that fail2ban can tail and ban on sight (`ban-file`, `ban-window`, `ban-threshold`, `ban-weights`; see [ban-feed docs](config.md#ban-feed))
 
-### ntfy server v2.26.0
+## ntfy server v2.26.0
 Released July 9, 2026
 
 This release hardens **message templates**, which are now executed with a hard-capped execution timeout. This closes
@@ -2193,17 +2211,19 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-### ntfy server v2.32.0 (UNRELEASED)
+### ntfy server v2.33.0 (UNRELEASED)
 
 **Features:**
 
-* Set the `Incremental: ?1` header ([RFC 10036](https://www.rfc-editor.org/info/rfc10036/)) on streaming subscriptions, so proxies that support it forward messages without buffering ([#2056](https://github.com/binwiederhier/ntfy/issues/2056), thanks to [@bt90](https://github.com/bt90) for the suggestion)
+* Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
+
+**Security:**
+
+* Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
+* Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
 
 **Bug fixes + maintenance:**
 
-* Fix template files (`?tpl=<name>`) ignoring the priority sent with the request when the file has no `priority` key ([#2045](https://github.com/binwiederhier/ntfy/issues/2045), thanks to [@6801318d8d](https://github.com/6801318d8d) for reporting)
-* Return HTTP 409 instead of 500 when deleting or changing the password of a user provisioned via `auth-users` through the admin API ([#2062](https://github.com/binwiederhier/ntfy/issues/2062), thanks to [@daniloamiranda](https://github.com/daniloamiranda) for reporting)
-* Run the shared-database housekeeping (pruning expired messages, attachments and tokens, web push expiry warnings, writing the published-messages total) on the cluster leader only, so a passive node no longer overwrites the total with its own count (experimental clustering)
 * Count published messages from every cluster node: each node adds its own publishes to the stored total instead of the leader overwriting it with its own count (experimental clustering)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
@@ -2218,3 +2238,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Restore the native swipe-to-go-back gesture in the topic detail view ([ntfy-ios#45](https://github.com/binwiederhier/ntfy-ios/pull/45), thanks to [@am7590](https://github.com/am7590) for the contribution)
 * Fix saved attachments being left "in use" so they couldn't be deleted in the Files app ([ntfy-ios#43](https://github.com/binwiederhier/ntfy-ios/pull/43), thanks to [@am7590](https://github.com/am7590) for the contribution)
 * Improve poll request subscription matching for protected topics so notifications resolve to the real message content, with better logging ([ntfy-ios#43](https://github.com/binwiederhier/ntfy-ios/pull/43), thanks to [@am7590](https://github.com/am7590) for the contribution)
+
+### ntfy Android v1.26.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Fix copying multiple selected messages including their timestamps ([#1926](https://github.com/binwiederhier/ntfy/issues/1926), thanks to [@podtor](https://github.com/podtor) for reporting)

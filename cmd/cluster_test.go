@@ -32,7 +32,9 @@ var testClusterStatus = &cluster.Status{
 }
 
 func newTestClusterStatusServer(t *testing.T) string {
-	return newTestClusterStatusServerFor(t, func() *cluster.Status { return testClusterStatus })
+	return newTestClusterStatusServerFor(t, func() *cluster.Status {
+		return testClusterStatus
+	})
 }
 
 func newTestClusterStatusServerFor(t *testing.T, status func() *cluster.Status) string {

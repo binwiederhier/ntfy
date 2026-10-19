@@ -174,7 +174,9 @@ func (c *meshCluster) BroadcastState(state *State) {
 	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
-			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error { return c.client.SendState(c.ctx, p.AdvertiseURL, body) })
+			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {
+				return c.client.SendState(c.ctx, p.AdvertiseURL, body)
+			})
 		}(p)
 	}
 }
@@ -234,7 +236,9 @@ func (c *meshCluster) Status() *Status {
 	for _, ps := range peers {
 		status.Peers = append(status.Peers, ps)
 	}
-	sort.Slice(status.Peers, func(i, j int) bool { return status.Peers[i].NodeID < status.Peers[j].NodeID })
+	sort.Slice(status.Peers, func(i, j int) bool {
+		return status.Peers[i].NodeID < status.Peers[j].NodeID
+	})
 	return status
 }
 
@@ -473,7 +477,9 @@ func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	for lines := range q.queue.Dequeue() {
 		body := assembleMessageBody(lines)
 		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(lines), len(body), nodeID)
-		err := c.sendToPeer(nodeID, messageURL(q.advertiseURL), func() error { return c.client.SendMessages(c.ctx, q.advertiseURL, body) })
+		err := c.sendToPeer(nodeID, messageURL(q.advertiseURL), func() error {
+			return c.client.SendMessages(c.ctx, q.advertiseURL, body)
+		})
 		if err != nil {
 			log.Tag(tag).Err(err).Warn("Batch to peer %s was lost", nodeID)
 		}

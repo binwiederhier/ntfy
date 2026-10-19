@@ -736,7 +736,7 @@ func TestMesh_Status_PeerThatLeftShowsLastSeen(t *testing.T) {
 	// A peer that left the registry keeps its counters, marked not live, with the time it was last
 	// seen; after peerStatsRetention it is forgotten, so a decommissioned node does not linger
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), openTestPool(t, schemaDSN), func(m *model.Message) {})
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), openTestPool(t, schemaDSN), discardMessage)
 	require.Nil(t, err)
 	defer mesh.Close()
 
@@ -832,4 +832,9 @@ func peerMetricValue(t *testing.T, name, peer string) float64 {
 		}
 	}
 	return 0
+}
+
+// discardMessage is the deliver callback for tests that do not look at deliveries
+func discardMessage(_ *model.Message) {
+	// Nothing to do: these tests only check status and counters
 }

@@ -2234,3 +2234,9 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Restore the native swipe-to-go-back gesture in the topic detail view ([ntfy-ios#45](https://github.com/binwiederhier/ntfy-ios/pull/45), thanks to [@am7590](https://github.com/am7590) for the contribution)
 * Fix saved attachments being left "in use" so they couldn't be deleted in the Files app ([ntfy-ios#43](https://github.com/binwiederhier/ntfy-ios/pull/43), thanks to [@am7590](https://github.com/am7590) for the contribution)
 * Improve poll request subscription matching for protected topics so notifications resolve to the real message content, with better logging ([ntfy-ios#43](https://github.com/binwiederhier/ntfy-ios/pull/43), thanks to [@am7590](https://github.com/am7590) for the contribution)
+
+### ntfy Android v1.26.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Fix copying multiple selected messages including their timestamps ([#1926](https://github.com/binwiederhier/ntfy/issues/1926), thanks to [@podtor](https://github.com/podtor) for reporting)

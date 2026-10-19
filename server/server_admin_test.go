@@ -557,3 +557,41 @@ func TestAccess_PeerCancelReloadsAccessAndCancels(t *testing.T) {
 	require.True(t, canceled.Load())
 	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
 }
+
+func TestAccess_ExternalRevocationCaughtByAccessReload(t *testing.T) {
+	// An access change made elsewhere (another node whose relay got lost, or the ntfy access CLI)
+	// reaches node B at its next access cache reload. B ends the streams of the user who lost
+	// access, and only those: carol, still allowed on the same topic, keeps her stream.
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	newNode := func() *Server {
+		conf := newTestConfig(t, dsn)
+		conf.AuthDefault = user.PermissionDenyAll
+		conf.AuthAccessCacheEnabled = true
+		conf.AuthAccessCacheReloadInterval = 500 * time.Millisecond
+		return newTestServer(t, conf)
+	}
+	a := newNode()
+	for _, name := range []string{"alice", "carol"} {
+		require.Nil(t, a.userManager.AddUser(name, "password", user.RoleUser, false))
+		require.Nil(t, a.userManager.AllowAccess(name, "private", user.PermissionRead))
+	}
+	b := newNode()
+	alice := map[string]string{"Authorization": util.BasicAuth("alice", "password")}
+	carol := map[string]string{"Authorization": util.BasicAuth("carol", "password")}
+	aliceStream := subscribeStream(t, b, "private", alice)
+	carolStream := subscribeStream(t, b, "private", carol)
+
+	require.Nil(t, a.userManager.ResetAccess("alice", "private"))
+	select {
+	case <-aliceStream.ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("alice's stream on node B was not canceled by its access cache reload")
+	}
+	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", alice).Code)
+	time.Sleep(time.Second) // Two more reloads
+	select {
+	case <-carolStream.ended:
+		t.Fatal("carol's stream was canceled, but she can still read the topic")
+	default:
+	}
+}

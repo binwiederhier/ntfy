@@ -2219,7 +2219,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Security:**
 
-* Cancel live subscriptions whose user can no longer read the topic, by re-checking access every manager run (catches revocations made with the `ntfy access` CLI or on another node), and relay access revocations and reservation takeovers to the other nodes of an experimental cluster
+* Relay reservation takeovers and access revocations to the other nodes of an experimental cluster, so their subscribers who lost access are disconnected too; with `auth-access-cache` on, also end such subscriptions when the cache reload finds the access changed (e.g. by the `ntfy access` CLI or a lost relay)
 * Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
 * Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
 

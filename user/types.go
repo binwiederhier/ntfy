@@ -296,6 +296,17 @@ const (
 	everyoneID = "u_everyone"
 )
 
+// AccessChange names one access entry (user_access row) that an access cache reload found
+// added, changed or removed
+type AccessChange struct {
+	Username string // User name, or Everyone
+	Topic    string // Topic or topic pattern, with * wildcards (as passed to AllowAccess)
+}
+
+// AccessChangedFunc is told about access entries that an access cache reload found changed.
+// The server uses it to re-check the live subscribers on the affected topics.
+type AccessChangedFunc func(changes []*AccessChange)
+
 // Config holds the configuration for the user Manager
 type Config struct {
 	Filename                     string              // Database filename, e.g. "/var/lib/ntfy/user.db" (SQLite)

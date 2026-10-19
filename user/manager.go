@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -53,14 +54,15 @@ var (
 
 // Manager handles user authentication, authorization, and management
 type Manager struct {
-	config      *Config
-	db          *db.DB
-	queries     queries
-	statsQueue  map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
-	tokenQueue  map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
-	accessCache *accessCache            // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
-	quit        chan struct{}           // Closed by Close() to signal background goroutines to stop
-	mu          sync.Mutex
+	config        *Config
+	db            *db.DB
+	queries       queries
+	statsQueue    map[string]*Stats                 // Accumulated stats deltas to be written to the database (UserID -> Stats)
+	tokenQueue    map[string]*TokenUpdate           // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
+	accessCache   *accessCache                      // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
+	accessChanged atomic.Pointer[AccessChangedFunc] // Told about entries a cache reload found changed; set after construction
+	quit          chan struct{}                     // Closed by Close() to signal background goroutines to stop
+	mu            sync.Mutex
 }
 
 var _ Auther = (*Manager)(nil)
@@ -109,18 +111,36 @@ func (a *Manager) ReloadAccessCache(usernames ...string) error {
 	return a.maybeReloadAccessCache(usernames...)
 }
 
+// SetAccessChangedFunc sets the function that access cache reloads report changed entries to
+func (a *Manager) SetAccessChangedFunc(fn AccessChangedFunc) {
+	a.accessChanged.Store(&fn)
+}
+
 // maybeReloadAccessCache refreshes the in-memory access cache from the
 // primary database. No-op when the cache is disabled. With no usernames it
 // does a full bulk reload; with one or more it refreshes only those users'
 // slices in a single DB round-trip via an IN clause.
+//
+// Entries the reload finds changed are reported to the AccessChangedFunc before it returns.
+// No reload runs under a.mu, so the function may call back into the manager.
 func (a *Manager) maybeReloadAccessCache(usernames ...string) error {
 	if a.accessCache == nil {
 		return nil
 	}
+	var changes []*AccessChange
+	var err error
 	if len(usernames) == 0 {
-		return a.accessCache.Reload(a.db, a.queries.selectAccessCacheAll)
+		changes, err = a.accessCache.Reload(a.db, a.queries.selectAccessCacheAll)
+	} else {
+		changes, err = a.accessCache.Reload(a.db, a.queries.selectAccessCacheUsers(len(usernames)), usernames...)
 	}
-	return a.accessCache.Reload(a.db, a.queries.selectAccessCacheUsers(len(usernames)), usernames...)
+	if err != nil {
+		return err
+	}
+	if fn := a.accessChanged.Load(); fn != nil && len(changes) > 0 {
+		(*fn)(changes)
+	}
+	return nil
 }
 
 // asyncAccessCacheReloadLoop periodically bulk-reloads the access cache so that

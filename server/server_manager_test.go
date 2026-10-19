@@ -3,8 +3,6 @@ package server
 import (
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/model"
-	"heckel.io/ntfy/v2/user"
-	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -103,37 +101,5 @@ func TestServer_Manager_MessagesTotalSumsAcrossNodes(t *testing.T) {
 		require.Equal(t, int64(3), messages)
 		require.Equal(t, int64(3), s1.messages)
 		require.Equal(t, int64(3), s2.messages)
-	})
-}
-
-func TestServer_Manager_ReauthorizesSubscribers(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		// A relayed revocation can be lost, and an ACL change made elsewhere (another node, the
-		// `ntfy access` CLI) never cancels anything here. A live stream must not keep receiving
-		// forever, so the manager re-checks that live subscribers may still read their topics.
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthDefault = user.PermissionDenyAll
-		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddUser("alice", "password", user.RoleUser, false))
-		require.Nil(t, s.userManager.AllowAccess("alice", "private", user.PermissionRead))
-		alice, err := s.userManager.User("alice")
-		require.Nil(t, err)
-		topics, err := s.topicsFromIDs(nil, "private")
-		require.Nil(t, err)
-		canceled := atomic.Bool{}
-		topics[0].Subscribe(func(*visitor, *model.Message) error {
-			return nil
-		}, alice.ID, func() {
-			canceled.Store(true)
-		})
-
-		// Still allowed to read: nothing happens
-		s.execManager()
-		require.False(t, canceled.Load())
-
-		// Revoked behind the server's back: the next manager run cancels the subscriber
-		require.Nil(t, s.userManager.ResetAccess("alice", "private"))
-		s.execManager()
-		require.True(t, canceled.Load())
 	})
 }

@@ -345,6 +345,9 @@ func New(conf *Config) (*Server, error) {
 	// the cluster delivers peer messages through callbacks into it (which is how the cluster
 	// package stays independent of the server)
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
+	if userManager != nil {
+		userManager.SetAccessChangedFunc(s.reauthorizeSubscribers)
+	}
 	s.cluster, err = cluster.New(&cluster.Config{
 		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
 		NodeID:          cluster.NodeID(conf.ClusterNodeID),

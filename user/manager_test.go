@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2417,6 +2418,63 @@ func TestAuthorizeTopicAccess_CacheAndDirectDBAgree(t *testing.T) {
 			require.Equal(t, dRead, cRead, "read mismatch for (%s, %s)", tc.user, tc.topic)
 			require.Equal(t, dWrite, cWrite, "write mismatch for (%s, %s)", tc.user, tc.topic)
 		}
+	})
+}
+
+func TestAccessCache_ReloadReportsChanges(t *testing.T) {
+	// A reload that finds entries added, changed or removed by someone else (another cluster
+	// node, the CLI) reports them, so the server can re-check the live subscribers they affect
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		reader := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess:             PermissionReadWrite,
+			BcryptCost:                bcrypt.MinCost,
+			AccessCacheEnabled:        true,
+			AccessCacheReloadInterval: time.Hour,
+		})
+		writer := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess: PermissionReadWrite,
+			BcryptCost:    bcrypt.MinCost,
+		})
+		require.Nil(t, writer.AddUser("phil", "phil", RoleUser, false))
+		require.Nil(t, writer.AllowAccess("phil", "unchanged", PermissionRead))
+		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionReadWrite))
+		require.Nil(t, reader.ReloadAccessCache())
+
+		var mu sync.Mutex
+		var changes []*AccessChange
+		reader.SetAccessChangedFunc(func(c []*AccessChange) {
+			mu.Lock()
+			defer mu.Unlock()
+			changes = append(changes, c...)
+		})
+		takeChanges := func() []*AccessChange {
+			mu.Lock()
+			defer mu.Unlock()
+			taken := changes
+			changes = nil
+			return taken
+		}
+
+		// A reservation (owner and everyone rows), a new wildcard, a downgrade; one row untouched
+		require.Nil(t, writer.AddReservation("phil", "my_topic", PermissionDenyAll, 0))
+		require.Nil(t, writer.AllowAccess("phil", "up_*", PermissionRead))
+		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionRead))
+		require.Nil(t, reader.ReloadAccessCache())
+		require.ElementsMatch(t, []*AccessChange{
+			{Username: "phil", Topic: "my_topic"},
+			{Username: Everyone, Topic: "my_topic"},
+			{Username: "phil", Topic: "up_*"},
+			{Username: "phil", Topic: "downgraded"},
+		}, takeChanges())
+
+		// A removal, seen by a reload of just that user
+		require.Nil(t, writer.ResetAccess("phil", "up_*"))
+		require.Nil(t, reader.ReloadAccessCache("phil"))
+		require.Equal(t, []*AccessChange{{Username: "phil", Topic: "up_*"}}, takeChanges())
+
+		// Nothing changed, nothing reported
+		require.Nil(t, reader.ReloadAccessCache())
+		require.Empty(t, takeChanges())
 	})
 }
 

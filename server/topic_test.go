@@ -235,17 +235,31 @@ func TestTopic_Publish_LateFanOutReachesLaterSubscribers(t *testing.T) {
 	require.Equal(t, int32(1), early.Load())
 }
 
-func TestTopic_SubscriberUserIDs(t *testing.T) {
-	subFn := func(v *visitor, msg *model.Message) error {
-		return nil
-	}
+func TestTopic_CancelSubscriberUser_AllOfTheUsersSubscribers(t *testing.T) {
+	// A user (or anonymous, "") can hold several streams on one topic; revoking access ends all
+	// of them, and nobody else's
 	to := newTopic("mytopic")
-	nopCancel := func() {
-		// The cancel callback is not under test here
+	canceled := make(map[string]int)
+	var mu sync.Mutex
+	subscribe := func(userID string) {
+		to.Subscribe(func(*visitor, *model.Message) error {
+			return nil
+		}, userID, func() {
+			mu.Lock()
+			defer mu.Unlock()
+			canceled[userID]++
+		})
 	}
-	to.Subscribe(subFn, "", nopCancel)
-	to.Subscribe(subFn, "u_phil", nopCancel)
-	to.Subscribe(subFn, "u_phil", nopCancel)
-	to.Subscribe(subFn, "u_ben", nopCancel)
-	require.ElementsMatch(t, []string{"u_phil", "u_ben"}, to.SubscriberUserIDs())
+	subscribe("u_alice")
+	subscribe("u_alice")
+	subscribe("")
+	subscribe("")
+	subscribe("u_carol")
+	require.ElementsMatch(t, []string{"u_alice", "", "u_carol"}, to.SubscriberUserIDs())
+
+	to.CancelSubscriberUser("u_alice")
+	to.CancelSubscriberUser("")
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, map[string]int{"u_alice": 2, "": 2}, canceled)
 }

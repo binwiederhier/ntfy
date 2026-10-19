@@ -244,25 +244,25 @@ func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
 	}
 }
 
-// CancelSubscriberUser kills the subscriber with the given user ID
+// CancelSubscriberUser kills all subscribers with the given user ID ("" = anonymous ones)
 func (t *topic) CancelSubscriberUser(userID string) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	for _, s := range t.subscribers {
 		if s.userID == userID {
 			t.cancelUserSubscriber(s)
-			return
 		}
 	}
 }
 
-// SubscriberUserIDs returns the distinct non-empty user IDs of this topic's subscribers
+// SubscriberUserIDs returns the distinct user IDs of this topic's subscribers, "" standing for
+// anonymous ones
 func (t *topic) SubscriberUserIDs() []string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	userIDs := make([]string, 0, len(t.subscribers))
+	userIDs := make([]string, 0)
 	for _, s := range t.subscribers {
-		if s.userID != "" && !slices.Contains(userIDs, s.userID) {
+		if !slices.Contains(userIDs, s.userID) {
 			userIDs = append(userIDs, s.userID)
 		}
 	}

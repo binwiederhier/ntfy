@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
@@ -223,15 +224,24 @@ func (s *Server) cancelSubscriberUserLocal(userID, topicPattern string) error {
 // applySubscriberCancel applies a peer node's subscriber-cancel request to local connections
 // only; it never re-broadcasts (loop prevention, see cluster.CancelFunc).
 //
-// A revocation also invalidates this node's ACL cache for that user: without it the cancelled
-// subscriber could reconnect immediately and be authorized from the stale cache (its periodic
-// reload is minutes away). Cancelling without the refresh would be theater.
+// It first refreshes this node's access cache for everyone and the user concerned: without it a
+// canceled subscriber could reconnect at once and be let in by the stale cache (its periodic
+// reload is minutes away). The refresh also re-checks the affected subscribers (see
+// reauthorizeSubscribers); the explicit cancel below covers nodes without the cache.
 func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
-	if cancel.UserID != "" && s.userManager != nil {
-		if u, err := s.userManager.UserByID(cancel.UserID); err != nil {
-			log.Tag(tagSubscribe).Err(err).Warn("Cannot look up user %s for a peer's revocation", cancel.UserID)
-		} else if err := s.userManager.ReloadAccessCache(u.Name); err != nil {
-			log.Tag(tagSubscribe).Err(err).Warn("Cannot reload the access cache for user %s", u.Name)
+	if s.userManager != nil {
+		usernames := []string{user.Everyone}
+		for _, userID := range []string{cancel.UserID, cancel.ExceptUserID} {
+			if userID == "" {
+				continue
+			} else if u, err := s.userManager.UserByID(userID); err == nil {
+				usernames = append(usernames, u.Name)
+			} else if !errors.Is(err, user.ErrUserNotFound) {
+				log.Tag(tagSubscribe).Err(err).Warn("Cannot look up user %s for a peer's subscriber cancel", userID)
+			}
+		}
+		if err := s.userManager.ReloadAccessCache(usernames...); err != nil {
+			log.Tag(tagSubscribe).Err(err).Warn("Cannot reload the access cache for a peer's subscriber cancel")
 		}
 	}
 	if cancel.ExceptUserID != "" {
@@ -246,4 +256,54 @@ func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
 	if err := s.cancelSubscriberUserLocal(cancel.UserID, cancel.Topic); err != nil {
 		log.Tag(tagSubscribe).Err(err).Warn("Cannot apply peer subscriber cancel for topic %s", cancel.Topic)
 	}
+}
+
+// reauthorizeSubscribers ends the live subscriptions that changed access entries no longer let
+// read their topic. The user manager calls it when an access cache reload finds entries
+// changed: by this node, by a peer (relayed or not), or by the ntfy access CLI. Only topics
+// matching a changed entry are checked, and on them only the subscribers the entry applies to
+// (an entry for everyone applies to all). A user that cannot be looked up keeps the
+// subscription, so that a database hiccup does not disconnect anyone; a deleted one does not.
+func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
+	users := make(map[string]*user.User) // Resolved once per call; nil means anonymous or deleted
+	for _, change := range changes {
+		for _, t := range s.topicsForAccessChange(change.Topic) {
+			for _, userID := range t.SubscriberUserIDs() {
+				u, resolved := users[userID]
+				if !resolved && userID != "" {
+					var err error
+					if u, err = s.userManager.UserByID(userID); err != nil && !errors.Is(err, user.ErrUserNotFound) {
+						log.Tag(tagSubscribe).Err(err).Warn("Cannot re-check the subscribers of user %s", userID)
+						continue
+					}
+					users[userID] = u
+				}
+				deleted := userID != "" && u == nil
+				if !deleted && change.Username != user.Everyone && (u == nil || u.Name != change.Username) {
+					continue // The entry does not apply to this subscriber
+				} else if deleted || s.userManager.Authorize(u, t.ID, user.PermissionRead) != nil {
+					log.Tag(tagSubscribe).With(t).Debug("Canceling subscribers of user %s: access to the topic changed", userID)
+					t.CancelSubscriberUser(userID)
+				}
+			}
+		}
+	}
+}
+
+// topicsForAccessChange returns the local topics a changed access entry's topic or pattern matches
+func (s *Server) topicsForAccessChange(topicPattern string) []*topic {
+	if !strings.Contains(topicPattern, "*") {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		if t, ok := s.topics[topicPattern]; ok {
+			return []*topic{t}
+		}
+		return nil
+	}
+	topics, err := s.topicsFromPattern(topicPattern)
+	if err != nil {
+		log.Tag(tagSubscribe).Err(err).Warn("Cannot match topics against access pattern %s", topicPattern)
+		return nil
+	}
+	return topics
 }

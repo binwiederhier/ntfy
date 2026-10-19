@@ -1,7 +1,9 @@
 package user
 
 import (
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -33,11 +35,13 @@ type accessCache struct {
 var testHookReloadScanned func()
 
 // aclEntry mirrors one user_access row. length feeds better()'s "longer
-// pattern wins" tie-break; the stored topic/pattern string itself is not kept
-// on the entry (the exact map already keys on it; surfacing wildcard "topics"
-// like "up%" alongside real ones would invite misuse). pattern is the
-// compiled regex form of the LIKE pattern; nil for exact entries.
+// pattern wins" tie-break. topic is the stored (escaped) topic or pattern; it
+// is only used to report changed entries after a reload, never for lookups
+// (surfacing wildcard "topics" like "up%" alongside real ones would invite
+// misuse). pattern is the compiled regex form of the LIKE pattern; nil for
+// exact entries.
 type aclEntry struct {
+	topic   string
 	length  int
 	pattern *regexp.Regexp
 	read    bool
@@ -86,7 +90,10 @@ func (c *accessCache) Lookup(username, topic string) (read, write, found bool) {
 // Since Reload can be triggered from different places and for different scopes (full
 // and user-specific), the function may cause races and lost-updates. This is solved
 // with the sequence number.
-func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) error {
+//
+// It returns the entries the reload found added, changed or removed, so that the
+// caller can re-check live subscriptions they affect.
+func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) ([]*AccessChange, error) {
 	started := time.Now()
 	scope := "full"
 	if len(usernames) > 0 {
@@ -103,7 +110,7 @@ func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) error 
 	// Query the database for all ACL entries
 	rows, err := d.Query(query, args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 	exacts := make(map[string]map[string]aclEntry)
@@ -113,11 +120,11 @@ func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) error 
 		var username, escapedTopic string
 		var read, write bool
 		if err := rows.Scan(&username, &escapedTopic, &read, &write); err != nil {
-			return err
+			return nil, err
 		}
 		entry, hasWildcard, err := toACLEntry(escapedTopic, read, write)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if hasWildcard {
 			patterns[username] = append(patterns[username], entry)
@@ -130,13 +137,14 @@ func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) error 
 		updatedEntries++
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	if testHookReloadScanned != nil {
 		testHookReloadScanned()
 	}
 	// Replace or update the internal maps
 	c.mu.Lock()
+	var changes []*AccessChange
 	if len(usernames) == 0 {
 		if c.seq != seqBefore {
 			c.mu.Unlock()
@@ -144,11 +152,13 @@ func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) error 
 				Field("reload_scope", scope).
 				Field("duration_ms", time.Since(started).Milliseconds()).
 				Warn("ACL cache reload skipped due to race")
-			return nil
+			return nil, nil
 		}
+		changes = diffACLEntries(c.exact, c.pattern, exacts, patterns, allUsernames(c.exact, c.pattern, exacts, patterns))
 		c.exact = exacts
 		c.pattern = patterns
 	} else {
+		changes = diffACLEntries(c.exact, c.pattern, exacts, patterns, usernames)
 		for _, u := range usernames {
 			if e, ok := exacts[u]; ok {
 				c.exact[u] = e
@@ -167,9 +177,60 @@ func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) error 
 	log.Tag(tag).
 		Field("reload_scope", scope).
 		Field("updated_entries", updatedEntries).
+		Field("changed_entries", len(changes)).
 		Field("duration_ms", time.Since(started).Milliseconds()).
 		Debug("ACL cache reloaded")
-	return nil
+	return changes, nil
+}
+
+// diffACLEntries returns the entries of the given users that differ between the old and the
+// new maps: added, removed, or with a different read/write permission
+func diffACLEntries(oldExact map[string]map[string]aclEntry, oldPattern map[string][]aclEntry, newExact map[string]map[string]aclEntry, newPattern map[string][]aclEntry, usernames []string) []*AccessChange {
+	changes := make([]*AccessChange, 0)
+	for _, username := range usernames {
+		before := aclEntriesByTopic(oldExact[username], oldPattern[username])
+		after := aclEntriesByTopic(newExact[username], newPattern[username])
+		for topic, entry := range after {
+			if old, ok := before[topic]; !ok || old.read != entry.read || old.write != entry.write {
+				changes = append(changes, &AccessChange{Username: username, Topic: fromSQLWildcard(topic)})
+			}
+		}
+		for topic := range before {
+			if _, ok := after[topic]; !ok {
+				changes = append(changes, &AccessChange{Username: username, Topic: fromSQLWildcard(topic)})
+			}
+		}
+	}
+	return changes
+}
+
+// aclEntriesByTopic indexes one user's exact and wildcard entries by their stored topic
+func aclEntriesByTopic(exact map[string]aclEntry, patterns []aclEntry) map[string]aclEntry {
+	entries := make(map[string]aclEntry, len(exact)+len(patterns))
+	for topic, entry := range exact {
+		entries[topic] = entry
+	}
+	for _, entry := range patterns {
+		entries[entry.topic] = entry
+	}
+	return entries
+}
+
+// allUsernames returns every username with entries in the old or the new maps
+func allUsernames(oldExact map[string]map[string]aclEntry, oldPattern map[string][]aclEntry, newExact map[string]map[string]aclEntry, newPattern map[string][]aclEntry) []string {
+	seen := make(map[string]struct{})
+	addKeys(seen, oldExact)
+	addKeys(seen, oldPattern)
+	addKeys(seen, newExact)
+	addKeys(seen, newPattern)
+	return slices.Collect(maps.Keys(seen))
+}
+
+// addKeys adds the keys of m to seen
+func addKeys[V any](seen map[string]struct{}, m map[string]V) {
+	for key := range m {
+		seen[key] = struct{}{}
+	}
 }
 
 // lookupNoLock returns the highest-priority entry for a single user. When
@@ -208,6 +269,7 @@ func (c *accessCache) lookupNoLock(username, topic, escapedTopic string) (*aclEn
 // entries leave entry.pattern nil.
 func toACLEntry(escapedTopic string, read, write bool) (entry aclEntry, hasWildcard bool, err error) {
 	entry = aclEntry{
+		topic:  escapedTopic,
 		length: len(escapedTopic),
 		read:   read,
 		write:  write,

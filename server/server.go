@@ -268,6 +268,44 @@ func New(conf *Config) (*Server, error) {
 		CallFormat:    conf.TwilioCallFormat,
 		BuildVersion:  conf.BuildVersion,
 	})
+	var banner *ban.Service
+	if conf.BanFile != "" {
+		banner = ban.NewService(&ban.Config{
+			File:           conf.BanFile,
+			Window:         conf.BanWindow,
+			Threshold:      conf.BanThreshold,
+			Weights:        conf.BanWeights,
+			PrefixBitsIPv4: conf.VisitorPrefixBitsIPv4,
+			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
+		})
+	}
+	// Peers reach this node on the dedicated cluster listener, never on the public ones
+	advertiseURL := conf.ClusterAdvertiseURL
+	if advertiseURL == "" && conf.ClusterListen != "" {
+		advertiseURL = "http://" + conf.ClusterListen
+	}
+	s := &Server{
+		config:          conf,
+		db:              pool,
+		messageCache:    messageCache,
+		webPush:         wp,
+		attachment:      attachmentStore,
+		twilio:          twilioClient,
+		mailer:          sender,
+		ban:             banner,
+		topics:          topics,
+		messages:        messages,
+		messagesHistory: []int64{messages},
+		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
+		visitors:        make(map[string]*visitor),
+		stripe:          stripe,
+	}
+	// Everything from here on needs the server itself: the price cache calls a method on it, and
+	// the cluster delivers peer messages through callbacks into it (which is how the cluster
+	// package stays independent of the server)
+	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
+	// The user manager and the Firebase client come after the server, since the user manager reports
+	// access changes to it (see reauthorizeSubscribers)
 	var userManager *user.Manager
 	if conf.AuthFile != "" || pool != nil {
 		authConfig := &user.Config{
@@ -283,6 +321,7 @@ func New(conf *Config) (*Server, error) {
 			QueueWriterInterval:       conf.AuthStatsQueueWriterInterval,
 			AccessCacheEnabled:        conf.AuthAccessCacheEnabled,
 			AccessCacheReloadInterval: conf.AuthAccessCacheReloadInterval,
+			AccessChangedFunc:         s.reauthorizeSubscribers,
 		}
 		if pool != nil {
 			userManager, err = user.NewPostgresManager(pool, authConfig)
@@ -307,47 +346,8 @@ func New(conf *Config) (*Server, error) {
 		}
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
-	var banner *ban.Service
-	if conf.BanFile != "" {
-		banner = ban.NewService(&ban.Config{
-			File:           conf.BanFile,
-			Window:         conf.BanWindow,
-			Threshold:      conf.BanThreshold,
-			Weights:        conf.BanWeights,
-			PrefixBitsIPv4: conf.VisitorPrefixBitsIPv4,
-			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
-		})
-	}
-	// Peers reach this node on the dedicated cluster listener, never on the public ones
-	advertiseURL := conf.ClusterAdvertiseURL
-	if advertiseURL == "" && conf.ClusterListen != "" {
-		advertiseURL = "http://" + conf.ClusterListen
-	}
-	s := &Server{
-		config:          conf,
-		db:              pool,
-		messageCache:    messageCache,
-		webPush:         wp,
-		attachment:      attachmentStore,
-		firebaseClient:  firebaseClient,
-		twilio:          twilioClient,
-		mailer:          sender,
-		ban:             banner,
-		topics:          topics,
-		userManager:     userManager,
-		messages:        messages,
-		messagesHistory: []int64{messages},
-		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		visitors:        make(map[string]*visitor),
-		stripe:          stripe,
-	}
-	// Everything from here on needs the server itself: the price cache calls a method on it, and
-	// the cluster delivers peer messages through callbacks into it (which is how the cluster
-	// package stays independent of the server)
-	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
-	if userManager != nil {
-		userManager.SetAccessChangedFunc(s.reauthorizeSubscribers)
-	}
+	s.userManager = userManager
+	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
 	}

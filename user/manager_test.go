@@ -2425,28 +2425,8 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 	// A reload that finds entries added, changed or removed by someone else (another cluster
 	// node, the CLI) reports them, so the server can re-check the live subscribers they affect
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
-		reader := newTestManagerFromConfig(t, newManager, &Config{
-			DefaultAccess:             PermissionReadWrite,
-			BcryptCost:                bcrypt.MinCost,
-			AccessCacheEnabled:        true,
-			AccessCacheReloadInterval: time.Hour,
-		})
-		writer := newTestManagerFromConfig(t, newManager, &Config{
-			DefaultAccess: PermissionReadWrite,
-			BcryptCost:    bcrypt.MinCost,
-		})
-		require.Nil(t, writer.AddUser("phil", "phil", RoleUser, false))
-		require.Nil(t, writer.AllowAccess("phil", "unchanged", PermissionRead))
-		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionReadWrite))
-		require.Nil(t, reader.ReloadAccessCache())
-
 		var mu sync.Mutex
 		var changes []*AccessChange
-		reader.SetAccessChangedFunc(func(c []*AccessChange) {
-			mu.Lock()
-			defer mu.Unlock()
-			changes = append(changes, c...)
-		})
 		takeChanges := func() []*AccessChange {
 			mu.Lock()
 			defer mu.Unlock()
@@ -2454,6 +2434,27 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 			changes = nil
 			return taken
 		}
+		writer := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess: PermissionReadWrite,
+			BcryptCost:    bcrypt.MinCost,
+		})
+		require.Nil(t, writer.AddUser("phil", "phil", RoleUser, false))
+		require.Nil(t, writer.AllowAccess("phil", "unchanged", PermissionRead))
+		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionReadWrite))
+		reader := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess:             PermissionReadWrite,
+			BcryptCost:                bcrypt.MinCost,
+			AccessCacheEnabled:        true,
+			AccessCacheReloadInterval: time.Hour,
+			AccessChangedFunc: func(c []*AccessChange) {
+				mu.Lock()
+				defer mu.Unlock()
+				changes = append(changes, c...)
+			},
+		})
+
+		// The initial load finds every row new; that is no change to report (and nobody subscribed yet)
+		require.Empty(t, takeChanges())
 
 		// A reservation (owner and everyone rows), a new wildcard, a downgrade; one row untouched
 		require.Nil(t, writer.AddReservation("phil", "my_topic", PermissionDenyAll, 0))

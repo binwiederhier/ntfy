@@ -281,7 +281,11 @@ func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
 					continue // The entry does not apply to this subscriber
 				} else if deleted || s.userManager.Authorize(u, t.ID, user.PermissionRead) != nil {
 					log.Tag(tagSubscribe).With(t).Debug("Canceling subscribers of user %s: access to the topic changed", userID)
-					t.CancelSubscriberUser(userID)
+					if userID == "" {
+						t.CancelAnonymousSubscribers()
+					} else {
+						t.CancelSubscriberUser(userID)
+					}
 				}
 			}
 		}

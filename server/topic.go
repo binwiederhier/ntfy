@@ -244,8 +244,20 @@ func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
 	}
 }
 
-// CancelSubscriberUser kills all subscribers with the given user ID ("" = anonymous ones)
+// CancelSubscriberUser kills all subscribers with the given user ID; an empty ID matches nobody
 func (t *topic) CancelSubscriberUser(userID string) {
+	if userID == "" {
+		return // Anonymous subscribers are only ever canceled on purpose, see CancelAnonymousSubscribers
+	}
+	t.cancelSubscribersWithUserID(userID)
+}
+
+// CancelAnonymousSubscribers kills all subscribers without a user
+func (t *topic) CancelAnonymousSubscribers() {
+	t.cancelSubscribersWithUserID("")
+}
+
+func (t *topic) cancelSubscribersWithUserID(userID string) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	for _, s := range t.subscribers {

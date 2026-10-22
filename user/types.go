@@ -320,6 +320,7 @@ type Config struct {
 	QueueWriterInterval          time.Duration       // Interval for the async queue writer to flush stats and token updates to the database
 	BcryptCost                   int                 // Cost of generated passwords; lowering makes testing faster
 	AccessCacheEnabled           bool                // Enables the in-memory ACL cache (high volume servers only)
+	AccessChangedFunc            AccessChangedFunc   // Told about access entries a cache reload found changed; may be nil
 	AccessCacheReloadInterval    time.Duration       // Reload interval for access cache, relevant for ACL writes from CLI
 	ExpiredMagicLinkReapInterval time.Duration       // Interval for sweeping expired email-verify/password-reset links
 }

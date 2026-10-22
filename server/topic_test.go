@@ -258,7 +258,12 @@ func TestTopic_CancelSubscriberUser_AllOfTheUsersSubscribers(t *testing.T) {
 	require.ElementsMatch(t, []string{"u_alice", "", "u_carol"}, to.SubscriberUserIDs())
 
 	to.CancelSubscriberUser("u_alice")
-	to.CancelSubscriberUser("")
+	to.CancelSubscriberUser("") // An empty user ID cancels nobody: anonymous streams need the explicit call
+	mu.Lock()
+	require.Equal(t, map[string]int{"u_alice": 2}, canceled)
+	mu.Unlock()
+
+	to.CancelAnonymousSubscribers()
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, map[string]int{"u_alice": 2, "": 2}, canceled)

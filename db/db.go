@@ -87,14 +87,14 @@ func (d *DB) Primary() *sql.DB {
 func (d *DB) Stats() []*PoolStats {
 	stats := []*PoolStats{
 		{
-			Role:  "primary",
+			Role:  PoolRolePrimary,
 			Addr:  d.primary.Addr,
 			Stats: d.primary.DB.Stats(),
 		},
 	}
 	for _, r := range d.replicas {
 		stats = append(stats, &PoolStats{
-			Role:  "replica",
+			Role:  PoolRoleReplica,
 			Addr:  r.Addr,
 			Stats: r.DB.Stats(),
 		})

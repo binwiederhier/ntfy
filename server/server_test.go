@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/v2/attachment"
+	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/log"
@@ -347,7 +348,7 @@ func TestServer_MetricsEnabled(t *testing.T) {
 		require.Contains(t, rr.Body.String(), "ntfy_http_requests_total")
 		if databaseURL != "" {
 			// The connection pools of a PostgreSQL database, read at scrape time
-			require.Regexp(t, `ntfy_db_pool_connections_max\{host="[^"]+",role="primary"\} 2`, rr.Body.String())
+			require.Regexp(t, `ntfy_db_pool_connections_max\{host="[^"]+",role="`+db.PoolRolePrimary+`"\} 2`, rr.Body.String())
 			require.Contains(t, rr.Body.String(), "ntfy_db_pool_waits_total{")
 		}
 	})

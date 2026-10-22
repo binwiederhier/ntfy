@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"database/sql"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/db"
 )
 
 // expectedMetricNames is the exact set of metrics the server exposes. These names are a public
@@ -65,7 +67,7 @@ func TestRegisteredMetricNames(t *testing.T) {
 	SetDBPoolsFunc(func() []*DBPool {
 		return []*DBPool{
 			{
-				Role: "primary",
+				Role: db.PoolRolePrimary,
 				Addr: "db:5432",
 			},
 		}
@@ -97,7 +99,7 @@ func TestDBPoolMetrics(t *testing.T) {
 	SetDBPoolsFunc(func() []*DBPool {
 		return []*DBPool{
 			{
-				Role: "primary",
+				Role: db.PoolRolePrimary,
 				Addr: "db:5432",
 				Stats: sql.DBStats{
 					MaxOpenConnections: 30,
@@ -109,7 +111,7 @@ func TestDBPoolMetrics(t *testing.T) {
 				},
 			},
 			{
-				Role: "replica",
+				Role: db.PoolRoleReplica,
 				Addr: "replica:5432",
 				Stats: sql.DBStats{
 					MaxOpenConnections: 20,
@@ -121,24 +123,24 @@ func TestDBPoolMetrics(t *testing.T) {
 		}
 	})
 	defer SetDBPoolsFunc(nil)
-	expected := `
+	expected := fmt.Sprintf(`
 # HELP ntfy_db_pool_connections_in_use Database connections currently in use, per pool
 # TYPE ntfy_db_pool_connections_in_use gauge
-ntfy_db_pool_connections_in_use{host="db:5432",role="primary"} 5
-ntfy_db_pool_connections_in_use{host="replica:5432",role="replica"} 1
+ntfy_db_pool_connections_in_use{host="db:5432",role="%[1]s"} 5
+ntfy_db_pool_connections_in_use{host="replica:5432",role="%[2]s"} 1
 # HELP ntfy_db_pool_connections_max Maximum open database connections (pool_max_conns), per pool
 # TYPE ntfy_db_pool_connections_max gauge
-ntfy_db_pool_connections_max{host="db:5432",role="primary"} 30
-ntfy_db_pool_connections_max{host="replica:5432",role="replica"} 20
+ntfy_db_pool_connections_max{host="db:5432",role="%[1]s"} 30
+ntfy_db_pool_connections_max{host="replica:5432",role="%[2]s"} 20
 # HELP ntfy_db_pool_wait_seconds_total Total time spent waiting for a free database connection, per pool
 # TYPE ntfy_db_pool_wait_seconds_total counter
-ntfy_db_pool_wait_seconds_total{host="db:5432",role="primary"} 1.5
-ntfy_db_pool_wait_seconds_total{host="replica:5432",role="replica"} 0
+ntfy_db_pool_wait_seconds_total{host="db:5432",role="%[1]s"} 1.5
+ntfy_db_pool_wait_seconds_total{host="replica:5432",role="%[2]s"} 0
 # HELP ntfy_db_pool_waits_total Times a query had to wait for a free database connection, per pool
 # TYPE ntfy_db_pool_waits_total counter
-ntfy_db_pool_waits_total{host="db:5432",role="primary"} 3
-ntfy_db_pool_waits_total{host="replica:5432",role="replica"} 0
-`
+ntfy_db_pool_waits_total{host="db:5432",role="%[1]s"} 3
+ntfy_db_pool_waits_total{host="replica:5432",role="%[2]s"} 0
+`, db.PoolRolePrimary, db.PoolRoleReplica)
 	require.Nil(t, testutil.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expected),
 		"ntfy_db_pool_connections_in_use", "ntfy_db_pool_connections_max", "ntfy_db_pool_waits_total", "ntfy_db_pool_wait_seconds_total"))
 	open, err := testutil.GatherAndCount(prometheus.DefaultGatherer, "ntfy_db_pool_connections_open", "ntfy_db_pool_connections_idle")

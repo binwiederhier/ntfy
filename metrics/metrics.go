@@ -165,7 +165,7 @@ func init() {
 
 // DBPool is one database connection pool's statistics: the primary's or a replica's
 type DBPool struct {
-	Role  string // "primary" or "replica"
+	Role  string // db.PoolRolePrimary or db.PoolRoleReplica
 	Addr  string // "host:port"
 	Stats sql.DBStats
 }

@@ -65,11 +65,11 @@ func TestDB_Stats(t *testing.T) {
 
 	stats := d.Stats()
 	require.Len(t, stats, 2)
-	require.Equal(t, "primary", stats[0].Role)
+	require.Equal(t, db.PoolRolePrimary, stats[0].Role)
 	require.Equal(t, "primary:5432", stats[0].Addr)
 	require.Equal(t, 7, stats[0].Stats.MaxOpenConnections)
 	require.Equal(t, 1, stats[0].Stats.InUse)
-	require.Equal(t, "replica", stats[1].Role)
+	require.Equal(t, db.PoolRoleReplica, stats[1].Role)
 	require.Equal(t, "replica:5432", stats[1].Addr)
 	require.Equal(t, 3, stats[1].Stats.MaxOpenConnections)
 	require.Equal(t, 0, stats[1].Stats.InUse)

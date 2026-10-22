@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -38,7 +39,7 @@ var flagsUser = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", Aliases: []string{"smtp_sender_user"}, EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-pass", Aliases: []string{"smtp_sender_pass"}, EnvVars: []string{"NTFY_SMTP_SENDER_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-from", Aliases: []string{"smtp_sender_from"}, EnvVars: []string{"NTFY_SMTP_SENDER_FROM"}, Usage: "SMTP sender address (if e-mail sending is enabled)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "admin-socket", Aliases: []string{"admin_socket"}, EnvVars: []string{"NTFY_ADMIN_SOCKET"}, Value: server.DefaultAdminSocket(), DefaultText: "/run/ntfy/admin.sock", Usage: "admin socket of the local ntfy server; empty forces direct database access"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "admin-socket", Aliases: []string{"admin_socket"}, EnvVars: []string{"NTFY_ADMIN_SOCKET"}, Value: server.DefaultAdminSocket(), DefaultText: "/run/ntfy/admin.sock on Linux, /var/run/ntfy/admin.sock on macOS/BSD", Usage: "admin socket of the local ntfy server; empty forces direct database access"}),
 	&cli.StringFlag{Name: "server", Aliases: []string{"S"}, EnvVars: []string{"NTFY_ADMIN_SERVER"}, Usage: "manage a remote server over HTTPS instead (base URL, e.g. https://ntfy.example.com); requires --token of an admin user"},
 	&cli.StringFlag{Name: "token", Aliases: []string{"k"}, EnvVars: []string{"NTFY_ADMIN_TOKEN"}, Usage: "admin access token for --server"},
 )
@@ -435,7 +436,9 @@ func createUserManager(c *cli.Context) (*user.Manager, error) {
 		}
 		return user.NewPostgresManager(db.New(host, nil), authConfig)
 	} else if authFile != "" {
-		if !util.FileExists(authFile) {
+		if _, err := os.Stat(authFile); errors.Is(err, fs.ErrPermission) {
+			return nil, fmt.Errorf("cannot access auth-file %s: permission denied, run this command as root or as the user the server runs as", authFile)
+		} else if err != nil {
 			return nil, errors.New("auth-file does not exist; please start the server at least once to create it")
 		}
 		return user.NewSQLiteManager(authFile, authStartupQueries, authConfig)

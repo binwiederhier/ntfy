@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -109,6 +110,9 @@ func TestCLI_AdminAPI_Server(t *testing.T) {
 	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--server=" + serverURL, "--token=" + token.Value, "add", "--role=admin", "emma"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "only possible over the admin socket")
+	_, err = remote("user", "del", "phil")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "only possible over the admin socket")
 
 	// --token is required, and must be an admin's
 	app, _, _, _ = newTestApp()
@@ -117,4 +121,29 @@ func TestCLI_AdminAPI_Server(t *testing.T) {
 	require.Contains(t, err.Error(), "--token is required")
 	_, err = remote("user", "--token=tk_doesnotexistdoesnotexist12345", "list")
 	require.Error(t, err)
+}
+
+func TestCLI_AdminAPI_SocketPermissionDenied(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can open any socket")
+	}
+	s, conf, port := newTestServerWithAuth(t, true)
+	defer test.StopServer(t, s, port)
+	require.Nil(t, os.Chmod(conf.AdminSocket, 0))
+
+	// Database not accessible either: the user is not allowed to manage this server, say how to fix it
+	dir := filepath.Dir(conf.AuthFile)
+	require.Nil(t, os.Chmod(dir, 0))
+	app, _, _, stderr := newTestApp()
+	err := runUserCommand(app, conf, "list")
+	require.Nil(t, os.Chmod(dir, 0700))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "permission denied on the admin socket")
+	require.NotContains(t, stderr.String(), "warning")
+
+	// Database accessible: the socket belongs to some other server (e.g. the system's), use the database
+	app, _, stdout, stderr := newTestApp()
+	require.Nil(t, runUserCommand(app, conf, "list"))
+	require.Contains(t, stdout.String(), "user * (role: anonymous")
+	require.Contains(t, stderr.String(), "(permission denied), writing to the database directly")
 }

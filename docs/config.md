@@ -918,25 +918,50 @@ has a token `tk_f099we8uzj7xi5qshzajwp6jffvkz` with the label "Backup script".
 
 ### Admin socket
 The `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` commands talk to the running ntfy server through a local
-admin socket, by default `/run/ntfy/admin.sock` (`/var/run/ntfy/admin.sock` on macOS). That way, changes take effect
-immediately: a removed user is disconnected right away, a new tier applies to the user's next request, and there is no
-delay until the server reloads its access control list.
+admin socket, by default `/run/ntfy/admin.sock` (`/var/run/ntfy/admin.sock` on macOS and the BSDs). That way, changes take
+effect immediately: a removed user is disconnected right away, and new tiers and access control entries apply to the very
+next request, even with `auth-access-cache` enabled.
 
 The socket needs no password or token: **being able to open the socket is the authorization**. It is created with
-mode `0660` in a directory with mode `0750`, both owned by the user ntfy runs as, so only that user, members of its group
-and `root` can use it. With the Debian/Ubuntu/Fedora packages, the shipped systemd unit creates `/run/ntfy` (via
-`RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group just work.
+mode `0660`, owned by the user and group ntfy runs as, so only that user, members of that group, and `root` can use it.
+The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`).
 
-The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`). If no
-server answers on the socket (the server is not running, or it cannot create the socket), the commands fall back to
-writing to the database directly, like they did before, and print a warning:
+If no server answers on the socket (the server is not running, or it could not create the socket), the commands fall
+back to editing the database directly, like they did before, and print a warning:
 
 ```
-warning: ntfy server not reachable at /run/ntfy/admin.sock, writing to the database directly; a running server picks this up within 1m27s
+warning: no ntfy server answered on the admin socket /run/ntfy/admin.sock (no such file or directory), writing to the database directly
 ```
 
-To change the path, set `admin-socket` in the `server.yml` file; the commands read it from there, too. To disable the
-socket, set `admin-socket: ""`. The admin socket is not available on Windows.
+The server logs at startup whether it is listening on the socket, and why not if it isn't:
+
+```
+INFO Admin socket listening on /run/ntfy/admin.sock (tag=startup)
+WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly (error=mkdir /run/ntfy: permission denied, tag=startup)
+```
+
+To change the path, set `admin-socket` in the `server.yml` file (or `NTFY_ADMIN_SOCKET`); the commands read it from
+there, too. To disable the socket, set `admin-socket: ""`. Depending on how you installed ntfy:
+
+* **Debian/Ubuntu/Fedora packages**: Works out of the box. The shipped systemd unit creates `/run/ntfy` (via
+  `RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group can manage users. If you use
+  your own unit file (e.g. a copy in `/etc/systemd/system/`), add `RuntimeDirectory=ntfy` and `RuntimeDirectoryMode=0750`
+  to its `[Service]` section, or the server cannot create the socket.
+* **Binary with the shipped systemd unit or OpenRC script**: Works out of the box; both create `/run/ntfy` for the `ntfy` user.
+* **Docker**: Run the commands inside the container, e.g. `docker exec -it ntfy ntfy user add phil`. This also works with
+  `user: UID:GID`, since the image ships a `/run/ntfy` directory that any user can create the socket in. With
+  `read_only: true`, add a writable `/run/ntfy` (`tmpfs: /run/ntfy` in docker-compose, `--tmpfs /run/ntfy` with `docker run`).
+  A separate `docker run ... binwiederhier/ntfy user ...` container does not see the server's socket and edits the database
+  directly; to share the socket, put it on a volume both containers mount (e.g. `NTFY_ADMIN_SOCKET=/var/lib/ntfy/admin.sock`).
+* **Kubernetes**: Like Docker, use `kubectl exec`. With `readOnlyRootFilesystem: true`, mount an `emptyDir` at `/run/ntfy`.
+* **Running ntfy as a regular user** (e.g. `ntfy serve -c ~/ntfy/server.yml`, a systemd user service, or Homebrew on macOS):
+  The user cannot create `/run/ntfy`, so set `admin-socket` to a path the user owns, e.g. `admin-socket: /home/phil/ntfy/admin.sock`,
+  and pass the same config file to the commands (`ntfy user -c ~/ntfy/server.yml ...`). Without it, the commands edit the
+  database directly, with a warning.
+* **Windows**: There is no admin socket on Windows. The commands edit the database directly, or use `--server` and `--token`.
+
+If a user who is neither `root` nor in the server's group runs a command, it fails with
+`permission denied on the admin socket /run/ntfy/admin.sock, run this command as root or as a member of the server's group (usually ntfy)`.
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,
@@ -2500,7 +2525,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`                                       | -                 | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                                       |
 | `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*                                          | -                 | Path to a Unix socket to listen on                                                                                                                                                                                                      |
 | `listen-unix-mode`                         | `NTFY_LISTEN_UNIX_MODE`                         | *file mode*                                         | *system default*  | File mode of the Unix socket, e.g. 0700 or 0777                                                                                                                                                                                         |
-| `admin-socket`                             | `NTFY_ADMIN_SOCKET`                             | *filename*                                          | `/run/ntfy/admin.sock` | Path of the local [admin socket](#admin-socket) the `ntfy user/access/token/tier` commands use; `""` disables it. Only opened if auth is configured; not available on Windows                                                           |
+| `admin-socket`                             | `NTFY_ADMIN_SOCKET`                             | *filename*                                          | `/run/ntfy/admin.sock` | Path of the local [admin socket](#admin-socket) the `ntfy user/access/token/tier` commands use (`/var/run/ntfy/admin.sock` on macOS/BSD); `""` disables it. Only opened if auth is configured; not available on Windows                                                           |
 | `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*                                          | -                 | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
@@ -2621,7 +2646,7 @@ OPTIONS:
    --listen-https value, --listen_https value, -L value                                                                   ip:port used as HTTPS listen address [$NTFY_LISTEN_HTTPS]
    --listen-unix value, --listen_unix value, -U value                                                                     listen on unix socket path [$NTFY_LISTEN_UNIX]
    --listen-unix-mode value, --listen_unix_mode value                                                                     file permissions of unix socket, e.g. 0700 (default: system default) [$NTFY_LISTEN_UNIX_MODE]
-   --admin-socket value, --admin_socket value                                                                             unix socket path for credential-less local admin access (ntfy user/access/token/tier); empty disables it (default: /run/ntfy/admin.sock (empty on Windows)) [$NTFY_ADMIN_SOCKET]
+   --admin-socket value, --admin_socket value                                                                                     unix socket path for credential-less local admin access (ntfy user/access/token/tier); empty disables it (default: /run/ntfy/admin.sock on Linux, /var/run/ntfy/admin.sock on macOS/BSD, none on Windows) [$NTFY_ADMIN_SOCKET]
    --key-file value, --key_file value, -K value                                                                           private key file, if listen-https is set [$NTFY_KEY_FILE]
    --cert-file value, --cert_file value, -E value                                                                         certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --firebase-key-file value, --firebase_key_file value, -F value                                                         Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]

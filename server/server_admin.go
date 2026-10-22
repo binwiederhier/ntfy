@@ -165,7 +165,7 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	} else if u != nil {
 		if u.IsAdmin() && !isAdminSocketRequest(r) {
-			return errHTTPForbidden
+			return errHTTPForbiddenAdminSocketOnly
 		}
 		if req.Hash != "" || req.Password != "" {
 			adminLog(v, r).Info("Changing password of user %s", req.Username)
@@ -219,10 +219,10 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	u, err := s.userManager.User(req.Username)
 	if err != nil {
 		return mapAdminUserError(err)
-	} else if !u.IsUser() && !isAdminSocketRequest(r) {
-		return errHTTPUnauthorized.Wrap("can only remove regular users from API")
 	} else if u.Name == user.Everyone {
 		return errHTTPBadRequest.Wrap("cannot remove the everyone user")
+	} else if !u.IsUser() && !isAdminSocketRequest(r) {
+		return errHTTPForbiddenAdminSocketOnly
 	}
 	adminLog(v, r).Info("Removing user %s", req.Username)
 	if err := s.userManager.RemoveUser(req.Username); err != nil {
@@ -377,7 +377,7 @@ func (s *Server) handleUsersPasswordReset(w http.ResponseWriter, r *http.Request
 	} else if u.Provisioned {
 		return errHTTPConflictProvisionedUserChange
 	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
-		return errHTTPForbidden
+		return errHTTPForbiddenAdminSocketOnly
 	}
 	var email string
 	if req.SendEmail {
@@ -514,7 +514,7 @@ func (s *Server) readAdminTokenUser(r *http.Request, username string) (*user.Use
 	if err != nil {
 		return nil, mapAdminUserError(err)
 	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
-		return nil, errHTTPForbidden
+		return nil, errHTTPForbiddenAdminSocketOnly
 	}
 	return u, nil
 }

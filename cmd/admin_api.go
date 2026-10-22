@@ -63,7 +63,14 @@ func newAdminAPI(c *cli.Context) (adminAPI, error) {
 		case errors.As(err, &apiErr) && apiErr.Code == client.AdminErrCodeNotFound:
 			// The server runs without auth, i.e. it does not use this database; createUserManager decides
 		case errors.Is(err, fs.ErrPermission):
-			return nil, fmt.Errorf("permission denied on the admin socket %s, run this command as root or as a member of the server's group (usually ntfy)", socket)
+			// Either this user may not manage the server, or the socket is some other server's (e.g. the
+			// system's, while managing one's own instance). Only the database can tell the two apart.
+			direct, directErr := newDirectAdminAPI(c)
+			if directErr != nil {
+				return nil, fmt.Errorf("permission denied on the admin socket %s, run this command as root or as a member of the server's group (usually ntfy)", socket)
+			}
+			fmt.Fprintf(c.App.ErrWriter, adminFallbackWarning, socket, adminUnreachableReason(err))
+			return direct, nil
 		case errors.Is(err, client.ErrAdminUnreachable):
 			fmt.Fprintf(c.App.ErrWriter, adminFallbackWarning, socket, adminUnreachableReason(err))
 		default:

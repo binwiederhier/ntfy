@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -170,4 +171,23 @@ func TestAdmin_Socket(t *testing.T) {
 	defer server.Close()
 	require.Nil(t, NewAdminSocket(socket).Ping())
 	require.Equal(t, "", auth)
+}
+
+func TestAdmin_SocketPermissionDenied(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can open any socket")
+	}
+	dir, err := os.MkdirTemp("", "ntfy-client")
+	require.Nil(t, err)
+	defer os.RemoveAll(dir)
+	socket := filepath.Join(dir, "admin.sock")
+	listener, err := net.Listen("unix", socket)
+	require.Nil(t, err)
+	defer listener.Close()
+	require.Nil(t, os.Chmod(socket, 0))
+
+	// The cause stays in the error chain, so callers can tell "no permission" from "no server"
+	err = NewAdminSocket(socket).Ping()
+	require.ErrorIs(t, err, ErrAdminUnreachable)
+	require.ErrorIs(t, err, fs.ErrPermission)
 }

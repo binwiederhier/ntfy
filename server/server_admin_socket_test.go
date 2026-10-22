@@ -22,6 +22,14 @@ import (
 	"heckel.io/ntfy/v2/user"
 )
 
+func TestAdminSocket_DefaultPath(t *testing.T) {
+	require.Equal(t, "/run/ntfy/admin.sock", defaultAdminSocketFor("linux"))
+	require.Equal(t, "/var/run/ntfy/admin.sock", defaultAdminSocketFor("darwin"))
+	require.Equal(t, "/var/run/ntfy/admin.sock", defaultAdminSocketFor("freebsd"))
+	require.Equal(t, "/var/run/ntfy/admin.sock", defaultAdminSocketFor("openbsd"))
+	require.Equal(t, "", defaultAdminSocketFor("windows"))
+}
+
 func TestAdminSocket_ListenAndRemove(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s, socket := newTestServerWithAdminSocket(t, newTestConfigWithAuthFile(t, databaseURL))
@@ -81,13 +89,35 @@ func TestAdminSocket_NonAdminRoutes(t *testing.T) {
 func TestAdminSocket_StaleSocketFile(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t, "")
 	conf.AdminSocket = filepath.Join(shortTempDir(t), "admin.sock")
-	require.Nil(t, os.WriteFile(conf.AdminSocket, []byte("stale"), 0600))
+	stale, err := net.Listen("unix", conf.AdminSocket)
+	require.Nil(t, err)
+	stale.(*net.UnixListener).SetUnlinkOnClose(false)
+	stale.Close() // Socket file stays behind, nobody listening (e.g. after a crash)
 	s := newTestServer(t, conf)
-	s.startAdminSocket()
+	output := captureLog(t, func() {
+		s.startAdminSocket()
+	})
+	require.Contains(t, output, "Admin socket listening on "+conf.AdminSocket)
 	resp, err := adminSocketClient(conf.AdminSocket).Get("http://ntfy/v1/users")
 	require.Nil(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 	resp.Body.Close()
+}
+
+func TestAdminSocket_RegularFileNotRemoved(t *testing.T) {
+	// A misconfigured path (e.g. pointing at the database) must never be deleted
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.AdminSocket = filepath.Join(shortTempDir(t), "user.db")
+	require.Nil(t, os.WriteFile(conf.AdminSocket, []byte("precious"), 0600))
+	s := newTestServer(t, conf)
+	output := captureLog(t, func() {
+		s.startAdminSocket()
+	})
+	require.Contains(t, output, "not a socket")
+	require.Nil(t, s.adminSocketServer)
+	data, err := os.ReadFile(conf.AdminSocket)
+	require.Nil(t, err)
+	require.Equal(t, "precious", string(data))
 }
 
 func TestAdminSocket_AnotherServerListening(t *testing.T) {
@@ -108,6 +138,24 @@ func TestAdminSocket_AnotherServerListening(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestAdminSocket_OtherUsersSocket(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can open any socket")
+	}
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.AdminSocket = filepath.Join(shortTempDir(t), "admin.sock")
+	other, err := net.Listen("unix", conf.AdminSocket)
+	require.Nil(t, err)
+	defer other.Close()
+	require.Nil(t, os.Chmod(conf.AdminSocket, 0)) // As seen by a user who may not open it
+	s := newTestServer(t, conf)
+	output := captureLog(t, func() {
+		s.startAdminSocket()
+	})
+	require.Contains(t, output, "belongs to a server of another user")
+	require.Nil(t, s.adminSocketServer)
+}
+
 func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root can write anywhere")
@@ -123,6 +171,7 @@ func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 	})
 	require.Contains(t, output, "Admin socket")
 	require.Contains(t, output, "not available")
+	require.NotContains(t, output, "listening")
 	require.Nil(t, s.adminSocketServer)
 }
 

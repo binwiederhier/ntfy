@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"heckel.io/ntfy/v2/log"
@@ -41,6 +42,22 @@ type peerCredentials struct {
 	PID int
 }
 
+// DefaultAdminSocket returns the default admin socket path. On Windows there is none: unix socket
+// file permissions do not protect it there, so the CLI uses the database or --server instead.
+func DefaultAdminSocket() string {
+	return defaultAdminSocketFor(runtime.GOOS)
+}
+
+func defaultAdminSocketFor(goos string) string {
+	switch goos {
+	case "windows":
+		return ""
+	case "linux":
+		return "/run/ntfy/admin.sock"
+	}
+	return "/var/run/ntfy/admin.sock" // macOS and the BSDs have no /run
+}
+
 // startAdminSocket listens on the admin socket, if configured, and serves the admin API on it.
 // Failing to listen is not fatal: the CLI falls back to the database, so it only logs a warning.
 func (s *Server) startAdminSocket() {
@@ -52,6 +69,7 @@ func (s *Server) startAdminSocket() {
 		log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly", s.config.AdminSocket)
 		return
 	}
+	log.Tag(tagStartup).Info("Admin socket listening on %s", s.config.AdminSocket)
 	s.adminSocketListener = listener
 	s.adminSocketServer = &http.Server{
 		Handler:     http.HandlerFunc(s.handleAdminSocket),
@@ -66,7 +84,8 @@ func (s *Server) startAdminSocket() {
 }
 
 // listenAdminSocket creates the socket's directory, removes a stale socket file (one with no
-// server behind it) and listens. A socket that answers belongs to another running server; in
+// server behind it) and listens. Anything at the path that is not a socket is left alone, in case
+// admin-socket points somewhere it should not (e.g. at the database). A socket that answers belongs to another running server; in
 // that case this one does not take it over.
 func (s *Server) listenAdminSocket() (net.Listener, error) {
 	path := s.config.AdminSocket
@@ -76,9 +95,15 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 	if conn, err := net.DialTimeout("unix", path, adminSocketDialTimeout); err == nil {
 		conn.Close()
 		return nil, fmt.Errorf("another server is listening on %s", path)
+	} else if errors.Is(err, fs.ErrPermission) {
+		return nil, fmt.Errorf("%s belongs to a server of another user, set admin-socket to a path of your own", path)
 	}
-	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, err
+	if stat, err := os.Lstat(path); err == nil {
+		if stat.Mode().Type() != fs.ModeSocket {
+			return nil, fmt.Errorf("%s exists and is not a socket, refusing to replace it", path)
+		} else if err := os.Remove(path); err != nil {
+			return nil, err
+		}
 	}
 	listener, err := net.Listen("unix", path)
 	if err != nil {

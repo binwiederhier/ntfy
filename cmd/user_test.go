@@ -209,6 +209,25 @@ func TestCLI_User_ResetPass_ProvisionedRejected(t *testing.T) {
 	})
 }
 
+func TestCLI_User_AuthFileNotReadable(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can read anything")
+	}
+	dir := t.TempDir()
+	authFile := filepath.Join(dir, "user.db")
+	require.Nil(t, os.WriteFile(authFile, []byte{}, 0600))
+	require.Nil(t, os.Chmod(dir, 0))
+	t.Cleanup(func() { os.Chmod(dir, 0700) })
+
+	configFile := filepath.Join(t.TempDir(), "server.yml")
+	require.Nil(t, os.WriteFile(configFile, []byte{}, 0600))
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "user", "--config=" + configFile, "--auth-file=" + authFile, "--admin-socket=", "list"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "permission denied")
+	require.NotContains(t, err.Error(), "does not exist")
+}
+
 // forEachAdminMode runs a CLI test twice: once with the commands talking to the test server over
 // its admin socket, and once with the socket disabled, i.e. writing to the database directly.
 // Both must produce the same output.

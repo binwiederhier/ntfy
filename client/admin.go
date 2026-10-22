@@ -371,12 +371,12 @@ func (a *Admin) do(method, path string, body any, out any) error {
 	}
 	resp, err := a.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrAdminUnreachable, err.Error())
+		return fmt.Errorf("%w: %w", ErrAdminUnreachable, err)
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, adminMaxResponseBytes))
 	if err != nil {
-		return fmt.Errorf("%w: %s", ErrAdminUnreachable, err.Error())
+		return fmt.Errorf("%w: %w", ErrAdminUnreachable, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		var apiErr AdminError

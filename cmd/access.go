@@ -196,7 +196,7 @@ func showUsers(c *cli.Context, users []*client.AdminUser) error {
 		} else {
 			fmt.Fprintf(c.App.Writer, "- no topic-specific permissions\n")
 		}
-		if u.Username == user.Everyone {
+		if u.Username == user.Everyone && u.DefaultAccess != "" { // Servers before v2.33.0 do not send it
 			access, err := user.ParsePermission(u.DefaultAccess)
 			if err != nil {
 				return err

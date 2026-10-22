@@ -325,6 +325,7 @@ func TestUser_DontChangeAdminPassword(t *testing.T) {
 			"Authorization": util.BasicAuth("phil", "phil"),
 		})
 		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 	})
 }
 
@@ -688,7 +689,8 @@ func TestUser_DeleteAdmin(t *testing.T) {
 		rr := request(t, s, "DELETE", "/v1/users", `{"username": "admin"}`, map[string]string{
 			"Authorization": util.BasicAuth("phil", "phil"),
 		})
-		require.Equal(t, 401, rr.Code)
+		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 
 		// Allowed over the socket
 		rr = requestAdminSocket(t, s, "DELETE", "/v1/users", `{"username": "admin"}`)
@@ -886,6 +888,7 @@ func TestTokens_AdminTokensOnlyOverSocket(t *testing.T) {
 		require.Equal(t, "ben", tokens[0].Username)
 		rr = request(t, s, "POST", "/v1/users/tokens", `{"username":"phil"}`, auth)
 		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 
 		// Over the socket, they are visible and can be created
 		rr = requestAdminSocket(t, s, "GET", "/v1/users/tokens", "")
@@ -959,6 +962,7 @@ func TestPasswordReset_Failures(t *testing.T) {
 		require.Equal(t, 40905, toHTTPError(t, rr.Body.String()).Code)
 		rr = request(t, s, "POST", "/v1/users/password/reset", `{"username":"phil"}`, auth)
 		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 
 		// No base URL
 		s.config.BaseURL = ""

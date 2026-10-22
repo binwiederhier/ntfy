@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	"time"
 )
 
 func init() {
@@ -64,8 +66,10 @@ var cmdTier = &cli.Command{
 Tiers can be used to grant users higher limits, such as daily message limits, attachment size, or
 make it possible for users to reserve topics.
 
-This is a server-only command. It directly reads from user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.
 
 Examples:
   ntfy tier add pro                     # Add tier with code "pro", using the defaults
@@ -107,8 +111,10 @@ Examples:
 After updating a tier, you may have to restart the ntfy server to apply them 
 to all visitors. 
 
-This is a server-only command. It directly reads from user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.
 
 Examples:
   ntfy tier change --name="Pro" pro        # Update the name of an existing tier
@@ -130,8 +136,10 @@ Examples:
 You cannot remove a tier if there are users associated with a tier. Use "ntfy user change-tier"
 to remove or switch their tier first.
 
-This is a server-only command. It directly reads from user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.
 
 Example:
   ntfy tier del pro
@@ -144,8 +152,10 @@ Example:
 			Action:  execTierList,
 			Description: `Shows a list of all configured tiers.
 
-This is a server-only command. It directly reads from user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.
 `,
 		},
 	},
@@ -155,8 +165,10 @@ The command allows you to add/remove/change tiers in the ntfy user database. Tie
 to grant users higher limits, such as daily message limits, attachment size, or make it 
 possible for users to reserve topics.
 
-This is a server-only command. It directly manages the user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.
 
 Examples:
   ntfy tier add pro                     # Add tier with code "pro", using the defaults
@@ -175,17 +187,6 @@ func execTierAdd(c *cli.Context) error {
 		return errors.New("if stripe-monthly-price-id is set, stripe-yearly-price-id must also be set")
 	} else if c.String("stripe-monthly-price-id") == "" && c.String("stripe-yearly-price-id") != "" {
 		return errors.New("if stripe-yearly-price-id is set, stripe-monthly-price-id must also be set")
-	}
-	manager, err := createUserManager(c)
-	if err != nil {
-		return err
-	}
-	if tier, _ := manager.Tier(code); tier != nil {
-		if c.Bool("ignore-exists") {
-			fmt.Fprintf(c.App.Writer, "tier %s already exists (exited successfully)\n", code)
-			return nil
-		}
-		return fmt.Errorf("tier %s already exists", code)
 	}
 	name := c.String("name")
 	if name == "" {
@@ -211,28 +212,41 @@ func execTierAdd(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	tier := &user.Tier{
-		ID:                       "", // Generated
+	api, err := newAdminAPI(c)
+	if err != nil {
+		return err
+	}
+	defer api.Close()
+	if _, err := api.Tier(code); err == nil {
+		if c.Bool("ignore-exists") {
+			fmt.Fprintf(c.App.Writer, "tier %s already exists (exited successfully)\n", code)
+			return nil
+		}
+		return fmt.Errorf("tier %s already exists", code)
+	} else if !isAdminErrorCode(err, client.AdminErrCodeTierNotFound) {
+		return adminError(err, "", code, "")
+	}
+	tier := &client.AdminTier{
 		Code:                     code,
 		Name:                     name,
-		MessageLimit:             c.Int64("message-limit"),
-		MessageExpiryDuration:    messageExpiryDuration,
-		EmailLimit:               c.Int64("email-limit"),
-		CallLimit:                c.Int64("call-limit"),
-		ReservationLimit:         c.Int64("reservation-limit"),
+		MessagesLimit:            c.Int64("message-limit"),
+		MessagesExpiryDuration:   int64(messageExpiryDuration.Seconds()),
+		EmailsLimit:              c.Int64("email-limit"),
+		CallsLimit:               c.Int64("call-limit"),
+		ReservationsLimit:        c.Int64("reservation-limit"),
 		AttachmentFileSizeLimit:  attachmentFileSizeLimit,
 		AttachmentTotalSizeLimit: attachmentTotalSizeLimit,
-		AttachmentExpiryDuration: attachmentExpiryDuration,
+		AttachmentExpiryDuration: int64(attachmentExpiryDuration.Seconds()),
 		AttachmentBandwidthLimit: attachmentBandwidthLimit,
 		StripeMonthlyPriceID:     c.String("stripe-monthly-price-id"),
 		StripeYearlyPriceID:      c.String("stripe-yearly-price-id"),
 	}
-	if err := manager.AddTier(tier); err != nil {
-		return err
+	if err := api.AddTier(tier); err != nil {
+		return adminError(err, "", code, "")
 	}
-	tier, err = manager.Tier(code)
+	tier, err = api.Tier(code)
 	if err != nil {
-		return err
+		return adminError(err, "", code, "")
 	}
 	fmt.Fprintf(c.App.Writer, "tier added\n\n")
 	printTier(c, tier)
@@ -246,36 +260,36 @@ func execTierChange(c *cli.Context) error {
 	} else if !user.AllowedTier(code) {
 		return errors.New("tier code must consist only of numbers and letters")
 	}
-	manager, err := createUserManager(c)
+	api, err := newAdminAPI(c)
 	if err != nil {
 		return err
 	}
-	tier, err := manager.Tier(code)
-	if err == user.ErrTierNotFound {
-		return fmt.Errorf("tier %s does not exist", code)
-	} else if err != nil {
-		return err
+	defer api.Close()
+	tier, err := api.Tier(code)
+	if err != nil {
+		return adminError(err, "", code, "")
 	}
 	if c.IsSet("name") {
 		tier.Name = c.String("name")
 	}
 	if c.IsSet("message-limit") {
-		tier.MessageLimit = c.Int64("message-limit")
+		tier.MessagesLimit = c.Int64("message-limit")
 	}
 	if c.IsSet("message-expiry-duration") {
-		tier.MessageExpiryDuration, err = util.ParseDuration(c.String("message-expiry-duration"))
+		d, err := util.ParseDuration(c.String("message-expiry-duration"))
 		if err != nil {
 			return err
 		}
+		tier.MessagesExpiryDuration = int64(d.Seconds())
 	}
 	if c.IsSet("email-limit") {
-		tier.EmailLimit = c.Int64("email-limit")
+		tier.EmailsLimit = c.Int64("email-limit")
 	}
 	if c.IsSet("call-limit") {
-		tier.CallLimit = c.Int64("call-limit")
+		tier.CallsLimit = c.Int64("call-limit")
 	}
 	if c.IsSet("reservation-limit") {
-		tier.ReservationLimit = c.Int64("reservation-limit")
+		tier.ReservationsLimit = c.Int64("reservation-limit")
 	}
 	if c.IsSet("attachment-file-size-limit") {
 		tier.AttachmentFileSizeLimit, err = util.ParseSize(c.String("attachment-file-size-limit"))
@@ -290,10 +304,11 @@ func execTierChange(c *cli.Context) error {
 		}
 	}
 	if c.IsSet("attachment-expiry-duration") {
-		tier.AttachmentExpiryDuration, err = util.ParseDuration(c.String("attachment-expiry-duration"))
+		d, err := util.ParseDuration(c.String("attachment-expiry-duration"))
 		if err != nil {
 			return err
 		}
+		tier.AttachmentExpiryDuration = int64(d.Seconds())
 	}
 	if c.IsSet("attachment-bandwidth-limit") {
 		tier.AttachmentBandwidthLimit, err = util.ParseSize(c.String("attachment-bandwidth-limit"))
@@ -312,8 +327,8 @@ func execTierChange(c *cli.Context) error {
 	} else if tier.StripeMonthlyPriceID == "" && tier.StripeYearlyPriceID != "" {
 		return errors.New("if stripe-yearly-price-id is set, stripe-monthly-price-id must also be set")
 	}
-	if err := manager.UpdateTier(tier); err != nil {
-		return err
+	if err := api.UpdateTier(tier); err != nil {
+		return adminError(err, "", code, "")
 	}
 	fmt.Fprintf(c.App.Writer, "tier updated\n\n")
 	printTier(c, tier)
@@ -325,28 +340,27 @@ func execTierDel(c *cli.Context) error {
 	if code == "" {
 		return errors.New("tier code expected, type 'ntfy tier del --help' for help")
 	}
-	manager, err := createUserManager(c)
+	api, err := newAdminAPI(c)
 	if err != nil {
 		return err
 	}
-	if _, err := manager.Tier(code); err == user.ErrTierNotFound {
-		return fmt.Errorf("tier %s does not exist", code)
-	}
-	if err := manager.RemoveTier(code); err != nil {
-		return err
+	defer api.Close()
+	if err := api.RemoveTier(code); err != nil {
+		return adminError(err, "", code, "")
 	}
 	fmt.Fprintf(c.App.Writer, "tier %s removed\n", code)
 	return nil
 }
 
 func execTierList(c *cli.Context) error {
-	manager, err := createUserManager(c)
+	api, err := newAdminAPI(c)
 	if err != nil {
 		return err
 	}
-	tiers, err := manager.Tiers()
+	defer api.Close()
+	tiers, err := api.Tiers()
 	if err != nil {
-		return err
+		return adminError(err, "", "", "")
 	}
 	for _, tier := range tiers {
 		printTier(c, tier)
@@ -354,21 +368,23 @@ func execTierList(c *cli.Context) error {
 	return nil
 }
 
-func printTier(c *cli.Context, tier *user.Tier) {
+func printTier(c *cli.Context, tier *client.AdminTier) {
 	prices := "(none)"
 	if tier.StripeMonthlyPriceID != "" && tier.StripeYearlyPriceID != "" {
 		prices = fmt.Sprintf("%s / %s", tier.StripeMonthlyPriceID, tier.StripeYearlyPriceID)
 	}
+	messageExpiryDuration := time.Duration(tier.MessagesExpiryDuration) * time.Second
+	attachmentExpiryDuration := time.Duration(tier.AttachmentExpiryDuration) * time.Second
 	fmt.Fprintf(c.App.Writer, "tier %s (id: %s)\n", tier.Code, tier.ID)
 	fmt.Fprintf(c.App.Writer, "- Name: %s\n", tier.Name)
-	fmt.Fprintf(c.App.Writer, "- Message limit: %d\n", tier.MessageLimit)
-	fmt.Fprintf(c.App.Writer, "- Message expiry duration: %s (%d seconds)\n", tier.MessageExpiryDuration.String(), int64(tier.MessageExpiryDuration.Seconds()))
-	fmt.Fprintf(c.App.Writer, "- Email limit: %d\n", tier.EmailLimit)
-	fmt.Fprintf(c.App.Writer, "- Phone call limit: %d\n", tier.CallLimit)
-	fmt.Fprintf(c.App.Writer, "- Reservation limit: %d\n", tier.ReservationLimit)
+	fmt.Fprintf(c.App.Writer, "- Message limit: %d\n", tier.MessagesLimit)
+	fmt.Fprintf(c.App.Writer, "- Message expiry duration: %s (%d seconds)\n", messageExpiryDuration.String(), tier.MessagesExpiryDuration)
+	fmt.Fprintf(c.App.Writer, "- Email limit: %d\n", tier.EmailsLimit)
+	fmt.Fprintf(c.App.Writer, "- Phone call limit: %d\n", tier.CallsLimit)
+	fmt.Fprintf(c.App.Writer, "- Reservation limit: %d\n", tier.ReservationsLimit)
 	fmt.Fprintf(c.App.Writer, "- Attachment file size limit: %s\n", util.FormatSizeHuman(tier.AttachmentFileSizeLimit))
 	fmt.Fprintf(c.App.Writer, "- Attachment total size limit: %s\n", util.FormatSizeHuman(tier.AttachmentTotalSizeLimit))
-	fmt.Fprintf(c.App.Writer, "- Attachment expiry duration: %s (%d seconds)\n", tier.AttachmentExpiryDuration.String(), int64(tier.AttachmentExpiryDuration.Seconds()))
+	fmt.Fprintf(c.App.Writer, "- Attachment expiry duration: %s (%d seconds)\n", attachmentExpiryDuration.String(), tier.AttachmentExpiryDuration)
 	fmt.Fprintf(c.App.Writer, "- Attachment daily bandwidth limit: %s\n", util.FormatSizeHuman(tier.AttachmentBandwidthLimit))
 	fmt.Fprintf(c.App.Writer, "- Stripe prices (monthly/yearly): %s\n", prices)
 }

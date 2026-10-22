@@ -8,7 +8,6 @@ import (
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
-	"net/netip"
 	"time"
 )
 
@@ -42,8 +41,10 @@ User access tokens can be used to publish, subscribe, or perform any other user-
 Tokens have full access, and can perform any task a user can do. They are meant to be used to 
 avoid spreading the password to various places.
 
-This is a server-only command. It directly reads from user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.
 
 Examples:
   ntfy token add phil                   # Create token for user phil which never expires
@@ -69,8 +70,10 @@ Example:
 			Action:  execTokenList,
 			Description: `Shows a list of all tokens.
 
-This is a server-only command. It directly reads from user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.`,
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.`,
 		},
 		{
 			Name:   "generate",
@@ -88,8 +91,10 @@ User access tokens can be used to publish, subscribe, or perform any other user-
 Tokens have full access, and can perform any task a user can do. They are meant to be used to 
 avoid spreading the password to various places.
 
-This is a server-only command. It directly manages the user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.
 
 Examples:
   ntfy token list                               # Shows list of tokens for all users
@@ -116,24 +121,19 @@ func execTokenAdd(c *cli.Context) error {
 			return err
 		}
 	}
-	manager, err := createUserManager(c)
+	api, err := newAdminAPI(c)
 	if err != nil {
 		return err
 	}
-	u, err := manager.User(username)
-	if errors.Is(err, user.ErrUserNotFound) {
-		return fmt.Errorf("user %s does not exist", username)
-	} else if err != nil {
-		return err
-	}
-	token, err := manager.CreateToken(u.ID, label, expires, netip.IPv4Unspecified(), false)
+	defer api.Close()
+	token, err := api.AddToken(username, label, expires)
 	if err != nil {
-		return err
+		return adminError(err, username, "", "")
 	}
-	if expires.Unix() == 0 {
-		fmt.Fprintf(c.App.Writer, "token %s created for user %s, never expires\n", token.Value, u.Name)
+	if token.Expires == 0 {
+		fmt.Fprintf(c.App.Writer, "token %s created for user %s, never expires\n", token.Token, token.Username)
 	} else {
-		fmt.Fprintf(c.App.Writer, "token %s created for user %s, expires %v\n", token.Value, u.Name, expires.Format(time.UnixDate))
+		fmt.Fprintf(c.App.Writer, "token %s created for user %s, expires %v\n", token.Token, token.Username, time.Unix(token.Expires, 0).Format(time.UnixDate))
 	}
 	return nil
 }
@@ -145,18 +145,13 @@ func execTokenDel(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createUserManager(c)
+	api, err := newAdminAPI(c)
 	if err != nil {
 		return err
 	}
-	u, err := manager.User(username)
-	if errors.Is(err, user.ErrUserNotFound) {
-		return fmt.Errorf("user %s does not exist", username)
-	} else if err != nil {
-		return err
-	}
-	if err := manager.RemoveToken(u.ID, token); err != nil {
-		return err
+	defer api.Close()
+	if err := api.RemoveToken(username, token); err != nil {
+		return adminError(err, username, "", token)
 	}
 	fmt.Fprintf(c.App.Writer, "token %s for user %s removed\n", token, username)
 	return nil
@@ -167,56 +162,40 @@ func execTokenList(c *cli.Context) error {
 	if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createUserManager(c)
+	api, err := newAdminAPI(c)
 	if err != nil {
 		return err
 	}
-	var users []*user.User
-	if username != "" {
-		u, err := manager.User(username)
-		if errors.Is(err, user.ErrUserNotFound) {
-			return fmt.Errorf("user %s does not exist", username)
-		} else if err != nil {
-			return err
-		}
-		users = append(users, u)
-	} else {
-		users, err = manager.Users()
-		if err != nil {
-			return err
-		}
-	}
-	usersWithTokens := 0
-	for _, u := range users {
-		tokens, err := manager.Tokens(u.ID)
-		if err != nil {
-			return err
-		} else if len(tokens) == 0 && username != "" {
-			fmt.Fprintf(c.App.Writer, "user %s has no access tokens\n", username)
-			return nil
-		} else if len(tokens) == 0 {
-			continue
-		}
-		usersWithTokens++
-		fmt.Fprintf(c.App.Writer, "user %s\n", u.Name)
-		for _, t := range tokens {
-			var label, expires, provisioned string
-			if t.Label != "" {
-				label = fmt.Sprintf(" (%s)", t.Label)
-			}
-			if t.Expires.Unix() == 0 {
-				expires = "never expires"
-			} else {
-				expires = fmt.Sprintf("expires %s", t.Expires.Format(time.RFC822))
-			}
-			if t.Provisioned {
-				provisioned = " (server config)"
-			}
-			fmt.Fprintf(c.App.Writer, "- %s%s, %s, accessed from %s at %s%s\n", t.Value, label, expires, t.LastOrigin.String(), t.LastAccess.Format(time.RFC822), provisioned)
-		}
-	}
-	if usersWithTokens == 0 {
+	defer api.Close()
+	tokens, err := api.Tokens(username)
+	if err != nil {
+		return adminError(err, username, "", "")
+	} else if len(tokens) == 0 && username != "" {
+		fmt.Fprintf(c.App.Writer, "user %s has no access tokens\n", username)
+		return nil
+	} else if len(tokens) == 0 {
 		fmt.Fprintf(c.App.Writer, "no users with tokens\n")
+		return nil
+	}
+	lastUsername := ""
+	for _, t := range tokens {
+		if t.Username != lastUsername {
+			fmt.Fprintf(c.App.Writer, "user %s\n", t.Username)
+			lastUsername = t.Username
+		}
+		var label, expires, provisioned string
+		if t.Label != "" {
+			label = fmt.Sprintf(" (%s)", t.Label)
+		}
+		if t.Expires == 0 {
+			expires = "never expires"
+		} else {
+			expires = fmt.Sprintf("expires %s", time.Unix(t.Expires, 0).Format(time.RFC822))
+		}
+		if t.Provisioned {
+			provisioned = " (server config)"
+		}
+		fmt.Fprintf(c.App.Writer, "- %s%s, %s, accessed from %s at %s%s\n", t.Token, label, expires, t.LastOrigin, time.Unix(t.LastAccess, 0).Format(time.RFC822), provisioned)
 	}
 	return nil
 }

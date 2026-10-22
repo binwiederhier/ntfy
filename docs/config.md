@@ -652,8 +652,14 @@ Once configured, you can use
 and topic patterns, and
 - the `ntfy token` command and the `auth-tokens` config option to [manage access tokens](#access-tokens) for users.
 
-These commands **directly edit the auth database** (as defined in `auth-file`), so they only work on the server, 
-and only if the user accessing them has the right permissions.
+These commands only work on the server (or with `--server`, see below). They **talk to the running ntfy server over
+its local [admin socket](#admin-socket)**, so changes take effect immediately. If the server is not running, they edit
+the auth database (as defined in `auth-file` or `database-url`) directly. Either way, they only work if the user running
+them has the right permissions: `root`, or a member of the `ntfy` group with the deb/rpm packages.
+
+To manage a remote server, pass its URL and an admin user's [access token](#access-tokens), e.g.
+`ntfy user --server=https://ntfy.example.com --token=tk_... list` (or `NTFY_ADMIN_SERVER` and `NTFY_ADMIN_TOKEN`). Over
+the network, admin users cannot be created, changed or removed, and roles cannot be changed; do that on the server.
 
 ### Users and roles
 Users can be added to the ntfy user database in two different ways

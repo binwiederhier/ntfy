@@ -216,6 +216,12 @@ const (
 		FROM tier
 		WHERE (stripe_monthly_price_id = ? OR stripe_yearly_price_id = ?)
 	`
+	sqliteSelectTierUsersCountQuery = `
+		SELECT t.code, COUNT(u.id)
+		FROM tier t
+		LEFT JOIN user u ON u.tier_id = t.id
+		GROUP BY t.code
+	`
 	sqliteDeleteTierQuery = `DELETE FROM tier WHERE code = ?`
 
 	// Phone queries
@@ -321,6 +327,7 @@ var sqliteQueries = queries{
 	selectTierByCode:               sqliteSelectTierByCodeQuery,
 	selectTierByPriceID:            sqliteSelectTierByPriceIDQuery,
 	updateTier:                     sqliteUpdateTierQuery,
+	selectTierUsersCount:           sqliteSelectTierUsersCountQuery,
 	deleteTier:                     sqliteDeleteTierQuery,
 	selectPhoneNumbers:             sqliteSelectPhoneNumbersQuery,
 	insertPhoneNumber:              sqliteInsertPhoneNumberQuery,

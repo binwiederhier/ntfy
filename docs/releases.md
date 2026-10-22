@@ -2217,6 +2217,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
 * Export PostgreSQL connection pool metrics (`ntfy_db_pool_*`: connections in use, and queries that waited for a free connection, per pool), to size `pool_max_conns` (see [PostgreSQL](config.md#postgresql))
+* Admin API: manage tokens of other users (`/v1/users/tokens`), tiers (`/v1/admin/tiers`) and password reset links (`/v1/users/password/reset`); `GET /v1/users` also returns tier names, provisioned users and grants and the default access, `PUT /v1/users` can remove a tier (`"tier": "-"`), and `DELETE /v1/users/access` can reset all of a user's entries or the whole ACL
 
 **Security:**
 
@@ -2226,6 +2227,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
+* Admin API: invalid password hashes, too many reservations for a new tier, and other user manager errors return 400/409 errors instead of a 500, and deleting a user also removes their web push subscriptions
 * Count published messages from every cluster node: each node adds its own publishes to the stored total instead of the leader overwriting it with its own count (experimental clustering)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)

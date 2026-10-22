@@ -1403,6 +1403,28 @@ func (a *Manager) Tier(code string) (*Tier, error) {
 	return a.readTier(rows)
 }
 
+// TierUsersCount returns the number of users per tier code, including tiers without users
+func (a *Manager) TierUsersCount() (map[string]int64, error) {
+	rows, err := a.db.Query(a.queries.selectTierUsersCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	counts := make(map[string]int64)
+	for rows.Next() {
+		var code string
+		var count int64
+		if err := rows.Scan(&code, &count); err != nil {
+			return nil, err
+		}
+		counts[code] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return counts, nil
+}
+
 // TierByStripePrice returns a Tier based on the Stripe price ID, or ErrTierNotFound if it does not exist
 func (a *Manager) TierByStripePrice(priceID string) (*Tier, error) {
 	rows, err := a.db.Query(a.queries.selectTierByPriceID, priceID, priceID)

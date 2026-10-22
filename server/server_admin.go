@@ -600,9 +600,16 @@ func isAdminSocketRequest(r *http.Request) bool {
 
 // adminLog returns the audit log event for a mutating admin request, with how it arrived
 func adminLog(v *visitor, r *http.Request) *log.Event {
-	via := "http"
-	if isAdminSocketRequest(r) {
-		via = "socket"
+	if !isAdminSocketRequest(r) {
+		return logvr(v, r).Tag(tagAdmin).Field("admin_via", "http")
 	}
-	return logvr(v, r).Tag(tagAdmin).Field("admin_via", via)
+	ev := logvr(v, r).Tag(tagAdmin).Field("admin_via", "socket")
+	if peer, err := fromContext[peerCredentials](r, contextAdminSocketPeer); err == nil {
+		ev = ev.Fields(log.Context{
+			"peer_uid": peer.UID,
+			"peer_gid": peer.GID,
+			"peer_pid": peer.PID,
+		})
+	}
+	return ev
 }

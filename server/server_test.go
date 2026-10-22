@@ -5293,6 +5293,7 @@ func forEachBackend(t *testing.T, f func(t *testing.T, databaseURL string)) {
 func newTestConfig(t *testing.T, databaseURL string) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"
+	conf.AdminSocket = "" // Tests that need it use newTestServerWithAdminSocket
 	if databaseURL != "" {
 		conf.DatabaseURL = databaseURL
 	} else {

@@ -50,38 +50,40 @@ import (
 
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
-	config            *Config
-	db                *db.DB          // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
-	cluster           cluster.Cluster // Fans messages out to peer cluster nodes (nop when not clustered)
-	httpServer        *http.Server
-	httpsServer       *http.Server
-	httpMetricsServer *http.Server
-	httpProfileServer *http.Server
-	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
-	unixListener      net.Listener
-	smtpServer        *smtp.Server
-	smtpServerBackend *smtpBackend
-	mailer            mail.Sender
-	topics            map[string]*topic
-	visitors          map[string]*visitor // ip:<ip> or user:<user>
-	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
-	firebaseClient    *firebaseClient
-	twilio            *twilio.Client
-	messages          int64                               // Total number of messages (persisted if messageCache enabled)
-	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
-	messagesFlushed   int64                               // Value of the messages counter at the last stats flush; the difference is written as a delta
-	userManager       *user.Manager                       // Might be nil!
-	messageCache      *message.Cache                      // Database that stores the messages
-	webPush           *webpush.Store                      // Database that stores web push subscriptions
-	attachment        *attachment.Store                   // Attachment store (file system or S3)
-	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
-	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
-	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
-	closeChan         chan bool
-	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
-	stopOnce          sync.Once
-	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
-	mu                sync.RWMutex
+	config              *Config
+	db                  *db.DB          // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
+	cluster             cluster.Cluster // Fans messages out to peer cluster nodes (nop when not clustered)
+	httpServer          *http.Server
+	httpsServer         *http.Server
+	httpMetricsServer   *http.Server
+	httpProfileServer   *http.Server
+	httpClusterServer   *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
+	unixListener        net.Listener
+	adminSocketServer   *http.Server // Serves the admin API on the local admin socket, see server_admin_socket.go
+	adminSocketListener net.Listener
+	smtpServer          *smtp.Server
+	smtpServerBackend   *smtpBackend
+	mailer              mail.Sender
+	topics              map[string]*topic
+	visitors            map[string]*visitor // ip:<ip> or user:<user>
+	ban                 *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	firebaseClient      *firebaseClient
+	twilio              *twilio.Client
+	messages            int64                               // Total number of messages (persisted if messageCache enabled)
+	messagesHistory     []int64                             // Last n values of the messages counter, used to determine rate
+	messagesFlushed     int64                               // Value of the messages counter at the last stats flush; the difference is written as a delta
+	userManager         *user.Manager                       // Might be nil!
+	messageCache        *message.Cache                      // Database that stores the messages
+	webPush             *webpush.Store                      // Database that stores web push subscriptions
+	attachment          *attachment.Store                   // Attachment store (file system or S3)
+	stripe              stripeAPI                           // Stripe API, can be replaced with a mock
+	priceCache          *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
+	metricsHandler      http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
+	closeChan           chan bool
+	tail                *message.Tail // Reads what was written, see runTail; nil without a message cache
+	stopOnce            sync.Once
+	stopped             atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
+	mu                  sync.RWMutex
 }
 
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
@@ -421,6 +423,9 @@ func (s *Server) Run() error {
 	if s.config.ListenUnix != "" {
 		listenStr += fmt.Sprintf(" %s[unix]", s.config.ListenUnix)
 	}
+	if s.config.AdminSocket != "" && s.userManager != nil {
+		listenStr += fmt.Sprintf(" %s[admin]", s.config.AdminSocket)
+	}
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
 	}
@@ -487,6 +492,7 @@ func (s *Server) Run() error {
 			errChan <- httpServer.Serve(s.unixListener)
 		}()
 	}
+	s.startAdminSocket()
 	if s.config.MetricsListenHTTP != "" {
 		s.httpMetricsServer = &http.Server{Addr: s.config.MetricsListenHTTP, Handler: promhttp.Handler()}
 		go func() {
@@ -562,6 +568,10 @@ func (s *Server) stop() {
 	}
 	if s.unixListener != nil {
 		s.unixListener.Close()
+	}
+	if s.adminSocketServer != nil {
+		s.adminSocketServer.Close()
+		s.adminSocketListener.Close() // Serve may not have picked it up yet; closing it removes the socket file
 	}
 	if s.smtpServer != nil {
 		s.smtpServer.Close()

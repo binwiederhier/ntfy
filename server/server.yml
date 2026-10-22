@@ -28,6 +28,13 @@
 # listen-unix: <socket-path>
 # listen-unix-mode: <linux permissions, e.g. 0700>
 
+# Local admin socket for the "ntfy user", "ntfy access", "ntfy token" and "ntfy tier" commands. Whoever can open
+# the socket (mode 0660: the ntfy user and group, and root) can manage users without a password. The commands
+# fall back to writing to the database directly if no server listens on it. Set to "" to disable.
+# The socket is only opened if auth-file or database-url is set. Not available on Windows.
+#
+# admin-socket: "/run/ntfy/admin.sock"
+
 # Path to the private key & cert file for the HTTPS web server. Not used if "listen-https" is not set.
 #
 # key-file: <filename>

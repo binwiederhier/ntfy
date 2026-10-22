@@ -2219,6 +2219,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Security:**
 
+* Build with Go 1.27.3, which includes the security fixes of Go 1.27.2 (`crypto/tls`, `net/http`, `html/template` and others) and 1.27.3 (`crypto/x509`: certificate chains through the compromised eMudhra intermediate CAs are rejected)
 * Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
 * Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
 

@@ -2461,16 +2461,33 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionRead))
 		require.Nil(t, reader.ReloadAccessCache())
 		require.ElementsMatch(t, []*AccessChange{
-			{Username: "phil", Topic: "my_topic"},
-			{Username: Everyone, Topic: "my_topic"},
-			{Username: "phil", Topic: "up_*"},
-			{Username: "phil", Topic: "downgraded"},
+			{
+				Username: "phil",
+				Topic:    "my_topic",
+			},
+			{
+				Username: Everyone,
+				Topic:    "my_topic",
+			},
+			{
+				Username: "phil",
+				Topic:    "up_*",
+			},
+			{
+				Username: "phil",
+				Topic:    "downgraded",
+			},
 		}, takeChanges())
 
 		// A removal, seen by a reload of just that user
 		require.Nil(t, writer.ResetAccess("phil", "up_*"))
 		require.Nil(t, reader.ReloadAccessCache("phil"))
-		require.Equal(t, []*AccessChange{{Username: "phil", Topic: "up_*"}}, takeChanges())
+		require.Equal(t, []*AccessChange{
+			{
+				Username: "phil",
+				Topic:    "up_*",
+			},
+		}, takeChanges())
 
 		// Nothing changed, nothing reported
 		require.Nil(t, reader.ReloadAccessCache())

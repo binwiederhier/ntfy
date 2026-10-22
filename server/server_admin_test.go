@@ -517,8 +517,14 @@ func TestAccess_Reset_RelaysSubscriberCancelToPeers(t *testing.T) {
 		rr = request(t, s, "DELETE", "/v1/users", `{"username": "ben"}`, admin)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, []*cluster.SubscriberCancel{
-			{Topic: "gol*", UserID: ben.ID},
-			{Topic: "*", UserID: ben.ID},
+			{
+				Topic:  "gol*",
+				UserID: ben.ID,
+			},
+			{
+				Topic:  "*",
+				UserID: ben.ID,
+			},
 		}, b.Cancels())
 	})
 }
@@ -553,7 +559,10 @@ func TestAccess_PeerCancelReloadsAccessAndCancels(t *testing.T) {
 
 	// Node A revokes; node B learns about it only through the relayed cancel
 	require.Nil(t, a.userManager.ResetAccess("alice", "private"))
-	b.applySubscriberCancel(&cluster.SubscriberCancel{Topic: "private", UserID: alice.ID})
+	b.applySubscriberCancel(&cluster.SubscriberCancel{
+		Topic:  "private",
+		UserID: alice.ID,
+	})
 	require.True(t, canceled.Load())
 	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
 }

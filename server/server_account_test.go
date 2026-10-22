@@ -1005,7 +1005,11 @@ func newReservationTestNodes(t *testing.T, clustered bool, accessReloadInterval 
 		confA.ClusterAdvertiseURL = "http://127.0.0.1:1"
 	}
 	sA = newTestServer(t, confA)
-	require.Nil(t, sA.userManager.AddTier(&user.Tier{Code: "pro", MessageLimit: 100, ReservationLimit: 2}))
+	require.Nil(t, sA.userManager.AddTier(&user.Tier{
+		Code:             "pro",
+		MessageLimit:     100,
+		ReservationLimit: 2,
+	}))
 	require.Nil(t, sA.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, sA.userManager.ChangeTier("phil", "pro"))
 	if clustered {

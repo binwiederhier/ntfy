@@ -192,16 +192,24 @@ func diffACLEntries(oldExact map[string]map[string]aclEntry, oldPattern map[stri
 		after := aclEntriesByTopic(newExact[username], newPattern[username])
 		for topic, entry := range after {
 			if old, ok := before[topic]; !ok || old.read != entry.read || old.write != entry.write {
-				changes = append(changes, &AccessChange{Username: username, Topic: fromSQLWildcard(topic)})
+				changes = append(changes, newAccessChange(username, topic))
 			}
 		}
 		for topic := range before {
 			if _, ok := after[topic]; !ok {
-				changes = append(changes, &AccessChange{Username: username, Topic: fromSQLWildcard(topic)})
+				changes = append(changes, newAccessChange(username, topic))
 			}
 		}
 	}
 	return changes
+}
+
+// newAccessChange returns the change for one user's stored (escaped, SQL wildcard) topic
+func newAccessChange(username, escapedTopic string) *AccessChange {
+	return &AccessChange{
+		Username: username,
+		Topic:    fromSQLWildcard(escapedTopic),
+	}
 }
 
 // aclEntriesByTopic indexes one user's exact and wildcard entries by their stored topic

@@ -206,7 +206,14 @@ func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
 		return err
 	}
 	// The topic/subscriber registry is per-node; ask peer nodes to kick the user too
-	s.cluster.BroadcastState(&cluster.State{SubscriberCancels: []*cluster.SubscriberCancel{{Topic: topicPattern, UserID: u.ID}}})
+	s.cluster.BroadcastState(&cluster.State{
+		SubscriberCancels: []*cluster.SubscriberCancel{
+			{
+				Topic:  topicPattern,
+				UserID: u.ID,
+			},
+		},
+	})
 	return nil
 }
 
@@ -221,13 +228,8 @@ func (s *Server) cancelSubscriberUserLocal(userID, topicPattern string) error {
 	return nil
 }
 
-// applySubscriberCancel applies a peer node's subscriber-cancel request to local connections
-// only; it never re-broadcasts (loop prevention, see cluster.CancelFunc).
-//
-// It first refreshes this node's access cache for everyone and the user concerned: without it a
-// canceled subscriber could reconnect at once and be let in by the stale cache (its periodic
-// reload is minutes away). The refresh also re-checks the affected subscribers (see
-// reauthorizeSubscribers); the explicit cancel below covers nodes without the cache.
+// applySubscriberCancel applies a peer's subscriber cancel locally, never re-broadcasting it. It
+// reloads the access cache first, so the canceled client's reconnect is not let in by a stale entry.
 func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
 	if s.userManager != nil {
 		usernames := []string{user.Everyone}
@@ -258,12 +260,8 @@ func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
 	}
 }
 
-// reauthorizeSubscribers ends the live subscriptions that changed access entries no longer let
-// read their topic. The user manager calls it when an access cache reload finds entries
-// changed: by this node, by a peer (relayed or not), or by the ntfy access CLI. Only topics
-// matching a changed entry are checked, and on them only the subscribers the entry applies to
-// (an entry for everyone applies to all). A user that cannot be looked up keeps the
-// subscription, so that a database hiccup does not disconnect anyone; a deleted one does not.
+// reauthorizeSubscribers ends the subscriptions that changed access entries no longer allow, checking
+// only matching topics. The user manager calls it after an access cache reload that found changes.
 func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
 	users := make(map[string]*user.User) // Resolved once per call; nil means anonymous or deleted
 	for _, change := range changes {

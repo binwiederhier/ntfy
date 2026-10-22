@@ -345,6 +345,11 @@ func TestServer_MetricsEnabled(t *testing.T) {
 		require.Equal(t, 200, rr.Code)
 		require.Contains(t, rr.Body.String(), "ntfy_messages_published_success")
 		require.Contains(t, rr.Body.String(), "ntfy_http_requests_total")
+		if databaseURL != "" {
+			// The connection pools of a PostgreSQL database, read at scrape time
+			require.Regexp(t, `ntfy_db_pool_connections_max\{host="[^"]+",role="primary"\} 2`, rr.Body.String())
+			require.Contains(t, rr.Body.String(), "ntfy_db_pool_waits_total{")
+		}
 	})
 }
 

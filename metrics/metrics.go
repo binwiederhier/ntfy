@@ -4,6 +4,9 @@
 package metrics
 
 import (
+	"database/sql"
+	"sync/atomic"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -114,6 +117,7 @@ var (
 	TailMessagesMissed = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_tail_messages_missed_total", // Sent by the tail, per subscriber that had missed it
 	})
+	dbPools = newDBPoolCollector() // Read through SetDBPoolsFunc
 )
 
 // init registers all collectors with the default Prometheus registry. Registration is
@@ -155,5 +159,71 @@ func init() {
 		Subscribers,
 		Topics,
 		HTTPRequests,
+		dbPools,
 	)
+}
+
+// DBPool is one database connection pool's statistics: the primary's or a replica's
+type DBPool struct {
+	Role  string // "primary" or "replica"
+	Addr  string // "host:port"
+	Stats sql.DBStats
+}
+
+// SetDBPoolsFunc sets the function that the ntfy_db_pool_* metrics read their values from on
+// every scrape; nil (the default) reports no pools
+func SetDBPoolsFunc(fn func() []*DBPool) {
+	dbPools.fn.Store(&fn)
+}
+
+// dbPoolCollector exports the database connection pools' statistics. It reads them at scrape
+// time rather than on a timer, so the in-use count is as fresh as the scrape, and a burst that
+// exhausts a pool between two scrapes still shows up in the wait counters.
+type dbPoolCollector struct {
+	fn          atomic.Pointer[func() []*DBPool]
+	max         *prometheus.Desc
+	open        *prometheus.Desc
+	inUse       *prometheus.Desc
+	idle        *prometheus.Desc
+	waits       *prometheus.Desc
+	waitSeconds *prometheus.Desc
+}
+
+func newDBPoolCollector() *dbPoolCollector {
+	labels := []string{"role", "host"}
+	return &dbPoolCollector{
+		max:         prometheus.NewDesc("ntfy_db_pool_connections_max", "Maximum open database connections (pool_max_conns), per pool", labels, nil),
+		open:        prometheus.NewDesc("ntfy_db_pool_connections_open", "Open database connections, in use or idle, per pool", labels, nil),
+		inUse:       prometheus.NewDesc("ntfy_db_pool_connections_in_use", "Database connections currently in use, per pool", labels, nil),
+		idle:        prometheus.NewDesc("ntfy_db_pool_connections_idle", "Idle database connections, per pool", labels, nil),
+		waits:       prometheus.NewDesc("ntfy_db_pool_waits_total", "Times a query had to wait for a free database connection, per pool", labels, nil),
+		waitSeconds: prometheus.NewDesc("ntfy_db_pool_wait_seconds_total", "Total time spent waiting for a free database connection, per pool", labels, nil),
+	}
+}
+
+// Describe implements prometheus.Collector
+func (c *dbPoolCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.max
+	ch <- c.open
+	ch <- c.inUse
+	ch <- c.idle
+	ch <- c.waits
+	ch <- c.waitSeconds
+}
+
+// Collect implements prometheus.Collector
+func (c *dbPoolCollector) Collect(ch chan<- prometheus.Metric) {
+	fn := c.fn.Load()
+	if fn == nil || *fn == nil {
+		return
+	}
+	for _, pool := range (*fn)() {
+		st := pool.Stats
+		ch <- prometheus.MustNewConstMetric(c.max, prometheus.GaugeValue, float64(st.MaxOpenConnections), pool.Role, pool.Addr)
+		ch <- prometheus.MustNewConstMetric(c.open, prometheus.GaugeValue, float64(st.OpenConnections), pool.Role, pool.Addr)
+		ch <- prometheus.MustNewConstMetric(c.inUse, prometheus.GaugeValue, float64(st.InUse), pool.Role, pool.Addr)
+		ch <- prometheus.MustNewConstMetric(c.idle, prometheus.GaugeValue, float64(st.Idle), pool.Role, pool.Addr)
+		ch <- prometheus.MustNewConstMetric(c.waits, prometheus.CounterValue, float64(st.WaitCount), pool.Role, pool.Addr)
+		ch <- prometheus.MustNewConstMetric(c.waitSeconds, prometheus.CounterValue, st.WaitDuration.Seconds(), pool.Role, pool.Addr)
+	}
 }

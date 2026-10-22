@@ -180,35 +180,55 @@ func SetDBPoolsFunc(fn func() []*DBPool) {
 // time rather than on a timer, so the in-use count is as fresh as the scrape, and a burst that
 // exhausts a pool between two scrapes still shows up in the wait counters.
 type dbPoolCollector struct {
-	fn          atomic.Pointer[func() []*DBPool]
-	max         *prometheus.Desc
-	open        *prometheus.Desc
-	inUse       *prometheus.Desc
-	idle        *prometheus.Desc
-	waits       *prometheus.Desc
-	waitSeconds *prometheus.Desc
+	fn      atomic.Pointer[func() []*DBPool]
+	metrics []*dbPoolMetric
+}
+
+// dbPoolMetric is one ntfy_db_pool_* metric: its description, and how to read it from a pool
+type dbPoolMetric struct {
+	desc      *prometheus.Desc
+	valueType prometheus.ValueType
+	value     func(stats sql.DBStats) float64
 }
 
 func newDBPoolCollector() *dbPoolCollector {
-	labels := []string{"role", "host"}
 	return &dbPoolCollector{
-		max:         prometheus.NewDesc("ntfy_db_pool_connections_max", "Maximum open database connections (pool_max_conns), per pool", labels, nil),
-		open:        prometheus.NewDesc("ntfy_db_pool_connections_open", "Open database connections, in use or idle, per pool", labels, nil),
-		inUse:       prometheus.NewDesc("ntfy_db_pool_connections_in_use", "Database connections currently in use, per pool", labels, nil),
-		idle:        prometheus.NewDesc("ntfy_db_pool_connections_idle", "Idle database connections, per pool", labels, nil),
-		waits:       prometheus.NewDesc("ntfy_db_pool_waits_total", "Times a query had to wait for a free database connection, per pool", labels, nil),
-		waitSeconds: prometheus.NewDesc("ntfy_db_pool_wait_seconds_total", "Total time spent waiting for a free database connection, per pool", labels, nil),
+		metrics: []*dbPoolMetric{
+			newDBPoolMetric("ntfy_db_pool_connections_max", "Maximum open database connections (pool_max_conns), per pool", prometheus.GaugeValue, func(stats sql.DBStats) float64 {
+				return float64(stats.MaxOpenConnections)
+			}),
+			newDBPoolMetric("ntfy_db_pool_connections_open", "Open database connections, in use or idle, per pool", prometheus.GaugeValue, func(stats sql.DBStats) float64 {
+				return float64(stats.OpenConnections)
+			}),
+			newDBPoolMetric("ntfy_db_pool_connections_in_use", "Database connections currently in use, per pool", prometheus.GaugeValue, func(stats sql.DBStats) float64 {
+				return float64(stats.InUse)
+			}),
+			newDBPoolMetric("ntfy_db_pool_connections_idle", "Idle database connections, per pool", prometheus.GaugeValue, func(stats sql.DBStats) float64 {
+				return float64(stats.Idle)
+			}),
+			newDBPoolMetric("ntfy_db_pool_waits_total", "Times a query had to wait for a free database connection, per pool", prometheus.CounterValue, func(stats sql.DBStats) float64 {
+				return float64(stats.WaitCount)
+			}),
+			newDBPoolMetric("ntfy_db_pool_wait_seconds_total", "Total time spent waiting for a free database connection, per pool", prometheus.CounterValue, func(stats sql.DBStats) float64 {
+				return stats.WaitDuration.Seconds()
+			}),
+		},
+	}
+}
+
+func newDBPoolMetric(name, help string, valueType prometheus.ValueType, value func(stats sql.DBStats) float64) *dbPoolMetric {
+	return &dbPoolMetric{
+		desc:      prometheus.NewDesc(name, help, []string{"role", "host"}, nil),
+		valueType: valueType,
+		value:     value,
 	}
 }
 
 // Describe implements prometheus.Collector
 func (c *dbPoolCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- c.max
-	ch <- c.open
-	ch <- c.inUse
-	ch <- c.idle
-	ch <- c.waits
-	ch <- c.waitSeconds
+	for _, m := range c.metrics {
+		ch <- m.desc
+	}
 }
 
 // Collect implements prometheus.Collector
@@ -218,12 +238,8 @@ func (c *dbPoolCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 	for _, pool := range (*fn)() {
-		st := pool.Stats
-		ch <- prometheus.MustNewConstMetric(c.max, prometheus.GaugeValue, float64(st.MaxOpenConnections), pool.Role, pool.Addr)
-		ch <- prometheus.MustNewConstMetric(c.open, prometheus.GaugeValue, float64(st.OpenConnections), pool.Role, pool.Addr)
-		ch <- prometheus.MustNewConstMetric(c.inUse, prometheus.GaugeValue, float64(st.InUse), pool.Role, pool.Addr)
-		ch <- prometheus.MustNewConstMetric(c.idle, prometheus.GaugeValue, float64(st.Idle), pool.Role, pool.Addr)
-		ch <- prometheus.MustNewConstMetric(c.waits, prometheus.CounterValue, float64(st.WaitCount), pool.Role, pool.Addr)
-		ch <- prometheus.MustNewConstMetric(c.waitSeconds, prometheus.CounterValue, st.WaitDuration.Seconds(), pool.Role, pool.Addr)
+		for _, m := range c.metrics {
+			ch <- prometheus.MustNewConstMetric(m.desc, m.valueType, m.value(pool.Stats), pool.Role, pool.Addr)
+		}
 	}
 }

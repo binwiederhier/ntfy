@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"crypto/sha256"
 	"embed"
 	"encoding/base64"
@@ -2071,7 +2072,11 @@ func (s *Server) runSMTPServer() error {
 	s.smtpServer.WriteTimeout = 10 * time.Second
 	s.smtpServer.MaxMessageBytes = 1024 * 1024 // Must be much larger than message size (headers, multipart, etc.)
 	s.smtpServer.MaxRecipients = 1
-	s.smtpServer.AllowInsecureAuth = true
+	cert, err := tls.LoadX509KeyPair(s.config.CertFile, s.config.KeyFile)
+	if err != nil {
+		return err
+	}
+	s.smtpServer.TLSConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	return s.smtpServer.ListenAndServe()
 }
 

@@ -63,7 +63,12 @@ func TestRegisteredMetricNames(t *testing.T) {
 	ClusterPeerBatchesReceived.WithLabelValues("node-b").Inc()
 	ClusterPeerLastSendSuccess.WithLabelValues("node-b").Set(1)
 	SetDBPoolsFunc(func() []*DBPool {
-		return []*DBPool{{Role: "primary", Addr: "db:5432"}}
+		return []*DBPool{
+			{
+				Role: "primary",
+				Addr: "db:5432",
+			},
+		}
 	})
 	defer SetDBPoolsFunc(nil)
 	families, err := prometheus.DefaultGatherer.Gather()
@@ -91,8 +96,28 @@ func TestDBPoolMetrics(t *testing.T) {
 	// shows up as waits even between two scrapes
 	SetDBPoolsFunc(func() []*DBPool {
 		return []*DBPool{
-			{Role: "primary", Addr: "db:5432", Stats: sql.DBStats{MaxOpenConnections: 30, OpenConnections: 12, InUse: 5, Idle: 7, WaitCount: 3, WaitDuration: 1500 * time.Millisecond}},
-			{Role: "replica", Addr: "replica:5432", Stats: sql.DBStats{MaxOpenConnections: 20, OpenConnections: 2, InUse: 1, Idle: 1}},
+			{
+				Role: "primary",
+				Addr: "db:5432",
+				Stats: sql.DBStats{
+					MaxOpenConnections: 30,
+					OpenConnections:    12,
+					InUse:              5,
+					Idle:               7,
+					WaitCount:          3,
+					WaitDuration:       1500 * time.Millisecond,
+				},
+			},
+			{
+				Role: "replica",
+				Addr: "replica:5432",
+				Stats: sql.DBStats{
+					MaxOpenConnections: 20,
+					OpenConnections:    2,
+					InUse:              1,
+					Idle:               1,
+				},
+			},
 		}
 	})
 	defer SetDBPoolsFunc(nil)

@@ -47,7 +47,15 @@ func TestDB_Stats(t *testing.T) {
 	replica, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "replica.db"))
 	require.Nil(t, err)
 	replica.SetMaxOpenConns(3)
-	d := db.New(&db.Host{Addr: "primary:5432", DB: primary}, []*db.Host{{Addr: "replica:5432", DB: replica}})
+	d := db.New(&db.Host{
+		Addr: "primary:5432",
+		DB:   primary,
+	}, []*db.Host{
+		{
+			Addr: "replica:5432",
+			DB:   replica,
+		},
+	})
 	defer d.Close()
 
 	// Hold one primary connection, so it shows as in use

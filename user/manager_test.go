@@ -1065,6 +1065,22 @@ func TestAccount_Tier_Create_With_ID(t *testing.T) {
 	})
 }
 
+func TestManager_TierUsersCount(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddTier(&Tier{Code: "pro", Name: "Pro"}))
+		require.Nil(t, a.AddTier(&Tier{Code: "empty", Name: "Empty"}))
+		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+		require.Nil(t, a.AddUser("emma", "emma", RoleUser, false))
+		require.Nil(t, a.ChangeTier("ben", "pro"))
+		require.Nil(t, a.ChangeTier("emma", "pro"))
+
+		counts, err := a.TierUsersCount()
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"pro": 2, "empty": 0}, counts)
+	})
+}
+
 func TestManager_Tier_Change_And_Reset(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		a := newTestManager(t, newManager, PermissionDenyAll)

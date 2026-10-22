@@ -170,20 +170,24 @@ type apiUserAddOrUpdateRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Hash     string `json:"hash"`
-	Tier     string `json:"tier"`
-	// Do not add 'role' here. We don't want to add admins via the API.
+	Tier     string `json:"tier"` // Tier code; apiTierReset ("-") removes the tier
+	Role     string `json:"role"` // Only honored over the admin socket; the network API refuses it (no admins via the API)
 }
 
 type apiUserResponse struct {
-	Username string                  `json:"username"`
-	Role     string                  `json:"role"`
-	Tier     string                  `json:"tier,omitempty"`
-	Grants   []*apiUserGrantResponse `json:"grants,omitempty"`
+	Username      string                  `json:"username"`
+	Role          string                  `json:"role"`
+	Tier          string                  `json:"tier,omitempty"`      // Tier code
+	TierName      string                  `json:"tier_name,omitempty"` // Display name, what the CLI prints
+	Provisioned   bool                    `json:"provisioned,omitempty"`
+	DefaultAccess string                  `json:"default_access,omitempty"` // Only on the "*" (everyone) entry: the server's auth-default-access
+	Grants        []*apiUserGrantResponse `json:"grants,omitempty"`
 }
 
 type apiUserGrantResponse struct {
-	Topic      string `json:"topic"` // This may be a pattern
-	Permission string `json:"permission"`
+	Topic       string `json:"topic"` // This may be a pattern
+	Permission  string `json:"permission"`
+	Provisioned bool   `json:"provisioned,omitempty"`
 }
 
 type apiUserDeleteRequest struct {
@@ -199,6 +203,61 @@ type apiAccessAllowRequest struct {
 type apiAccessResetRequest struct {
 	Username string `json:"username"`
 	Topic    string `json:"topic"`
+}
+
+type apiUsersTokensAddRequest struct {
+	Username string `json:"username"`
+	Label    string `json:"label"`
+	Expires  int64  `json:"expires"` // Unix seconds; 0 = never
+}
+
+type apiUsersTokensDeleteRequest struct {
+	Username string `json:"username"`
+	Token    string `json:"token"`
+}
+
+type apiUserTokenResponse struct {
+	Username    string `json:"username"`
+	Token       string `json:"token"`
+	Label       string `json:"label,omitempty"`
+	Expires     int64  `json:"expires"`     // Unix seconds; 0 = never
+	LastAccess  int64  `json:"last_access"` // Unix seconds
+	LastOrigin  string `json:"last_origin"` // IP
+	Provisioned bool   `json:"provisioned,omitempty"`
+}
+
+type apiUsersPasswordResetRequest struct {
+	Username  string `json:"username"`
+	SendEmail bool   `json:"send_email"`
+}
+
+type apiUsersPasswordResetResponse struct {
+	Link  string `json:"link"`
+	Email string `json:"email,omitempty"` // Address the link was sent to, if send_email was set
+}
+
+// apiAdminTier is used for both requests and responses of the admin tier API. Durations are in seconds.
+// The field names match the admin UI branch (user-management), so it can rebase onto this.
+type apiAdminTier struct {
+	ID                       string `json:"id,omitempty"` // Response only
+	Code                     string `json:"code"`
+	Name                     string `json:"name"`
+	MessagesLimit            int64  `json:"messages_limit"`
+	MessagesExpiryDuration   int64  `json:"messages_expiry_duration"`
+	EmailsLimit              int64  `json:"emails_limit"`
+	CallsLimit               int64  `json:"calls_limit"`
+	ReservationsLimit        int64  `json:"reservations_limit"`
+	AttachmentFileSizeLimit  int64  `json:"attachment_file_size_limit"`
+	AttachmentTotalSizeLimit int64  `json:"attachment_total_size_limit"`
+	AttachmentExpiryDuration int64  `json:"attachment_expiry_duration"`
+	AttachmentBandwidthLimit int64  `json:"attachment_bandwidth_limit"`
+	StripeMonthlyPriceID     string `json:"stripe_monthly_price_id,omitempty"`
+	StripeYearlyPriceID      string `json:"stripe_yearly_price_id,omitempty"`
+	Users                    int64  `json:"users"` // Response only: number of users on this tier
+}
+
+type apiAdminTierDeleteRequest struct {
+	Code string `json:"code"`
 }
 
 type apiAccountCreateRequest struct {

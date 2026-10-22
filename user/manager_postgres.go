@@ -219,6 +219,12 @@ const (
 		FROM tier
 		WHERE (stripe_monthly_price_id = $1 OR stripe_yearly_price_id = $2)
 	`
+	postgresSelectTierUsersCountQuery = `
+		SELECT t.code, COUNT(u.id)
+		FROM tier t
+		LEFT JOIN "user" u ON u.tier_id = t.id
+		GROUP BY t.code
+	`
 	postgresDeleteTierQuery = `DELETE FROM tier WHERE code = $1`
 
 	// Phone queries
@@ -325,6 +331,7 @@ var postgresQueries = queries{
 	selectTierByCode:               postgresSelectTierByCodeQuery,
 	selectTierByPriceID:            postgresSelectTierByPriceIDQuery,
 	updateTier:                     postgresUpdateTierQuery,
+	selectTierUsersCount:           postgresSelectTierUsersCountQuery,
 	deleteTier:                     postgresDeleteTierQuery,
 	selectPhoneNumbers:             postgresSelectPhoneNumbersQuery,
 	insertPhoneNumber:              postgresInsertPhoneNumberQuery,

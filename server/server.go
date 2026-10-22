@@ -122,6 +122,9 @@ var (
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
+	apiUsersTokensPath                                   = "/v1/users/tokens"
+	apiUsersPasswordResetPath                            = "/v1/users/password/reset"
+	apiAdminTiersPath                                    = "/v1/admin/tiers"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountLoginPath                                  = "/v1/account/login"
 	apiAccountTokenPath                                  = "/v1/account/token"
@@ -678,26 +681,14 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.handleHealth(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiReadyPath {
 		return s.handleReady(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiVersionPath {
-		return s.ensureAdmin(s.handleVersion)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiConfigPath {
 		return s.handleConfig(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webAppConfigPath {
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webAppManifestPath {
 		return s.ensureWebPushEnabled(s.handleWebManifest)(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
-		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
-	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPath {
-		return s.ensureAdmin(s.handleUsersAdd)(w, r, v)
-	} else if r.Method == http.MethodPut && r.URL.Path == apiUsersPath {
-		return s.ensureAdmin(s.handleUsersUpdate)(w, r, v)
-	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersPath {
-		return s.ensureAdmin(s.handleUsersDelete)(w, r, v)
-	} else if (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiUsersAccessPath {
-		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
-	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
-		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
+	} else if h := s.adminHandler(r, false); h != nil {
+		return s.ensureAdmin(h)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {

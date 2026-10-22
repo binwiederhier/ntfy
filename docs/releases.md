@@ -2216,6 +2216,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
+* Export PostgreSQL connection pool metrics (`ntfy_db_pool_*`: connections in use, and queries that waited for a free connection, per pool), to size `pool_max_conns` (see [PostgreSQL](config.md#postgresql))
 
 **Security:**
 

@@ -23,3 +23,16 @@ type Host struct {
 	DB      *sql.DB
 	healthy atomic.Bool
 }
+
+// Roles of a connection pool, see PoolStats
+const (
+	PoolRolePrimary = "primary"
+	PoolRoleReplica = "replica"
+)
+
+// PoolStats is one connection pool's statistics: the primary's or a replica's
+type PoolStats struct {
+	Role  string // PoolRolePrimary or PoolRoleReplica
+	Addr  string // "host:port"
+	Stats sql.DBStats
+}

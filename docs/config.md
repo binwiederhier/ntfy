@@ -491,6 +491,11 @@ on the primary and on every replica (this is what ntfy.sh runs). The reasoning:
 * `pool_conn_max_idle_time`: releases connections the server does not need overnight; under steady traffic the pool
   rotates through all connections, so the limit never triggers.
 
+To size the pools, watch the `ntfy_db_pool_*` [metrics](#monitoring), one series per pool (`role` is `primary` or
+`replica`): `ntfy_db_pool_connections_in_use` is how many connections are busy right now, and `ntfy_db_pool_waits_total`
+and `ntfy_db_pool_wait_seconds_total` count queries that had to wait for a free connection. The open connection count
+says little, since the pool rotates through all of them. Waits that keep going up mean the pool is too small.
+
 
 ## Message cache
 If desired, ntfy can temporarily keep notifications in an in-memory or an on-disk cache. Caching messages for a short period

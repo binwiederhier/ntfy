@@ -348,6 +348,9 @@ func New(conf *Config) (*Server, error) {
 	if userManager != nil {
 		userManager.SetAccessChangedFunc(s.reauthorizeSubscribers)
 	}
+	if pool != nil {
+		metrics.SetDBPoolsFunc(s.dbPoolStats)
+	}
 	s.cluster, err = cluster.New(&cluster.Config{
 		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
 		NodeID:          cluster.NodeID(conf.ClusterNodeID),
@@ -371,6 +374,19 @@ func New(conf *Config) (*Server, error) {
 		go s.runTail()
 	}
 	return s, nil
+}
+
+// dbPoolStats reports the database connection pools for the ntfy_db_pool_* metrics
+func (s *Server) dbPoolStats() []*metrics.DBPool {
+	pools := make([]*metrics.DBPool, 0)
+	for _, p := range s.db.Stats() {
+		pools = append(pools, &metrics.DBPool{
+			Role:  p.Role,
+			Addr:  p.Addr,
+			Stats: p.Stats,
+		})
+	}
+	return pools
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {

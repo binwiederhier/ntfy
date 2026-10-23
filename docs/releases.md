@@ -2242,6 +2242,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.34.0 (UNRELEASED)
+
+**Features:**
+
+* Allow several comma-separated addresses in `listen-http`, so a load balancer can hold more than ~63k connections to one ntfy node
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

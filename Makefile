@@ -113,11 +113,12 @@ docker-dev:
 APT_GET := sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
 #
 # The Azure mirror also trickles for minutes without stalling, which no apt timeout catches, so
-# GitHub runners use the main Ubuntu archive instead (a no-op elsewhere).
-APT_SOURCES := /etc/apt/sources.list.d/ubuntu.sources
+# GitHub runners use the main Ubuntu archive instead (a no-op elsewhere). Their ubuntu.sources points
+# at a mirror list (mirror+file:/etc/apt/apt-mirrors.txt) with the Azure mirror first, so both change.
+APT_SOURCES := /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt
 
 build-deps-ubuntu:
-	[ ! -f $(APT_SOURCES) ] || sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' $(APT_SOURCES)
+	for f in $(APT_SOURCES); do [ ! -f $$f ] || sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' $$f; done
 	$(APT_GET) update
 	$(APT_GET) install -y \
 		curl \

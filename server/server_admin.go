@@ -156,7 +156,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	} else if err != nil {
 		return err
 	}
-	if err := s.killUserSubscriber(u, "*"); err != nil { // FIXME super inefficient
+	if err := s.killUserSubscriberEverywhere(u); err != nil { // FIXME super inefficient
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -202,13 +202,48 @@ func (s *Server) handleAccessReset(w http.ResponseWriter, r *http.Request, v *vi
 }
 
 func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
-	if err := s.cancelSubscriberUserLocal(u.ID, topicPattern); err != nil {
+	topics, err := s.topicsFromPattern(topicPattern)
+	if err != nil {
+		return err
+	}
+	for _, t := range topics {
+		t.CancelSubscriberUser(u.ID)
+	}
+	return nil
+}
+
+// broadcastAccessChanged tells the other cluster nodes that this node changed access entries, so
+// they reload their access cache, which ends the streams that lost access there (see
+// reauthorizeSubscribers). The user manager calls it after every access write. The signal is
+// best effort: the periodic reload catches a lost one.
+func (s *Server) broadcastAccessChanged() {
+	s.cluster.BroadcastState(&cluster.State{
+		AccessChanged: true,
+	})
+}
+
+// handlePeerAccessChanged reloads the access cache after a peer changed access entries, never
+// re-broadcasting it (loop prevention)
+func (s *Server) handlePeerAccessChanged() {
+	if s.userManager == nil {
+		return
+	}
+	if err := s.userManager.ReloadAccessCache(); err != nil {
+		log.Tag(tagSubscribe).Err(err).Warn("Cannot reload the access cache after a peer changed access entries")
+	}
+}
+
+// killUserSubscriberEverywhere ends a deleted user's streams on this node and on the other cluster
+// nodes. An access cache reload does not find them: a user without access entries (e.g. an admin)
+// leaves nothing in the cache to compare.
+func (s *Server) killUserSubscriberEverywhere(u *user.User) error {
+	if err := s.killUserSubscriber(u, "*"); err != nil {
 		return err
 	}
 	s.cluster.BroadcastState(&cluster.State{
 		SubscriberCancels: []*cluster.SubscriberCancel{
 			{
-				Topic:  topicPattern,
+				Topic:  "*",
 				UserID: u.ID,
 			},
 		},
@@ -216,46 +251,19 @@ func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
 	return nil
 }
 
-func (s *Server) cancelSubscriberUserLocal(userID, topicPattern string) error {
-	topics, err := s.topicsFromPattern(topicPattern)
-	if err != nil {
-		return err
-	}
-	for _, t := range topics {
-		t.CancelSubscriberUser(userID)
-	}
-	return nil
-}
-
-// applySubscriberCancel applies a peer's subscriber cancel locally, never re-broadcasting it. It
-// reloads the access cache first, so the canceled client's reconnect is not let in by a stale entry.
+// applySubscriberCancel applies a peer's subscriber cancel (a deleted user) locally, never
+// re-broadcasting it
 func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
-	if s.userManager != nil {
-		usernames := []string{user.Everyone}
-		for _, userID := range []string{cancel.UserID, cancel.ExceptUserID} {
-			if userID == "" {
-				continue
-			} else if u, err := s.userManager.UserByID(userID); err == nil {
-				usernames = append(usernames, u.Name)
-			} else if !errors.Is(err, user.ErrUserNotFound) {
-				log.Tag(tagSubscribe).Err(err).Warn("Cannot look up user %s for a peer's subscriber cancel", userID)
-			}
-		}
-		if err := s.userManager.ReloadAccessCache(usernames...); err != nil {
-			log.Tag(tagSubscribe).Err(err).Warn("Cannot reload the access cache for a peer's subscriber cancel")
-		}
+	if cancel.UserID == "" {
+		return // Nothing else is relayed; see killUserSubscriberEverywhere
 	}
-	if cancel.ExceptUserID != "" {
-		s.mu.RLock()
-		t, ok := s.topics[cancel.Topic]
-		s.mu.RUnlock()
-		if ok {
-			t.CancelSubscribersExceptUser(cancel.ExceptUserID)
-		}
+	topics, err := s.topicsFromPattern(cancel.Topic)
+	if err != nil {
+		log.Tag(tagSubscribe).Err(err).Warn("Cannot apply peer subscriber cancel for topic %s", cancel.Topic)
 		return
 	}
-	if err := s.cancelSubscriberUserLocal(cancel.UserID, cancel.Topic); err != nil {
-		log.Tag(tagSubscribe).Err(err).Warn("Cannot apply peer subscriber cancel for topic %s", cancel.Topic)
+	for _, t := range topics {
+		t.CancelSubscriberUser(cancel.UserID)
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster"
 	dbtest "heckel.io/ntfy/v2/db/test"
-	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"sync/atomic"
@@ -496,10 +495,12 @@ func TestAccess_AllowReset_KillConnection(t *testing.T) {
 	})
 }
 
-func TestAccess_Reset_RelaysSubscriberCancelToPeers(t *testing.T) {
+func TestAccess_WritesTellPeers(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		// Subscribers are per node, so revoking access (or deleting the user) must also ask peer
-		// nodes to cancel the user's connections, not only this node's
+		// Subscribers are per node: an access write tells the other nodes to reload their access
+		// cache (which ends the streams that lost access there). Deleting a user also asks them to
+		// cancel the user's streams, since a user without access entries (e.g. an admin) leaves
+		// nothing in the cache to find.
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		s := newTestServer(t, c)
 		defer s.closeDatabases()
@@ -512,15 +513,15 @@ func TestAccess_Reset_RelaysSubscriberCancelToPeers(t *testing.T) {
 		require.Nil(t, err)
 		admin := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
 
+		before := b.AccessChanged()
 		rr := request(t, s, "DELETE", "/v1/users/access", `{"username": "ben", "topic":"gol*"}`, admin)
 		require.Equal(t, 200, rr.Code)
+		require.Greater(t, b.AccessChanged(), before)
+		require.Empty(t, b.Cancels())
+
 		rr = request(t, s, "DELETE", "/v1/users", `{"username": "ben"}`, admin)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, []*cluster.SubscriberCancel{
-			{
-				Topic:  "gol*",
-				UserID: ben.ID,
-			},
 			{
 				Topic:  "*",
 				UserID: ben.ID,
@@ -529,9 +530,9 @@ func TestAccess_Reset_RelaysSubscriberCancelToPeers(t *testing.T) {
 	})
 }
 
-func TestAccess_PeerCancelReloadsAccessAndCancels(t *testing.T) {
-	// A peer's revocation must cancel the local subscriber AND refresh this node's access cache:
-	// otherwise the client reconnects at once and is let in by the stale cached permission
+func TestAccess_PeerAccessChangedReloadsAndCancels(t *testing.T) {
+	// Told by a peer that access changed, this node reloads its access cache: the reload ends the
+	// subscriber who lost access, and the client's reconnect is denied, not let in by a stale entry
 	dsn := dbtest.CreateTestPostgresSchema(t)
 	newNode := func() *Server {
 		conf := newTestConfig(t, dsn)
@@ -544,27 +545,35 @@ func TestAccess_PeerCancelReloadsAccessAndCancels(t *testing.T) {
 	require.Nil(t, a.userManager.AddUser("alice", "password", user.RoleUser, false))
 	require.Nil(t, a.userManager.AllowAccess("alice", "private", user.PermissionRead))
 	b := newNode()
-	alice, err := a.userManager.User("alice")
-	require.Nil(t, err)
 	headers := map[string]string{"Authorization": util.BasicAuth("alice", "password")}
-	require.Equal(t, 200, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
-	topics, err := b.topicsFromIDs(nil, "private")
-	require.Nil(t, err)
-	canceled := atomic.Bool{}
-	topics[0].Subscribe(func(*visitor, *model.Message) error {
-		return nil
-	}, alice.ID, func() {
-		canceled.Store(true)
-	})
+	stream := subscribeStream(t, b, "private", headers)
 
-	// Node A revokes; node B learns about it only through the relayed cancel
 	require.Nil(t, a.userManager.ResetAccess("alice", "private"))
-	b.applySubscriberCancel(&cluster.SubscriberCancel{
-		Topic:  "private",
-		UserID: alice.ID,
-	})
-	require.True(t, canceled.Load())
+	b.handlePeerAccessChanged()
+	select {
+	case <-stream.ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("alice's stream was not canceled")
+	}
 	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
+}
+
+func TestAccess_PeerUserCancelCancels(t *testing.T) {
+	// A peer deleted a user: this node cancels the user's streams
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleAdmin, false))
+	ben, err := s.userManager.User("ben")
+	require.Nil(t, err)
+	stream := subscribeStream(t, s, "mytopic", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
+	s.applySubscriberCancel(&cluster.SubscriberCancel{
+		Topic:  "*",
+		UserID: ben.ID,
+	})
+	select {
+	case <-stream.ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("ben's stream was not canceled")
+	}
 }
 
 func TestAccess_ExternalRevocationCaughtByAccessReload(t *testing.T) {

@@ -88,6 +88,10 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 		log.Tag(tag).Debug("Received %d announced topic(s) from peer %s", len(state.Topics.Added), origin)
 		c.conf.TopicsAddedFunc(state.Topics.Added)
 	}
+	if state.AccessChanged && c.conf.AccessChangedFunc != nil {
+		log.Tag(tag).Debug("Peer %s changed access entries, reloading the access cache", origin)
+		c.conf.AccessChangedFunc()
+	}
 	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
 		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)
 		for _, cancel := range state.Cancels {

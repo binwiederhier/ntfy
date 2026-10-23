@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/twilio"
@@ -554,15 +553,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-	t.CancelSubscribersExceptUser(u.ID)
-	s.cluster.BroadcastState(&cluster.State{
-		SubscriberCancels: []*cluster.SubscriberCancel{
-			{
-				Topic:        t.ID,
-				ExceptUserID: u.ID,
-			},
-		},
-	})
+	t.CancelSubscribersExceptUser(u.ID) // The other nodes end theirs when they reload their access cache, see broadcastAccessChanged
 	return s.writeJSON(w, newSuccessResponse())
 }
 

@@ -41,7 +41,7 @@ const (
 	DefaultUserStatsQueueWriterInterval = 33 * time.Second
 	DefaultUserPasswordBcryptCost       = 10
 	DefaultAccessCacheEnabled           = false
-	DefaultAccessCacheReloadInterval    = 87 * time.Second
+	DefaultAccessCacheReloadInterval    = 31 * time.Second
 	DefaultExpiredMagicLinkReapInterval = time.Hour // How often expired email-verify/password-reset links are swept
 )
 
@@ -102,32 +102,24 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 	return manager, nil
 }
 
-// ReloadAccessCache refreshes the in-memory access cache for the given users (all users when
-// none are named) from the primary database. No-op when the cache is disabled. Callers that
-// learn about an ACL change made elsewhere (another cluster node revoking access) use it to
-// avoid serving a stale permission until the periodic reload.
-func (a *Manager) ReloadAccessCache(usernames ...string) error {
-	return a.maybeReloadAccessCache(usernames...)
+// ReloadAccessCache reloads the whole in-memory access cache from the primary database, e.g. when
+// another cluster node changed access entries; entries that changed are reported to
+// Config.AccessChangedFunc. No-op when the cache is disabled.
+func (a *Manager) ReloadAccessCache() error {
+	return a.maybeReloadAccessCache()
 }
 
-// maybeReloadAccessCache refreshes the in-memory access cache from the
-// primary database. No-op when the cache is disabled. With no usernames it
-// does a full bulk reload; with one or more it refreshes only those users'
-// slices in a single DB round-trip via an IN clause.
+// maybeReloadAccessCache reloads the whole in-memory access cache from the primary database
+// (about 15 ms for ntfy.sh's 5,500 entries, so there is no point in reloading parts of it). No-op
+// when the cache is disabled.
 //
 // Entries the reload finds changed are reported to Config.AccessChangedFunc before it returns.
 // No reload runs under a.mu, so the function may call back into the manager.
-func (a *Manager) maybeReloadAccessCache(usernames ...string) error {
+func (a *Manager) maybeReloadAccessCache() error {
 	if a.accessCache == nil {
 		return nil
 	}
-	var changes []*AccessChange
-	var err error
-	if len(usernames) == 0 {
-		changes, err = a.accessCache.Reload(a.db, a.queries.selectAccessCacheAll)
-	} else {
-		changes, err = a.accessCache.Reload(a.db, a.queries.selectAccessCacheUsers(len(usernames)), usernames...)
-	}
+	changes, err := a.accessCache.Reload(a.db, a.queries.selectAccessCacheAll)
 	if err != nil {
 		return err
 	}
@@ -135,6 +127,17 @@ func (a *Manager) maybeReloadAccessCache(usernames ...string) error {
 		a.config.AccessChangedFunc(changes)
 	}
 	return nil
+}
+
+// accessWritten is called after this process wrote access entries (or users): it reloads the
+// access cache, so the change applies here at once, and tells Config.AccessWrittenFunc, so that
+// the other cluster nodes reload theirs. Never called for a reload alone, which would loop.
+func (a *Manager) accessWritten() error {
+	err := a.maybeReloadAccessCache()
+	if a.config.AccessWrittenFunc != nil {
+		a.config.AccessWrittenFunc() // Even if the reload failed: the write happened
+	}
+	return err
 }
 
 // asyncAccessCacheReloadLoop periodically bulk-reloads the access cache so that
@@ -257,7 +260,7 @@ func (a *Manager) RemoveUser(username string) error {
 		return err
 	}
 	// Reload user-specific parts of the access cache
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // removeUserTx deletes the user with the given username
@@ -295,7 +298,7 @@ func (a *Manager) MarkUserRemoved(user *User) error {
 		return err
 	}
 	// Reload user-specific parts of the access cache
-	return a.maybeReloadAccessCache(user.Name, Everyone)
+	return a.accessWritten()
 }
 
 // RemoveDeletedUsers deletes all users that have been marked deleted
@@ -311,7 +314,7 @@ func (a *Manager) RemoveDeletedUsers() error {
 		return nil
 	}
 	// Full cache reload, because we don't know which users were affected.
-	return a.maybeReloadAccessCache()
+	return a.accessWritten()
 }
 
 // ChangePassword changes a user's password
@@ -349,7 +352,7 @@ func (a *Manager) ChangeRole(username string, role Role) error {
 		return err
 	}
 	// Full cache reload: Role changes are extremely rare.
-	return a.maybeReloadAccessCache()
+	return a.accessWritten()
 }
 
 // changeRoleTx changes a user's role
@@ -766,7 +769,7 @@ func (a *Manager) AllowAccess(username string, topicPattern string, permission P
 		return err
 	}
 	// Only this user's row set changed; refresh their slice only.
-	return a.maybeReloadAccessCache(username)
+	return a.accessWritten()
 }
 
 func (a *Manager) allowAccessTx(tx *sql.Tx, username string, topicPattern string, permission Permission, provisioned bool) error {
@@ -788,14 +791,7 @@ func (a *Manager) ResetAccess(username string, topicPattern string) error {
 	if err != nil {
 		return err
 	}
-	// Empty username -> deleteAllAccess affected every user, bulk reload.
-	// Otherwise refresh the named user plus Everyone, since resetUserAccessTx
-	// and deleteTopicAccess both touch rows owned by the user (typically the
-	// Everyone row from their reservations).
-	if username == "" {
-		return a.maybeReloadAccessCache()
-	}
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 func (a *Manager) resetAccessTx(tx *sql.Tx, username string, topicPattern string) error {
@@ -956,7 +952,7 @@ func (a *Manager) AddReservation(username string, topic string, everyone Permiss
 		return err
 	}
 	// Both user's and Everyone's rows changed.
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // RemoveReservations deletes the access control entries associated with the given username/topic,
@@ -984,7 +980,7 @@ func (a *Manager) RemoveReservations(username string, topics ...string) error {
 	}
 	// Mirror the DB: rows for this user and any Everyone rows owned by this
 	// user are gone. Refresh both slices.
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // Reservations returns all user-owned topics, and the associated everyone-access
@@ -1106,7 +1102,7 @@ func (a *Manager) RemoveExcessReservations(username string, limit int64) ([]stri
 	if len(removedTopics) > 0 {
 		// removeReservationAccessTx deletes rows owned by this user and the
 		// matching Everyone rows, so we refresh the access cache.
-		if err := a.maybeReloadAccessCache(username, Everyone); err != nil {
+		if err := a.accessWritten(); err != nil {
 			return nil, err
 		}
 	}

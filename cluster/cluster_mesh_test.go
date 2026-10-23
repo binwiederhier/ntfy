@@ -838,3 +838,40 @@ func peerMetricValue(t *testing.T, name, peer string) float64 {
 func discardMessage(_ *model.Message) {
 	// Nothing to do: these tests only check status and counters
 }
+
+func TestMesh_AccessChangedBroadcast(t *testing.T) {
+	// Node A changed access entries: node B must be told, so it reloads its access cache; node A's
+	// own callback must not fire (no loop)
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
+	changedA, changedB := atomic.Int32{}, atomic.Int32{}
+
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
+	confB.AccessChangedFunc = func() {
+		changedB.Add(1)
+	}
+	meshB, err := newMeshCluster(confB, poolB, nil)
+	require.Nil(t, err)
+	defer meshB.Close()
+	srvB := &http.Server{Handler: meshB}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+
+	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	confA.AccessChangedFunc = func() {
+		changedA.Add(1)
+	}
+	meshA, err := newMeshCluster(confA, poolA, nil)
+	require.Nil(t, err)
+	defer meshA.Close()
+
+	meshA.BroadcastState(&State{
+		AccessChanged: true,
+	})
+	waitFor(t, func() bool {
+		return changedB.Load() == 1
+	})
+	require.Equal(t, int32(0), changedA.Load())
+}

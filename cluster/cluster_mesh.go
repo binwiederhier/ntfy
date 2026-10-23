@@ -156,14 +156,17 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 // gained their first local subscriber (a hint for peers' cached rate-visitor lookups, never
 // used for routing) and subscriber cancels.
 func (c *meshCluster) BroadcastState(state *State) {
-	if len(state.AddedTopics) == 0 && len(state.SubscriberCancels) == 0 {
+	if len(state.AddedTopics) == 0 && len(state.SubscriberCancels) == 0 && !state.AccessChanged {
 		return
 	}
 	peers := c.registry.Peers()
 	if len(peers) == 0 {
 		return
 	}
-	envelope := &apiState{Cancels: state.SubscriberCancels}
+	envelope := &apiState{
+		Cancels:       state.SubscriberCancels,
+		AccessChanged: state.AccessChanged,
+	}
 	if len(state.AddedTopics) > 0 {
 		envelope.Topics = &apiStateTopics{Added: state.AddedTopics}
 	}
@@ -171,7 +174,7 @@ func (c *meshCluster) BroadcastState(state *State) {
 	if err != nil {
 		return
 	}
-	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), len(peers))
+	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels, access changed: %t) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), state.AccessChanged, len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
 			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {

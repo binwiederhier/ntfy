@@ -317,6 +317,7 @@ func New(conf *Config) (*Server, error) {
 			AccessCacheEnabled:        conf.AuthAccessCacheEnabled,
 			AccessCacheReloadInterval: conf.AuthAccessCacheReloadInterval,
 			AccessChangedFunc:         s.reauthorizeSubscribers,
+			AccessWrittenFunc:         s.broadcastAccessChanged,
 		}
 		if pool != nil {
 			userManager, err = user.NewPostgresManager(pool, authConfig)
@@ -347,15 +348,16 @@ func New(conf *Config) (*Server, error) {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
-		Enabled:         conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
-		NodeID:          cluster.NodeID(conf.ClusterNodeID),
-		AdvertiseURL:    advertiseURL,
-		Role:            conf.ClusterRole,
-		Secret:          conf.ClusterSecret,
-		BatchLinger:     conf.ClusterBatchLinger,
-		CancelFunc:      s.applySubscriberCancel,
-		IsolatedFunc:    s.maybeCloseLocalSubscribers,
-		MaxMessageBytes: int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
+		Enabled:           conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
+		NodeID:            cluster.NodeID(conf.ClusterNodeID),
+		AdvertiseURL:      advertiseURL,
+		Role:              conf.ClusterRole,
+		Secret:            conf.ClusterSecret,
+		BatchLinger:       conf.ClusterBatchLinger,
+		CancelFunc:        s.applySubscriberCancel,
+		AccessChangedFunc: s.handlePeerAccessChanged,
+		IsolatedFunc:      s.maybeCloseLocalSubscribers,
+		MaxMessageBytes:   int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
 		return nil, err

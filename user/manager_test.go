@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2480,9 +2481,9 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 			},
 		}, takeChanges())
 
-		// A removal, seen by a reload of just that user
+		// A removal
 		require.Nil(t, writer.ResetAccess("phil", "up_*"))
-		require.Nil(t, reader.ReloadAccessCache("phil"))
+		require.Nil(t, reader.ReloadAccessCache())
 		require.Equal(t, []*AccessChange{
 			{
 				Username: "phil",
@@ -2596,13 +2597,10 @@ func TestAccessCache_RemoveExcessReservationsInvalidatesCache(t *testing.T) {
 	})
 }
 
-// TestAccessCache_FullReloadDoesNotClobberConcurrentRevoke models finding #2:
-// a periodic full reload scans the whole user_access table outside the cache
-// lock. If a local ACL mutation revokes a grant and refreshes that user's slice
-// while the scan is in flight, applying the now-stale full snapshot must not
-// resurrect the revoked grant. The testHookReloadScanned seam injects the revoke
-// into exactly that race window.
-func TestAccessCache_FullReloadDoesNotClobberConcurrentRevoke(t *testing.T) {
+// TestAccessCache_WriteDuringFullReloadIsNotLost: a full reload scans user_access outside the cache
+// lock. If an access write lands while the scan is in flight, the write's own reload must still
+// apply it: the stale snapshot must not win.
+func TestAccessCache_WriteDuringFullReloadIsNotLost(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		a := newTestManagerFromConfig(t, newManager, &Config{
 			DefaultAccess:             PermissionDenyAll,
@@ -2613,33 +2611,61 @@ func TestAccessCache_FullReloadDoesNotClobberConcurrentRevoke(t *testing.T) {
 		require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
 		require.Nil(t, a.AllowAccess("phil", "secret", PermissionReadWrite))
 
-		// Sanity: the grant is served from the cache.
-		_, _, found, err := a.authorizeTopicAccess("phil", "secret")
-		require.Nil(t, err)
-		require.True(t, found)
-
-		// Arm the seam: when the full reload below finishes scanning (and still
-		// sees the grant), revoke it via a per-user reload before the full reload
-		// applies its now-stale snapshot. The re-entrant per-user reload that
-		// ResetAccess triggers is a no-op here (fired guard), and the whole thing
-		// runs single-threaded in this goroutine.
+		// When the full reload below has scanned (and still sees the grant), revoke it from another
+		// goroutine, as a concurrent request would
+		revoked := make(chan struct{})
 		fired := false
 		testHookReloadScanned = func() {
 			if fired {
 				return
 			}
 			fired = true
-			require.Nil(t, a.ResetAccess("phil", "secret"))
+			go func() {
+				require.Nil(t, a.ResetAccess("phil", "secret"))
+				close(revoked)
+			}()
+			time.Sleep(100 * time.Millisecond) // Let the revoke write to the database
 		}
 		defer func() { testHookReloadScanned = nil }()
 
-		// Trigger the full reload. Without the seq guard it would swap in its
-		// stale snapshot and resurrect the grant.
-		require.Nil(t, a.maybeReloadAccessCache())
-
-		_, _, found, err = a.authorizeTopicAccess("phil", "secret")
+		require.Nil(t, a.ReloadAccessCache())
+		<-revoked
+		_, _, found, err := a.authorizeTopicAccess("phil", "secret")
 		require.Nil(t, err)
-		require.False(t, found, "stale full reload resurrected a revoked grant")
+		require.False(t, found, "a stale full reload resurrected a revoked grant")
+	})
+}
+
+func TestManager_AccessWritesTellPeers(t *testing.T) {
+	// Every access write is passed on (the server tells the other cluster nodes, which reload their
+	// access cache); a reload alone is not a write, so passing it on would loop between nodes
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		written := atomic.Int32{}
+		a := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess:             PermissionReadWrite,
+			BcryptCost:                bcrypt.MinCost,
+			AccessCacheEnabled:        true,
+			AccessCacheReloadInterval: time.Hour,
+			AccessWrittenFunc: func() {
+				written.Add(1)
+			},
+		})
+		require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
+		require.Nil(t, a.AddUser("ben", "mypass", RoleUser, false))
+		before := written.Load()
+		require.Nil(t, a.AllowAccess("phil", "secret", PermissionRead))
+		require.Equal(t, before+1, written.Load())
+		require.Nil(t, a.ResetAccess("phil", "secret"))
+		require.Equal(t, before+2, written.Load())
+		require.Nil(t, a.AddReservation("phil", "mytopic", PermissionDenyAll, 10))
+		require.Equal(t, before+3, written.Load())
+		require.Nil(t, a.RemoveReservations("phil", "mytopic"))
+		require.Equal(t, before+4, written.Load())
+		require.Nil(t, a.RemoveUser("ben"))
+		require.Equal(t, before+5, written.Load())
+
+		require.Nil(t, a.ReloadAccessCache())
+		require.Equal(t, before+5, written.Load())
 	})
 }
 

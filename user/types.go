@@ -321,8 +321,9 @@ type Config struct {
 	BcryptCost                   int                 // Cost of generated passwords; lowering makes testing faster
 	AccessCacheEnabled           bool                // Enables the in-memory ACL cache (high volume servers only)
 	AccessChangedFunc            AccessChangedFunc   // Told about access entries a cache reload found changed; may be nil
-	AccessCacheReloadInterval    time.Duration       // Reload interval for access cache, relevant for ACL writes from CLI
-	ExpiredMagicLinkReapInterval time.Duration       // Interval for sweeping expired email-verify/password-reset links
+	AccessWrittenFunc            func()
+	AccessCacheReloadInterval    time.Duration // Reload interval for access cache, relevant for ACL writes from CLI
+	ExpiredMagicLinkReapInterval time.Duration // Interval for sweeping expired email-verify/password-reset links
 }
 
 // Error constants used by the package
@@ -374,9 +375,8 @@ type queries struct {
 	deleteUsersProvisioned         string
 
 	// Access queries
-	selectTopicPerms            string             // Direct-DB authorizeTopicAccess query; used when the in-memory cache is disabled
-	selectAccessCacheAll        string             // Bulk load: (user_name, topic, read, write) for the in-memory ACL cache
-	selectAccessCacheUsers      func(n int) string // Returns a per-users load query whose IN clause is sized for n usernames
+	selectTopicPerms            string // Direct-DB authorizeTopicAccess query; used when the in-memory cache is disabled
+	selectAccessCacheAll        string // Bulk load: (user_name, topic, read, write) for the in-memory ACL cache
 	selectUserAllAccess         string
 	selectUserAccess            string
 	selectUserReservations      string

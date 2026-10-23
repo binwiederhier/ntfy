@@ -23,10 +23,10 @@ import (
 // Walked per request; trivially small in practice. Wildcards are NOT u_everyone-
 // only -- any user can create them.
 type accessCache struct {
-	exact   map[string]map[string]aclEntry
-	pattern map[string][]aclEntry
-	seq     uint64       // Bumped on every reload; lets a full reload detect a per-user reload that raced its scan
-	mu      sync.RWMutex // Protect exact, pattern, and seq
+	exact    map[string]map[string]aclEntry
+	pattern  map[string][]aclEntry
+	reloadMu sync.Mutex   // Serializes reloads, so a reload that scanned earlier never replaces a later one
+	mu       sync.RWMutex // Protects exact and pattern
 }
 
 // testHookReloadScanned, if non-nil, is invoked by Reload after the DB scan but
@@ -80,35 +80,16 @@ func (c *accessCache) Lookup(username, topic string) (read, write, found bool) {
 	return false, false, false
 }
 
-// Reload scans (user_name, topic, read, write) rows and merges them into the
-// cache. With no usernames the cache is replaced wholesale; otherwise the
-// query is invoked with those usernames as positional args and only the
-// listed users' slices are touched (a username absent from the result drops
-// them from both maps). Runs against the primary so a reload after a
-// mutation sees the just-written rows.
-//
-// Since Reload can be triggered from different places and for different scopes (full
-// and user-specific), the function may cause races and lost-updates. This is solved
-// with the sequence number.
-//
-// It returns the entries the reload found added, changed or removed, so that the
-// caller can re-check live subscriptions they affect.
-func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) ([]*AccessChange, error) {
+// Reload replaces the cache with every access entry in the database and returns the entries
+// that differ from before (added, removed, or with other permissions), so that the caller can
+// re-check the live subscriptions they affect. Runs against the primary so a reload after a
+// write sees the just-written rows. Reloads are serialized: one that scanned earlier must never
+// replace one that scanned later.
+func (c *accessCache) Reload(d *db.DB, query string) ([]*AccessChange, error) {
+	c.reloadMu.Lock()
+	defer c.reloadMu.Unlock()
 	started := time.Now()
-	scope := "full"
-	if len(usernames) > 0 {
-		scope = "users=" + strings.Join(usernames, ",")
-	}
-	// Read the sequence number before the SQL query so we can detect races later
-	c.mu.RLock()
-	seqBefore := c.seq
-	c.mu.RUnlock()
-	args := make([]any, len(usernames))
-	for i, u := range usernames {
-		args[i] = u
-	}
-	// Query the database for all ACL entries
-	rows, err := d.Query(query, args...)
+	rows, err := d.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -142,40 +123,13 @@ func (c *accessCache) Reload(d *db.DB, query string, usernames ...string) ([]*Ac
 	if testHookReloadScanned != nil {
 		testHookReloadScanned()
 	}
-	// Replace or update the internal maps
+	// Replace the internal maps
 	c.mu.Lock()
-	var changes []*AccessChange
-	if len(usernames) == 0 {
-		if c.seq != seqBefore {
-			c.mu.Unlock()
-			log.Tag(tag).
-				Field("reload_scope", scope).
-				Field("duration_ms", time.Since(started).Milliseconds()).
-				Warn("ACL cache reload skipped due to race")
-			return nil, nil
-		}
-		changes = diffACLEntries(c.exact, c.pattern, exacts, patterns, allUsernames(c.exact, c.pattern, exacts, patterns))
-		c.exact = exacts
-		c.pattern = patterns
-	} else {
-		changes = diffACLEntries(c.exact, c.pattern, exacts, patterns, usernames)
-		for _, u := range usernames {
-			if e, ok := exacts[u]; ok {
-				c.exact[u] = e
-			} else {
-				delete(c.exact, u)
-			}
-			if p, ok := patterns[u]; ok {
-				c.pattern[u] = p
-			} else {
-				delete(c.pattern, u)
-			}
-		}
-	}
-	c.seq++
+	changes := diffACLEntries(c.exact, c.pattern, exacts, patterns, allUsernames(c.exact, c.pattern, exacts, patterns))
+	c.exact = exacts
+	c.pattern = patterns
 	c.mu.Unlock()
 	log.Tag(tag).
-		Field("reload_scope", scope).
 		Field("updated_entries", updatedEntries).
 		Field("changed_entries", len(changes)).
 		Field("duration_ms", time.Since(started).Milliseconds()).

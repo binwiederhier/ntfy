@@ -23,14 +23,15 @@ import (
 // fakeCluster records relayed messages and topic announcements so tests can assert that every
 // publish path passes through the cluster exactly once, and that subscription hooks fire.
 type fakeCluster struct {
-	mu         sync.Mutex
-	messages   []*model.Message
-	announced  []string
-	cancels    []*cluster.SubscriberCancel
-	notLeader  bool
-	notHealthy bool
-	notReady   bool
-	role       cluster.Role // Empty means active
+	mu            sync.Mutex
+	messages      []*model.Message
+	announced     []string
+	cancels       []*cluster.SubscriberCancel
+	accessChanged int
+	notLeader     bool
+	notHealthy    bool
+	notReady      bool
+	role          cluster.Role // Empty means active
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -47,6 +48,9 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	defer b.mu.Unlock()
 	b.announced = append(b.announced, state.AddedTopics...)
 	b.cancels = append(b.cancels, state.SubscriberCancels...)
+	if state.AccessChanged {
+		b.accessChanged++
+	}
 }
 
 func (b *fakeCluster) Ready() bool {
@@ -102,6 +106,12 @@ func (b *fakeCluster) Messages() []*model.Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return append([]*model.Message{}, b.messages...)
+}
+
+func (b *fakeCluster) AccessChanged() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.accessChanged
 }
 
 func (b *fakeCluster) Cancels() []*cluster.SubscriberCancel {

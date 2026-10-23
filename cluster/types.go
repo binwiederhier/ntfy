@@ -20,6 +20,7 @@ type Config struct {
 	BatchLinger       time.Duration   // How long messages wait in a peer queue to form a batch; 0 = send immediately
 	MaxMessageBytes   int64           // Upper bound for a single message on the wire (batch limits derive from this)
 	CancelFunc        CancelFunc      // Applies a peer's subscriber-cancel request to local connections; may be nil
+	AccessChangedFunc func()          // Told that a peer changed access entries, to reload the access cache; must not re-broadcast; may be nil
 	TopicsAddedFunc   TopicsAddedFunc // Told about topics that just gained their first subscriber on a peer; may be nil
 	IsolatedFunc      func()          // Called while this node lost its registration but a peer is healthy; may be nil
 }
@@ -32,6 +33,7 @@ type DeliverFunc func(m *model.Message)
 type State struct {
 	AddedTopics       []string            // Topics that just gained their first local subscriber on this node
 	SubscriberCancels []*SubscriberCancel // Requests to cancel matching live subscriber connections on peer nodes
+	AccessChanged     bool                // Access entries changed (written by this node): peers reload their access cache
 }
 
 // SubscriberCancel asks peer nodes to cancel matching live subscriber connections, mirroring
@@ -118,8 +120,9 @@ type apiHealth struct {
 // apiState is the peer state-exchange envelope. Each concern is an optional section; future
 // concerns (rate limit counters, stats) become siblings of Topics.
 type apiState struct {
-	Topics  *apiStateTopics     `json:"topics,omitempty"`
-	Cancels []*SubscriberCancel `json:"cancels,omitempty"`
+	Topics        *apiStateTopics     `json:"topics,omitempty"`
+	Cancels       []*SubscriberCancel `json:"cancels,omitempty"`
+	AccessChanged bool                `json:"access_changed,omitempty"`
 }
 
 // apiStateTopics carries topics that just gained their first subscriber on the sending node.

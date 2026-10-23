@@ -2250,7 +2250,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Security:**
 
-* Relay reservation takeovers and access revocations to the other nodes of an experimental cluster, so their subscribers who lost access are disconnected too; with `auth-access-cache` on, also end such subscriptions when the cache reload finds the access changed (e.g. by the `ntfy access` CLI or a lost relay)
+* In an experimental cluster, tell the other nodes when access changes (e.g. a reservation or a revoked permission), so they reload their access cache and disconnect subscribers who lost access; the access cache reload also catches changes made elsewhere, e.g. by the `ntfy access` CLI, and now runs every 31 seconds instead of 87
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

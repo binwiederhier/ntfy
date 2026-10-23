@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -267,4 +268,41 @@ func TestTopic_CancelSubscriberUser_AllOfTheUsersSubscribers(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, map[string]int{"u_alice": 2, "": 2}, canceled)
+}
+
+func TestTopic_CancelSubscribersWithContextLoggingDoesNotDeadlock(t *testing.T) {
+	// With log level overrides (or debug logging), canceling a subscriber logs the topic's context,
+	// which takes the topic lock. A cancel must not hold that lock while it logs: holding the write
+	// lock deadlocks at once, and holding a read lock deadlocks as soon as a canceled stream's
+	// Unsubscribe waits for the write lock (seen in the lab, which froze the access cache reload)
+	log.SetLevelOverride("tag", tagSubscribe, log.DebugLevel)
+	t.Cleanup(log.ResetLevelOverrides)
+	to := newTopic("mytopic")
+	subscribe := func(userID string) {
+		var id int
+		id = to.Subscribe(func(*visitor, *model.Message) error {
+			return nil
+		}, userID, func() {
+			go to.Unsubscribe(id) // Like a real stream: its handler unsubscribes when it ends
+			time.Sleep(50 * time.Millisecond)
+		})
+	}
+	for _, userID := range []string{"u_owner", "u_other", "u_other", "u_revoked", "u_revoked", "", ""} {
+		subscribe(userID)
+	}
+	done := make(chan struct{})
+	go func() {
+		to.CancelSubscriberUser("u_revoked")
+		to.CancelAnonymousSubscribers()
+		to.CancelSubscribersExceptUser("u_owner")
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("canceling subscribers deadlocked")
+	}
+	require.Eventually(t, func() bool {
+		return to.SubscribersCount() == 1
+	}, 2*time.Second, 10*time.Millisecond)
 }

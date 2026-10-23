@@ -226,21 +226,19 @@ func (t *topic) SubscribersCount() int {
 
 // CancelAllSubscribers calls the cancel function of every subscriber, closing their connections
 func (t *topic) CancelAllSubscribers() {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	for _, s := range t.subscribers {
+	for _, s := range t.subscribersMatching(func(*topicSubscriber) bool {
+		return true
+	}) {
 		s.cancel()
 	}
 }
 
 // CancelSubscribersExceptUser calls the cancel function for all subscribers, forcing
 func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	for _, s := range t.subscribers {
-		if s.userID != exceptUserID {
-			t.cancelUserSubscriber(s)
-		}
+	for _, s := range t.subscribersMatching(func(s *topicSubscriber) bool {
+		return s.userID != exceptUserID
+	}) {
+		t.cancelUserSubscriber(s)
 	}
 }
 
@@ -258,13 +256,26 @@ func (t *topic) CancelAnonymousSubscribers() {
 }
 
 func (t *topic) cancelSubscribersWithUserID(userID string) {
+	for _, s := range t.subscribersMatching(func(s *topicSubscriber) bool {
+		return s.userID == userID
+	}) {
+		t.cancelUserSubscriber(s)
+	}
+}
+
+// subscribersMatching returns the subscribers that match, so that the caller cancels them without
+// holding t.mu: canceling logs the topic's context, which takes t.mu, and a canceled stream's
+// Unsubscribe waits for it
+func (t *topic) subscribersMatching(match func(s *topicSubscriber) bool) []*topicSubscriber {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+	matching := make([]*topicSubscriber, 0)
 	for _, s := range t.subscribers {
-		if s.userID == userID {
-			t.cancelUserSubscriber(s)
+		if match(s) {
+			matching = append(matching, s)
 		}
 	}
+	return matching
 }
 
 // SubscriberUserIDs returns the distinct user IDs of this topic's subscribers, "" standing for

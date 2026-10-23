@@ -15,18 +15,24 @@ import notifier from "../app/Notifier";
 import prefs from "../app/Prefs";
 import { EVENT_MESSAGE_DELETE, EVENT_MESSAGE_CLEAR, SW_PERIODIC_SYNC_EXTEND_TOKEN_TAG } from "../app/events";
 
+const isIOSStandalone = window.navigator.standalone === true;
+
 /**
  * Wire connectionManager and subscriptionManager so that subscriptions are updated when the connection
  * state changes. Conversely, when the subscription changes, the connection is refreshed (which may lead
  * to the connection being re-established).
  *
- * When Web Push is enabled, we do not need to connect to our home server via WebSocket, since notifications
+ * When Web Push is enabled, we usually do not need to connect to our home server via WebSocket, since notifications
  * will be delivered via Web Push. However, we still need to connect to other servers via WebSocket, or for internal
- * topics, such as sync topics (st_...).
+ * topics, such as sync topics (st_...). On iOS standalone PWAs, keep the WebSocket connections because service-worker
+ * database changes are not propagated reliably to an already-running app.
  */
 export const useConnectionListeners = (account, subscriptions, users, webPushTopics) => {
   const wsSubscriptions = useMemo(
-    () => (subscriptions && webPushTopics ? subscriptions.filter((s) => !webPushTopics.includes(s.topic)) : []),
+    () =>
+      subscriptions && webPushTopics
+        ? subscriptions.filter((subscription) => isIOSStandalone || !webPushTopics.includes(subscription.topic))
+        : [],
     // wsSubscriptions should stay stable unless the list of subscription IDs changes. Without the memo, the connection
     // listener calls a refresh for no reason. This isn't a problem due to the makeConnectionId, but it triggers an
     // unnecessary recomputation for every received message.
@@ -71,7 +77,9 @@ export const useConnectionListeners = (account, subscriptions, users, webPushTop
             await subscriptionManager.deleteNotificationBySequenceId(subscription.id, sequenceId);
           }
           const added = await subscriptionManager.addNotification(subscription.id, notification);
-          if (added) {
+          // Web Push already displays the system notification on iOS. The WebSocket is kept
+          // only to update the foreground UI immediately, so do not display a second banner.
+          if (added && !isIOSStandalone) {
             await subscriptionManager.notify(subscription.id, notification);
           }
         }
@@ -242,7 +250,6 @@ export const useWebPushTopics = () => {
 };
 
 const matchMedia = window.matchMedia("(display-mode: standalone)");
-const isIOSStandalone = window.navigator.standalone === true;
 
 /*
  * Watches the "display-mode" to detect if the app is running as a standalone app (PWA).

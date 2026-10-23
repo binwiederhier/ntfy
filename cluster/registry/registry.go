@@ -120,7 +120,7 @@ type Registry struct {
 	registeredAt time.Time  // When the last successful Register was ISSUED; zero = never
 	refreshedAt  time.Time  // When the last successful Refresh was ISSUED; zero = never
 	lowestSince  time.Time  // When this node first saw itself as the lowest live active id; zero = it is not
-	mu           sync.Mutex // Protects peers, registeredAt, refreshedAt and lowestSince
+	mu           sync.Mutex // Protects role, peers, registeredAt, refreshedAt and lowestSince
 }
 
 // New creates or migrates the registry schema and returns this node's membership handle. It
@@ -139,6 +139,15 @@ func New(pool *db.DB, nodeID, advertiseURL string, role Role, ttl time.Duration)
 	}, nil
 }
 
+// SetRole changes the role this node registers with, at runtime (maintenance mode makes an active
+// node act as passive). Leadership ends at once on a step down to passive; peers see the new role
+// at the next Register.
+func (r *Registry) SetRole(role Role) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.role = role
+}
+
 // Register upserts this node into the registry with a fresh heartbeat. The registration is
 // dated from when the statement was ISSUED, not when it returned: that timestamp bounds how
 // long this node may believe it is the leader, and a late response must not extend it.
@@ -146,7 +155,10 @@ func (r *Registry) Register() error {
 	ctx, cancel := r.opContext()
 	defer cancel()
 	issued := time.Now()
-	if _, err := r.pool.ExecContext(ctx, upsertNodeQuery, r.nodeID, r.advertiseURL, r.role); err != nil {
+	r.mu.Lock()
+	role := r.role
+	r.mu.Unlock()
+	if _, err := r.pool.ExecContext(ctx, upsertNodeQuery, r.nodeID, r.advertiseURL, role); err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -216,7 +228,9 @@ func (r *Registry) Prune() error {
 func (r *Registry) IsLeader() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.registeredAt.IsZero() || time.Since(r.registeredAt) >= r.lease() {
+	if r.role != RoleActive {
+		return false // A passive node never leads; checked here too, since its row may still say active
+	} else if r.registeredAt.IsZero() || time.Since(r.registeredAt) >= r.lease() {
 		return false // Our registration is stale: peers no longer count us as live
 	}
 	if r.refreshedAt.IsZero() || time.Since(r.refreshedAt) >= r.lease() {

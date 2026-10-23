@@ -39,6 +39,10 @@ func (c *nopCluster) Role() Role {
 	return RoleActive // A single node takes all client traffic
 }
 
+func (c *nopCluster) SetMaintenance(_ bool) {
+	// Nothing to tell: there are no peers, and a single node never enters maintenance mode
+}
+
 func (c *nopCluster) Ready() bool {
 	return true // A single node takes all client traffic
 }

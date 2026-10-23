@@ -79,7 +79,8 @@ func (r *streamRegistry) CancelSome(n int) int {
 // taking new subscriptions (503, which a load balancer retries on another node; /v1/ready fails
 // too) and closes the open streams evenly over ClusterDrainDuration, so their clients reconnect to
 // the other nodes a few at a time instead of all at once. Clients resume with since=, so nothing is
-// lost. Publishes, polls and the cluster mesh keep working. It returns when no streams are left, or
+// lost. Publishes, polls and the cluster mesh keep working; due delayed messages are left to the
+// next leader. It returns when no streams are left, or
 // right away when ctx is canceled; the node stays in maintenance mode. A shutdown calls it first.
 //
 // It drains only an active node with at least one other healthy active node: otherwise there is
@@ -89,6 +90,7 @@ func (s *Server) Drain(ctx context.Context) {
 		return
 	}
 	s.maintenance.Store(true)
+	s.cluster.SetMaintenance(true) // Act as passive: peers stop counting this node, and leadership moves
 	total := s.streams.Len()
 	duration := s.config.ClusterDrainDuration
 	log.Tag(tagMaintenance).Info("Entering maintenance mode: closing %d stream(s) over %v, new subscriptions are rejected", total, duration)

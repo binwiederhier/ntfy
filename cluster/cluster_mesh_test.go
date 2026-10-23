@@ -838,3 +838,32 @@ func peerMetricValue(t *testing.T, name, peer string) float64 {
 func discardMessage(_ *model.Message) {
 	// Nothing to do: these tests only check status and counters
 }
+
+func TestMesh_MaintenanceActsAsPassive(t *testing.T) {
+	// In maintenance mode a node takes no clients and gives up leadership, and its peers see it as
+	// passive, so they no longer count it as a place for clients. Its configured role stays.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, mesh.IsLeader)
+	require.True(t, mesh.Ready())
+
+	mesh.SetMaintenance(true)
+	require.False(t, mesh.Ready())
+	require.False(t, mesh.IsLeader())
+	require.Equal(t, RoleActive, mesh.Role())
+	require.Equal(t, RolePassive, mesh.Members()[0].Role)
+	observer, err := registry.New(pool, "observer", "http://192.168.1.99:2587", RolePassive, time.Minute)
+	require.Nil(t, err)
+	waitFor(t, func() bool {
+		peers, err := observer.Refresh()
+		require.Nil(t, err)
+		return len(peers) == 1 && peers[0].Role == RolePassive
+	})
+
+	mesh.SetMaintenance(false)
+	require.True(t, mesh.Ready())
+	require.Equal(t, RoleActive, mesh.Members()[0].Role)
+}

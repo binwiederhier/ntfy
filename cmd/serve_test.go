@@ -649,6 +649,11 @@ func TestCLI_Serve_ClusterValidation(t *testing.T) {
 	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-duration=-1s"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster drain duration")
+	// 0 is valid (no drain): the error is about the role, which is checked after the drain duration
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-duration=0", "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a", "--experimental-cluster-role=leader"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-role")
 	// The role must be one of the known ones: a typo would make a node half passive
 	app, _, _, _ = newTestApp()
 	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a", "--experimental-cluster-role=leader"})

@@ -203,3 +203,39 @@ func countClosed(streams []<-chan struct{}) int {
 	}
 	return closed
 }
+
+func TestServer_Maintenance_ActsAsPassiveInTheCluster(t *testing.T) {
+	// Peers must stop counting a node in maintenance mode as a place for clients, and leadership
+	// must move off it, so the cluster is told
+	s, cl := newDrainTestServer(t, time.Second, drainTestMember("node-1", cluster.RoleActive), drainTestMember("node-2", cluster.RoleActive))
+	openDrainTestStream(s, "/mytopic/json")
+	waitFor(t, func() bool {
+		return s.streams.Len() == 1
+	})
+	s.Drain(context.Background())
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	require.True(t, cl.maintenance)
+}
+
+func TestServer_Maintenance_NoDelayedMessagesClaimed(t *testing.T) {
+	// A node in maintenance mode is on its way out: it must not claim due delayed messages, which
+	// the next leader sends instead
+	s := newTestServer(t, newTestConfig(t, ""))
+	response := request(t, s, "PUT", "/mytopic", "a message", map[string]string{
+		"In": "1h",
+	})
+	require.Equal(t, 200, response.Code)
+	msg := toMessage(t, response.Body.String())
+	require.Nil(t, s.messageCache.UpdateMessageTime(msg.ID, time.Now().Add(-10*time.Second).Unix()))
+
+	s.maintenance.Store(true)
+	require.Nil(t, s.sendDelayedMessages())
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 0, len(toMessages(t, response.Body.String())))
+
+	s.maintenance.Store(false)
+	require.Nil(t, s.sendDelayedMessages())
+	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 1, len(toMessages(t, response.Body.String())))
+}

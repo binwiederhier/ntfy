@@ -664,3 +664,22 @@ func TestRegistry_PruneKeepsRecentlyLiveActiveNodes(t *testing.T) {
 	tick(t, a)
 	require.False(t, a.IsLeader())
 }
+
+func TestRegistry_SetRolePassiveHandsLeadershipOver(t *testing.T) {
+	// Maintenance mode makes a node act as passive at runtime: it stops leading at once, and its
+	// peers see the new role at its next heartbeat and take over
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	waitForLeader(t, a, b)
+	a.SetRole(RolePassive)
+	require.False(t, a.IsLeader())
+	tick(t, a, b)
+	peers := b.Peers()
+	require.Len(t, peers, 1)
+	require.Equal(t, RolePassive, peers[0].Role)
+	waitForLeader(t, b, a)
+}

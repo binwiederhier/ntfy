@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"heckel.io/ntfy/v2/cluster/registry"
@@ -54,7 +55,8 @@ type meshCluster struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
-	mu             sync.Mutex // Protects queues, closed, knownPeers, stats and lastRegistered
+	maintenance    atomic.Bool // Maintenance mode: this node acts as passive (see SetMaintenance)
+	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -188,7 +190,12 @@ func (c *meshCluster) BroadcastState(state *State) {
 // which is what an agent needs to disregard its answer and keep the upstreams it has.
 func (c *meshCluster) Members() []Member {
 	fresh := c.registry.Fresh()
-	members := []Member{{NodeID: c.conf.NodeID, AdvertiseURL: c.conf.AdvertiseURL, Role: c.conf.Role, Healthy: c.Healthy()}}
+	members := []Member{{
+		NodeID:       c.conf.NodeID,
+		AdvertiseURL: c.conf.AdvertiseURL,
+		Role:         c.effectiveRole(),
+		Healthy:      c.Healthy(),
+	}}
 	for _, p := range c.registry.Peers() {
 		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Role: p.Role, Healthy: fresh})
 	}
@@ -202,7 +209,7 @@ func (c *meshCluster) Status() *Status {
 	now := time.Now()
 	status := &Status{
 		NodeID:  c.conf.NodeID,
-		Role:    c.conf.Role,
+		Role:    c.effectiveRole(),
 		Leader:  c.IsLeader(),
 		Healthy: c.Healthy(),
 		Time:    now.Unix(),
@@ -255,6 +262,23 @@ func (c *meshCluster) Healthy() bool {
 	return time.Since(c.lastRegistered) < c.conf.NodeTTL
 }
 
+// SetMaintenance turns maintenance mode on or off: while on, this node acts as passive. It is not
+// ready, gives up leadership at once, never fences, and registers as passive at its next
+// heartbeat, so its peers stop counting it as a place for clients and the next leader takes over.
+// Its configured role (Role) does not change.
+func (c *meshCluster) SetMaintenance(on bool) {
+	c.maintenance.Store(on)
+	c.registry.SetRole(c.effectiveRole())
+}
+
+// effectiveRole is the role this node acts in: passive in maintenance mode, else its configured role
+func (c *meshCluster) effectiveRole() Role {
+	if c.maintenance.Load() {
+		return RolePassive
+	}
+	return c.conf.Role
+}
+
 // Role reports this node's configured role
 func (c *meshCluster) Role() Role {
 	return c.conf.Role
@@ -263,7 +287,7 @@ func (c *meshCluster) Role() Role {
 // Ready reports whether a load balancer should send clients here (see the Cluster interface). It
 // reads the last peer snapshot rather than probing peers, since load balancers call it often.
 func (c *meshCluster) Ready() bool {
-	if c.conf.Role != RoleActive {
+	if c.effectiveRole() != RoleActive {
 		return false
 	} else if c.Healthy() {
 		return true
@@ -419,9 +443,10 @@ func (c *meshCluster) isolationLoop() {
 //
 // Roles narrow this further. A passive peer is not behind the load balancer, so it is nowhere
 // better for clients that reconnect through it. A passive node never fences at all: its
-// clients connected to it directly, and nothing would route them elsewhere.
+// clients connected to it directly, and nothing would route them elsewhere. Nor does a node in
+// maintenance mode: it is draining its clients already, gradually rather than all at once.
 func (c *meshCluster) maybeIsolated() {
-	if c.conf.IsolatedFunc == nil || c.conf.Role == RolePassive || c.Healthy() {
+	if c.conf.IsolatedFunc == nil || c.effectiveRole() == RolePassive || c.Healthy() {
 		return
 	}
 	c.mu.Lock()

@@ -120,6 +120,9 @@ type Cluster interface {
 	Ready() bool
 	// Role reports this node's configured role (active, or passive)
 	Role() Role
+	// SetMaintenance turns maintenance mode on or off. While on, this node acts as passive: it is
+	// not ready, does not lead, and its peers see it as passive. Nop single-node.
+	SetMaintenance(on bool)
 	// Close stops the cluster and releases its resources.
 	Close() error
 }

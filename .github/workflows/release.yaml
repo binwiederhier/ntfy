@@ -42,6 +42,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
       - name: Install dependencies
+        timeout-minutes: 10 # A stalled apt mirror must fail the run, not hang it
         run: make build-deps-ubuntu
       - name: Build and publish
         run: make release

@@ -108,9 +108,13 @@ docker-dev:
 
 # Ubuntu-specific
 
+# The Azure apt mirrors on GitHub runners sometimes stall mid-download, and apt then waits forever.
+# A timeout fails the stalled download, and the retries fetch it again.
+APT_GET := sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+
 build-deps-ubuntu:
-	sudo apt-get update
-	sudo apt-get install -y \
+	$(APT_GET) update
+	$(APT_GET) install -y \
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
@@ -119,7 +123,7 @@ build-deps-ubuntu:
 		python3-venv \
 		qemu-user \
 		jq
-	which pip3 || sudo apt-get install -y python3-pip
+	which pip3 || $(APT_GET) install -y python3-pip
 
 
 # Documentation

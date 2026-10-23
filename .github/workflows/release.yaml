@@ -5,7 +5,7 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:17

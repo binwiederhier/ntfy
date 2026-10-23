@@ -555,7 +555,6 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 		return err
 	}
 	t.CancelSubscribersExceptUser(u.ID)
-	// The topic/subscriber registry is per-node; peer nodes must kick their subscribers too
 	s.cluster.BroadcastState(&cluster.State{
 		SubscriberCancels: []*cluster.SubscriberCancel{
 			{

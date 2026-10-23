@@ -81,7 +81,7 @@ type Server struct {
 	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
 	stopOnce          sync.Once
 	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
-	draining          atomic.Bool     // Set by Drain: new subscriptions get 503, and /v1/ready fails
+	maintenance       atomic.Bool     // Maintenance mode, set by Drain: new subscriptions get 503, and /v1/ready fails
 	streams           *streamRegistry // Open subscriber connections, for Drain
 	mu                sync.RWMutex
 }
@@ -634,7 +634,7 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	metrics.HTTPRequests.WithLabelValues(strconv.Itoa(httpErr.HTTPCode), strconv.Itoa(httpErr.Code), r.Method).Inc()
 	isRateLimiting := util.Contains(rateLimitingErrorCodes, httpErr.HTTPCode)
 	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode) ||
-		httpErr.Code == errHTTPServiceUnavailableDraining.Code // A draining node rejects every new subscription, by design
+		httpErr.Code == errHTTPServiceUnavailableMaintenance.Code // A node in maintenance mode rejects every new subscription, by design
 	ev := logvr(v, r).Err(err)
 	if websocket.IsWebSocketUpgrade(r) {
 		ev.Tag(tagWebsocket).Fields(websocketErrorContext(err))
@@ -845,15 +845,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor
 // handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
 // Ready). A passive node is healthy (see handleHealth) but never ready.
 func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	draining := s.draining.Load()
-	ready := s.cluster.Ready() && !draining
+	maintenance := s.maintenance.Load()
+	ready := s.cluster.Ready() && !maintenance
 	if !ready {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	return s.writeJSON(w, &apiReadyResponse{
-		Ready:    ready,
-		Role:     s.cluster.Role(),
-		Draining: draining,
+		Ready:       ready,
+		Role:        s.cluster.Role(),
+		Maintenance: maintenance,
 	})
 }
 
@@ -1582,8 +1582,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
-	} else if !poll && s.draining.Load() {
-		return errHTTPServiceUnavailableDraining
+	} else if !poll && s.maintenance.Load() {
+		return errHTTPServiceUnavailableMaintenance
 	}
 	var wlock sync.Mutex
 	var closed bool
@@ -1701,8 +1701,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
-	} else if !poll && s.draining.Load() {
-		return errHTTPServiceUnavailableDraining // Before the upgrade, so the load balancer can retry elsewhere
+	} else if !poll && s.maintenance.Load() {
+		return errHTTPServiceUnavailableMaintenance // Before the upgrade, so the load balancer can retry elsewhere
 	}
 	upgrader := &websocket.Upgrader{
 		ReadBufferSize:  wsBufferSize,

@@ -151,9 +151,9 @@ type apiHealthResponse struct {
 }
 
 type apiReadyResponse struct {
-	Ready    bool         `json:"ready"`
-	Role     cluster.Role `json:"role"`
-	Draining bool         `json:"draining,omitempty"`
+	Ready       bool         `json:"ready"`
+	Role        cluster.Role `json:"role"`
+	Maintenance bool         `json:"maintenance,omitempty"`
 }
 
 type apiVersionResponse struct {

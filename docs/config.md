@@ -2278,9 +2278,10 @@ A few important notes:
   `passive` node never leads and never becomes ready, so it stays out of the load balancer; use it for test clients
   only, since while it is cut off from the database, its clients can miss messages published elsewhere.
 * **Health checks:** point your load balancer at `/v1/ready`, not `/v1/health` (see [Health checks](#health-checks)).
-* **Draining on shutdown:** when an active node gets `SIGTERM` (e.g. `systemctl restart ntfy` during a deploy) and
-  another active node is up, it drains first: it answers new subscriptions with 503, fails `/v1/ready`, and closes
-  its open subscriber connections evenly over `experimental-cluster-drain-duration` (default: 1 minute). Clients
+* **Maintenance mode on shutdown:** when an active node gets `SIGTERM` (e.g. `systemctl restart ntfy` during a deploy)
+  and another active node is up, it enters maintenance mode and drains before it exits: it answers new subscriptions
+  with 503, fails `/v1/ready`, and closes its open subscriber connections evenly over
+  `experimental-cluster-drain-duration` (default: 1 minute). Clients
   reconnect a few at a time, through the load balancer, to the other nodes, and catch up on what they missed, instead
   of all reconnecting at once. Publishing and polling keep working while a node drains. Set your load balancer to retry
   on 503 (nginx: `proxy_next_upstream error timeout http_503;`), and give the service manager enough time to wait for
@@ -2355,12 +2356,12 @@ few seconds, has failed for 30 seconds.
 For load balancers, use `/v1/ready` instead: it returns 200 only if the server should receive clients. Without
 clustering that is always the case. With clustering, a passive node is never ready, and an unhealthy active node is not ready
 while another active node can take its clients. The only active node stays ready even when it is unhealthy, since there is
-nowhere better for its clients. A node that is [draining](#clustering-experimental) before a shutdown is not ready either,
-and says so:
+nowhere better for its clients. A node in [maintenance mode](#clustering-experimental) (e.g. while it drains before a
+shutdown) is not ready either, and says so:
 
 ```json
 {"ready":true,"role":"active"}
-{"ready":false,"role":"active","draining":true}
+{"ready":false,"role":"active","maintenance":true}
 ```
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
@@ -2496,7 +2497,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `experimental-cluster-secret`              | `NTFY_EXPERIMENTAL_CLUSTER_SECRET`              | *string*                                            | -                 | Experimental, not ready for production. Shared secret authenticating node-to-node traffic; must match on all nodes.                                                                                                                      |
 | `experimental-cluster-batch-linger`        | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
 | `experimental-cluster-role`                | `NTFY_EXPERIMENTAL_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
-| `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. On shutdown (`SIGTERM`), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` disables draining. A node drains only if another active node is up. The service manager's stop timeout must be longer. |
+| `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. On shutdown (`SIGTERM`), an active node enters maintenance mode first; this is how long it takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` disables draining. A node drains only if another active node is up. The service manager's stop timeout must be longer. |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |

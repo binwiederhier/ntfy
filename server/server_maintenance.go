@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	tagDrain = "drain"
+	tagMaintenance = "maintenance"
 
 	// drainTickInterval is how often a drain closes its next share of streams; small enough that
 	// the closes look continuous to the load balancers, rather than bursts
@@ -75,11 +75,12 @@ func (r *streamRegistry) CancelSome(n int) int {
 	return canceled
 }
 
-// Drain moves this node's clients to the other nodes before a shutdown: it stops taking new
-// subscriptions (503, which a load balancer retries on another node; /v1/ready fails too) and
-// closes the open streams evenly over ClusterDrainDuration, so their clients reconnect to the
-// other nodes a few at a time instead of all at once. Clients resume with since=, so nothing is
-// lost. It returns when no streams are left, or right away when ctx is canceled.
+// Drain puts this node into maintenance mode and moves its clients to the other nodes: it stops
+// taking new subscriptions (503, which a load balancer retries on another node; /v1/ready fails
+// too) and closes the open streams evenly over ClusterDrainDuration, so their clients reconnect to
+// the other nodes a few at a time instead of all at once. Clients resume with since=, so nothing is
+// lost. Publishes, polls and the cluster mesh keep working. It returns when no streams are left, or
+// right away when ctx is canceled; the node stays in maintenance mode. A shutdown calls it first.
 //
 // It drains only an active node with at least one other healthy active node: otherwise there is
 // nowhere for the clients to go, and a drain would only delay the shutdown.
@@ -87,10 +88,10 @@ func (s *Server) Drain(ctx context.Context) {
 	if !s.shouldDrain() {
 		return
 	}
-	s.draining.Store(true)
+	s.maintenance.Store(true)
 	total := s.streams.Len()
 	duration := s.config.ClusterDrainDuration
-	log.Tag(tagDrain).Info("Draining: closing %d stream(s) over %v, new subscriptions are rejected", total, duration)
+	log.Tag(tagMaintenance).Info("Entering maintenance mode: closing %d stream(s) over %v, new subscriptions are rejected", total, duration)
 	start, lastLog := time.Now(), time.Now()
 	closed := 0
 	ticker := time.NewTicker(drainTickInterval)
@@ -98,12 +99,12 @@ func (s *Server) Drain(ctx context.Context) {
 	for s.streams.Len() > 0 {
 		select {
 		case <-ctx.Done():
-			log.Tag(tagDrain).Info("Draining canceled, %d stream(s) left", s.streams.Len())
+			log.Tag(tagMaintenance).Info("Drain canceled, %d stream(s) left", s.streams.Len())
 			return
 		case <-ticker.C:
 		}
 		// Close the share of the streams that is due by now. Streams that opened right as the drain
-		// started (past the draining check, but not counted in total) go at the end.
+		// started (past the maintenance check, but not counted in total) go at the end.
 		elapsed := time.Since(start)
 		due := int(float64(total)*elapsed.Seconds()/duration.Seconds()) - closed
 		if elapsed >= duration {
@@ -113,11 +114,11 @@ func (s *Server) Drain(ctx context.Context) {
 			closed += s.streams.CancelSome(due)
 		}
 		if time.Since(lastLog) >= drainLogInterval {
-			log.Tag(tagDrain).Info("Draining: closed %d stream(s), %d left", closed, s.streams.Len())
+			log.Tag(tagMaintenance).Info("Maintenance mode: closed %d stream(s), %d left", closed, s.streams.Len())
 			lastLog = time.Now()
 		}
 	}
-	log.Tag(tagDrain).Info("Drained: closed %d stream(s) in %v", closed, time.Since(start).Round(time.Millisecond))
+	log.Tag(tagMaintenance).Info("Maintenance mode: drained, closed %d stream(s) in %v", closed, time.Since(start).Round(time.Millisecond))
 }
 
 func (s *Server) shouldDrain() bool {
@@ -129,6 +130,6 @@ func (s *Server) shouldDrain() bool {
 			return true
 		}
 	}
-	log.Tag(tagDrain).Info("Not draining: no other active node to take this node's clients")
+	log.Tag(tagMaintenance).Info("Not entering maintenance mode: no other active node to take this node's clients")
 	return false
 }

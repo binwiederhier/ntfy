@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,12 +32,25 @@ func sigHandlerConfigReload(config string) {
 // sigHandlerShutdown stops the server gracefully on SIGTERM/SIGINT (systemd stop, Ctrl-C), so
 // pending writes such as the message cache batch are persisted. It closes stopping first, so
 // the caller can tell the resulting Run error apart from a real failure.
+//
+// A cluster node drains first (see Server.Drain); a second signal skips the rest of the drain.
 func sigHandlerShutdown(s *server.Server, stopping chan<- struct{}) {
-	sigs := make(chan os.Signal, 1)
+	sigs := make(chan os.Signal, 2)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
 	sig := <-sigs
 	log.Info("Received %s, shutting down ...", sig)
 	close(stopping)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		select {
+		case sig := <-sigs:
+			log.Info("Received %s again, shutting down without draining", sig)
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	s.Drain(ctx)
 	s.Stop()
 }
 

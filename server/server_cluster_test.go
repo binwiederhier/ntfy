@@ -30,6 +30,7 @@ type fakeCluster struct {
 	notHealthy bool
 	notReady   bool
 	role       cluster.Role // Empty means active
+	members    []cluster.Member
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -92,7 +93,11 @@ func (b *fakeCluster) setLeader(leader bool) {
 	b.notLeader = !leader
 }
 
-func (b *fakeCluster) Members() []cluster.Member { return nil }
+func (b *fakeCluster) Members() []cluster.Member {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.members
+}
 
 func (b *fakeCluster) Close() error { return nil }
 

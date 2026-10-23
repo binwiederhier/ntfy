@@ -2242,6 +2242,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.34.0 (UNRELEASED)
+
+**Features:**
+
+* Cluster nodes drain on shutdown: an active node closes its subscriber connections gradually over `experimental-cluster-drain-duration` (default 1 minute), so its clients move to the other nodes without a reconnect storm (experimental, see [clustering](config.md#clustering-experimental))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

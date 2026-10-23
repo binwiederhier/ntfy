@@ -16,9 +16,13 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/emersion/go-smtp"
 	"github.com/microcosm-cc/bluemonday"
+	"golang.org/x/text/encoding"
+	"golang.org/x/text/encoding/htmlindex"
+	"golang.org/x/text/encoding/ianaindex"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
@@ -159,12 +163,17 @@ func (s *smtpSession) Data(r io.Reader) error {
 		}
 		body = strings.TrimSpace(body)
 		if len(body) > conf.MessageSizeLimit {
-			body = body[:conf.MessageSizeLimit]
+			// Charset conversion can expand a character to multiple UTF-8 bytes.
+			limit := conf.MessageSizeLimit
+			for limit > 0 && !utf8.RuneStart(body[limit]) {
+				limit--
+			}
+			body = body[:limit]
 		}
 		m := model.NewDefaultMessage(s.topic, body)
 		subject := strings.TrimSpace(msg.Header.Get("Subject"))
 		if subject != "" {
-			dec := mime.WordDecoder{}
+			dec := mime.WordDecoder{CharsetReader: readMailCharset}
 			subject, err := dec.DecodeHeader(subject)
 			if err != nil {
 				return err
@@ -244,9 +253,20 @@ func (s *smtpSession) withFailCount(fn func() error) error {
 	return err
 }
 
+func readMailCharset(charset string, input io.Reader) (io.Reader, error) {
+	enc, err := ianaindex.MIME.Encoding(charset)
+	if err != nil || enc == nil {
+		enc, err = htmlindex.Get(charset)
+	}
+	if err != nil || enc == nil || enc == encoding.Replacement {
+		return nil, fmt.Errorf("mime: unhandled charset %q", charset)
+	}
+	return enc.NewDecoder().Reader(input), nil
+}
+
 func readMailBody(body io.Reader, header mail.Header) (string, error) {
 	if header.Get("Content-Type") == "" {
-		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"))
+		return readPlainTextMailBody(body, header.Get("Content-Transfer-Encoding"), "")
 	}
 	contentType, params, err := mime.ParseMediaType(header.Get("Content-Type"))
 	if err != nil {
@@ -254,7 +274,7 @@ func readMailBody(body io.Reader, header mail.Header) (string, error) {
 	}
 	canonicalContentType := strings.ToLower(contentType)
 	if canonicalContentType == "text/plain" || canonicalContentType == "text/html" {
-		return readTextMailBody(body, canonicalContentType, header.Get("Content-Transfer-Encoding"))
+		return readTextMailBody(body, canonicalContentType, header.Get("Content-Transfer-Encoding"), params["charset"])
 	} else if strings.HasPrefix(canonicalContentType, "multipart/") {
 		return readMultipartMailBody(body, params)
 	}
@@ -289,7 +309,7 @@ func readMultipartMailBodyParts(body io.Reader, params map[string]string, depth 
 		}
 		canonicalPartContentType := strings.ToLower(partContentType)
 		if canonicalPartContentType == "text/plain" || canonicalPartContentType == "text/html" {
-			s, err := readTextMailBody(part, canonicalPartContentType, part.Header.Get("Content-Transfer-Encoding"))
+			s, err := readTextMailBody(part, canonicalPartContentType, part.Header.Get("Content-Transfer-Encoding"), partParams["charset"])
 			if err != nil {
 				return err
 			}
@@ -303,20 +323,29 @@ func readMultipartMailBodyParts(body io.Reader, params map[string]string, depth 
 	}
 }
 
-func readTextMailBody(reader io.Reader, contentType, transferEncoding string) (string, error) {
+func readTextMailBody(reader io.Reader, contentType, transferEncoding, charset string) (string, error) {
 	if contentType == "text/plain" {
-		return readPlainTextMailBody(reader, transferEncoding)
+		return readPlainTextMailBody(reader, transferEncoding, charset)
 	} else if contentType == "text/html" {
-		return readHTMLMailBody(reader, transferEncoding)
+		return readHTMLMailBody(reader, transferEncoding, charset)
 	}
 	return "", fmt.Errorf("unsupported content type: %s", contentType)
 }
 
-func readPlainTextMailBody(reader io.Reader, transferEncoding string) (string, error) {
+func readPlainTextMailBody(reader io.Reader, transferEncoding, charset string) (string, error) {
 	if strings.ToLower(transferEncoding) == "base64" {
 		reader = base64.NewDecoder(base64.StdEncoding, reader)
 	} else if strings.ToLower(transferEncoding) == "quoted-printable" {
 		reader = quotedprintable.NewReader(reader)
+	}
+	// Decode transfer encoding first, then the declared character set. Preserve
+	// the existing behavior for bodies without a charset, UTF-8, and US-ASCII.
+	if charset != "" && !strings.EqualFold(charset, "utf-8") && !strings.EqualFold(charset, "us-ascii") {
+		var err error
+		reader, err = readMailCharset(charset, reader)
+		if err != nil {
+			return "", err
+		}
 	}
 	body, err := io.ReadAll(reader)
 	if err != nil {
@@ -325,8 +354,8 @@ func readPlainTextMailBody(reader io.Reader, transferEncoding string) (string, e
 	return string(body), nil
 }
 
-func readHTMLMailBody(reader io.Reader, transferEncoding string) (string, error) {
-	body, err := readPlainTextMailBody(reader, transferEncoding)
+func readHTMLMailBody(reader io.Reader, transferEncoding, charset string) (string, error) {
+	body, err := readPlainTextMailBody(reader, transferEncoding, charset)
 	if err != nil {
 		return "", err
 	}

@@ -117,6 +117,7 @@ build-deps-ubuntu:
 		gcc-mingw-w64-x86-64 \
 		python3 \
 		python3-venv \
+		qemu-user \
 		jq
 	which pip3 || sudo apt-get install -y python3-pip
 

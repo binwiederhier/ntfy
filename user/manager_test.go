@@ -2636,6 +2636,41 @@ func TestAccessCache_WriteDuringFullReloadIsNotLost(t *testing.T) {
 	})
 }
 
+func TestManager_RequestAccessCacheReloadCoalesces(t *testing.T) {
+	// A burst of "access changed" signals from peers must not queue a reload each: requests that
+	// arrive during a reload collapse into one more, which still sees the latest write
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess:             PermissionDenyAll,
+			BcryptCost:                bcrypt.MinCost,
+			AccessCacheEnabled:        true,
+			AccessCacheReloadInterval: time.Hour, // keep the background poller out of this test
+		})
+		require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
+		reloads := atomic.Int32{}
+		testHookReloadScanned = func() {
+			reloads.Add(1)
+			time.Sleep(50 * time.Millisecond) // Long enough for the burst to land during a reload
+		}
+		defer func() { testHookReloadScanned = nil }()
+
+		// A write the cache does not know about yet, as if made on a peer
+		_, err := a.db.Exec(a.queries.upsertUserAccess, "phil", "secret", true, true, "", "", false)
+		require.Nil(t, err)
+		start := time.Now()
+		for i := 0; i < 100; i++ {
+			a.RequestAccessCacheReload()
+		}
+		require.Less(t, time.Since(start), 50*time.Millisecond) // Requests never wait for a reload
+		require.Eventually(t, func() bool {
+			_, _, found, err := a.authorizeTopicAccess("phil", "secret")
+			return err == nil && found
+		}, 5*time.Second, 10*time.Millisecond)
+		time.Sleep(200 * time.Millisecond) // Let any queued reload finish
+		require.LessOrEqual(t, reloads.Load(), int32(2))
+	})
+}
+
 func TestManager_AccessWritesTellPeers(t *testing.T) {
 	// Every access write is passed on (the server tells the other cluster nodes, which reload their
 	// access cache); a reload alone is not a write, so passing it on would loop between nodes

@@ -222,15 +222,13 @@ func (s *Server) broadcastAccessChanged() {
 	})
 }
 
-// handlePeerAccessChanged reloads the access cache after a peer changed access entries, never
+// handlePeerAccessChanged has the access cache reloaded after a peer changed access entries, never
 // re-broadcasting it (loop prevention)
 func (s *Server) handlePeerAccessChanged() {
 	if s.userManager == nil {
 		return
 	}
-	if err := s.userManager.ReloadAccessCache(); err != nil {
-		log.Tag(tagSubscribe).Err(err).Warn("Cannot reload the access cache after a peer changed access entries")
-	}
+	s.userManager.RequestAccessCacheReload() // Coalesced: a burst of peer changes costs at most two reloads
 }
 
 // killUserSubscriberEverywhere ends a deleted user's streams on this node and on the other cluster

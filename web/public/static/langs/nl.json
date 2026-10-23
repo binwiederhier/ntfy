@@ -403,5 +403,10 @@
     "error_boundary_button_reload_ntfy": "Herlaad ntfy",
     "web_push_subscription_expiring_title": "Notificaties worden gepauzeerd",
     "web_push_subscription_expiring_body": "Open ntfy om weer notificaties te ontvangen",
-    "web_push_unknown_notification_title": "Onbekende notificatie ontvangen van de server"
+    "web_push_unknown_notification_title": "Onbekende notificatie ontvangen van de server",
+    "prefs_legal_contact_title": "Contact:",
+    "prefs_legal_name": "Naam",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Juridische kennisgeving",
+    "prefs_privacy_policy": "Privacybeleid"
 }

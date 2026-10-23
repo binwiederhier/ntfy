@@ -127,6 +127,11 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-startup-queries", Aliases: []string{"web_push_startup_queries"}, EnvVars: []string{"NTFY_WEB_PUSH_STARTUP_QUERIES"}, Usage: "queries run when the web push database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-duration", Aliases: []string{"web_push_expiry_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryDuration), Usage: "automatically expire unused subscriptions after this time"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-warning-duration", Aliases: []string{"web_push_expiry_warning_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_WARNING_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryWarningDuration), Usage: "send web push warning notification after this time before expiring unused subscriptions"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "legal-name", Aliases: []string{"legal_name"}, EnvVars: []string{"NTFY_LEGAL_NAME"}, Value: "", Usage: "stores the server maintainer's full legal name"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "legal-email", Aliases: []string{"legal_email"}, EnvVars: []string{"NTFY_LEGAL_EMAIL"}, Value: "", Usage: "stores the contact email address for legal inquiries"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "privacy-policy-url", Aliases: []string{"privacy_policy_url"}, EnvVars: []string{"NTFY_PRIVACY_POLICY_URL"}, Value: "", Usage: "URL link to the server's privacy policy page"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "legal-notice-url", Aliases: []string{"legal_notice_url"}, EnvVars: []string{"NTFY_LEGAL_NOTICE_URL"}, Value: "", Usage: "URL link to the server's legal notice or impressum page"}),
+
 )
 
 var cmdServe = &cli.Command{
@@ -247,7 +252,10 @@ func execServe(c *cli.Context) error {
 	metricsListenHTTP := c.String("metrics-listen-http")
 	enableMetrics := c.Bool("enable-metrics") || metricsListenHTTP != ""
 	profileListenHTTP := c.String("profile-listen-http")
-
+	legalName := c.String("legal-name")
+	legalEmail := c.String("legal-email")
+	privacyPolicy := c.String("privacy-policy-url")
+	legalNotice := c.String("legal-notice-url")
 	// Convert durations
 	cacheDuration, err := util.ParseDuration(cacheDurationStr)
 	if err != nil {
@@ -609,6 +617,10 @@ func execServe(c *cli.Context) error {
 	conf.BuildVersion = c.App.Version
 	conf.BuildDate = maybeFromMetadata(c.App.Metadata, MetadataKeyDate)
 	conf.BuildCommit = maybeFromMetadata(c.App.Metadata, MetadataKeyCommit)
+	conf.LegalName = legalName
+	conf.LegalEmail = legalEmail
+	conf.PrivacyPolicyURL = privacyPolicy
+	conf.LegalNoticeURL = legalNotice
 
 	// Check if we should run as a Windows service
 	if ranAsService, err := maybeRunAsService(conf); err != nil {

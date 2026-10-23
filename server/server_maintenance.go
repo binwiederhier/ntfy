@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"heckel.io/ntfy/v2/cluster"
@@ -19,61 +18,6 @@ const (
 	// drainLogInterval is how often a drain logs its progress
 	drainLogInterval = 10 * time.Second
 )
-
-// streamRegistry tracks the open subscriber connections (HTTP streams and WebSockets), one entry
-// per connection however many topics it subscribes to, so a drain can close them one at a time.
-// Polls are not streams: they end on their own.
-type streamRegistry struct {
-	nextID  int
-	cancels map[int]context.CancelFunc
-	mu      sync.Mutex // Protects nextID and cancels
-}
-
-func newStreamRegistry() *streamRegistry {
-	return &streamRegistry{
-		cancels: make(map[int]context.CancelFunc),
-	}
-}
-
-// Add registers a stream and returns its ID for Remove
-func (r *streamRegistry) Add(cancel context.CancelFunc) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.nextID++
-	r.cancels[r.nextID] = cancel
-	return r.nextID
-}
-
-// Remove forgets a stream that ended; a stream CancelSome already closed is gone already
-func (r *streamRegistry) Remove(id int) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.cancels, id)
-}
-
-// Len returns the number of open streams
-func (r *streamRegistry) Len() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return len(r.cancels)
-}
-
-// CancelSome closes up to n streams, picked in map order (i.e. at random), and returns how
-// many it closed. They are removed right away, so the next call picks others.
-func (r *streamRegistry) CancelSome(n int) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	canceled := 0
-	for id, cancel := range r.cancels {
-		if canceled >= n {
-			break
-		}
-		cancel()
-		delete(r.cancels, id)
-		canceled++
-	}
-	return canceled
-}
 
 // Drain puts this node into maintenance mode and moves its clients to the other nodes, in two phases.
 // Entering (ClusterDrainDelay): /v1/ready fails, so the readiness agents take the node out of the
@@ -92,8 +36,7 @@ func (s *Server) Drain(ctx context.Context) {
 	}
 	// Entering: not ready, so the readiness agents take this node out of the load balancers, but
 	// still serving everything, since requests already on their way must not fail
-	s.maintenance.Store(true)
-	s.cluster.SetMaintenance(true) // Act as passive: peers stop counting this node, and leadership moves
+	s.cluster.SetMaintenance(true) // Acts as passive: not ready, peers stop counting it, leadership moves
 	if delay := s.config.ClusterDrainDelay; delay > 0 {
 		log.Tag(tagMaintenance).Info("Entering maintenance mode: not ready, still serving for %v until the load balancers stop sending requests", delay)
 		select {
@@ -140,13 +83,12 @@ func (s *Server) Drain(ctx context.Context) {
 
 func (s *Server) shouldDrain() bool {
 	if s.config.ClusterDrainDuration <= 0 || s.cluster.Role() != cluster.RoleActive {
+		return false // Maintenance mode off, or not a node that takes clients (or in maintenance already)
+	} else if !s.cluster.HasActivePeer() {
+		if s.config.ClusterListen != "" { // Single node: no peers ever, so nothing worth saying
+			log.Tag(tagMaintenance).Info("Not entering maintenance mode: no other active node to take this node's clients")
+		}
 		return false
 	}
-	for _, m := range s.cluster.Members() {
-		if string(m.NodeID) != s.config.ClusterNodeID && m.Role == cluster.RoleActive && m.Healthy {
-			return true
-		}
-	}
-	log.Tag(tagMaintenance).Info("Not entering maintenance mode: no other active node to take this node's clients")
-	return false
+	return true
 }

@@ -118,11 +118,17 @@ type Cluster interface {
 	// Healthy, or that is not but has no other active node to take its clients. The only active
 	// node stays ready with a stale heartbeat, since pulling it would leave clients nowhere to go.
 	Ready() bool
-	// Role reports this node's configured role (active, or passive)
+	// Role reports the role this node acts in: its configured role (active, or passive), or passive
+	// in maintenance mode
 	Role() Role
 	// SetMaintenance turns maintenance mode on or off. While on, this node acts as passive: it is
 	// not ready, does not lead, and its peers see it as passive. Nop single-node.
 	SetMaintenance(on bool)
+	// Maintenance reports whether this node is in maintenance mode. Never single-node.
+	Maintenance() bool
+	// HasActivePeer reports whether another active node is live, i.e. whether there is somewhere for
+	// this node's clients to go. Never single-node.
+	HasActivePeer() bool
 	// Close stops the cluster and releases its resources.
 	Close() error
 }

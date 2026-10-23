@@ -81,7 +81,6 @@ type Server struct {
 	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
 	stopOnce          sync.Once
 	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
-	maintenance       atomic.Bool     // Maintenance mode, set by Drain: new subscriptions get 503, and /v1/ready fails
 	streams           *streamRegistry // Open subscriber connections, for Drain
 	draining          atomic.Bool     // Draining phase of maintenance mode: read-only (see Drain)
 	mu                sync.RWMutex
@@ -846,7 +845,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor
 // handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
 // Ready). A passive node is healthy (see handleHealth) but never ready.
 func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	maintenance := s.maintenance.Load()
+	maintenance := s.cluster.Maintenance()
 	ready := s.cluster.Ready() && !maintenance
 	if !ready {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -2191,7 +2190,7 @@ func (s *Server) runDelayedSender() {
 }
 
 func (s *Server) sendDelayedMessages() error {
-	if s.maintenance.Load() {
+	if s.cluster.Maintenance() {
 		return nil // On its way out: claiming now could leave a claimed message unsent; the next leader sends it
 	}
 	messages, err := s.messageCache.MessagesDue()

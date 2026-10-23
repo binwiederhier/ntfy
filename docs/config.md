@@ -2303,7 +2303,7 @@ in one burst. To avoid that, an active node that gets `SIGTERM` while another ac
 
 | | Active | Passive | Entering | Draining |
 |---|---|---|---|---|
-| `/v1/ready` | 200 | 503 | 503, `"maintenance": true` | 503, `"maintenance": true` |
+| `/v1/ready` | 200 | 503 | 503, `"role": "passive", "maintenance": true` | 503, `"role": "passive", "maintenance": true` |
 | New subscriptions (streams, WebSockets) | accepted | accepted | accepted | 503 |
 | Open subscriber connections | kept | kept | kept | closed gradually |
 | Polls (`poll=1`) | served | served | served | served |
@@ -2382,11 +2382,11 @@ For load balancers, use `/v1/ready` instead: it returns 200 only if the server s
 clustering that is always the case. With clustering, a passive node is never ready, and an unhealthy active node is not ready
 while another active node can take its clients. The only active node stays ready even when it is unhealthy, since there is
 nowhere better for its clients. A node in [maintenance mode](#clustering-experimental) (e.g. while it drains before a
-shutdown) is not ready either, and says so:
+shutdown) is not ready either: it acts as passive, and says so:
 
 ```json
 {"ready":true,"role":"active"}
-{"ready":false,"role":"active","maintenance":true}
+{"ready":false,"role":"passive","maintenance":true}
 ```
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.

@@ -30,8 +30,8 @@ type fakeCluster struct {
 	notHealthy  bool
 	notReady    bool
 	role        cluster.Role // Empty means active
-	members     []cluster.Member
 	maintenance bool
+	activePeer  bool // Whether another active node is up, for maintenance mode
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -64,7 +64,9 @@ func (b *fakeCluster) setReady(ready bool) {
 func (b *fakeCluster) Role() cluster.Role {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.role == "" {
+	if b.maintenance {
+		return cluster.RolePassive // Like the mesh: the role it acts in
+	} else if b.role == "" {
 		return cluster.RoleActive
 	}
 	return b.role
@@ -100,10 +102,20 @@ func (b *fakeCluster) SetMaintenance(on bool) {
 	b.maintenance = on
 }
 
-func (b *fakeCluster) Members() []cluster.Member {
+func (b *fakeCluster) Maintenance() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.members
+	return b.maintenance
+}
+
+func (b *fakeCluster) HasActivePeer() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.activePeer
+}
+
+func (b *fakeCluster) Members() []cluster.Member {
+	return nil // No test needs members
 }
 
 func (b *fakeCluster) Close() error { return nil }

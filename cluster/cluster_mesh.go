@@ -193,7 +193,7 @@ func (c *meshCluster) Members() []Member {
 	members := []Member{{
 		NodeID:       c.conf.NodeID,
 		AdvertiseURL: c.conf.AdvertiseURL,
-		Role:         c.effectiveRole(),
+		Role:         c.Role(),
 		Healthy:      c.Healthy(),
 	}}
 	for _, p := range c.registry.Peers() {
@@ -209,7 +209,7 @@ func (c *meshCluster) Status() *Status {
 	now := time.Now()
 	status := &Status{
 		NodeID:  c.conf.NodeID,
-		Role:    c.effectiveRole(),
+		Role:    c.Role(),
 		Leader:  c.IsLeader(),
 		Healthy: c.Healthy(),
 		Time:    now.Unix(),
@@ -268,26 +268,32 @@ func (c *meshCluster) Healthy() bool {
 // Its configured role (Role) does not change.
 func (c *meshCluster) SetMaintenance(on bool) {
 	c.maintenance.Store(on)
-	c.registry.SetRole(c.effectiveRole())
+	c.registry.SetRole(c.Role())
 }
 
-// effectiveRole is the role this node acts in: passive in maintenance mode, else its configured role
-func (c *meshCluster) effectiveRole() Role {
+// Maintenance reports whether this node is in maintenance mode
+func (c *meshCluster) Maintenance() bool {
+	return c.maintenance.Load()
+}
+
+// HasActivePeer reports whether another active node is live (as of the last registry refresh), i.e.
+// whether there is somewhere for this node's clients to go
+func (c *meshCluster) HasActivePeer() bool {
+	return hasActivePeer(c.registry.Peers())
+}
+
+// Role reports the role this node acts in: passive in maintenance mode, else its configured role
+func (c *meshCluster) Role() Role {
 	if c.maintenance.Load() {
 		return RolePassive
 	}
 	return c.conf.Role
 }
 
-// Role reports this node's configured role
-func (c *meshCluster) Role() Role {
-	return c.conf.Role
-}
-
 // Ready reports whether a load balancer should send clients here (see the Cluster interface). It
 // reads the last peer snapshot rather than probing peers, since load balancers call it often.
 func (c *meshCluster) Ready() bool {
-	if c.effectiveRole() != RoleActive {
+	if c.Role() != RoleActive {
 		return false
 	} else if c.Healthy() {
 		return true
@@ -446,7 +452,7 @@ func (c *meshCluster) isolationLoop() {
 // clients connected to it directly, and nothing would route them elsewhere. Nor does a node in
 // maintenance mode: it is draining its clients already, gradually rather than all at once.
 func (c *meshCluster) maybeIsolated() {
-	if c.conf.IsolatedFunc == nil || c.effectiveRole() == RolePassive || c.Healthy() {
+	if c.conf.IsolatedFunc == nil || c.Role() == RolePassive || c.Healthy() {
 		return
 	}
 	c.mu.Lock()

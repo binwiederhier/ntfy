@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"heckel.io/ntfy/v2/cluster"
@@ -19,29 +20,97 @@ const (
 	drainLogInterval = 10 * time.Second
 )
 
-// Drain puts this node into maintenance mode and moves its clients to the other nodes, in two phases.
-// Entering (ClusterDrainDelay): /v1/ready fails, so the readiness agents take the node out of the
-// load balancers, but it still serves everything; it acts as passive in the cluster, so leadership
-// moves and it claims no delayed messages. Draining (ClusterDrainDuration): read-only, i.e. new
-// subscriptions and publishes get 503, and the open streams are closed evenly, so their clients
-// reconnect to the other nodes a few at a time instead of all at once. Clients resume with
-// since=, so nothing is lost. Polls and the cluster mesh keep working. It returns when no streams are left, or
-// right away when ctx is canceled; the node stays in maintenance mode. A shutdown calls it first.
+var (
+	errMaintenanceDisabled     = errors.New("maintenance mode is off (experimental-cluster-drain-duration is 0)")
+	errMaintenanceNotActive    = errors.New("only an active node can enter maintenance mode")
+	errMaintenanceNoActivePeer = errors.New("no other active node to take this node's clients")
+)
+
+// maintenanceRun is maintenance mode while it is on: the goroutine running its phases, and how to stop it
+type maintenanceRun struct {
+	cancel context.CancelFunc
+	done   chan struct{} // Closed when the phases end: drained, or turned off
+}
+
+// SetMaintenance turns maintenance mode on or off. It is a state, not a shutdown: a node can enter
+// it, sit in it drained for as long as needed, and leave it again.
 //
-// It drains only an active node with at least one other healthy active node: otherwise there is
-// nowhere for the clients to go, and a drain would only delay the shutdown.
-func (s *Server) Drain(ctx context.Context) {
-	if !s.shouldDrain() {
+// On, it moves this node's clients to the other nodes in two phases, run in the background (it
+// returns at once). Entering (ClusterDrainDelay): /v1/ready fails, so the readiness agents take the
+// node out of the load balancers, but it still serves everything; it acts as passive in the
+// cluster, so leadership moves and it claims no delayed messages. Draining (ClusterDrainDuration):
+// read-only, i.e. new subscriptions and publishes get 503, and the open streams are closed evenly,
+// so their clients reconnect to the other nodes a few at a time instead of all at once. Clients
+// resume with since=, so nothing is lost. Polls and the cluster mesh keep working throughout. Then
+// it stays drained. Only an active node with another active node can enter it: otherwise there is
+// nowhere for its clients to go.
+//
+// Off, it stops the phases wherever they are and takes the node back into service: ready, writable,
+// active in the cluster. Streams it closed already stay on the other nodes.
+func (s *Server) SetMaintenance(on bool) error {
+	s.maintenanceMu.Lock()
+	defer s.maintenanceMu.Unlock()
+	if !on {
+		s.leaveMaintenanceNoLock()
+		return nil
+	} else if s.maintenance != nil {
+		return nil // On already
+	} else if s.config.ClusterDrainDuration <= 0 {
+		return errMaintenanceDisabled
+	} else if s.cluster.Role() != cluster.RoleActive {
+		return errMaintenanceNotActive
+	} else if !s.cluster.Peers().HasActive() {
+		return errMaintenanceNoActivePeer
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s.maintenance = &maintenanceRun{
+		cancel: cancel,
+		done:   make(chan struct{}),
+	}
+	s.cluster.SetMaintenance(true) // Acts as passive: not ready, peers stop counting it, leadership moves
+	go s.runMaintenance(ctx, s.maintenance.done)
+	return nil
+}
+
+// WaitDrained blocks until maintenance mode has drained this node (or is turned off), or ctx is
+// canceled. It returns at once if maintenance mode is off.
+func (s *Server) WaitDrained(ctx context.Context) {
+	s.maintenanceMu.Lock()
+	run := s.maintenance
+	s.maintenanceMu.Unlock()
+	if run == nil {
 		return
 	}
+	select {
+	case <-run.done:
+	case <-ctx.Done():
+	}
+}
+
+// Drain moves this node's clients to the other nodes before a shutdown: it turns maintenance mode on
+// and waits until drained, or until ctx is canceled (a second SIGTERM). A node that cannot enter
+// maintenance mode (single node, last active node, passive node) returns at once.
+func (s *Server) Drain(ctx context.Context) {
+	if err := s.SetMaintenance(true); err != nil {
+		if s.config.ClusterListen != "" { // Single node: never possible, so nothing worth saying
+			log.Tag(tagMaintenance).Info("Not entering maintenance mode: %s", err.Error())
+		}
+		return
+	}
+	s.WaitDrained(ctx)
+}
+
+// runMaintenance runs the phases of maintenance mode (see SetMaintenance) until drained, or until
+// ctx is canceled because maintenance mode was turned off
+func (s *Server) runMaintenance(ctx context.Context, done chan struct{}) {
+	defer close(done)
+
 	// Entering: not ready, so the readiness agents take this node out of the load balancers, but
 	// still serving everything, since requests already on their way must not fail
-	s.cluster.SetMaintenance(true) // Acts as passive: not ready, peers stop counting it, leadership moves
 	if delay := s.config.ClusterDrainDelay; delay > 0 {
 		log.Tag(tagMaintenance).Info("Entering maintenance mode: not ready, still serving for %v until the load balancers stop sending requests", delay)
 		select {
 		case <-ctx.Done():
-			log.Tag(tagMaintenance).Info("Drain canceled while entering maintenance mode")
 			return
 		case <-time.After(delay):
 		}
@@ -59,7 +128,6 @@ func (s *Server) Drain(ctx context.Context) {
 	for s.streams.Len() > 0 {
 		select {
 		case <-ctx.Done():
-			log.Tag(tagMaintenance).Info("Drain canceled, %d stream(s) left", s.streams.Len())
 			return
 		case <-ticker.C:
 		}
@@ -81,14 +149,17 @@ func (s *Server) Drain(ctx context.Context) {
 	log.Tag(tagMaintenance).Info("Maintenance mode: drained, closed %d stream(s) in %v", closed, time.Since(start).Round(time.Millisecond))
 }
 
-func (s *Server) shouldDrain() bool {
-	if s.config.ClusterDrainDuration <= 0 || s.cluster.Role() != cluster.RoleActive {
-		return false // Maintenance mode off, or not a node that takes clients (or in maintenance already)
-	} else if !s.cluster.Peers().HasActive() {
-		if s.config.ClusterListen != "" { // Single node: no peers ever, so nothing worth saying
-			log.Tag(tagMaintenance).Info("Not entering maintenance mode: no other active node to take this node's clients")
-		}
-		return false
+// leaveMaintenanceNoLock stops the phases, waits for them to end (so draining is not set again
+// after it is cleared), and takes the node back into service
+func (s *Server) leaveMaintenanceNoLock() {
+	run := s.maintenance
+	if run == nil {
+		return
 	}
-	return true
+	run.cancel()
+	<-run.done
+	s.maintenance = nil
+	s.draining.Store(false)
+	s.cluster.SetMaintenance(false)
+	log.Tag(tagMaintenance).Info("Left maintenance mode: ready, taking subscriptions and publishes again")
 }

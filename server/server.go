@@ -82,7 +82,9 @@ type Server struct {
 	stopOnce          sync.Once
 	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
 	streams           *streamRegistry // Open subscriber connections, for Drain
-	draining          atomic.Bool     // Draining phase of maintenance mode: read-only (see Drain)
+	draining          atomic.Bool     // Draining phase of maintenance mode: read-only (see SetMaintenance)
+	maintenance       *maintenanceRun // Maintenance mode while on, nil while off (see SetMaintenance)
+	maintenanceMu     sync.Mutex      // Protects maintenance; serializes SetMaintenance
 	mu                sync.RWMutex
 }
 

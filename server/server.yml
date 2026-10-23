@@ -94,7 +94,7 @@
 #   sending it requests. Then it drains: it is read-only (new subscriptions and publishes get 503)
 #   and closes its subscriber connections evenly over the drain duration. Make sure the service
 #   manager waits long enough (systemd: TimeoutStopSec, default 90s). A drain duration of 0
-#   turns maintenance mode off.
+#   disables maintenance mode.
 #
 # Clustering also requires "database-url": the shared PostgreSQL database carries the durable
 # state and the cluster's own coordination tables.

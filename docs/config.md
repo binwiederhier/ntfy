@@ -2288,8 +2288,9 @@ A few important notes:
 
 ### Maintenance mode
 Restarting a node drops all of its subscriber connections at once, and all of its clients reconnect to the other nodes
-in one burst. To avoid that, an active node that gets `SIGTERM` while another active node is up goes through
-**maintenance mode** before it exits:
+in one burst. **Maintenance mode** avoids that: it moves a node's clients to the other nodes gradually, and without
+failed requests. It is a state a node is in until it is turned off again or restarts. An active node enters it when it
+gets `SIGTERM` while another active node is up, and exits once it is drained:
 
 1. **Entering** (`experimental-cluster-drain-delay`, default 15 seconds): `/v1/ready` fails at once, so your load
    balancer stops sending the node new requests, but the node still serves everything, so requests already on their
@@ -2299,7 +2300,7 @@ in one burst. To avoid that, an active node that gets `SIGTERM` while another ac
    and publishes get HTTP 503 (incoming email gets a temporary SMTP error, so mail servers retry), and the open
    subscriber connections are closed evenly over the duration. The clients reconnect, through the load balancer, to the
    other nodes, and catch up on what they missed.
-3. **Drained:** no connections are left, and the node exits.
+3. **Drained:** no connections are left. On `SIGTERM`, the node exits now.
 
 | | Active | Passive | Entering | Draining |
 |---|---|---|---|---|
@@ -2312,7 +2313,7 @@ in one burst. To avoid that, an active node that gets `SIGTERM` while another ac
 
 Your load balancer should stop routing to a node once its `/v1/ready` fails, and your service manager must wait for
 both phases (e.g. systemd's `TimeoutStopSec`, default 90 seconds). Set `experimental-cluster-drain-duration` to `0` to
-turn maintenance mode off.
+disable maintenance mode.
 
 ### Cluster status
 `/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,
@@ -2520,7 +2521,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `experimental-cluster-batch-linger`        | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
 | `experimental-cluster-role`                | `NTFY_EXPERIMENTAL_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
 | `experimental-cluster-drain-delay`         | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY`         | *duration*                                          | `15s`             | Experimental, not ready for production. In [maintenance mode](#maintenance-mode), how long a node is not ready but still serves everything, so the load balancer stops sending it requests before it drains. |
-| `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. In [maintenance mode](#maintenance-mode) (on `SIGTERM`), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` turns maintenance mode off. The service manager's stop timeout must be longer than the delay plus this. |
+| `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. In [maintenance mode](#maintenance-mode) (on `SIGTERM`), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` disables maintenance mode. The service manager's stop timeout must be longer than the delay plus this. |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |

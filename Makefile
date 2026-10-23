@@ -111,8 +111,13 @@ docker-dev:
 # The Azure apt mirrors on GitHub runners sometimes stall mid-download, and apt then waits forever.
 # A timeout fails the stalled download, and the retries fetch it again.
 APT_GET := sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+#
+# The Azure mirror also trickles for minutes without stalling, which no apt timeout catches, so
+# GitHub runners use the main Ubuntu archive instead (a no-op elsewhere).
+APT_SOURCES := /etc/apt/sources.list.d/ubuntu.sources
 
 build-deps-ubuntu:
+	[ ! -f $(APT_SOURCES) ] || sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' $(APT_SOURCES)
 	$(APT_GET) update
 	$(APT_GET) install -y \
 		curl \

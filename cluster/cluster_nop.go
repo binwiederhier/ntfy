@@ -43,8 +43,8 @@ func (c *nopCluster) Maintenance() bool {
 	return false // See SetMaintenance
 }
 
-func (c *nopCluster) HasActivePeer() bool {
-	return false // A single node has no peers
+func (c *nopCluster) Peers() Peers {
+	return nil // A single node has no peers
 }
 
 func (c *nopCluster) SetMaintenance(_ bool) {

@@ -84,7 +84,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	if err != nil {
 		return nil, err
 	}
-	if conf.Role == RolePassive && !hasActivePeer(peers) {
+	if conf.Role == RolePassive && !peers.HasActive() {
 		log.Tag(tag).Warn("This node is passive and no active node is live: load balancers checking /v1/ready send it no clients, and the cluster has no leader until an active node joins")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -110,16 +110,6 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	go c.heartbeatLoop()
 	go c.isolationLoop()
 	return c, nil
-}
-
-// hasActivePeer reports whether any of the peers is active
-func hasActivePeer(peers []*registry.Peer) bool {
-	for _, p := range peers {
-		if p.Role == RoleActive {
-			return true
-		}
-	}
-	return false
 }
 
 // ForwardMessage enqueues the message for delivery to every live peer node; a peer without
@@ -278,10 +268,9 @@ func (c *meshCluster) Maintenance() bool {
 	return c.maintenance.Load()
 }
 
-// HasActivePeer reports whether another active node is live (as of the last registry refresh), i.e.
-// whether there is somewhere for this node's clients to go
-func (c *meshCluster) HasActivePeer() bool {
-	return hasActivePeer(c.registry.Peers())
+// Peers returns the live peer nodes as of the last registry refresh, excluding this node
+func (c *meshCluster) Peers() Peers {
+	return c.registry.Peers()
 }
 
 // Role reports the role this node acts in: passive in maintenance mode, else its configured role
@@ -394,7 +383,7 @@ func (c *meshCluster) heartbeat() error {
 // advertise URL (the retired queue's remainder was headed for a dead address anyway). New and
 // replacement queues are created lazily by ForwardMessage, not here, so a freshly joined peer is
 // reachable immediately.
-func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
+func (c *meshCluster) reconcilePeers(peers Peers) {
 	metrics.ClusterPeers.Set(float64(len(peers)))
 	alive := make(map[NodeID]*registry.Peer, len(peers))
 	for _, p := range peers {

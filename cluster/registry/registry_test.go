@@ -683,3 +683,15 @@ func TestRegistry_SetRolePassiveHandsLeadershipOver(t *testing.T) {
 	require.Equal(t, RolePassive, peers[0].Role)
 	waitForLeader(t, b, a)
 }
+
+func TestPeers_HasActive(t *testing.T) {
+	// Whether there is somewhere for a node's clients to go: a passive peer takes none
+	require.False(t, Peers(nil).HasActive())
+	require.False(t, Peers{
+		&Peer{NodeID: "app2", Role: RolePassive},
+	}.HasActive())
+	require.True(t, Peers{
+		&Peer{NodeID: "app2", Role: RolePassive},
+		&Peer{NodeID: "app3", Role: RoleActive},
+	}.HasActive())
+}

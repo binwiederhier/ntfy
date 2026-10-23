@@ -871,14 +871,14 @@ func TestMesh_MaintenanceActsAsPassive(t *testing.T) {
 	require.Equal(t, RoleActive, mesh.Members()[0].Role)
 }
 
-func TestMesh_HasActivePeer(t *testing.T) {
+func TestMesh_PeersHasActive(t *testing.T) {
 	// A node may only enter maintenance mode if another active node can take its clients
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	require.True(t, mesh.HasActivePeer())
+	require.True(t, mesh.Peers().HasActive())
 }
 
 func TestMesh_PassivePeerIsNoActivePeer(t *testing.T) {
@@ -887,5 +887,5 @@ func TestMesh_PassivePeerIsNoActivePeer(t *testing.T) {
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
-	require.False(t, mesh.HasActivePeer())
+	require.False(t, mesh.Peers().HasActive())
 }

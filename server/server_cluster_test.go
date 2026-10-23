@@ -31,7 +31,7 @@ type fakeCluster struct {
 	notReady    bool
 	role        cluster.Role // Empty means active
 	maintenance bool
-	activePeer  bool // Whether another active node is up, for maintenance mode
+	peers       cluster.Peers
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -108,10 +108,10 @@ func (b *fakeCluster) Maintenance() bool {
 	return b.maintenance
 }
 
-func (b *fakeCluster) HasActivePeer() bool {
+func (b *fakeCluster) Peers() cluster.Peers {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.activePeer
+	return b.peers
 }
 
 func (b *fakeCluster) Members() []cluster.Member {

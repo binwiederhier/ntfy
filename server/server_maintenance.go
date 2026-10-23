@@ -84,7 +84,7 @@ func (s *Server) Drain(ctx context.Context) {
 func (s *Server) shouldDrain() bool {
 	if s.config.ClusterDrainDuration <= 0 || s.cluster.Role() != cluster.RoleActive {
 		return false // Maintenance mode off, or not a node that takes clients (or in maintenance already)
-	} else if !s.cluster.HasActivePeer() {
+	} else if !s.cluster.Peers().HasActive() {
 		if s.config.ClusterListen != "" { // Single node: no peers ever, so nothing worth saying
 			log.Tag(tagMaintenance).Info("Not entering maintenance mode: no other active node to take this node's clients")
 		}

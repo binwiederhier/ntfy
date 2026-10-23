@@ -241,8 +241,14 @@ func newDrainTestServer(t *testing.T, drainDuration time.Duration, activePeer bo
 	conf.ClusterDrainDelay = 0 // Most tests are about the draining phase
 	conf.ClusterDrainDuration = drainDuration
 	s := newTestServer(t, conf)
-	cl := &fakeCluster{
-		activePeer: activePeer,
+	cl := &fakeCluster{}
+	if activePeer {
+		cl.peers = cluster.Peers{
+			&cluster.Peer{
+				NodeID: "node-2",
+				Role:   cluster.RoleActive,
+			},
+		}
 	}
 	s.cluster = cl
 	return s, cl

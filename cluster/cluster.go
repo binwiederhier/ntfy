@@ -48,6 +48,12 @@ type NodeID string
 // Role is a node's part in the cluster; the registry owns it because leadership is derived there
 type Role = registry.Role
 
+// Peer is a live peer node, and Peers a list of them (see registry.Peers)
+type (
+	Peer  = registry.Peer
+	Peers = registry.Peers
+)
+
 // Node roles (see registry.Role)
 const (
 	RoleActive  = registry.RoleActive
@@ -126,9 +132,10 @@ type Cluster interface {
 	SetMaintenance(on bool)
 	// Maintenance reports whether this node is in maintenance mode. Never single-node.
 	Maintenance() bool
-	// HasActivePeer reports whether another active node is live, i.e. whether there is somewhere for
-	// this node's clients to go. Never single-node.
-	HasActivePeer() bool
+	// Peers returns the live peer nodes (as of the last registry refresh), excluding this node; e.g.
+	// Peers().HasActive() tells whether there is somewhere for this node's clients to go. None
+	// single-node.
+	Peers() Peers
 	// Close stops the cluster and releases its resources.
 	Close() error
 }

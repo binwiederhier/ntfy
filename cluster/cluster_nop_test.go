@@ -11,7 +11,8 @@ func TestNop_NeverInMaintenanceAndNoPeers(t *testing.T) {
 	c := &nopCluster{}
 	c.SetMaintenance(true)
 	require.False(t, c.Maintenance())
-	require.False(t, c.HasActivePeer())
+	require.Empty(t, c.Peers())
+	require.False(t, c.Peers().HasActive())
 	require.Equal(t, RoleActive, c.Role())
 	require.True(t, c.Ready())
 }

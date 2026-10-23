@@ -127,7 +127,7 @@ var (
 type Config struct {
 	File                                 string // Config file, only used for testing
 	BaseURL                              string
-	ListenHTTP                           string
+	ListenHTTP                           []string // Several addresses let a load balancer open more than ~63k connections to this node
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
@@ -251,7 +251,7 @@ func NewConfig() *Config {
 	return &Config{
 		File:                                 DefaultConfigFile, // Only used for testing
 		BaseURL:                              "",
-		ListenHTTP:                           DefaultListenHTTP,
+		ListenHTTP:                           []string{DefaultListenHTTP},
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,

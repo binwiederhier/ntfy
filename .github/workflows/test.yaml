@@ -37,6 +37,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './web/package-lock.json'
       - name: Install dependencies
+        timeout-minutes: 10 # A stalled apt mirror must fail the run, not hang it
         run: make build-deps-ubuntu
       - name: Build docs (required for tests)
         run: make docs

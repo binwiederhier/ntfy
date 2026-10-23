@@ -53,7 +53,7 @@ type Server struct {
 	config            *Config
 	db                *db.DB          // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
 	cluster           cluster.Cluster // Fans messages out to peer cluster nodes (nop when not clustered)
-	httpServer        *http.Server
+	httpServers       []*http.Server
 	httpsServer       *http.Server
 	httpMetricsServer *http.Server
 	httpProfileServer *http.Server
@@ -412,8 +412,8 @@ func createAttachmentStore(conf *Config, messageCache *message.Cache) (*attachme
 // a manager go routine to print stats and prune messages.
 func (s *Server) Run() error {
 	var listenStr string
-	if s.config.ListenHTTP != "" {
-		listenStr += fmt.Sprintf(" %s[http]", s.config.ListenHTTP)
+	for _, addr := range s.config.ListenHTTP {
+		listenStr += fmt.Sprintf(" %s[http]", addr)
 	}
 	if s.config.ListenHTTPS != "" {
 		listenStr += fmt.Sprintf(" %s[https]", s.config.ListenHTTPS)
@@ -447,10 +447,11 @@ func (s *Server) Run() error {
 		return nil // Stopped while we waited for the lock, i.e. the stores are closed by now
 	}
 	s.closeChan = make(chan bool)
-	if s.config.ListenHTTP != "" {
-		s.httpServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
+	for _, addr := range s.config.ListenHTTP {
+		httpServer := &http.Server{Addr: addr, Handler: mux}
+		s.httpServers = append(s.httpServers, httpServer)
 		go func() {
-			errChan <- s.httpServer.ListenAndServe()
+			errChan <- httpServer.ListenAndServe()
 		}()
 	}
 	if s.config.ListenHTTPS != "" {
@@ -554,8 +555,8 @@ func (s *Server) stopBounded() {
 func (s *Server) stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.httpServer != nil {
-		s.httpServer.Close()
+	for _, httpServer := range s.httpServers {
+		httpServer.Close()
 	}
 	if s.httpsServer != nil {
 		s.httpsServer.Close()

@@ -35,7 +35,7 @@ var flagsServe = append(
 	append([]cli.Flag{}, flagsDefault...),
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: server.DefaultConfigFile, Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "base-url", Aliases: []string{"base_url", "B"}, EnvVars: []string{"NTFY_BASE_URL"}, Usage: "externally visible base URL for this host (e.g. https://ntfy.sh)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used as HTTP listen address"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used as HTTP listen address; several comma-separated addresses are allowed"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used as HTTPS listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-unix", Aliases: []string{"listen_unix", "U"}, EnvVars: []string{"NTFY_LISTEN_UNIX"}, Usage: "listen on unix socket path"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "listen-unix-mode", Aliases: []string{"listen_unix_mode"}, EnvVars: []string{"NTFY_LISTEN_UNIX_MODE"}, DefaultText: "system default", Usage: "file permissions of unix socket, e.g. 0700"}),
@@ -156,7 +156,7 @@ func execServe(c *cli.Context) error {
 	// Read all the options
 	config := c.String("config")
 	baseURL := strings.TrimSuffix(c.String("base-url"), "/")
-	listenHTTP := c.String("listen-http")
+	listenHTTPRaw := c.String("listen-http")
 	listenHTTPS := c.String("listen-https")
 	listenUnix := c.String("listen-unix")
 	listenUnixMode := c.Int("listen-unix-mode")
@@ -473,9 +473,9 @@ func execServe(c *cli.Context) error {
 		return err
 	}
 
-	// Special case: Unset default
-	if listenHTTP == "-" {
-		listenHTTP = ""
+	listenHTTP, err := parseListenHTTP(listenHTTPRaw)
+	if err != nil {
+		return err
 	}
 
 	// Resolve hosts
@@ -804,4 +804,25 @@ func wildcardAddr(addr string) bool {
 		return true // Unparseable -> cannot derive a URL either
 	}
 	return host == "" || host == "0.0.0.0" || host == "::"
+}
+
+// parseListenHTTP parses the comma-separated listen-http addresses ("-" unsets the default)
+func parseListenHTTP(raw string) ([]string, error) {
+	addrs := make([]string, 0)
+	if raw == "" || raw == "-" {
+		return addrs, nil
+	}
+	seen := make(map[string]struct{})
+	for _, addr := range strings.Split(raw, ",") {
+		addr = strings.TrimSpace(addr)
+		if addr == "" {
+			return nil, fmt.Errorf("invalid listen-http: %s, empty address", raw)
+		}
+		if _, ok := seen[addr]; ok {
+			return nil, fmt.Errorf("invalid listen-http: %s, duplicate address %s", raw, addr)
+		}
+		seen[addr] = struct{}{}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
 }

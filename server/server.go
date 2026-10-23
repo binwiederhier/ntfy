@@ -300,12 +300,7 @@ func New(conf *Config) (*Server, error) {
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
 	}
-	// Everything from here on needs the server itself: the price cache calls a method on it, and
-	// the cluster delivers peer messages through callbacks into it (which is how the cluster
-	// package stays independent of the server)
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
-	// The user manager and the Firebase client come after the server, since the user manager reports
-	// access changes to it (see reauthorizeSubscribers)
 	var userManager *user.Manager
 	if conf.AuthFile != "" || pool != nil {
 		authConfig := &user.Config{

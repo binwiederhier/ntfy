@@ -205,7 +205,6 @@ func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
 	if err := s.cancelSubscriberUserLocal(u.ID, topicPattern); err != nil {
 		return err
 	}
-	// The topic/subscriber registry is per-node; ask peer nodes to kick the user too
 	s.cluster.BroadcastState(&cluster.State{
 		SubscriberCancels: []*cluster.SubscriberCancel{
 			{

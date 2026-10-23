@@ -2310,12 +2310,9 @@ in one burst. To avoid that, an active node that gets `SIGTERM` while another ac
 | Publishes (HTTP and email) | served | served | served | rejected (503, SMTP 451) |
 | Leads the cluster's jobs, sends delayed messages | may | never | never | never |
 
-Your load balancer must stop sending requests to a node whose `/v1/ready` fails within the drain delay (with nginx,
-for instance, by re-resolving the upstream name from a DNS record that only lists ready nodes), and retry on 503 for
-idempotent requests (nginx: `proxy_next_upstream error timeout http_503;`). The service manager must wait for both
-phases: systemd's default stop timeout is 90 seconds (`TimeoutStopSec`), Docker's is 10 seconds (`docker stop -t`,
-`stop_grace_period` in Compose). A second `SIGTERM` skips the rest. The last active node, and a passive node, stop
-right away. Set `experimental-cluster-drain-duration` to `0` to turn maintenance mode off.
+Your load balancer should stop routing to a node once its `/v1/ready` fails, and your service manager must wait for
+both phases (e.g. systemd's `TimeoutStopSec`, default 90 seconds). Set `experimental-cluster-drain-duration` to `0` to
+turn maintenance mode off.
 
 ### Cluster status
 `/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,

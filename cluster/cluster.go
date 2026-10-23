@@ -48,9 +48,11 @@ type NodeID string
 // Role is a node's part in the cluster; the registry owns it because leadership is derived there
 type Role = registry.Role
 
-// Peer is a live peer node, and Peers a list of them (see registry.Peers)
 type (
-	Peer  = registry.Peer
+	// Peer is a live peer node (see registry.Peer)
+	Peer = registry.Peer
+
+	// Peers is a list of live peer nodes (see registry.Peers)
 	Peers = registry.Peers
 )
 

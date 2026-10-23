@@ -152,8 +152,8 @@ func New(pool *db.DB, nodeID, advertiseURL string, role Role, ttl time.Duration)
 	}, nil
 }
 
-// SetRole changes the role this node registers with, at runtime (maintenance mode makes an active
-// node act as passive). Leadership ends at once on a step down to passive; peers see the new role
+// SetRole changes the role this node registers with, at runtime (a draining active node acts as
+// passive). Leadership ends at once on a step down to passive; peers see the new role
 // at the next Register.
 func (r *Registry) SetRole(role Role) {
 	r.mu.Lock()

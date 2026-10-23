@@ -82,9 +82,7 @@ type Server struct {
 	stopOnce          sync.Once
 	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
 	streams           *streamRegistry // Open subscriber connections, for Drain
-	draining          atomic.Bool     // Draining phase of maintenance mode: read-only (see SetMaintenance)
-	maintenance       *maintenanceRun // Maintenance mode while on, nil while off (see SetMaintenance)
-	maintenanceMu     sync.Mutex      // Protects maintenance; serializes SetMaintenance
+	readOnly          atomic.Bool     // Second phase of a drain: new subscriptions and publishes get 503 (see Drain)
 	mu                sync.RWMutex
 }
 
@@ -636,7 +634,7 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	metrics.HTTPRequests.WithLabelValues(strconv.Itoa(httpErr.HTTPCode), strconv.Itoa(httpErr.Code), r.Method).Inc()
 	isRateLimiting := util.Contains(rateLimitingErrorCodes, httpErr.HTTPCode)
 	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode) ||
-		httpErr.Code == errHTTPServiceUnavailableMaintenance.Code // A node in maintenance mode rejects every new subscription, by design
+		httpErr.Code == errHTTPServiceUnavailableDraining.Code // A draining node rejects every new subscription, by design
 	ev := logvr(v, r).Err(err)
 	if websocket.IsWebSocketUpgrade(r) {
 		ev.Tag(tagWebsocket).Fields(websocketErrorContext(err))
@@ -847,15 +845,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor
 // handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
 // Ready). A passive node is healthy (see handleHealth) but never ready.
 func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	maintenance := s.cluster.Maintenance()
-	ready := s.cluster.Ready() && !maintenance
+	draining := s.cluster.Draining()
+	ready := s.cluster.Ready() && !draining
 	if !ready {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	return s.writeJSON(w, &apiReadyResponse{
-		Ready:       ready,
-		Role:        s.cluster.Role(),
-		Maintenance: maintenance,
+		Ready:    ready,
+		Role:     s.cluster.Role(),
+		Draining: draining,
 	})
 }
 
@@ -997,8 +995,8 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 }
 
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
-	if s.draining.Load() {
-		return nil, errHTTPServiceUnavailableMaintenance // Read-only; the load balancers stopped sending requests while entering
+	if s.readOnly.Load() {
+		return nil, errHTTPServiceUnavailableDraining // Read-only; the load balancers stopped sending requests in the drain delay
 	}
 	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
@@ -1587,8 +1585,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
-	} else if !poll && s.draining.Load() {
-		return errHTTPServiceUnavailableMaintenance
+	} else if !poll && s.readOnly.Load() {
+		return errHTTPServiceUnavailableDraining
 	}
 	var wlock sync.Mutex
 	var closed bool
@@ -1706,8 +1704,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
-	} else if !poll && s.draining.Load() {
-		return errHTTPServiceUnavailableMaintenance // Before the upgrade, so the load balancer can retry elsewhere
+	} else if !poll && s.readOnly.Load() {
+		return errHTTPServiceUnavailableDraining // Before the upgrade, so the load balancer can retry elsewhere
 	}
 	upgrader := &websocket.Upgrader{
 		ReadBufferSize:  wsBufferSize,
@@ -2192,7 +2190,7 @@ func (s *Server) runDelayedSender() {
 }
 
 func (s *Server) sendDelayedMessages() error {
-	if s.cluster.Maintenance() {
+	if s.cluster.Draining() {
 		return nil // On its way out: claiming now could leave a claimed message unsent; the next leader sends it
 	}
 	messages, err := s.messageCache.MessagesDue()

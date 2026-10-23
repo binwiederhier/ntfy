@@ -336,8 +336,8 @@ up`, readAll(t, r.Body))
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
-func TestSmtpBackend_MaintenanceIsATemporaryFailure(t *testing.T) {
-	// A node in maintenance mode answers publishes with 503. For email that must be a temporary
+func TestSmtpBackend_DrainingIsATemporaryFailure(t *testing.T) {
+	// A draining node answers publishes with 503. For email that must be a temporary
 	// failure (4xx), so the sending mail server retries, e.g. with the next MX, instead of bouncing.
 	email := `EHLO example.com
 MAIL FROM: phil@example.com
@@ -349,8 +349,8 @@ what's up
 .
 `
 	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(errHTTPServiceUnavailableMaintenance.HTTPCode)
-		_, _ = io.WriteString(w, errHTTPServiceUnavailableMaintenance.JSON())
+		w.WriteHeader(errHTTPServiceUnavailableDraining.HTTPCode)
+		_, _ = io.WriteString(w, errHTTPServiceUnavailableDraining.JSON())
 	})
 	defer s.Close()
 	defer c.Close()

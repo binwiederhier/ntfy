@@ -666,7 +666,7 @@ func TestRegistry_PruneKeepsRecentlyLiveActiveNodes(t *testing.T) {
 }
 
 func TestRegistry_SetRolePassiveHandsLeadershipOver(t *testing.T) {
-	// Maintenance mode makes a node act as passive at runtime: it stops leading at once, and its
+	// A draining node acts as passive at runtime: it stops leading at once, and its
 	// peers see the new role at its next heartbeat and take over
 	t.Parallel()
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))

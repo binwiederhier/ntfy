@@ -184,6 +184,6 @@ var (
 	errHTTPInternalErrorInvalidPath                  = &errHTTP{50002, http.StatusInternalServerError, "internal server error: invalid path", "", nil}
 	errHTTPInternalErrorMissingBaseURL               = &errHTTP{50003, http.StatusInternalServerError, "internal server error: base-url must be be configured for this feature", "https://ntfy.sh/docs/config/", nil}
 	errHTTPInternalErrorWebPushUnableToPublish       = &errHTTP{50004, http.StatusInternalServerError, "internal server error: unable to publish web push message", "", nil}
-	errHTTPServiceUnavailableMaintenance             = &errHTTP{50301, http.StatusServiceUnavailable, "service unavailable: this node is in maintenance mode, please reconnect", "", nil}
+	errHTTPServiceUnavailableDraining                = &errHTTP{50301, http.StatusServiceUnavailable, "service unavailable: this node is shutting down, please reconnect", "", nil}
 	errHTTPInsufficientStorageUnifiedPush            = &errHTTP{50701, http.StatusInsufficientStorage, "cannot publish to UnifiedPush topic without previously active subscriber", "", nil}
 )

@@ -23,15 +23,15 @@ import (
 // fakeCluster records relayed messages and topic announcements so tests can assert that every
 // publish path passes through the cluster exactly once, and that subscription hooks fire.
 type fakeCluster struct {
-	mu          sync.Mutex
-	messages    []*model.Message
-	announced   []string
-	notLeader   bool
-	notHealthy  bool
-	notReady    bool
-	role        cluster.Role // Empty means active
-	maintenance bool
-	peers       cluster.Peers
+	mu         sync.Mutex
+	messages   []*model.Message
+	announced  []string
+	notLeader  bool
+	notHealthy bool
+	notReady   bool
+	role       cluster.Role // Empty means active
+	draining   bool
+	peers      cluster.Peers
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -64,7 +64,7 @@ func (b *fakeCluster) setReady(ready bool) {
 func (b *fakeCluster) Role() cluster.Role {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.maintenance {
+	if b.draining {
 		return cluster.RolePassive // Like the mesh: the role it acts in
 	} else if b.role == "" {
 		return cluster.RoleActive
@@ -96,16 +96,16 @@ func (b *fakeCluster) setLeader(leader bool) {
 	b.notLeader = !leader
 }
 
-func (b *fakeCluster) SetMaintenance(on bool) {
+func (b *fakeCluster) SetDraining(on bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.maintenance = on
+	b.draining = on
 }
 
-func (b *fakeCluster) Maintenance() bool {
+func (b *fakeCluster) Draining() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.maintenance
+	return b.draining
 }
 
 func (b *fakeCluster) Peers() cluster.Peers {

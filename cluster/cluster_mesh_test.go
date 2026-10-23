@@ -839,9 +839,9 @@ func discardMessage(_ *model.Message) {
 	// Nothing to do: these tests only check status and counters
 }
 
-func TestMesh_MaintenanceActsAsPassive(t *testing.T) {
-	// In maintenance mode a node takes no clients and gives up leadership, and its peers see it as
-	// passive, so they no longer count it as a place for clients. Its configured role stays.
+func TestMesh_DrainingActsAsPassive(t *testing.T) {
+	// A draining node takes no clients and gives up leadership, and its peers see it as passive, so
+	// they no longer count it as a place for clients. Its configured role stays.
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
@@ -850,8 +850,8 @@ func TestMesh_MaintenanceActsAsPassive(t *testing.T) {
 	waitFor(t, mesh.IsLeader)
 	require.True(t, mesh.Ready())
 
-	mesh.SetMaintenance(true)
-	require.True(t, mesh.Maintenance())
+	mesh.SetDraining(true)
+	require.True(t, mesh.Draining())
 	require.False(t, mesh.Ready())
 	require.False(t, mesh.IsLeader())
 	require.Equal(t, RolePassive, mesh.Role()) // The role it acts in; the configured one is in its config
@@ -864,15 +864,15 @@ func TestMesh_MaintenanceActsAsPassive(t *testing.T) {
 		return len(peers) == 1 && peers[0].Role == RolePassive
 	})
 
-	mesh.SetMaintenance(false)
-	require.False(t, mesh.Maintenance())
+	mesh.SetDraining(false)
+	require.False(t, mesh.Draining())
 	require.True(t, mesh.Ready())
 	require.Equal(t, RoleActive, mesh.Role())
 	require.Equal(t, RoleActive, mesh.Members()[0].Role)
 }
 
 func TestMesh_PeersHasActive(t *testing.T) {
-	// A node may only enter maintenance mode if another active node can take its clients
+	// A node only drains if another active node can take its clients
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)

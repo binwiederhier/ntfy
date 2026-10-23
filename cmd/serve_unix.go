@@ -33,8 +33,7 @@ func sigHandlerConfigReload(config string) {
 // pending writes such as the message cache batch are persisted. It closes stopping first, so
 // the caller can tell the resulting Run error apart from a real failure.
 //
-// A cluster node first enters maintenance mode and drains (see Server.Drain); a second signal
-// skips the rest of the drain.
+// A cluster node first drains (see Server.Drain); a second signal skips the rest of the drain.
 func sigHandlerShutdown(s *server.Server, stopping chan<- struct{}) {
 	sigs := make(chan os.Signal, 2)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)

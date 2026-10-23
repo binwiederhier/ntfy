@@ -6,11 +6,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNop_NeverInMaintenanceAndNoPeers(t *testing.T) {
-	// A single node has nowhere to send its clients, so it never enters maintenance mode
+func TestNop_NeverDrainsAndHasNoPeers(t *testing.T) {
+	// A single node has nowhere to send its clients, so it never drains
 	c := &nopCluster{}
-	c.SetMaintenance(true)
-	require.False(t, c.Maintenance())
+	c.SetDraining(true)
+	require.False(t, c.Draining())
 	require.Empty(t, c.Peers())
 	require.False(t, c.Peers().HasActive())
 	require.Equal(t, RoleActive, c.Role())

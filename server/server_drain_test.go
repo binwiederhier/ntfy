@@ -15,7 +15,7 @@ import (
 	"heckel.io/ntfy/v2/log"
 )
 
-func TestServer_Maintenance_ClosesStreamsGradually(t *testing.T) {
+func TestServer_Drain_ClosesStreamsGradually(t *testing.T) {
 	s, _ := newDrainTestServer(t, 2*time.Second, true)
 	streams := make([]<-chan struct{}, 0)
 	for i := 0; i < 20; i++ {
@@ -50,7 +50,7 @@ func TestServer_Maintenance_ClosesStreamsGradually(t *testing.T) {
 	require.Equal(t, 0, s.streams.Len())
 }
 
-func TestServer_Maintenance_DrainingIsReadOnly(t *testing.T) {
+func TestServer_Drain_DrainingIsReadOnly(t *testing.T) {
 	// While draining, new streams and all publishes get 503: the load balancers stopped sending
 	// requests during the entering phase, so these are stragglers. Reads (polls) are still served.
 	s, _ := newDrainTestServer(t, 3*time.Second, true)
@@ -64,12 +64,12 @@ func TestServer_Maintenance_DrainingIsReadOnly(t *testing.T) {
 	defer cancel()
 	go s.Drain(ctx)
 	waitFor(t, func() bool {
-		return s.draining.Load()
+		return s.readOnly.Load()
 	})
 
 	rr = request(t, s, "GET", "/mytopic/json", "", nil)
 	require.Equal(t, 503, rr.Code)
-	require.Equal(t, errHTTPServiceUnavailableMaintenance.Code, toHTTPError(t, rr.Body.String()).Code)
+	require.Equal(t, errHTTPServiceUnavailableDraining.Code, toHTTPError(t, rr.Body.String()).Code)
 	rr = request(t, s, "GET", "/mytopic/ws", "", map[string]string{
 		"Upgrade": "websocket",
 	})
@@ -78,7 +78,7 @@ func TestServer_Maintenance_DrainingIsReadOnly(t *testing.T) {
 	for _, method := range []string{"POST", "PUT"} {
 		rr = request(t, s, method, "/mytopic", "hi there", nil)
 		require.Equal(t, 503, rr.Code)
-		require.Equal(t, errHTTPServiceUnavailableMaintenance.Code, toHTTPError(t, rr.Body.String()).Code)
+		require.Equal(t, errHTTPServiceUnavailableDraining.Code, toHTTPError(t, rr.Body.String()).Code)
 	}
 	rr = request(t, s, "GET", "/mytopic/publish?message=hi+there", "", nil)
 	require.Equal(t, 503, rr.Code)
@@ -90,10 +90,10 @@ func TestServer_Maintenance_DrainingIsReadOnly(t *testing.T) {
 
 	rr = request(t, s, "GET", "/v1/ready", "", nil)
 	require.Equal(t, 503, rr.Code)
-	require.JSONEq(t, `{"ready":false,"role":"passive","maintenance":true}`, rr.Body.String())
+	require.JSONEq(t, `{"ready":false,"role":"passive","draining":true}`, rr.Body.String())
 }
 
-func TestServer_Maintenance_EnteringServesEverything(t *testing.T) {
+func TestServer_Drain_EnteringServesEverything(t *testing.T) {
 	// While entering, the node is not ready, so the readiness agents take it out of the load
 	// balancers, but it still serves everything: requests already on their way must succeed
 	s, cl := newDrainTestServer(t, time.Second, true)
@@ -106,14 +106,14 @@ func TestServer_Maintenance_EnteringServesEverything(t *testing.T) {
 	defer cancel()
 	go s.Drain(ctx)
 	waitFor(t, func() bool {
-		return s.cluster.Maintenance()
+		return s.cluster.Draining()
 	})
 
 	rr := request(t, s, "GET", "/v1/ready", "", nil)
 	require.Equal(t, 503, rr.Code)
-	require.JSONEq(t, `{"ready":false,"role":"passive","maintenance":true}`, rr.Body.String())
+	require.JSONEq(t, `{"ready":false,"role":"passive","draining":true}`, rr.Body.String())
 	cl.mu.Lock()
-	require.True(t, cl.maintenance) // Acts as passive from the start: leadership moves away now
+	require.True(t, cl.draining) // Acts as passive from the start: leadership moves away now
 	cl.mu.Unlock()
 	rr = request(t, s, "PUT", "/mytopic", "hi there", nil)
 	require.Equal(t, 200, rr.Code)
@@ -121,17 +121,17 @@ func TestServer_Maintenance_EnteringServesEverything(t *testing.T) {
 	waitFor(t, func() bool {
 		return s.streams.Len() == 2
 	})
-	require.False(t, s.draining.Load())
+	require.False(t, s.readOnly.Load())
 
 	// After the delay, it drains
 	waitFor(t, func() bool {
-		return s.draining.Load()
+		return s.readOnly.Load()
 	})
 	rr = request(t, s, "PUT", "/mytopic", "too late", nil)
 	require.Equal(t, 503, rr.Code)
 }
 
-func TestServer_Maintenance_CanceledWhileEntering(t *testing.T) {
+func TestServer_Drain_CanceledWhileEntering(t *testing.T) {
 	s, _ := newDrainTestServer(t, time.Second, true)
 	s.config.ClusterDrainDelay = time.Minute
 	openDrainTestStream(s, "/mytopic/json")
@@ -145,7 +145,7 @@ func TestServer_Maintenance_CanceledWhileEntering(t *testing.T) {
 		close(drained)
 	}()
 	waitFor(t, func() bool {
-		return s.cluster.Maintenance()
+		return s.cluster.Draining()
 	})
 	cancel()
 	select {
@@ -153,10 +153,10 @@ func TestServer_Maintenance_CanceledWhileEntering(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("drain did not stop when canceled while entering")
 	}
-	require.False(t, s.draining.Load())
+	require.False(t, s.readOnly.Load())
 }
 
-func TestServer_Maintenance_SkippedWithoutAnotherActiveNode(t *testing.T) {
+func TestServer_Drain_SkippedWithoutAnotherActiveNode(t *testing.T) {
 	// Draining the last active node would send its clients nowhere: a passive peer does not count
 	s, _ := newDrainTestServer(t, 2*time.Second, false)
 	stream := openDrainTestStream(s, "/mytopic/json")
@@ -166,22 +166,33 @@ func TestServer_Maintenance_SkippedWithoutAnotherActiveNode(t *testing.T) {
 	start := time.Now()
 	s.Drain(context.Background())
 	require.Less(t, time.Since(start), 500*time.Millisecond)
-	require.False(t, s.cluster.Maintenance())
+	require.False(t, s.cluster.Draining())
 	require.Equal(t, 0, countClosed([]<-chan struct{}{stream}))
 }
 
-func TestServer_Maintenance_SkippedWithZeroDuration(t *testing.T) {
-	s, _ := newDrainTestServer(t, 0, true)
-	stream := openDrainTestStream(s, "/mytopic/json")
+func TestServer_Drain_ZeroDurationClosesAllAtOnce(t *testing.T) {
+	// A drain duration of 0 still drains (not ready, then read-only), but closes every stream at once
+	s, cl := newDrainTestServer(t, 0, true)
+	streams := make([]<-chan struct{}, 0)
+	for i := 0; i < 5; i++ {
+		streams = append(streams, openDrainTestStream(s, "/mytopic/json"))
+	}
 	waitFor(t, func() bool {
-		return s.streams.Len() == 1
+		return s.streams.Len() == 5
 	})
+	start := time.Now()
 	s.Drain(context.Background())
-	require.False(t, s.cluster.Maintenance())
-	require.Equal(t, 0, countClosed([]<-chan struct{}{stream}))
+	require.Less(t, time.Since(start), time.Second)
+	waitFor(t, func() bool {
+		return countClosed(streams) == 5
+	})
+	require.True(t, s.readOnly.Load())
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	require.True(t, cl.draining)
 }
 
-func TestServer_Maintenance_SkippedOnPassiveNode(t *testing.T) {
+func TestServer_Drain_SkippedOnPassiveNode(t *testing.T) {
 	s, cl := newDrainTestServer(t, 2*time.Second, true)
 	cl.mu.Lock()
 	cl.role = cluster.RolePassive
@@ -191,10 +202,10 @@ func TestServer_Maintenance_SkippedOnPassiveNode(t *testing.T) {
 		return s.streams.Len() == 1
 	})
 	s.Drain(context.Background())
-	require.False(t, s.cluster.Maintenance())
+	require.False(t, s.cluster.Draining())
 }
 
-func TestServer_Maintenance_StopsWhenCanceled(t *testing.T) {
+func TestServer_Drain_StopsWhenCanceled(t *testing.T) {
 	// A second SIGTERM cancels the drain, and the shutdown goes on at once
 	s, _ := newDrainTestServer(t, time.Minute, true)
 	openDrainTestStream(s, "/mytopic/json")
@@ -208,7 +219,7 @@ func TestServer_Maintenance_StopsWhenCanceled(t *testing.T) {
 		close(drained)
 	}()
 	waitFor(t, func() bool {
-		return s.cluster.Maintenance()
+		return s.cluster.Draining()
 	})
 	cancel()
 	select {
@@ -218,7 +229,7 @@ func TestServer_Maintenance_StopsWhenCanceled(t *testing.T) {
 	}
 }
 
-func TestServer_Maintenance_StreamsCountsConnectionsNotTopics(t *testing.T) {
+func TestServer_Drain_StreamsCountsConnectionsNotTopics(t *testing.T) {
 	// One connection subscribed to three topics is one stream to close, not three
 	s, _ := newDrainTestServer(t, time.Second, true)
 	streamHTTP := openDrainTestStream(s, "/a,b,c/json")
@@ -278,8 +289,8 @@ func countClosed(streams []<-chan struct{}) int {
 	return closed
 }
 
-func TestServer_Maintenance_ActsAsPassiveInTheCluster(t *testing.T) {
-	// Peers must stop counting a node in maintenance mode as a place for clients, and leadership
+func TestServer_Drain_ActsAsPassiveInTheCluster(t *testing.T) {
+	// Peers must stop counting a draining node as a place for clients, and leadership
 	// must move off it, so the cluster is told
 	s, cl := newDrainTestServer(t, time.Second, true)
 	openDrainTestStream(s, "/mytopic/json")
@@ -289,11 +300,11 @@ func TestServer_Maintenance_ActsAsPassiveInTheCluster(t *testing.T) {
 	s.Drain(context.Background())
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
-	require.True(t, cl.maintenance)
+	require.True(t, cl.draining)
 }
 
-func TestServer_Maintenance_NoDelayedMessagesClaimed(t *testing.T) {
-	// A node in maintenance mode is on its way out: it must not claim due delayed messages, which
+func TestServer_Drain_NoDelayedMessagesClaimed(t *testing.T) {
+	// A draining node is on its way out: it must not claim due delayed messages, which
 	// the next leader sends instead
 	s := newTestServer(t, newTestConfig(t, ""))
 	cl := &fakeCluster{}
@@ -305,20 +316,20 @@ func TestServer_Maintenance_NoDelayedMessagesClaimed(t *testing.T) {
 	msg := toMessage(t, response.Body.String())
 	require.Nil(t, s.messageCache.UpdateMessageTime(msg.ID, time.Now().Add(-10*time.Second).Unix()))
 
-	cl.SetMaintenance(true)
+	cl.SetDraining(true)
 	require.Nil(t, s.sendDelayedMessages())
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 0, len(toMessages(t, response.Body.String())))
 
-	cl.SetMaintenance(false)
+	cl.SetDraining(false)
 	require.Nil(t, s.sendDelayedMessages())
 	response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 1, len(toMessages(t, response.Body.String())))
 }
 
-func TestServer_Maintenance_SingleNodeShutdownIsQuiet(t *testing.T) {
+func TestServer_Drain_SingleNodeShutdownIsQuiet(t *testing.T) {
 	// Without clustering there is nowhere to send clients: a shutdown stops at once, and says
-	// nothing about maintenance mode (every self-hosted server would log it on every restart)
+	// nothing about draining (every self-hosted server would log it on every restart)
 	var out bytes.Buffer
 	log.SetOutput(&out)
 	t.Cleanup(func() {
@@ -326,98 +337,6 @@ func TestServer_Maintenance_SingleNodeShutdownIsQuiet(t *testing.T) {
 	})
 	s := newTestServer(t, newTestConfig(t, ""))
 	s.Drain(context.Background())
-	require.False(t, s.cluster.Maintenance())
-	require.NotContains(t, strings.ToLower(out.String()), "maintenance")
-}
-
-func TestServer_Maintenance_OnReturnsAtOnceAndIsIdempotent(t *testing.T) {
-	// The phases run in the background, so an admin command can turn maintenance mode on and return
-	s, _ := newDrainTestServer(t, time.Second, true)
-	s.config.ClusterDrainDelay = time.Minute
-	start := time.Now()
-	require.Nil(t, s.SetMaintenance(true))
-	require.Nil(t, s.SetMaintenance(true))
-	require.Less(t, time.Since(start), time.Second)
-	require.True(t, s.cluster.Maintenance())
-	require.Nil(t, s.SetMaintenance(false))
-}
-
-func TestServer_Maintenance_OnRefusedWithoutSomewhereToGo(t *testing.T) {
-	s, cl := newDrainTestServer(t, time.Second, false)
-	require.ErrorIs(t, s.SetMaintenance(true), errMaintenanceNoActivePeer)
-	require.False(t, s.cluster.Maintenance())
-
-	cl.mu.Lock()
-	cl.role = cluster.RolePassive
-	cl.mu.Unlock()
-	require.ErrorIs(t, s.SetMaintenance(true), errMaintenanceNotActive)
-
-	s, _ = newDrainTestServer(t, 0, true)
-	require.ErrorIs(t, s.SetMaintenance(true), errMaintenanceDisabled)
-	require.False(t, s.cluster.Maintenance())
-}
-
-func TestServer_Maintenance_OffWhileEntering(t *testing.T) {
-	s, _ := newDrainTestServer(t, time.Second, true)
-	s.config.ClusterDrainDelay = time.Second
-	require.Nil(t, s.SetMaintenance(true))
-	rr := request(t, s, "GET", "/v1/ready", "", nil)
-	require.Equal(t, 503, rr.Code)
-
-	require.Nil(t, s.SetMaintenance(false))
-	requireBackInService(t, s)
-	time.Sleep(1500 * time.Millisecond) // Past the delay: the canceled phases must not start draining
-	require.False(t, s.draining.Load())
-	requireBackInService(t, s)
-}
-
-func TestServer_Maintenance_OffWhileDraining(t *testing.T) {
-	// Streams already closed stay on the other nodes; the rest stay open
-	s, _ := newDrainTestServer(t, 3*time.Second, true)
-	stream := openDrainTestStream(s, "/othertopic/json")
-	waitFor(t, func() bool {
-		return s.streams.Len() == 1
-	})
-	require.Nil(t, s.SetMaintenance(true))
-	waitFor(t, func() bool {
-		return s.draining.Load()
-	})
-	require.Nil(t, s.SetMaintenance(false))
-	requireBackInService(t, s)
-	require.Equal(t, 0, countClosed([]<-chan struct{}{stream}))
-	openDrainTestStream(s, "/mytopic/json")
-	waitFor(t, func() bool {
-		return s.streams.Len() == 2
-	})
-}
-
-func TestServer_Maintenance_OffAfterDrained(t *testing.T) {
-	s, _ := newDrainTestServer(t, 500*time.Millisecond, true)
-	openDrainTestStream(s, "/mytopic/json")
-	waitFor(t, func() bool {
-		return s.streams.Len() == 1
-	})
-	require.Nil(t, s.SetMaintenance(true))
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	s.WaitDrained(ctx)
-	require.Nil(t, ctx.Err())
-	require.Equal(t, 0, s.streams.Len())
-	rr := request(t, s, "PUT", "/mytopic", "still drained", nil)
-	require.Equal(t, 503, rr.Code)
-
-	require.Nil(t, s.SetMaintenance(false))
-	requireBackInService(t, s)
-}
-
-// requireBackInService checks that a node out of maintenance mode is ready and takes publishes and streams again
-func requireBackInService(t *testing.T, s *Server) {
-	t.Helper()
-	require.False(t, s.cluster.Maintenance())
-	require.False(t, s.draining.Load())
-	rr := request(t, s, "GET", "/v1/ready", "", nil)
-	require.Equal(t, 200, rr.Code)
-	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
-	rr = request(t, s, "PUT", "/mytopic", "back in service", nil)
-	require.Equal(t, 200, rr.Code)
+	require.False(t, s.cluster.Draining())
+	require.NotContains(t, strings.ToLower(out.String()), "drain")
 }

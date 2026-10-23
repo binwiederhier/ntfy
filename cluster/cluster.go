@@ -127,13 +127,14 @@ type Cluster interface {
 	// node stays ready with a stale heartbeat, since pulling it would leave clients nowhere to go.
 	Ready() bool
 	// Role reports the role this node acts in: its configured role (active, or passive), or passive
-	// in maintenance mode
+	// while draining
 	Role() Role
-	// SetMaintenance turns maintenance mode on or off. While on, this node acts as passive: it is
-	// not ready, does not lead, and its peers see it as passive. Nop single-node.
-	SetMaintenance(on bool)
-	// Maintenance reports whether this node is in maintenance mode. Never single-node.
-	Maintenance() bool
+	// SetDraining marks this node as draining (moving its clients to other nodes, e.g. before a
+	// shutdown), or not. While draining, it acts as passive: it is not ready, does not lead, and its
+	// peers see it as passive. Nop single-node.
+	SetDraining(on bool)
+	// Draining reports whether this node is draining. Never single-node.
+	Draining() bool
 	// Peers returns the live peer nodes (as of the last registry refresh), excluding this node; e.g.
 	// Peers().HasActive() tells whether there is somewhere for this node's clients to go. None
 	// single-node.

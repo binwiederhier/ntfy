@@ -55,8 +55,8 @@ type meshCluster struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
-	maintenance    atomic.Bool // Maintenance mode: this node acts as passive (see SetMaintenance); lock-free reads, since Role is called with c.mu held
-	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetMaintenance
+	draining       atomic.Bool // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
+	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -252,20 +252,20 @@ func (c *meshCluster) Healthy() bool {
 	return time.Since(c.lastRegistered) < c.conf.NodeTTL
 }
 
-// SetMaintenance turns maintenance mode on or off: while on, this node acts as passive. It is not
+// SetDraining marks this node as draining, or not: while draining, it acts as passive. It is not
 // ready, gives up leadership at once, never fences, and registers as passive at its next
 // heartbeat, so its peers stop counting it as a place for clients and the next leader takes over.
-// Its configured role (Role) does not change.
-func (c *meshCluster) SetMaintenance(on bool) {
+// Its configured role does not change.
+func (c *meshCluster) SetDraining(on bool) {
 	c.mu.Lock() // Serializes writers, so the flag and the registered role always match
 	defer c.mu.Unlock()
-	c.maintenance.Store(on)
+	c.draining.Store(on)
 	c.registry.SetRole(c.Role())
 }
 
-// Maintenance reports whether this node is in maintenance mode
-func (c *meshCluster) Maintenance() bool {
-	return c.maintenance.Load()
+// Draining reports whether this node is draining
+func (c *meshCluster) Draining() bool {
+	return c.draining.Load()
 }
 
 // Peers returns the live peer nodes as of the last registry refresh, excluding this node
@@ -273,9 +273,9 @@ func (c *meshCluster) Peers() Peers {
 	return c.registry.Peers()
 }
 
-// Role reports the role this node acts in: passive in maintenance mode, else its configured role
+// Role reports the role this node acts in: passive while draining, else its configured role
 func (c *meshCluster) Role() Role {
-	if c.maintenance.Load() {
+	if c.draining.Load() {
 		return RolePassive
 	}
 	return c.conf.Role
@@ -440,8 +440,8 @@ func (c *meshCluster) isolationLoop() {
 //
 // Roles narrow this further. A passive peer is not behind the load balancer, so it is nowhere
 // better for clients that reconnect through it. A passive node never fences at all: its
-// clients connected to it directly, and nothing would route them elsewhere. Nor does a node in
-// maintenance mode: it is draining its clients already, gradually rather than all at once.
+// clients connected to it directly, and nothing would route them elsewhere. Nor does a draining
+// node: it moves its clients already, gradually rather than all at once.
 func (c *meshCluster) maybeIsolated() {
 	if c.conf.IsolatedFunc == nil || c.Role() == RolePassive || c.Healthy() {
 		return

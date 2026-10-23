@@ -75,12 +75,13 @@ func (r *streamRegistry) CancelSome(n int) int {
 	return canceled
 }
 
-// Drain puts this node into maintenance mode and moves its clients to the other nodes: it stops
-// taking new subscriptions (503, which a load balancer retries on another node; /v1/ready fails
-// too) and closes the open streams evenly over ClusterDrainDuration, so their clients reconnect to
-// the other nodes a few at a time instead of all at once. Clients resume with since=, so nothing is
-// lost. Publishes, polls and the cluster mesh keep working; due delayed messages are left to the
-// next leader. It returns when no streams are left, or
+// Drain puts this node into maintenance mode and moves its clients to the other nodes, in two phases.
+// Entering (ClusterDrainDelay): /v1/ready fails, so the readiness agents take the node out of the
+// load balancers, but it still serves everything; it acts as passive in the cluster, so leadership
+// moves and it claims no delayed messages. Draining (ClusterDrainDuration): read-only, i.e. new
+// subscriptions and publishes get 503, and the open streams are closed evenly, so their clients
+// reconnect to the other nodes a few at a time instead of all at once. Clients resume with
+// since=, so nothing is lost. Polls and the cluster mesh keep working. It returns when no streams are left, or
 // right away when ctx is canceled; the node stays in maintenance mode. A shutdown calls it first.
 //
 // It drains only an active node with at least one other healthy active node: otherwise there is
@@ -89,11 +90,25 @@ func (s *Server) Drain(ctx context.Context) {
 	if !s.shouldDrain() {
 		return
 	}
+	// Entering: not ready, so the readiness agents take this node out of the load balancers, but
+	// still serving everything, since requests already on their way must not fail
 	s.maintenance.Store(true)
 	s.cluster.SetMaintenance(true) // Act as passive: peers stop counting this node, and leadership moves
+	if delay := s.config.ClusterDrainDelay; delay > 0 {
+		log.Tag(tagMaintenance).Info("Entering maintenance mode: not ready, still serving for %v until the load balancers stop sending requests", delay)
+		select {
+		case <-ctx.Done():
+			log.Tag(tagMaintenance).Info("Drain canceled while entering maintenance mode")
+			return
+		case <-time.After(delay):
+		}
+	}
+
+	// Draining: read-only, and the streams are closed evenly over the drain duration
+	s.draining.Store(true)
 	total := s.streams.Len()
 	duration := s.config.ClusterDrainDuration
-	log.Tag(tagMaintenance).Info("Entering maintenance mode: closing %d stream(s) over %v, new subscriptions are rejected", total, duration)
+	log.Tag(tagMaintenance).Info("Maintenance mode: draining, closing %d stream(s) over %v, new subscriptions and publishes are rejected", total, duration)
 	start, lastLog := time.Now(), time.Now()
 	closed := 0
 	ticker := time.NewTicker(drainTickInterval)

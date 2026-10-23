@@ -32,7 +32,8 @@ const (
 	DefaultStripePriceCacheDuration             = 3 * time.Hour          // Time to keep Stripe prices cached in memory before a refresh is needed
 	DefaultClusterBatchLinger                   = 500 * time.Millisecond // How long fan-out messages wait to form a per-peer batch (experimental clustering)
 	DefaultClusterRole                          = cluster.RoleActive     // Active nodes take client traffic, lead and fence (experimental clustering)
-	DefaultClusterDrainDuration                 = time.Minute            // How long a node closes its streams on shutdown; fits systemd's default stop timeout (90s) (experimental clustering)
+	DefaultClusterDrainDelay                    = 15 * time.Second       // How long a node in maintenance mode still serves everything before it drains; with the drain duration, fits systemd's default stop timeout (90s) (experimental clustering)
+	DefaultClusterDrainDuration                 = time.Minute            // How long a node in maintenance mode takes to close its streams (experimental clustering)
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -141,6 +142,7 @@ type Config struct {
 	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	ClusterRole                          cluster.Role  // Active (default) or passive: a passive node never leads and never fences
+	ClusterDrainDelay                    time.Duration // In maintenance mode, how long a node still serves everything (not ready) before it drains
 	ClusterDrainDuration                 time.Duration // On shutdown, how long an active node takes to close its streams so they reconnect to other nodes; 0 disables
 	FirebaseKeyFile                      string
 	CacheFile                            string
@@ -264,6 +266,7 @@ func NewConfig() *Config {
 		ClusterSecret:                        "",
 		ClusterBatchLinger:                   DefaultClusterBatchLinger,
 		ClusterRole:                          DefaultClusterRole,
+		ClusterDrainDelay:                    DefaultClusterDrainDelay,
 		ClusterDrainDuration:                 DefaultClusterDrainDuration,
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",

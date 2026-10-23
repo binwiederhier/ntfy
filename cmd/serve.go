@@ -50,6 +50,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-secret", Aliases: []string{"experimental_cluster_secret"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-role", Aliases: []string{"experimental_cluster_role"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_ROLE"}, Value: string(server.DefaultClusterRole), Usage: "role of this cluster node: active (takes client traffic, may lead) or passive (hidden: never leads, never fences)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-batch-linger", Aliases: []string{"experimental_cluster_batch_linger"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER"}, Value: util.FormatDuration(server.DefaultClusterBatchLinger), Usage: "how long fan-out messages wait to form a batch per peer node (0 = send immediately)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-drain-delay", Aliases: []string{"experimental_cluster_drain_delay"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY"}, Value: util.FormatDuration(server.DefaultClusterDrainDelay), Usage: "on shutdown (SIGTERM), how long an active cluster node is not ready but still serves everything, so the load balancers stop sending it requests before it drains"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-drain-duration", Aliases: []string{"experimental_cluster_drain_duration"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION"}, Value: util.FormatDuration(server.DefaultClusterDrainDuration), Usage: "on shutdown (SIGTERM), how long an active cluster node takes to close its subscriber connections, so they reconnect to the other nodes gradually (0 = no drain)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
@@ -171,6 +172,7 @@ func execServe(c *cli.Context) error {
 	clusterSecret := c.String("experimental-cluster-secret")
 	clusterBatchLingerStr := c.String("experimental-cluster-batch-linger")
 	clusterRoleStr := c.String("experimental-cluster-role")
+	clusterDrainDelayStr := c.String("experimental-cluster-drain-delay")
 	clusterDrainDurationStr := c.String("experimental-cluster-drain-duration")
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
@@ -270,6 +272,10 @@ func execServe(c *cli.Context) error {
 	clusterBatchLinger, err := util.ParseDuration(clusterBatchLingerStr)
 	if err != nil || clusterBatchLinger < 0 {
 		return fmt.Errorf("invalid cluster batch linger: %s", clusterBatchLingerStr)
+	}
+	clusterDrainDelay, err := util.ParseDuration(clusterDrainDelayStr)
+	if err != nil || clusterDrainDelay < 0 {
+		return fmt.Errorf("invalid cluster drain delay: %s", clusterDrainDelayStr)
 	}
 	clusterDrainDuration, err := util.ParseDuration(clusterDrainDurationStr)
 	if err != nil || clusterDrainDuration < 0 {
@@ -605,6 +611,7 @@ func execServe(c *cli.Context) error {
 	conf.ClusterSecret = clusterSecret
 	conf.ClusterBatchLinger = clusterBatchLinger
 	conf.ClusterRole = clusterRole
+	conf.ClusterDrainDelay = clusterDrainDelay
 	conf.ClusterDrainDuration = clusterDrainDuration
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey

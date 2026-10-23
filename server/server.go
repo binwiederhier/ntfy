@@ -83,6 +83,7 @@ type Server struct {
 	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
 	maintenance       atomic.Bool     // Maintenance mode, set by Drain: new subscriptions get 503, and /v1/ready fails
 	streams           *streamRegistry // Open subscriber connections, for Drain
+	draining          atomic.Bool     // Draining phase of maintenance mode: read-only (see Drain)
 	mu                sync.RWMutex
 }
 
@@ -995,6 +996,9 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 }
 
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
+	if s.draining.Load() {
+		return nil, errHTTPServiceUnavailableMaintenance // Read-only; the load balancers stopped sending requests while entering
+	}
 	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
 	if err != nil {
@@ -1582,7 +1586,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
-	} else if !poll && s.maintenance.Load() {
+	} else if !poll && s.draining.Load() {
 		return errHTTPServiceUnavailableMaintenance
 	}
 	var wlock sync.Mutex
@@ -1701,7 +1705,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
-	} else if !poll && s.maintenance.Load() {
+	} else if !poll && s.draining.Load() {
 		return errHTTPServiceUnavailableMaintenance // Before the upgrade, so the load balancer can retry elsewhere
 	}
 	upgrader := &websocket.Upgrader{

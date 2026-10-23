@@ -55,8 +55,8 @@ type meshCluster struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
-	maintenance    atomic.Bool // Maintenance mode: this node acts as passive (see SetMaintenance)
-	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered
+	maintenance    atomic.Bool // Maintenance mode: this node acts as passive (see SetMaintenance); lock-free reads, since Role is called with c.mu held
+	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetMaintenance
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -267,6 +267,8 @@ func (c *meshCluster) Healthy() bool {
 // heartbeat, so its peers stop counting it as a place for clients and the next leader takes over.
 // Its configured role (Role) does not change.
 func (c *meshCluster) SetMaintenance(on bool) {
+	c.mu.Lock() // Serializes writers, so the flag and the registered role always match
+	defer c.mu.Unlock()
 	c.maintenance.Store(on)
 	c.registry.SetRole(c.Role())
 }

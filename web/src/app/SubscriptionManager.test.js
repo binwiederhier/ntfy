@@ -158,6 +158,18 @@ describe("SubscriptionManager.addNotification", () => {
     expect((await db.subscriptions.get(subscriptionId)).last).toBe("m2");
   });
 
+  it("preserves a duplicate message when replacing older versions of the same sequence", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotification(subscriptionId, message("m1", { sequence_id: "s1" }));
+    await manager.markNotificationRead("m1");
+
+    // Replaying the same WebSocket message should leave its read state intact.
+    await manager.deleteNotificationBySequenceId(subscriptionId, "s1", "m1");
+    expect(await manager.addNotification(subscriptionId, message("m1", { sequence_id: "s1" }))).toBe(false);
+
+    expect(await db.notifications.get("m1")).toMatchObject({ sequenceId: "s1", new: 0 });
+  });
+
   it("does not store delete and clear events", async () => {
     const { db, manager } = await setup();
     expect(await manager.addNotification(subscriptionId, message("d1", { event: "message_delete", sequence_id: "s1" }))).toBe(false);

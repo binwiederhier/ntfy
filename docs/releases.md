@@ -6,11 +6,20 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.33.0 | Oct 23, 2026  |
+| ntfy server      | v2.33.1 | Oct 23, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.33.1
+Released October 23, 2026
+
+This is a hotfix release for the amd64 binaries of v2.33.0, which crashed with "Illegal instruction" on older CPUs.
+
+**Bug fixes + maintenance:**
+
+* Fix "Illegal instruction" crash of the amd64 binaries on CPUs without x86-64-v3 (AVX2/BMI2), by building releases on Ubuntu 24.04 again ([#2092](https://github.com/binwiederhier/ntfy/issues/2092), thanks to [@frank-bg](https://github.com/frank-bg) for reporting)
 
 ## ntfy server v2.33.0
 Released October 23, 2026
@@ -2234,6 +2243,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 ## Not released yet
 
 ### ntfy server v2.34.0 (UNRELEASED)
+
+**Features:**
+
+* Allow several comma-separated addresses in `listen-http`, so a load balancer can hold more than ~63k connections to one ntfy node
 
 **Security:**
 

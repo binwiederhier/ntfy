@@ -19,6 +19,9 @@
 # To listen on all interfaces, you may omit the IP address, e.g. ":443".
 # To disable HTTP, set "listen-http" to "-".
 #
+# "listen-http" may list several comma-separated addresses, e.g. "10.0.0.5:2586,10.0.0.5:2588".
+# Behind a load balancer, each address allows ~63k more connections from it (one per source port).
+#
 # listen-http: ":80"
 # listen-https:
 

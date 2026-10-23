@@ -5772,7 +5772,7 @@ func TestServer_RunDoesNotStartListenersAfterStop(t *testing.T) {
 	addr := ln.Addr().String()
 	require.Nil(t, ln.Close())
 	conf := newTestConfig(t, "")
-	conf.ListenHTTP = addr
+	conf.ListenHTTP = []string{addr}
 	s := newTestServer(t, conf)
 	s.Stop()
 
@@ -5785,6 +5785,48 @@ func TestServer_RunDoesNotStartListenersAfterStop(t *testing.T) {
 	}
 	_, err = net.DialTimeout("tcp", addr, time.Second)
 	require.Error(t, err, "listener was started after Stop")
+}
+
+func TestServer_RunListensOnSeveralAddresses(t *testing.T) {
+	// A load balancer reaches each upstream address from one source IP, so every extra address
+	// gives it another ~63k ports to this node
+	addrs := []string{freeTestAddr(t), freeTestAddr(t)}
+	conf := newTestConfig(t, "")
+	conf.ListenHTTP = addrs
+	s := newTestServer(t, conf)
+	done := make(chan error, 1)
+	go func() { done <- s.Run() }()
+	for _, addr := range addrs {
+		require.Eventually(t, func() bool {
+			resp, err := http.Get("http://" + addr + "/v1/health")
+			if err != nil {
+				return false
+			}
+			resp.Body.Close()
+			return resp.StatusCode == http.StatusOK
+		}, 10*time.Second, 50*time.Millisecond, "no answer on %s", addr)
+	}
+
+	// Stop closes every listener
+	s.Stop()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return after Stop")
+	}
+	for _, addr := range addrs {
+		_, err := net.DialTimeout("tcp", addr, time.Second)
+		require.Error(t, err, "listener %s still open after Stop", addr)
+	}
+}
+
+// freeTestAddr returns a local address that was free a moment ago
+func freeTestAddr(t *testing.T) string {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	addr := ln.Addr().String()
+	require.Nil(t, ln.Close())
+	return addr
 }
 
 func TestServer_StopIsBoundedWhenAStoreBlocks(t *testing.T) {

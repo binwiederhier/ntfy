@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"heckel.io/ntfy/v2/cluster/registry"
@@ -54,7 +55,8 @@ type meshCluster struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
-	mu             sync.Mutex // Protects queues, closed, knownPeers, stats and lastRegistered
+	draining       atomic.Bool // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
+	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -82,7 +84,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	if err != nil {
 		return nil, err
 	}
-	if conf.Role == RolePassive && !hasActivePeer(peers) {
+	if conf.Role == RolePassive && !peers.HasActive() {
 		log.Tag(tag).Warn("This node is passive and no active node is live: load balancers checking /v1/ready send it no clients, and the cluster has no leader until an active node joins")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -108,16 +110,6 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	go c.heartbeatLoop()
 	go c.isolationLoop()
 	return c, nil
-}
-
-// hasActivePeer reports whether any of the peers is active
-func hasActivePeer(peers []*registry.Peer) bool {
-	for _, p := range peers {
-		if p.Role == RoleActive {
-			return true
-		}
-	}
-	return false
 }
 
 // ForwardMessage enqueues the message for delivery to every live peer node; a peer without
@@ -191,7 +183,12 @@ func (c *meshCluster) BroadcastState(state *State) {
 // which is what an agent needs to disregard its answer and keep the upstreams it has.
 func (c *meshCluster) Members() []Member {
 	fresh := c.registry.Fresh()
-	members := []Member{{NodeID: c.conf.NodeID, AdvertiseURL: c.conf.AdvertiseURL, Role: c.conf.Role, Healthy: c.Healthy()}}
+	members := []Member{{
+		NodeID:       c.conf.NodeID,
+		AdvertiseURL: c.conf.AdvertiseURL,
+		Role:         c.Role(),
+		Healthy:      c.Healthy(),
+	}}
 	for _, p := range c.registry.Peers() {
 		members = append(members, Member{NodeID: NodeID(p.NodeID), AdvertiseURL: p.AdvertiseURL, Role: p.Role, Healthy: fresh})
 	}
@@ -205,7 +202,7 @@ func (c *meshCluster) Status() *Status {
 	now := time.Now()
 	status := &Status{
 		NodeID:  c.conf.NodeID,
-		Role:    c.conf.Role,
+		Role:    c.Role(),
 		Leader:  c.IsLeader(),
 		Healthy: c.Healthy(),
 		Time:    now.Unix(),
@@ -258,15 +255,39 @@ func (c *meshCluster) Healthy() bool {
 	return time.Since(c.lastRegistered) < c.conf.NodeTTL
 }
 
-// Role reports this node's configured role
+// SetDraining marks this node as draining, or not: while draining, it acts as passive. It is not
+// ready, gives up leadership at once, never fences, and registers as passive at its next
+// heartbeat, so its peers stop counting it as a place for clients and the next leader takes over.
+// Its configured role does not change.
+func (c *meshCluster) SetDraining(on bool) {
+	c.mu.Lock() // Serializes writers, so the flag and the registered role always match
+	defer c.mu.Unlock()
+	c.draining.Store(on)
+	c.registry.SetRole(c.Role())
+}
+
+// Draining reports whether this node is draining
+func (c *meshCluster) Draining() bool {
+	return c.draining.Load()
+}
+
+// Peers returns the live peer nodes as of the last registry refresh, excluding this node
+func (c *meshCluster) Peers() Peers {
+	return c.registry.Peers()
+}
+
+// Role reports the role this node acts in: passive while draining, else its configured role
 func (c *meshCluster) Role() Role {
+	if c.draining.Load() {
+		return RolePassive
+	}
 	return c.conf.Role
 }
 
 // Ready reports whether a load balancer should send clients here (see the Cluster interface). It
 // reads the last peer snapshot rather than probing peers, since load balancers call it often.
 func (c *meshCluster) Ready() bool {
-	if c.conf.Role != RoleActive {
+	if c.Role() != RoleActive {
 		return false
 	} else if c.Healthy() {
 		return true
@@ -365,7 +386,7 @@ func (c *meshCluster) heartbeat() error {
 // advertise URL (the retired queue's remainder was headed for a dead address anyway). New and
 // replacement queues are created lazily by ForwardMessage, not here, so a freshly joined peer is
 // reachable immediately.
-func (c *meshCluster) reconcilePeers(peers []*registry.Peer) {
+func (c *meshCluster) reconcilePeers(peers Peers) {
 	metrics.ClusterPeers.Set(float64(len(peers)))
 	alive := make(map[NodeID]*registry.Peer, len(peers))
 	for _, p := range peers {
@@ -422,9 +443,10 @@ func (c *meshCluster) isolationLoop() {
 //
 // Roles narrow this further. A passive peer is not behind the load balancer, so it is nowhere
 // better for clients that reconnect through it. A passive node never fences at all: its
-// clients connected to it directly, and nothing would route them elsewhere.
+// clients connected to it directly, and nothing would route them elsewhere. Nor does a draining
+// node: it moves its clients already, gradually rather than all at once.
 func (c *meshCluster) maybeIsolated() {
-	if c.conf.IsolatedFunc == nil || c.conf.Role == RolePassive || c.Healthy() {
+	if c.conf.IsolatedFunc == nil || c.Role() == RolePassive || c.Healthy() {
 		return
 	}
 	c.mu.Lock()

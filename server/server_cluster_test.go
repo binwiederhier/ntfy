@@ -32,6 +32,8 @@ type fakeCluster struct {
 	notHealthy    bool
 	notReady      bool
 	role          cluster.Role // Empty means active
+	draining      bool
+	peers         cluster.Peers
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -56,7 +58,7 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 func (b *fakeCluster) Ready() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return !b.notReady
+	return !b.notReady && !b.draining // Like the mesh: a draining node acts as passive
 }
 
 func (b *fakeCluster) setReady(ready bool) {
@@ -68,7 +70,9 @@ func (b *fakeCluster) setReady(ready bool) {
 func (b *fakeCluster) Role() cluster.Role {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.role == "" {
+	if b.draining {
+		return cluster.RolePassive // Like the mesh: the role it acts in
+	} else if b.role == "" {
 		return cluster.RoleActive
 	}
 	return b.role
@@ -98,7 +102,27 @@ func (b *fakeCluster) setLeader(leader bool) {
 	b.notLeader = !leader
 }
 
-func (b *fakeCluster) Members() []cluster.Member { return nil }
+func (b *fakeCluster) SetDraining(on bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.draining = on
+}
+
+func (b *fakeCluster) Draining() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.draining
+}
+
+func (b *fakeCluster) Peers() cluster.Peers {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.peers
+}
+
+func (b *fakeCluster) Members() []cluster.Member {
+	return nil // No test needs members
+}
 
 func (b *fakeCluster) Close() error { return nil }
 

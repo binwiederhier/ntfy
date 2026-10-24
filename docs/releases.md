@@ -2247,6 +2247,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Allow several comma-separated addresses in `listen-http`, so a load balancer can hold more than ~63k connections to one ntfy node
+* Cluster nodes drain on shutdown: an active node withdraws (stops being ready), then turns read-only and closes its subscriber connections gradually (`experimental-cluster-drain-delay`, `experimental-cluster-drain-duration`), so its clients move to the other nodes without a reconnect storm (experimental, see [draining on shutdown](config.md#draining-on-shutdown))
 
 **Security:**
 

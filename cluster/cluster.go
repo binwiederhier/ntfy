@@ -48,6 +48,14 @@ type NodeID string
 // Role is a node's part in the cluster; the registry owns it because leadership is derived there
 type Role = registry.Role
 
+type (
+	// Peer is a live peer node (see registry.Peer)
+	Peer = registry.Peer
+
+	// Peers is a list of live peer nodes (see registry.Peers)
+	Peers = registry.Peers
+)
+
 // Node roles (see registry.Role)
 const (
 	RoleActive  = registry.RoleActive
@@ -117,9 +125,21 @@ type Cluster interface {
 	// Ready reports whether a load balancer should send clients here: an active node that is
 	// Healthy, or that is not but has no other active node to take its clients. The only active
 	// node stays ready with a stale heartbeat, since pulling it would leave clients nowhere to go.
+	// A draining node is never ready: it acts as passive (see Role).
 	Ready() bool
-	// Role reports this node's configured role (active, or passive)
+	// Role reports the role this node acts in: its configured role (active, or passive), or passive
+	// while draining
 	Role() Role
+	// SetDraining marks this node as draining (moving its clients to other nodes, e.g. before a
+	// shutdown), or not. While draining, it acts as passive: it is not ready, does not lead, and its
+	// peers see it as passive. Nop single-node.
+	SetDraining(on bool)
+	// Draining reports whether this node is draining. Never single-node.
+	Draining() bool
+	// Peers returns the live peer nodes (as of the last registry refresh), excluding this node; e.g.
+	// Peers().HasActive() tells whether there is somewhere for this node's clients to go. None
+	// single-node.
+	Peers() Peers
 	// Close stops the cluster and releases its resources.
 	Close() error
 }

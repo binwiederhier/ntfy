@@ -835,6 +835,57 @@ func discardMessage(_ *model.Message) {
 	// Nothing to do: these tests only check status and counters
 }
 
+func TestMesh_DrainingActsAsPassive(t *testing.T) {
+	// A draining node takes no clients and gives up leadership, and its peers see it as passive, so
+	// they no longer count it as a place for clients. Its configured role stays.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, mesh.IsLeader)
+	require.True(t, mesh.Ready())
+
+	mesh.SetDraining(true)
+	require.True(t, mesh.Draining())
+	require.False(t, mesh.Ready())
+	require.False(t, mesh.IsLeader())
+	require.Equal(t, RolePassive, mesh.Role()) // The role it acts in; the configured one is in its config
+	require.Equal(t, RolePassive, mesh.Members()[0].Role)
+	observer, err := registry.New(pool, "observer", "http://192.168.1.99:2587", RolePassive, time.Minute)
+	require.Nil(t, err)
+	waitFor(t, func() bool {
+		peers, err := observer.Refresh()
+		require.Nil(t, err)
+		return len(peers) == 1 && peers[0].Role == RolePassive
+	})
+
+	mesh.SetDraining(false)
+	require.False(t, mesh.Draining())
+	require.True(t, mesh.Ready())
+	require.Equal(t, RoleActive, mesh.Role())
+	require.Equal(t, RoleActive, mesh.Members()[0].Role)
+}
+
+func TestMesh_PeersHasActive(t *testing.T) {
+	// A node only drains if another active node can take its clients
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.True(t, mesh.Peers().HasActive())
+}
+
+func TestMesh_PassivePeerIsNoActivePeer(t *testing.T) {
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeerWithRole(t, pool, "node-passive", "http://192.168.1.51:2587", RolePassive)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.False(t, mesh.Peers().HasActive())
+}
+
 func TestMesh_AccessChangedBroadcast(t *testing.T) {
 	// Node A changed access entries: node B must be told, so it reloads its access cache; node A's
 	// own callback must not fire (no loop)

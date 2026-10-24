@@ -87,6 +87,13 @@
 #   jobs, and it never closes its subscribers to send them elsewhere. Active nodes do not count
 #   it as a place to send theirs either. The member list reports each node's role, so load
 #   balancer agents can route to active nodes only.
+# - experimental-cluster-drain-delay and experimental-cluster-drain-duration control how an active
+#   node drains on shutdown (SIGTERM) if another active node is up, so its clients move to the
+#   other nodes gradually instead of all at once. For the drain delay, the node withdraws: it is not
+#   ready (/v1/ready fails) but still serves everything, so the load balancer can stop sending it
+#   requests. Then it is read-only (new subscriptions and publishes get 503) and closes its
+#   subscriber connections evenly over the drain duration (all at once with 0). Make sure the
+#   service manager waits long enough (systemd: TimeoutStopSec, default 90s).
 #
 # Clustering also requires "database-url": the shared PostgreSQL database carries the durable
 # state and the cluster's own coordination tables.
@@ -101,6 +108,8 @@
 # experimental-cluster-secret: <secret>
 # experimental-cluster-batch-linger: 500ms
 # experimental-cluster-role: active
+# experimental-cluster-drain-delay: 15s
+# experimental-cluster-drain-duration: 1m
 
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.

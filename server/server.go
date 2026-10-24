@@ -80,7 +80,9 @@ type Server struct {
 	closeChan         chan bool
 	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
 	stopOnce          sync.Once
-	stopped           atomic.Bool // Set by Stop; read by Run, which must not start listeners afterwards
+	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
+	streams           *streamRegistry // Open subscriber connections, for Drain
+	readOnly          atomic.Bool     // Second phase of a drain: new subscriptions and publishes get 503 (see Drain)
 	mu                sync.RWMutex
 }
 
@@ -299,6 +301,7 @@ func New(conf *Config) (*Server, error) {
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
 		visitors:        make(map[string]*visitor),
 		stripe:          stripe,
+		streams:         newStreamRegistry(),
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager
@@ -636,7 +639,8 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	}
 	metrics.HTTPRequests.WithLabelValues(strconv.Itoa(httpErr.HTTPCode), strconv.Itoa(httpErr.Code), r.Method).Inc()
 	isRateLimiting := util.Contains(rateLimitingErrorCodes, httpErr.HTTPCode)
-	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode)
+	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode) ||
+		httpErr.Code == errHTTPServiceUnavailableDraining.Code // A draining node rejects every new subscription, by design
 	ev := logvr(v, r).Err(err)
 	if websocket.IsWebSocketUpgrade(r) {
 		ev.Tag(tagWebsocket).Fields(websocketErrorContext(err))
@@ -851,7 +855,11 @@ func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor)
 	if !ready {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, &apiReadyResponse{Ready: ready, Role: s.cluster.Role()})
+	return s.writeJSON(w, &apiReadyResponse{
+		Ready:    ready,
+		Role:     s.cluster.Role(),
+		Draining: s.cluster.Draining(),
+	})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -992,6 +1000,9 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 }
 
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
+	if s.readOnly.Load() {
+		return nil, errHTTPServiceUnavailableDraining // Read-only; the load balancers stopped sending requests in the drain delay
+	}
 	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
 	if err != nil {
@@ -1579,6 +1590,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
+	} else if !poll && s.readOnly.Load() {
+		return errHTTPServiceUnavailableDraining
 	}
 	var wlock sync.Mutex
 	var closed bool
@@ -1641,6 +1654,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if testHookBeforeSubscribe != nil {
 		testHookBeforeSubscribe()
 	}
+	streamID := s.streams.Add(cancel)
+	defer s.streams.Remove(streamID)
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.User(), cancel))
@@ -1700,6 +1715,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
+	} else if !poll && s.readOnly.Load() {
+		return errHTTPServiceUnavailableDraining // Before the upgrade, so the load balancer can retry elsewhere
 	}
 	upgrader := &websocket.Upgrader{
 		ReadBufferSize:  wsBufferSize,
@@ -1796,6 +1813,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	if testHookBeforeSubscribe != nil {
 		testHookBeforeSubscribe()
 	}
+	streamID := s.streams.Add(cancel)
+	defer s.streams.Remove(streamID)
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
 		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.User(), cancel))
@@ -2198,6 +2217,9 @@ func (s *Server) runDelayedSender() {
 }
 
 func (s *Server) sendDelayedMessages() error {
+	if s.cluster.Draining() {
+		return nil // On its way out: claiming now could leave a claimed message unsent; the next leader sends it
+	}
 	messages, err := s.messageCache.MessagesDue()
 	if err != nil {
 		return err

@@ -664,3 +664,34 @@ func TestRegistry_PruneKeepsRecentlyLiveActiveNodes(t *testing.T) {
 	tick(t, a)
 	require.False(t, a.IsLeader())
 }
+
+func TestRegistry_SetRolePassiveHandsLeadershipOver(t *testing.T) {
+	// A draining node acts as passive at runtime: it stops leading at once, and its
+	// peers see the new role at its next heartbeat and take over
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	waitForLeader(t, a, b)
+	a.SetRole(RolePassive)
+	require.False(t, a.IsLeader())
+	tick(t, a, b)
+	peers := b.Peers()
+	require.Len(t, peers, 1)
+	require.Equal(t, RolePassive, peers[0].Role)
+	waitForLeader(t, b, a)
+}
+
+func TestPeers_HasActive(t *testing.T) {
+	// Whether there is somewhere for a node's clients to go: a passive peer takes none
+	require.False(t, Peers(nil).HasActive())
+	require.False(t, Peers{
+		&Peer{NodeID: "app2", Role: RolePassive},
+	}.HasActive())
+	require.True(t, Peers{
+		&Peer{NodeID: "app2", Role: RolePassive},
+		&Peer{NodeID: "app3", Role: RoleActive},
+	}.HasActive())
+}

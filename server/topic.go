@@ -2,12 +2,12 @@ package server
 
 import (
 	"math/rand"
-	"slices"
 	"sync"
 	"time"
 
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -36,7 +36,8 @@ type topic struct {
 }
 
 type topicSubscriber struct {
-	userID       string // User ID associated with this subscription, may be empty
+	userID       string     // User ID associated with this subscription, may be empty
+	user         *user.User // The user as of subscribing, nil if anonymous; lets a re-check authorize without the database
 	subscriber   subscriber
 	cancel       func()
 	subscribedAt time.Time     // When it subscribed; what went out before, it missed
@@ -56,8 +57,12 @@ func newTopic(id string) *topic {
 	}
 }
 
-// Subscribe subscribes to this topic
-func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscriberID int) {
+// Subscribe subscribes to this topic, as the given user (nil if anonymous)
+func (t *topic) Subscribe(s subscriber, u *user.User, cancel func()) (subscriberID int) {
+	userID := ""
+	if u != nil {
+		userID = u.ID
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for i := 0; i < 5; i++ { // Best effort retry
@@ -69,6 +74,7 @@ func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscribe
 	}
 	t.subscribers[subscriberID] = &topicSubscriber{
 		userID:       userID, // May be empty
+		user:         u,
 		subscriber:   s,
 		cancel:       cancel,
 		subscribedAt: time.Now(),
@@ -278,18 +284,16 @@ func (t *topic) subscribersMatching(match func(s *topicSubscriber) bool) []*topi
 	return matching
 }
 
-// SubscriberUserIDs returns the distinct user IDs of this topic's subscribers, "" standing for
-// anonymous ones
-func (t *topic) SubscriberUserIDs() []string {
+// SubscriberUsers returns the distinct users of this topic's subscribers by user ID, as of when
+// they subscribed; "" maps to nil for the anonymous ones
+func (t *topic) SubscriberUsers() map[string]*user.User {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	userIDs := make([]string, 0)
+	users := make(map[string]*user.User)
 	for _, s := range t.subscribers {
-		if !slices.Contains(userIDs, s.userID) {
-			userIDs = append(userIDs, s.userID)
-		}
+		users[s.userID] = s.user
 	}
-	return userIDs
+	return users
 }
 
 func (t *topic) cancelUserSubscriber(s *topicSubscriber) {

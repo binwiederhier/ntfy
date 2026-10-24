@@ -1635,7 +1635,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	defer cancel()
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.User(), cancel))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
@@ -1784,7 +1784,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.User(), cancel))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {

@@ -1964,7 +1964,7 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 		require.NotNil(t, s.topics["mytopic"])
 
 		// Fudge with last access, but subscribe, and see that it won't get pruned (because of subscriber)
-		subID := s.topics["mytopic"].Subscribe(subFn, "", func() {})
+		subID := s.topics["mytopic"].Subscribe(subFn, nil, func() {})
 		s.topics["mytopic"].mu.Lock()
 		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
 		s.topics["mytopic"].mu.Unlock()

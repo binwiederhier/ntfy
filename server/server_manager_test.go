@@ -35,7 +35,7 @@ func TestServer_Manager_ExpiresDeliveries(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t, ""))
 	topics, err := s.topicsFromIDs(nil, "mytopic")
 	require.Nil(t, err)
-	topics[0].Subscribe(func(_ *visitor, _ *model.Message) error { return nil }, "", func() {}) // Not stale
+	topics[0].Subscribe(func(_ *visitor, _ *model.Message) error { return nil }, nil, func() {}) // Not stale
 	topics[0].mu.Lock()
 	topics[0].delivered["old"] = time.Now().Add(-topicDeliveredRetain - time.Second)
 	topics[0].mu.Unlock()

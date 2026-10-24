@@ -267,30 +267,22 @@ func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
 
 // reauthorizeSubscribers ends the subscriptions that changed access entries no longer allow, checking
 // only matching topics. The user manager calls it after an access cache reload that found changes.
+// It authorizes each subscriber's user as of subscribing, against the cache, without a database
+// query; a deleted user's streams end through killUserSubscriberEverywhere instead.
 func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
-	users := make(map[string]*user.User) // Resolved once per call; nil means anonymous or deleted
 	for _, change := range changes {
 		for _, t := range s.topicsForAccessChange(change.Topic) {
-			for _, userID := range t.SubscriberUserIDs() {
-				u, resolved := users[userID]
-				if !resolved && userID != "" {
-					var err error
-					if u, err = s.userManager.UserByID(userID); err != nil && !errors.Is(err, user.ErrUserNotFound) {
-						log.Tag(tagSubscribe).Err(err).Warn("Cannot re-check the subscribers of user %s", userID)
-						continue
-					}
-					users[userID] = u
-				}
-				deleted := userID != "" && u == nil
-				if !deleted && change.Username != user.Everyone && (u == nil || u.Name != change.Username) {
+			for userID, u := range t.SubscriberUsers() {
+				if change.Username != user.Everyone && (u == nil || u.Name != change.Username) {
 					continue // The entry does not apply to this subscriber
-				} else if deleted || s.userManager.Authorize(u, t.ID, user.PermissionRead) != nil {
-					log.Tag(tagSubscribe).With(t).Debug("Canceling subscribers of user %s: access to the topic changed", userID)
-					if userID == "" {
-						t.CancelAnonymousSubscribers()
-					} else {
-						t.CancelSubscriberUser(userID)
-					}
+				} else if s.userManager.Authorize(u, t.ID, user.PermissionRead) == nil {
+					continue // Still allowed
+				}
+				log.Tag(tagSubscribe).With(t).Debug("Canceling subscribers of user %s: access to the topic changed", userID)
+				if userID == "" {
+					t.CancelAnonymousSubscribers()
+				} else {
+					t.CancelSubscriberUser(userID)
 				}
 			}
 		}

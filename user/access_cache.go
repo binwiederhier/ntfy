@@ -23,6 +23,8 @@ import (
 // Walked per request; trivially small in practice. Wildcards are NOT u_everyone-
 // only -- any user can create them.
 type accessCache struct {
+	db       *db.DB // Reloads read the primary, so a reload after a write sees the just-written rows
+	query    string // Loads every (user_name, topic, read, write) row
 	exact    map[string]map[string]aclEntry
 	pattern  map[string][]aclEntry
 	reloadMu sync.Mutex   // Serializes reloads, so a reload that scanned earlier never replaces a later one
@@ -48,8 +50,10 @@ type aclEntry struct {
 	write   bool
 }
 
-func newAccessCache() *accessCache {
+func newAccessCache(d *db.DB, query string) *accessCache {
 	return &accessCache{
+		db:      d,
+		query:   query,
 		exact:   make(map[string]map[string]aclEntry),
 		pattern: make(map[string][]aclEntry),
 	}
@@ -82,14 +86,13 @@ func (c *accessCache) Lookup(username, topic string) (read, write, found bool) {
 
 // Reload replaces the cache with every access entry in the database and returns the entries
 // that differ from before (added, removed, or with other permissions), so that the caller can
-// re-check the live subscriptions they affect. Runs against the primary so a reload after a
-// write sees the just-written rows. Reloads are serialized: one that scanned earlier must never
-// replace one that scanned later.
-func (c *accessCache) Reload(d *db.DB, query string) ([]*AccessChange, error) {
+// re-check the live subscriptions they affect. Reloads are serialized: one that scanned earlier
+// must never replace one that scanned later.
+func (c *accessCache) Reload() ([]*AccessChange, error) {
 	c.reloadMu.Lock()
 	defer c.reloadMu.Unlock()
 	started := time.Now()
-	rows, err := d.Query(query)
+	rows, err := c.db.Query(c.query)
 	if err != nil {
 		return nil, err
 	}

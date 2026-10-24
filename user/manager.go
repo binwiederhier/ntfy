@@ -53,15 +53,15 @@ var (
 
 // Manager handles user authentication, authorization, and management
 type Manager struct {
-	config         *Config
-	db             *db.DB
-	queries        queries
-	statsQueue     map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
-	tokenQueue     map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
-	accessCache    *accessCache            // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
-	quit           chan struct{}           // Closed by Close() to signal background goroutines to stop
-	reloadRequests chan struct{}           // Pending access cache reload request, at most one (see RequestAccessCacheReload)
-	mu             sync.Mutex
+	config                    *Config
+	db                        *db.DB
+	queries                   queries
+	statsQueue                map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
+	tokenQueue                map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
+	accessCache               *accessCache            // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
+	accessCacheReloadRequests chan struct{}           // Pending access cache reload request, at most one (see RequestAccessCacheReload)
+	quit                      chan struct{}           // Closed by Close() to signal background goroutines to stop
+	mu                        sync.Mutex
 }
 
 var _ Auther = (*Manager)(nil)
@@ -91,10 +91,10 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 		return nil, err
 	}
 	if config.AccessCacheEnabled {
-		manager.accessCache = newAccessCache()
-		manager.reloadRequests = make(chan struct{}, 1)
+		manager.accessCache = newAccessCache(d, queries.selectAccessCacheAll)
+		manager.accessCacheReloadRequests = make(chan struct{}, 1)
 		// The initial load finds every entry new; that is no change, so nothing is reported
-		if _, err := manager.accessCache.Reload(d, queries.selectAccessCacheAll); err != nil {
+		if _, err := manager.accessCache.Reload(); err != nil {
 			return nil, err
 		}
 		go manager.asyncAccessCacheReloadLoop(manager.config.AccessCacheReloadInterval)
@@ -120,7 +120,7 @@ func (a *Manager) RequestAccessCacheReload() {
 		return
 	}
 	select {
-	case a.reloadRequests <- struct{}{}:
+	case a.accessCacheReloadRequests <- struct{}{}:
 	default: // A reload is pending already; it will see this change too
 	}
 }
@@ -135,7 +135,7 @@ func (a *Manager) maybeReloadAccessCache() error {
 	if a.accessCache == nil {
 		return nil
 	}
-	changes, err := a.accessCache.Reload(a.db, a.queries.selectAccessCacheAll)
+	changes, err := a.accessCache.Reload()
 	if err != nil {
 		return err
 	}
@@ -170,7 +170,7 @@ func (a *Manager) asyncAccessCacheReloadLoop(interval time.Duration) {
 		case <-a.quit:
 			return
 		case <-ticker.C:
-		case <-a.reloadRequests:
+		case <-a.accessCacheReloadRequests:
 		}
 		if err := a.maybeReloadAccessCache(); err != nil {
 			log.Tag(tag).Err(err).Warn("Reloading ACL cache failed")

@@ -69,7 +69,7 @@ func TestACLCache_LookupBeforeReload(t *testing.T) {
 	// A freshly-constructed cache has empty exact and wildcards maps. The
 	// cache treats this as "no rule found", which the caller resolves via
 	// DefaultAccess.
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	read, write, found := c.Lookup("phil", "mytopic")
 	require.False(t, found)
 	require.False(t, read)
@@ -77,7 +77,7 @@ func TestACLCache_LookupBeforeReload(t *testing.T) {
 }
 
 func TestACLCache_ExactMatchHit(t *testing.T) {
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: "phil", topic: "mytopic", read: true, write: true},
 	})
@@ -88,7 +88,7 @@ func TestACLCache_ExactMatchHit(t *testing.T) {
 }
 
 func TestACLCache_ExactMatchMiss(t *testing.T) {
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: "phil", topic: "mytopic", read: true, write: true},
 	})
@@ -99,7 +99,7 @@ func TestACLCache_ExactMatchMiss(t *testing.T) {
 func TestACLCache_LiteralUnderscoreExactMatch(t *testing.T) {
 	// Stored as "my\_topic" (toSQLWildcard of "my_topic"). A literal underscore
 	// in the requested topic must match, while any other single char must not.
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: "phil", topic: `my\_topic`, read: true, write: false},
 	})
@@ -113,7 +113,7 @@ func TestACLCache_LiteralUnderscoreExactMatch(t *testing.T) {
 }
 
 func TestACLCache_WildcardMatch(t *testing.T) {
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: Everyone, topic: "up%", read: false, write: true},
 	})
@@ -124,7 +124,7 @@ func TestACLCache_WildcardMatch(t *testing.T) {
 }
 
 func TestACLCache_SpecificUserBeatsEveryone(t *testing.T) {
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: Everyone, topic: "mytopic", read: true, write: false},
 		{user: "phil", topic: "mytopic", read: false, write: false}, // deny-all for phil
@@ -139,7 +139,7 @@ func TestACLCache_SpecificUserBeatsEveryoneEvenWhenShorter(t *testing.T) {
 	// The SQL's "user_name DESC" sort key takes precedence over LENGTH(topic).
 	// Concretely: a specific user with a shorter matching rule still wins over
 	// Everyone with a longer matching rule.
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: Everyone, topic: "foo", read: true, write: true}, // exact, length 3
 		{user: "phil", topic: "f%", read: false, write: false},  // wildcard, length 2, deny-all
@@ -154,7 +154,7 @@ func TestACLCache_SpecificUserBeatsEveryoneRegardlessOfWrite(t *testing.T) {
 	// Same-length rules but conflicting permissions across user boundary: the
 	// specific user always wins, even if its permission set is weaker (or
 	// stronger, in either direction).
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: Everyone, topic: "mytopic", read: true, write: true}, // wide-open
 		{user: "phil", topic: "mytopic", read: true, write: false},  // read-only for phil
@@ -166,7 +166,7 @@ func TestACLCache_SpecificUserBeatsEveryoneRegardlessOfWrite(t *testing.T) {
 }
 
 func TestACLCache_AnonymousReadsEveryone(t *testing.T) {
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: Everyone, topic: "announcements", read: true, write: false},
 	})
@@ -179,7 +179,7 @@ func TestACLCache_AnonymousReadsEveryone(t *testing.T) {
 func TestACLCache_LongerPatternWinsForSameUser(t *testing.T) {
 	// Both rules belong to the same user (Everyone). The more specific (longer)
 	// "mytopic%" should beat the catch-all "%".
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: Everyone, topic: "%", read: true, write: false},
 		{user: Everyone, topic: "mytopic%", read: true, write: true},
@@ -196,7 +196,7 @@ func TestACLCache_ExactBeatsShorterWildcardSameUser(t *testing.T) {
 	// the SQL's "LENGTH(topic) DESC" tie-break. Crucially, the cache must seed
 	// "best" from the exact map probe before walking wildcards, otherwise a
 	// shorter wildcard could overwrite a longer exact.
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: "phil", topic: "foo", read: true, write: true},  // exact, length 3
 		{user: "phil", topic: "f%", read: false, write: false}, // wildcard, length 2, deny-all
@@ -211,7 +211,7 @@ func TestACLCache_LongerWildcardBeatsExactSameUser(t *testing.T) {
 	// Same user, two matching rules: exact "foo" (length 3) and wildcard "foo%"
 	// (length 4). The wildcard wins on length DESC. Exercises the "swap best
 	// to wildcard when better() returns true" path.
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: "phil", topic: "foo", read: false, write: false}, // exact, length 3, deny-all
 		{user: "phil", topic: "foo%", read: true, write: true},  // wildcard, length 4
@@ -227,7 +227,7 @@ func TestACLCache_WriteBeatsReadAtEqualLength(t *testing.T) {
 	// should win the tie-break. The two-rows-with-same-topic shape is
 	// impossible via real upsert (pkey would conflict), so we inject the entries
 	// directly into the cache's wildcard slice.
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	c.mu.Lock()
 	c.exact = map[string]map[string]aclEntry{}
 	c.pattern = map[string][]aclEntry{
@@ -245,7 +245,7 @@ func TestACLCache_WriteBeatsReadAtEqualLength(t *testing.T) {
 func TestACLCache_ConcurrentLookupAndReload(t *testing.T) {
 	// Lock-based swap must be safe under concurrent reads. The race detector
 	// catches any unsafe shared mutation.
-	c := newAccessCache()
+	c := newAccessCache(nil, "") // Never reloaded: these tests fill the maps themselves
 	loadCache(t, c, []rawACLRow{
 		{user: Everyone, topic: "mytopic", read: true, write: true},
 	})

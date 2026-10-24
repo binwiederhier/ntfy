@@ -36,15 +36,12 @@ type State struct {
 	AccessChanged     bool                // Access entries changed (written by this node): peers reload their access cache
 }
 
-// SubscriberCancel asks peer nodes to cancel matching live subscriber connections, mirroring
-// the two local operations that reach into open connections: reservation takeover (Topic +
-// ExceptUserID: cancel everyone else on that one topic) and access revocation (Topic pattern +
-// UserID: cancel that user wherever the pattern matches). Without relaying these, they only
-// affect the node they ran on and revoked subscribers keep receiving on other nodes.
+// SubscriberCancel asks peer nodes to cancel all live subscriber connections of a user, e.g. one
+// that was deleted. Access changes do not need it, since peers reload their access cache and end
+// the streams that lost access themselves (see State.AccessChanged), but a deleted user without
+// access entries leaves nothing in the cache to compare.
 type SubscriberCancel struct {
-	Topic        string `json:"topic"`                    // Topic ID, or a "*" pattern when UserID is set
-	UserID       string `json:"user_id,omitempty"`        // Cancel this user's subscribers (access revocation)
-	ExceptUserID string `json:"except_user_id,omitempty"` // Cancel everyone BUT this user (reservation takeover)
+	UserID string `json:"user_id"`
 }
 
 // CancelFunc applies a peer's subscriber-cancel request to this node's local connections. The

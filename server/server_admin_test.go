@@ -523,7 +523,6 @@ func TestAccess_WritesTellPeers(t *testing.T) {
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, []*cluster.SubscriberCancel{
 			{
-				Topic:  "*",
 				UserID: ben.ID,
 			},
 		}, b.Cancels())
@@ -566,7 +565,6 @@ func TestAccess_PeerUserCancelCancels(t *testing.T) {
 	require.Nil(t, err)
 	stream := subscribeStream(t, s, "mytopic", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
 	s.applySubscriberCancel(&cluster.SubscriberCancel{
-		Topic:  "*",
 		UserID: ben.ID,
 	})
 	select {

@@ -156,9 +156,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	} else if err != nil {
 		return err
 	}
-	if err := s.killUserSubscriberEverywhere(u); err != nil { // FIXME super inefficient
-		return err
-	}
+	s.killUserSubscriberEverywhere(u) // FIXME super inefficient
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -234,34 +232,33 @@ func (s *Server) handlePeerAccessChanged() {
 // killUserSubscriberEverywhere ends a deleted user's streams on this node and on the other cluster
 // nodes. An access cache reload does not find them: a user without access entries (e.g. an admin)
 // leaves nothing in the cache to compare.
-func (s *Server) killUserSubscriberEverywhere(u *user.User) error {
-	if err := s.killUserSubscriber(u, "*"); err != nil {
-		return err
-	}
+func (s *Server) killUserSubscriberEverywhere(u *user.User) {
+	s.cancelUserSubscribersLocal(u.ID)
 	s.cluster.BroadcastState(&cluster.State{
 		SubscriberCancels: []*cluster.SubscriberCancel{
 			{
-				Topic:  "*",
 				UserID: u.ID,
 			},
 		},
 	})
-	return nil
 }
 
 // applySubscriberCancel applies a peer's subscriber cancel (a deleted user) locally, never
 // re-broadcasting it
 func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
-	if cancel.UserID == "" {
-		return // Nothing else is relayed; see killUserSubscriberEverywhere
+	s.cancelUserSubscribersLocal(cancel.UserID)
+}
+
+// cancelUserSubscribersLocal ends all of a user's streams on this node, on every topic
+func (s *Server) cancelUserSubscribersLocal(userID string) {
+	s.mu.RLock()
+	topics := make([]*topic, 0, len(s.topics))
+	for _, t := range s.topics {
+		topics = append(topics, t)
 	}
-	topics, err := s.topicsFromPattern(cancel.Topic)
-	if err != nil {
-		log.Tag(tagSubscribe).Err(err).Warn("Cannot apply peer subscriber cancel for topic %s", cancel.Topic)
-		return
-	}
+	s.mu.RUnlock()
 	for _, t := range topics {
-		t.CancelSubscriberUser(cancel.UserID)
+		t.CancelSubscriberUser(userID) // An empty user ID cancels nobody
 	}
 }
 

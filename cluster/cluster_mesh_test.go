@@ -364,10 +364,16 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	require.Nil(t, err)
 	defer meshA.Close()
 
-	meshA.BroadcastState(&State{SubscriberCancels: []*SubscriberCancel{
-		{Topic: "mytopic", ExceptUserID: "u_owner"},
-		{Topic: "up*", UserID: "u_revoked"},
-	}})
+	meshA.BroadcastState(&State{
+		SubscriberCancels: []*SubscriberCancel{
+			{
+				UserID: "u_deleted",
+			},
+			{
+				UserID: "u_other",
+			},
+		},
+	})
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -375,10 +381,8 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	})
 	mu.Lock()
 	defer mu.Unlock()
-	require.Equal(t, "mytopic", receivedB[0].Topic)
-	require.Equal(t, "u_owner", receivedB[0].ExceptUserID)
-	require.Equal(t, "up*", receivedB[1].Topic)
-	require.Equal(t, "u_revoked", receivedB[1].UserID)
+	require.Equal(t, "u_deleted", receivedB[0].UserID)
+	require.Equal(t, "u_other", receivedB[1].UserID)
 	require.Equal(t, 0, canceledA)
 }
 

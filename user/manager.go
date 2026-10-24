@@ -41,7 +41,7 @@ const (
 	DefaultUserStatsQueueWriterInterval = 33 * time.Second
 	DefaultUserPasswordBcryptCost       = 10
 	DefaultAccessCacheEnabled           = false
-	DefaultAccessCacheReloadInterval    = 63 * time.Second
+	DefaultAccessCacheReloadInterval    = 67 * time.Second
 	DefaultExpiredMagicLinkReapInterval = time.Hour // How often expired email-verify/password-reset links are swept
 )
 

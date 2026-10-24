@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"net/netip"
 	"reflect"
-	"runtime"
 	"text/template"
 	"time"
 
@@ -245,18 +244,6 @@ type Config struct {
 	BuildVersion                         string        // Injected by App
 	BuildDate                            string        // Injected by App
 	BuildCommit                          string        // Injected by App
-}
-
-// DefaultAdminSocket returns the default admin socket path. On Windows there is none: unix socket
-// file permissions do not protect it there, so the CLI uses the database or --server instead.
-func DefaultAdminSocket() string {
-	switch runtime.GOOS {
-	case "windows":
-		return ""
-	case "darwin":
-		return "/var/run/ntfy/admin.sock"
-	}
-	return "/run/ntfy/admin.sock"
 }
 
 // NewConfig instantiates a default new server config

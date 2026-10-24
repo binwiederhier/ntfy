@@ -76,7 +76,7 @@ func TestTopic_Subscribe_DuplicateID(t *testing.T) {
 	rand.Seed(1)
 	a := rand.Int()
 	to.subscribers[a] = &topicSubscriber{
-		userID:     "a",
+		user:       testSubscriberUser("a"),
 		subscriber: nil,
 		cancel:     func() {},
 	}
@@ -91,7 +91,7 @@ func TestTopic_Subscribe_DuplicateID(t *testing.T) {
 	res := to.subscribers[id]
 
 	require.NotEqual(t, id, a)
-	require.Equal(t, "b", res.userID, "b")
+	require.Equal(t, "b", res.userID(), "b")
 }
 
 func TestTopic_PublishMissed_OnlyToSubscribersThatMissedIt(t *testing.T) {

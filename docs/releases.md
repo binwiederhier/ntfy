@@ -2250,7 +2250,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Security:**
 
-* In an experimental cluster, tell the other nodes when access changes (e.g. a reservation or a revoked permission), so they reload their access cache and disconnect subscribers who lost access; the access cache reload also catches changes made elsewhere, e.g. by the `ntfy access` CLI, and now runs every 31 seconds instead of 87
+* In an experimental cluster, tell the other nodes when access changes (e.g. a reservation or a revoked permission), so they reload their access cache and disconnect subscribers who lost access; the access cache reload also catches changes made elsewhere, e.g. by the `ntfy access` CLI, and now runs every 63 seconds instead of 87
 
 **Bug fixes + maintenance:**
 

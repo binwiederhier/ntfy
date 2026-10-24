@@ -36,12 +36,19 @@ type topic struct {
 }
 
 type topicSubscriber struct {
-	userID       string     // User ID associated with this subscription, may be empty
 	user         *user.User // The user as of subscribing, nil if anonymous; lets a re-check authorize without the database
 	subscriber   subscriber
 	cancel       func()
 	subscribedAt time.Time     // When it subscribed; what went out before, it missed
 	sent         chan struct{} // Closed when the last batch of sends to this subscriber is done; the next one waits for it
+}
+
+// userID returns the subscriber's user ID, or "" if anonymous
+func (s *topicSubscriber) userID() string {
+	if s.user == nil {
+		return ""
+	}
+	return s.user.ID
 }
 
 // subscriber is a function that is called for every new message on a topic
@@ -59,10 +66,6 @@ func newTopic(id string) *topic {
 
 // Subscribe subscribes to this topic, as the given user (nil if anonymous)
 func (t *topic) Subscribe(s subscriber, u *user.User, cancel func()) (subscriberID int) {
-	userID := ""
-	if u != nil {
-		userID = u.ID
-	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for i := 0; i < 5; i++ { // Best effort retry
@@ -73,8 +76,7 @@ func (t *topic) Subscribe(s subscriber, u *user.User, cancel func()) (subscriber
 		}
 	}
 	t.subscribers[subscriberID] = &topicSubscriber{
-		userID:       userID, // May be empty
-		user:         u,
+		user:         u, // May be nil
 		subscriber:   s,
 		cancel:       cancel,
 		subscribedAt: time.Now(),
@@ -232,18 +234,20 @@ func (t *topic) SubscribersCount() int {
 
 // CancelAllSubscribers calls the cancel function of every subscriber, closing their connections
 func (t *topic) CancelAllSubscribers() {
-	for _, s := range t.subscribersMatching(func(*topicSubscriber) bool {
+	subscribers := t.subscribersMatching(func(*topicSubscriber) bool {
 		return true
-	}) {
+	})
+	for _, s := range subscribers {
 		s.cancel()
 	}
 }
 
 // CancelSubscribersExceptUser calls the cancel function for all subscribers, forcing
 func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
-	for _, s := range t.subscribersMatching(func(s *topicSubscriber) bool {
-		return s.userID != exceptUserID
-	}) {
+	subscribers := t.subscribersMatching(func(s *topicSubscriber) bool {
+		return s.userID() != exceptUserID
+	})
+	for _, s := range subscribers {
 		t.cancelUserSubscriber(s)
 	}
 }
@@ -262,9 +266,10 @@ func (t *topic) CancelAnonymousSubscribers() {
 }
 
 func (t *topic) cancelSubscribersWithUserID(userID string) {
-	for _, s := range t.subscribersMatching(func(s *topicSubscriber) bool {
-		return s.userID == userID
-	}) {
+	subscribers := t.subscribersMatching(func(s *topicSubscriber) bool {
+		return s.userID() == userID
+	})
+	for _, s := range subscribers {
 		t.cancelUserSubscriber(s)
 	}
 }
@@ -291,7 +296,7 @@ func (t *topic) SubscriberUsers() map[string]*user.User {
 	defer t.mu.RUnlock()
 	users := make(map[string]*user.User)
 	for _, s := range t.subscribers {
-		users[s.userID] = s.user
+		users[s.userID()] = s.user
 	}
 	return users
 }
@@ -301,9 +306,9 @@ func (t *topic) cancelUserSubscriber(s *topicSubscriber) {
 		Tag(tagSubscribe).
 		With(t).
 		Fields(log.Context{
-			"user_id": s.userID,
+			"user_id": s.userID(),
 		}).
-		Debug("Canceling subscriber with user ID %s", s.userID)
+		Debug("Canceling subscriber with user ID %s", s.userID())
 	s.cancel()
 }
 
@@ -330,7 +335,7 @@ func (t *topic) subscribersCopy() map[int]*topicSubscriber {
 	subscribers := make(map[int]*topicSubscriber)
 	for k, sub := range t.subscribers {
 		subscribers[k] = &topicSubscriber{
-			userID:     sub.userID,
+			user:       sub.user,
 			subscriber: sub.subscriber,
 			cancel:     sub.cancel,
 		}

@@ -53,15 +53,14 @@ var (
 
 // Manager handles user authentication, authorization, and management
 type Manager struct {
-	config                    *Config
-	db                        *db.DB
-	queries                   queries
-	statsQueue                map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
-	tokenQueue                map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
-	accessCache               *accessCache            // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
-	accessCacheReloadRequests chan struct{}           // Pending access cache reload request, at most one (see RequestAccessCacheReload)
-	quit                      chan struct{}           // Closed by Close() to signal background goroutines to stop
-	mu                        sync.Mutex
+	config      *Config
+	db          *db.DB
+	queries     queries
+	statsQueue  map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
+	tokenQueue  map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
+	accessCache *accessCache            // In-memory snapshot of user_access; reloaded by accessWritten after every ACL mutation
+	quit        chan struct{}           // Closed by Close() to signal background goroutines to stop
+	mu          sync.Mutex
 }
 
 var _ Auther = (*Manager)(nil)
@@ -91,13 +90,10 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 		return nil, err
 	}
 	if config.AccessCacheEnabled {
-		manager.accessCache = newAccessCache(d, queries.selectAccessCacheAll)
-		manager.accessCacheReloadRequests = make(chan struct{}, 1)
-		// The initial load finds every entry new; that is no change, so nothing is reported
-		if _, err := manager.accessCache.Reload(); err != nil {
+		manager.accessCache = newAccessCache(d, queries.selectAccessCacheAll, config.AccessCacheChangedFunc)
+		if err := manager.accessCache.Start(config.AccessCacheReloadInterval); err != nil {
 			return nil, err
 		}
-		go manager.asyncAccessCacheReloadLoop(manager.config.AccessCacheReloadInterval)
 	}
 	go manager.asyncQueueWriteLoop(manager.config.QueueWriterInterval)
 	go manager.asyncExpiredMagicLinkReapLoop(manager.config.ExpiredMagicLinkReapInterval)
@@ -105,70 +101,28 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 }
 
 // RequestAccessCacheReload asks for a reload of the whole access cache soon, e.g. because another
-// cluster node changed access entries, and returns at once. Requests that arrive while a reload
-// runs collapse into one more reload, so a burst of them costs at most two, and the last one
-// sees every change. No-op when the cache is disabled.
+// cluster node changed access entries, and returns at once; bursts are coalesced (see
+// accessCache.RequestReload). No-op when the cache is disabled.
 func (a *Manager) RequestAccessCacheReload() {
 	if a.accessCache == nil {
 		return
 	}
-	select {
-	case a.accessCacheReloadRequests <- struct{}{}:
-	default: // A reload is pending already; it will see this change too
-	}
-}
-
-// maybeReloadAccessCache reloads the whole in-memory access cache from the primary database
-// (about 15 ms for ntfy.sh's 5,500 entries, so there is no point in reloading parts of it). No-op
-// when the cache is disabled.
-//
-// Entries the reload finds changed are reported to Config.AccessCacheChangedFunc before it returns.
-// No reload runs under a.mu, so the function may call back into the manager.
-func (a *Manager) maybeReloadAccessCache() error {
-	if a.accessCache == nil {
-		return nil
-	}
-	changes, err := a.accessCache.Reload()
-	if err != nil {
-		return err
-	}
-	if a.config.AccessCacheChangedFunc != nil && len(changes) > 0 {
-		a.config.AccessCacheChangedFunc(changes)
-	}
-	return nil
+	a.accessCache.RequestReload()
 }
 
 // accessWritten is called after this process wrote access entries (or users): it tells
 // Config.AccessWrittenFunc first, so that the other cluster nodes start reloading their access
 // cache right away, then reloads this node's cache, so the change applies here before the write
-// returns. Never called for a reload alone, which would loop.
+// returns. Never called for a reload alone, which would loop. No reload runs under a.mu, so
+// Config.AccessCacheChangedFunc may call back into the manager.
 func (a *Manager) accessWritten() error {
 	if a.config.AccessWrittenFunc != nil {
 		a.config.AccessWrittenFunc()
 	}
-	return a.maybeReloadAccessCache()
-}
-
-// asyncAccessCacheReloadLoop periodically bulk-reloads the access cache so that
-// writes made by other processes against the same database (most notably the
-// `ntfy access` CLI subcommand running while a server holds the cache) become
-// visible within the configured interval. This Manager's own mutations do
-// not depend on the poller -- they reload the cache synchronously. It also serves
-// RequestAccessCacheReload.
-func (a *Manager) asyncAccessCacheReloadLoop(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-a.quit:
-			return
-		case <-ticker.C:
-		case <-a.accessCacheReloadRequests:
-		}
-		if err := a.maybeReloadAccessCache(); err != nil {
-			log.Tag(tag).Err(err).Warn("Reloading ACL cache failed")
-		}
+	if a.accessCache == nil {
+		return nil
 	}
+	return a.accessCache.Reload()
 }
 
 // asyncExpiredMagicLinkReapLoop periodically deletes expired email-verification and
@@ -2012,6 +1966,9 @@ func (a *Manager) Close() error {
 		// Already closed
 	default:
 		close(a.quit)
+		if a.accessCache != nil {
+			a.accessCache.Close()
+		}
 	}
 	return a.db.Close()
 }

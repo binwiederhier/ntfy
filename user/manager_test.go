@@ -2461,7 +2461,7 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 		require.Nil(t, writer.AddReservation("phil", "my_topic", PermissionDenyAll, 0))
 		require.Nil(t, writer.AllowAccess("phil", "up_*", PermissionRead))
 		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionRead))
-		require.Nil(t, reader.maybeReloadAccessCache())
+		require.Nil(t, reader.accessCache.Reload())
 		require.ElementsMatch(t, []*AccessChange{
 			{
 				Username:     "phil",
@@ -2483,7 +2483,7 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 
 		// A removal
 		require.Nil(t, writer.ResetAccess("phil", "up_*"))
-		require.Nil(t, reader.maybeReloadAccessCache())
+		require.Nil(t, reader.accessCache.Reload())
 		require.Equal(t, []*AccessChange{
 			{
 				Username:     "phil",
@@ -2492,7 +2492,7 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 		}, takeChanges())
 
 		// Nothing changed, nothing reported
-		require.Nil(t, reader.maybeReloadAccessCache())
+		require.Nil(t, reader.accessCache.Reload())
 		require.Empty(t, takeChanges())
 	})
 }
@@ -2628,56 +2628,11 @@ func TestAccessCache_WriteDuringFullReloadIsNotLost(t *testing.T) {
 		}
 		defer func() { testHookReloadScanned = nil }()
 
-		require.Nil(t, a.maybeReloadAccessCache())
+		require.Nil(t, a.accessCache.Reload())
 		<-revoked
 		_, _, found, err := a.authorizeTopicAccess("phil", "secret")
 		require.Nil(t, err)
 		require.False(t, found, "a stale full reload resurrected a revoked grant")
-	})
-}
-
-func TestManager_RequestAccessCacheReloadCoalesces(t *testing.T) {
-	// A burst of "access changed" signals from peers must not queue a reload each: requests that
-	// arrive during a reload collapse into one more, which still sees a write made during the first
-	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
-		a := newTestManagerFromConfig(t, newManager, &Config{
-			DefaultAccess:             PermissionDenyAll,
-			BcryptCost:                bcrypt.MinCost,
-			AccessCacheEnabled:        true,
-			AccessCacheReloadInterval: time.Hour, // keep the background poller out of this test
-		})
-		require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
-		reloads := atomic.Int32{}
-		scanned, release := make(chan struct{}), make(chan struct{})
-		testHookReloadScanned = func() {
-			if reloads.Add(1) == 1 {
-				close(scanned)
-				<-release // Hold the first reload after its scan
-			}
-		}
-		defer func() { testHookReloadScanned = nil }()
-
-		// Start a reload and hold it after it scanned the DB
-		a.RequestAccessCacheReload()
-		<-scanned
-
-		// A write the held reload did not see, as if made on a peer, then a burst of signals for it
-		_, err := a.db.Exec(a.queries.upsertUserAccess, "phil", "secret", true, true, "", "", false)
-		require.Nil(t, err)
-		start := time.Now()
-		for i := 0; i < 100; i++ {
-			a.RequestAccessCacheReload()
-		}
-		require.Less(t, time.Since(start), 50*time.Millisecond) // Requests never wait for a reload
-		close(release)
-
-		// The burst collapses into one more reload, which sees the write
-		require.Eventually(t, func() bool {
-			_, _, found, err := a.authorizeTopicAccess("phil", "secret")
-			return err == nil && found
-		}, 5*time.Second, 10*time.Millisecond)
-		time.Sleep(200 * time.Millisecond) // Let any queued reload finish
-		require.Equal(t, int32(2), reloads.Load())
 	})
 }
 
@@ -2742,7 +2697,7 @@ func TestManager_AccessWritesTellPeers(t *testing.T) {
 		require.Nil(t, a.RemoveUser("ben"))
 		require.Equal(t, before+5, written.Load())
 
-		require.Nil(t, a.maybeReloadAccessCache())
+		require.Nil(t, a.accessCache.Reload())
 		require.Equal(t, before+5, written.Load())
 	})
 }

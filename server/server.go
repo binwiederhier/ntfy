@@ -59,7 +59,7 @@ type Server struct {
 	httpProfileServer   *http.Server
 	httpClusterServer   *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	unixListener        net.Listener
-	adminSocketServer   *http.Server // Serves the admin API on the local admin socket, see server_admin_socket.go
+	adminSocketServer   *http.Server // Serves the admin API on the local admin socket, see handleAdminSocket
 	adminSocketListener net.Listener
 	smtpServer          *smtp.Server
 	smtpServerBackend   *smtpBackend

@@ -1,9 +1,7 @@
 package user
 
 import (
-	"maps"
 	"regexp"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -128,7 +126,7 @@ func (c *accessCache) Reload() ([]*AccessChange, error) {
 	}
 	// Replace the internal maps
 	c.mu.Lock()
-	changes := diffACLEntries(c.exact, c.pattern, exacts, patterns, allUsernames(c.exact, c.pattern, exacts, patterns))
+	changes := diffACLEntries(c.exact, c.pattern, exacts, patterns)
 	c.exact = exacts
 	c.pattern = patterns
 	c.mu.Unlock()
@@ -140,61 +138,60 @@ func (c *accessCache) Reload() ([]*AccessChange, error) {
 	return changes, nil
 }
 
-// diffACLEntries returns the entries of the given users that differ between the old and the
-// new maps: added, removed, or with a different read/write permission
-func diffACLEntries(oldExact map[string]map[string]aclEntry, oldPattern map[string][]aclEntry, newExact map[string]map[string]aclEntry, newPattern map[string][]aclEntry, usernames []string) []*AccessChange {
+// diffACLEntries returns the entries that differ between the old and the new maps: added,
+// removed, or with a different read/write permission
+func diffACLEntries(oldExact map[string]map[string]aclEntry, oldPattern map[string][]aclEntry, newExact map[string]map[string]aclEntry, newPattern map[string][]aclEntry) []*AccessChange {
+	before := flattenACLEntries(oldExact, oldPattern)
+	after := flattenACLEntries(newExact, newPattern)
 	changes := make([]*AccessChange, 0)
-	for _, username := range usernames {
-		before := aclEntriesByTopic(oldExact[username], oldPattern[username])
-		after := aclEntriesByTopic(newExact[username], newPattern[username])
-		for topic, entry := range after {
-			if old, ok := before[topic]; !ok || old.read != entry.read || old.write != entry.write {
-				changes = append(changes, newAccessChange(username, topic))
-			}
+	for key, entry := range after {
+		if old, ok := before[key]; !ok || old.read != entry.read || old.write != entry.write {
+			changes = append(changes, newAccessChange(key))
 		}
-		for topic := range before {
-			if _, ok := after[topic]; !ok {
-				changes = append(changes, newAccessChange(username, topic))
-			}
+	}
+	for key := range before {
+		if _, ok := after[key]; !ok {
+			changes = append(changes, newAccessChange(key))
 		}
 	}
 	return changes
 }
 
-// newAccessChange returns the change for one user's stored (escaped, SQL wildcard) topic
-func newAccessChange(username, escapedTopic string) *AccessChange {
-	return &AccessChange{
-		Username: username,
-		Topic:    fromSQLWildcard(escapedTopic),
-	}
+// aclKey identifies one access entry: a user and a stored (escaped, SQL wildcard) topic
+type aclKey struct {
+	username string
+	topic    string
 }
 
-// aclEntriesByTopic indexes one user's exact and wildcard entries by their stored topic
-func aclEntriesByTopic(exact map[string]aclEntry, patterns []aclEntry) map[string]aclEntry {
-	entries := make(map[string]aclEntry, len(exact)+len(patterns))
-	for topic, entry := range exact {
-		entries[topic] = entry
+// flattenACLEntries indexes every exact and wildcard entry by user and stored topic
+func flattenACLEntries(exact map[string]map[string]aclEntry, pattern map[string][]aclEntry) map[aclKey]aclEntry {
+	entries := make(map[aclKey]aclEntry)
+	for username, byTopic := range exact {
+		for topic, entry := range byTopic {
+			key := aclKey{
+				username: username,
+				topic:    topic,
+			}
+			entries[key] = entry
+		}
 	}
-	for _, entry := range patterns {
-		entries[entry.topic] = entry
+	for username, patterns := range pattern {
+		for _, entry := range patterns {
+			key := aclKey{
+				username: username,
+				topic:    entry.topic,
+			}
+			entries[key] = entry
+		}
 	}
 	return entries
 }
 
-// allUsernames returns every username with entries in the old or the new maps
-func allUsernames(oldExact map[string]map[string]aclEntry, oldPattern map[string][]aclEntry, newExact map[string]map[string]aclEntry, newPattern map[string][]aclEntry) []string {
-	seen := make(map[string]struct{})
-	addKeys(seen, oldExact)
-	addKeys(seen, oldPattern)
-	addKeys(seen, newExact)
-	addKeys(seen, newPattern)
-	return slices.Collect(maps.Keys(seen))
-}
-
-// addKeys adds the keys of m to seen
-func addKeys[V any](seen map[string]struct{}, m map[string]V) {
-	for key := range m {
-		seen[key] = struct{}{}
+// newAccessChange returns the change for one entry, with * wildcards
+func newAccessChange(key aclKey) *AccessChange {
+	return &AccessChange{
+		Username: key.username,
+		Topic:    fromSQLWildcard(key.topic),
 	}
 }
 

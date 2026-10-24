@@ -2461,7 +2461,7 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 		require.Nil(t, writer.AddReservation("phil", "my_topic", PermissionDenyAll, 0))
 		require.Nil(t, writer.AllowAccess("phil", "up_*", PermissionRead))
 		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionRead))
-		require.Nil(t, reader.ReloadAccessCache())
+		require.Nil(t, reader.maybeReloadAccessCache())
 		require.ElementsMatch(t, []*AccessChange{
 			{
 				Username: "phil",
@@ -2483,7 +2483,7 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 
 		// A removal
 		require.Nil(t, writer.ResetAccess("phil", "up_*"))
-		require.Nil(t, reader.ReloadAccessCache())
+		require.Nil(t, reader.maybeReloadAccessCache())
 		require.Equal(t, []*AccessChange{
 			{
 				Username: "phil",
@@ -2492,7 +2492,7 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 		}, takeChanges())
 
 		// Nothing changed, nothing reported
-		require.Nil(t, reader.ReloadAccessCache())
+		require.Nil(t, reader.maybeReloadAccessCache())
 		require.Empty(t, takeChanges())
 	})
 }
@@ -2628,7 +2628,7 @@ func TestAccessCache_WriteDuringFullReloadIsNotLost(t *testing.T) {
 		}
 		defer func() { testHookReloadScanned = nil }()
 
-		require.Nil(t, a.ReloadAccessCache())
+		require.Nil(t, a.maybeReloadAccessCache())
 		<-revoked
 		_, _, found, err := a.authorizeTopicAccess("phil", "secret")
 		require.Nil(t, err)
@@ -2732,7 +2732,7 @@ func TestManager_AccessWritesTellPeers(t *testing.T) {
 		require.Nil(t, a.RemoveUser("ben"))
 		require.Equal(t, before+5, written.Load())
 
-		require.Nil(t, a.ReloadAccessCache())
+		require.Nil(t, a.maybeReloadAccessCache())
 		require.Equal(t, before+5, written.Load())
 	})
 }

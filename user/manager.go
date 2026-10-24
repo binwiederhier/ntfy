@@ -104,13 +104,6 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 	return manager, nil
 }
 
-// ReloadAccessCache reloads the whole in-memory access cache from the primary database, e.g. when
-// another cluster node changed access entries; entries that changed are reported to
-// Config.AccessCacheChangedFunc. No-op when the cache is disabled.
-func (a *Manager) ReloadAccessCache() error {
-	return a.maybeReloadAccessCache()
-}
-
 // RequestAccessCacheReload asks for a reload of the whole access cache soon, e.g. because another
 // cluster node changed access entries, and returns at once. Requests that arrive while a reload
 // runs collapse into one more reload, so a burst of them costs at most two, and the last one

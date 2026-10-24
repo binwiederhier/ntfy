@@ -233,24 +233,18 @@ func (s *Server) handlePeerAccessChanged() {
 // nodes. An access cache reload does not find them: a user without access entries (e.g. an admin)
 // leaves nothing in the cache to compare.
 func (s *Server) killUserSubscriberEverywhere(u *user.User) {
-	s.cancelUserSubscribersLocal(u.ID)
+	cancel := &cluster.SubscriberCancel{
+		UserID: u.ID,
+	}
+	s.applySubscriberCancel(cancel)
 	s.cluster.BroadcastState(&cluster.State{
-		SubscriberCancels: []*cluster.SubscriberCancel{
-			{
-				UserID: u.ID,
-			},
-		},
+		SubscriberCancels: []*cluster.SubscriberCancel{cancel},
 	})
 }
 
-// applySubscriberCancel applies a peer's subscriber cancel (a deleted user) locally, never
-// re-broadcasting it
+// applySubscriberCancel ends all of a user's streams on this node, on every topic: for a peer's
+// cancel (a deleted user), never re-broadcast, and for a local delete
 func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
-	s.cancelUserSubscribersLocal(cancel.UserID)
-}
-
-// cancelUserSubscribersLocal ends all of a user's streams on this node, on every topic
-func (s *Server) cancelUserSubscribersLocal(userID string) {
 	s.mu.RLock()
 	topics := make([]*topic, 0, len(s.topics))
 	for _, t := range s.topics {
@@ -258,7 +252,7 @@ func (s *Server) cancelUserSubscribersLocal(userID string) {
 	}
 	s.mu.RUnlock()
 	for _, t := range topics {
-		t.CancelSubscriberUser(userID) // An empty user ID cancels nobody
+		t.CancelSubscriberUser(cancel.UserID) // An empty user ID cancels nobody
 	}
 }
 

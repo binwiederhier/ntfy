@@ -5,16 +5,28 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/urfave/cli/v2"
+	"golang.org/x/term"
 	"heckel.io/ntfy/v2/client"
 )
 
 const (
-	adminFallbackWarning = "warning: no ntfy server answered on the admin socket %s (%s), writing to the database directly\n"
+	adminFallbackWarningBanner = "**********************************************************************"
+	adminFallbackWarningText   = `DEPRECATION WARNING: No ntfy server answered on the admin socket
+%s (%s), writing to the database
+directly. A running server may not see this change right away.
+
+Direct database access will be removed after 2026-11-22. After that, the
+ntfy user/access/token/tier commands need a running server.
+See https://docs.ntfy.sh/deprecations/ for details.`
+	adminWarningColorYellow = "\033[1;33m"
+	adminWarningColorReset  = "\033[0m"
 )
 
 // adminAPI is what the user, access, token and tier commands need. client.Admin implements it
@@ -69,10 +81,10 @@ func newAdminAPI(c *cli.Context) (adminAPI, error) {
 			if directErr != nil {
 				return nil, fmt.Errorf("permission denied on the admin socket %s, run this command as root or as a member of the server's group (usually ntfy)", socket)
 			}
-			fmt.Fprintf(c.App.ErrWriter, adminFallbackWarning, socket, adminUnreachableReason(err))
+			printAdminFallbackWarning(c.App.ErrWriter, socket, err)
 			return direct, nil
 		case errors.Is(err, client.ErrAdminUnreachable):
-			fmt.Fprintf(c.App.ErrWriter, adminFallbackWarning, socket, adminUnreachableReason(err))
+			printAdminFallbackWarning(c.App.ErrWriter, socket, err)
 		default:
 			return nil, err // The server answered with some other error; do not hide it behind a fallback
 		}
@@ -139,4 +151,23 @@ func adminUnreachableReason(err error) string {
 		reason = reason[i+2:]
 	}
 	return reason
+}
+
+// printAdminFallbackWarning tells the user, loudly, that the change bypasses the running server, and
+// that this fallback is deprecated (see docs/deprecations.md).
+// It is yellow on a terminal, and plain text in logs and pipes, or if NO_COLOR is set.
+func printAdminFallbackWarning(w io.Writer, socket string, err error) {
+	color := false
+	if f, ok := w.(*os.File); ok && os.Getenv("NO_COLOR") == "" {
+		color = term.IsTerminal(int(f.Fd()))
+	}
+	fmt.Fprint(w, adminFallbackWarning(socket, adminUnreachableReason(err), color))
+}
+
+func adminFallbackWarning(socket, reason string, color bool) string {
+	warning := adminFallbackWarningBanner + "\n" + fmt.Sprintf(adminFallbackWarningText, socket, reason) + "\n" + adminFallbackWarningBanner
+	if color {
+		warning = adminWarningColorYellow + warning + adminWarningColorReset
+	}
+	return warning + "\n"
 }

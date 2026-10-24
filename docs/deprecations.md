@@ -4,7 +4,38 @@ This page is used to list deprecation notices for ntfy. Deprecated commands and 
 before the behavior is changed depends on the severity of the change, and how prominent the feature is.
 
 ## Active deprecations
-_No active deprecations_
+
+### ntfy CLI: `ntfy user/access/token/tier` without a running server
+> Active since 2026-10-22 (v2.33.0), behavior will change after 2026-11-22
+
+The `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` commands now talk to the running ntfy server through
+its local [admin socket](config.md#admin-socket), so changes take effect immediately. If no server answers on the
+socket, they still edit the database directly, like they used to, and print a deprecation warning. This fallback
+will be removed: after that, these commands need a running server, either through the admin socket or with
+`--server` and `--token`.
+
+If you see the warning, make sure the server can create its admin socket (see [admin socket](config.md#admin-socket)
+for what to change depending on how you installed ntfy). To set up users before the server ever ran, use
+[`auth-users`](config.md#users-via-the-config) in the config file instead.
+
+=== "Before"
+    ```
+    $ systemctl stop ntfy
+    $ ntfy user add phil
+    **********************************************************************
+    DEPRECATION WARNING: No ntfy server answered on the admin socket
+    /run/ntfy/admin.sock (no such file or directory), writing to the database
+    directly. A running server may not see this change right away.
+    ...
+    user phil added with role user
+    ```
+
+=== "After"
+    ```
+    $ systemctl stop ntfy
+    $ ntfy user add phil
+    ntfy error: no ntfy server answered on the admin socket /run/ntfy/admin.sock
+    ```
 
 ## Previous deprecations
 

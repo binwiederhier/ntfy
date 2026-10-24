@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +41,8 @@ func TestCLI_AdminAPI_FallbackWarning(t *testing.T) {
 	socket := filepath.Join(shortTempDir(t), "admin.sock")
 	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--admin-socket=" + socket, "list"}))
 	require.Contains(t, stdout.String(), "user * (role: anonymous, tier: none)")
-	require.Contains(t, stderr.String(), "warning: no ntfy server answered on the admin socket "+socket)
+	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket)
+	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
 
 	// Stale socket file, nobody listening
 	listener, err := net.Listen("unix", socket)
@@ -49,7 +51,24 @@ func TestCLI_AdminAPI_FallbackWarning(t *testing.T) {
 	listener.Close()
 	app, _, _, stderr = newTestApp()
 	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--admin-socket=" + socket, "list"}))
-	require.Contains(t, stderr.String(), "warning: no ntfy server answered on the admin socket "+socket)
+	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket)
+	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
+}
+
+func TestCLI_AdminAPI_FallbackWarningBanner(t *testing.T) {
+	plain := adminFallbackWarning("/run/ntfy/admin.sock", "no such file or directory", false)
+	require.Equal(t, `**********************************************************************
+DEPRECATION WARNING: No ntfy server answered on the admin socket
+/run/ntfy/admin.sock (no such file or directory), writing to the database
+directly. A running server may not see this change right away.
+
+Direct database access will be removed after 2026-11-22. After that, the
+ntfy user/access/token/tier commands need a running server.
+See https://docs.ntfy.sh/deprecations/ for details.
+**********************************************************************
+`, plain)
+	yellow := adminFallbackWarning("/run/ntfy/admin.sock", "no such file or directory", true)
+	require.Equal(t, "\033[1;33m"+strings.TrimSuffix(plain, "\n")+"\033[0m\n", yellow)
 }
 
 func TestCLI_AdminAPI_SocketErrorNoFallback(t *testing.T) {
@@ -145,5 +164,5 @@ func TestCLI_AdminAPI_SocketPermissionDenied(t *testing.T) {
 	app, _, stdout, stderr := newTestApp()
 	require.Nil(t, runUserCommand(app, conf, "list"))
 	require.Contains(t, stdout.String(), "user * (role: anonymous")
-	require.Contains(t, stderr.String(), "(permission denied), writing to the database directly")
+	require.Contains(t, stderr.String(), "(permission denied), writing to the database\ndirectly")
 }

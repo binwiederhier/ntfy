@@ -927,10 +927,19 @@ mode `0660`, owned by the user and group ntfy runs as, so only that user, member
 The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`).
 
 If no server answers on the socket (the server is not running, or it could not create the socket), the commands fall
-back to editing the database directly, like they did before, and print a warning:
+back to editing the database directly, like they did before, and print a warning (in yellow on a terminal, unless
+`NO_COLOR` is set). This fallback is [deprecated](deprecations.md) and will be removed after 2026-11-22:
 
 ```
-warning: no ntfy server answered on the admin socket /run/ntfy/admin.sock (no such file or directory), writing to the database directly
+**********************************************************************
+DEPRECATION WARNING: No ntfy server answered on the admin socket
+/run/ntfy/admin.sock (no such file or directory), writing to the database
+directly. A running server may not see this change right away.
+
+Direct database access will be removed after 2026-11-22. After that, the
+ntfy user/access/token/tier commands need a running server.
+See https://docs.ntfy.sh/deprecations/ for details.
+**********************************************************************
 ```
 
 The server logs at startup whether it is listening on the socket, and why not if it isn't:

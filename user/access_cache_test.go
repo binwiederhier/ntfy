@@ -2,7 +2,6 @@ package user
 
 import (
 	"regexp"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -287,9 +286,9 @@ func loadCache(t *testing.T, c *accessCache, rows []rawACLRow) {
 	exact := make(map[string]map[string]aclEntry)
 	wildcards := make(map[string][]aclEntry)
 	for _, r := range rows {
-		e := aclEntry{length: len(r.topic), read: r.read, write: r.write}
-		if strings.Contains(r.topic, "%") {
-			e.pattern = mustCompileLikeToRegex(t, r.topic)
+		e, hasWildcard, err := toACLEntry(r.topic, r.read, r.write) // As Reload builds them
+		require.Nil(t, err)
+		if hasWildcard {
 			wildcards[r.user] = append(wildcards[r.user], e)
 		} else {
 			if exact[r.user] == nil {
@@ -309,4 +308,56 @@ func mustCompileLikeToRegex(t *testing.T, pattern string) *regexp.Regexp {
 	r, err := compileLikeToRegex(pattern)
 	require.NoError(t, err)
 	return r
+}
+
+func TestACLCache_DiffACLEntries(t *testing.T) {
+	// Added, removed and changed entries are reported, exact and wildcard alike, per user; unchanged
+	// ones are not. Wildcard topics come back with * (as passed to AllowAccess).
+	before := newAccessCache(nil, "") // Never reloaded: the test fills the maps itself
+	loadCache(t, before, []rawACLRow{
+		{user: "phil", topic: "unchanged", read: true, write: true},
+		{user: "phil", topic: "removed", read: true, write: false},
+		{user: "phil", topic: "downgraded", read: true, write: true},
+		{user: "phil", topic: "up\\_%", read: true, write: false},
+		{user: "ben", topic: "shared", read: true, write: false},
+		{user: "*", topic: "public", read: true, write: true},
+	})
+	after := newAccessCache(nil, "")
+	loadCache(t, after, []rawACLRow{
+		{user: "phil", topic: "unchanged", read: true, write: true},
+		{user: "phil", topic: "downgraded", read: true, write: false},
+		{user: "phil", topic: "added", read: true, write: false},
+		{user: "ben", topic: "shared", read: true, write: false},
+		{user: "ben", topic: "new%", read: true, write: true},
+		{user: "*", topic: "public", read: false, write: false},
+	})
+	require.ElementsMatch(t, []*AccessChange{
+		{
+			Username: "phil",
+			Topic:    "removed",
+		},
+		{
+			Username: "phil",
+			Topic:    "downgraded",
+		},
+		{
+			Username: "phil",
+			Topic:    "up_*",
+		},
+		{
+			Username: "phil",
+			Topic:    "added",
+		},
+		{
+			Username: "ben",
+			Topic:    "new*",
+		},
+		{
+			Username: "*",
+			Topic:    "public",
+		},
+	}, diffACLEntries(before.exact, before.pattern, after.exact, after.pattern))
+
+	// Nothing changed, nothing reported
+	require.Empty(t, diffACLEntries(after.exact, after.pattern, after.exact, after.pattern))
 }

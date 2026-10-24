@@ -245,6 +245,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 	if err := s.userManager.MarkUserRemoved(u); err != nil {
 		return err
 	}
+	s.userDeleted(u)
 	return s.writeJSON(w, newSuccessResponse())
 }
 

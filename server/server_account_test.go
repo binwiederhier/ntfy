@@ -526,6 +526,31 @@ func TestAccount_Delete_Success(t *testing.T) {
 	})
 }
 
+func TestAccount_Delete_EndsStreamsEverywhere(t *testing.T) {
+	// Deleting your own account ends your streams here and tells the other cluster nodes, like an
+	// admin's delete: an admin without access entries leaves nothing for an access reload to find
+	conf := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, conf)
+	cl := &fakeCluster{}
+	s.cluster = cl
+	require.Nil(t, s.userManager.AddUser("phil", "mypass", user.RoleAdmin, false))
+	phil, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	headers := map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	}
+	stream := subscribeStream(t, s, "mytopic", headers)
+
+	rr := request(t, s, "DELETE", "/v1/account", `{"password":"mypass"}`, headers)
+	require.Equal(t, 200, rr.Code)
+	select {
+	case <-stream.ended:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the deleted user's stream stayed open")
+	}
+	require.Equal(t, []string{phil.ID}, cl.DeletedUsers())
+}
+
 func TestAccount_Delete_Not_Allowed(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		conf := newTestConfigWithAuthFile(t, databaseURL)

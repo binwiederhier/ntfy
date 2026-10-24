@@ -156,10 +156,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	} else if err != nil {
 		return err
 	}
-	s.handleUsersDeleted([]string{u.ID}) // FIXME super inefficient
-	s.cluster.BroadcastState(&cluster.State{
-		DeletedUserIDs: []string{u.ID},
-	})
+	s.userDeleted(u) // FIXME super inefficient
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -230,6 +227,15 @@ func (s *Server) handlePeerAccessChanged() {
 		return
 	}
 	s.userManager.RequestAccessCacheReload() // Coalesced: a burst of peer changes costs at most two reloads
+}
+
+// userDeleted ends a deleted user's streams on this node and tells the other cluster nodes, which end
+// theirs (see handleUsersDeleted). Called by both deletes: by an admin, and of one's own account.
+func (s *Server) userDeleted(u *user.User) {
+	s.handleUsersDeleted([]string{u.ID})
+	s.cluster.BroadcastState(&cluster.State{
+		DeletedUserIDs: []string{u.ID},
+	})
 }
 
 // handleUsersDeleted ends all streams of the given (deleted) users on this node, on every topic,

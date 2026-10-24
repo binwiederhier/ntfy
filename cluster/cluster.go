@@ -125,6 +125,7 @@ type Cluster interface {
 	// Ready reports whether a load balancer should send clients here: an active node that is
 	// Healthy, or that is not but has no other active node to take its clients. The only active
 	// node stays ready with a stale heartbeat, since pulling it would leave clients nowhere to go.
+	// A draining node is never ready: it acts as passive (see Role).
 	Ready() bool
 	// Role reports the role this node acts in: its configured role (active, or passive), or passive
 	// while draining

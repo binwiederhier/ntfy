@@ -851,15 +851,14 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor
 // handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
 // Ready). A passive node is healthy (see handleHealth) but never ready.
 func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	draining := s.cluster.Draining()
-	ready := s.cluster.Ready() && !draining
+	ready := s.cluster.Ready()
 	if !ready {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 	return s.writeJSON(w, &apiReadyResponse{
 		Ready:    ready,
 		Role:     s.cluster.Role(),
-		Draining: draining,
+		Draining: s.cluster.Draining(),
 	})
 }
 

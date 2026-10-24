@@ -58,7 +58,7 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 func (b *fakeCluster) Ready() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return !b.notReady
+	return !b.notReady && !b.draining // Like the mesh: a draining node acts as passive
 }
 
 func (b *fakeCluster) setReady(ready bool) {

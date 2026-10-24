@@ -6,11 +6,33 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.33.1 | Oct 23, 2026  |
+| ntfy server      | v2.34.0 | Oct 24, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.34.0
+Released October 24, 2026
+
+This release prepares the experimental cluster to run behind load balancers: nodes drain on shutdown instead of
+dropping all of their clients at once, ntfy can listen on several addresses, and access changes reach every node. It
+also fixes a revoked or deleted user keeping some of their subscriptions, on every server.
+
+**Features:**
+
+* Allow several comma-separated addresses in `listen-http`, so a load balancer can hold more than ~63k connections to one ntfy node
+* Cluster nodes drain on shutdown: an active node withdraws (stops being ready), then turns read-only and closes its subscriber connections gradually (`experimental-cluster-drain-delay`, `experimental-cluster-drain-duration`), so its clients move to the other nodes without a reconnect storm (experimental, see [draining on shutdown](config.md#draining-on-shutdown))
+
+**Security:**
+
+* End all of a user's subscriptions when their access to a topic is reset or the user is deleted: only the first one was ended, so the others kept receiving the topic's messages ([#1845](https://github.com/binwiederhier/ntfy/pull/1845), thanks to [@gigioneggiando](https://github.com/gigioneggiando) for reporting)
+* In an experimental cluster, tell the other nodes when access changes (e.g. a reservation or a revoked permission), so they reload their access cache and disconnect subscribers who lost access; the access cache reload also catches changes made elsewhere, e.g. by the `ntfy access` CLI, and now runs every 67 seconds instead of 87
+
+**Bug fixes + maintenance:**
+
+* Fix a deadlock when ending subscriptions (reserving a topic with live subscribers, revoking access, deleting a user) while debug logging or `log-level-overrides` is on: the subscriptions' topic stayed locked for good
+* Fix a data race when `log-level-overrides` changes (e.g. on a config reload with SIGHUP) while the server logs
 
 ## ntfy server v2.33.1
 Released October 23, 2026
@@ -2241,22 +2263,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.34.0 (UNRELEASED)
-
-**Features:**
-
-* Allow several comma-separated addresses in `listen-http`, so a load balancer can hold more than ~63k connections to one ntfy node
-* Cluster nodes drain on shutdown: an active node withdraws (stops being ready), then turns read-only and closes its subscriber connections gradually (`experimental-cluster-drain-delay`, `experimental-cluster-drain-duration`), so its clients move to the other nodes without a reconnect storm (experimental, see [draining on shutdown](config.md#draining-on-shutdown))
-
-**Security:**
-
-* In an experimental cluster, tell the other nodes when access changes (e.g. a reservation or a revoked permission), so they reload their access cache and disconnect subscribers who lost access; the access cache reload also catches changes made elsewhere, e.g. by the `ntfy access` CLI, and now runs every 67 seconds instead of 87
-
-**Bug fixes + maintenance:**
-
-* Fix a deadlock when ending subscriptions (reserving a topic with live subscribers, revoking access, deleting a user) while debug logging or `log-level-overrides` is on: the subscriptions' topic stayed locked for good
-* Fix a data race when `log-level-overrides` changes (e.g. on a config reload with SIGHUP) while the server logs
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

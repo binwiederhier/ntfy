@@ -276,8 +276,13 @@ export class SubscriptionManager {
     await this.db.notifications.delete(notificationId);
   }
 
-  async deleteNotificationBySequenceId(subscriptionId, sequenceId) {
-    await this.db.notifications.where({ subscriptionId, sequenceId }).delete();
+  async deleteNotificationBySequenceId(subscriptionId, sequenceId, exceptNotificationId) {
+    const notifications = this.db.notifications.where({ subscriptionId, sequenceId });
+    if (exceptNotificationId) {
+      await notifications.and((notification) => notification.id !== exceptNotificationId).delete();
+    } else {
+      await notifications.delete();
+    }
   }
 
   async deleteNotifications(subscriptionId) {

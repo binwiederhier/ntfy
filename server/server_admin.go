@@ -266,6 +266,23 @@ func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
 	}
 }
 
+// authorizeSubscribed authorizes a new stream once more, right after it subscribed. An access change
+// whose re-check (see reauthorizeSubscribers) ran between the request's authorization and its
+// subscribing would otherwise miss the stream for good. Each check sees the other: the re-check runs
+// after the cache was swapped, so either it finds the subscription or this check finds the new
+// entries. Only with the access cache, where it is a lookup in memory and re-checks happen at all.
+func (s *Server) authorizeSubscribed(v *visitor, topics []*topic) error {
+	if s.userManager == nil || !s.config.AuthAccessCacheEnabled {
+		return nil
+	}
+	for _, t := range topics {
+		if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionRead); err != nil {
+			return errHTTPForbidden
+		}
+	}
+	return nil
+}
+
 // topicsForAccessChange returns the local topics a changed access entry's topic or pattern matches
 func (s *Server) topicsForAccessChange(topicPattern string) []*topic {
 	if !strings.Contains(topicPattern, "*") {

@@ -641,3 +641,34 @@ func TestAccess_RecheckUsesEachSubscriptionsOwnUser(t *testing.T) {
 	require.True(t, userCanceled.Load())
 	require.False(t, adminCanceled.Load())
 }
+
+func TestAccess_RevokeBetweenAuthorizeAndSubscribe(t *testing.T) {
+	// A revoke, and its re-check of live subscribers, can land after a request was authorized but
+	// before its stream subscribed: no later re-check would find the stream, so it must not slip through
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.AuthDefault = user.PermissionDenyAll
+	conf.AuthAccessCacheEnabled = true
+	conf.AuthAccessCacheReloadInterval = time.Hour
+	s := newTestServer(t, conf)
+	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
+	require.Nil(t, s.userManager.AllowAccess("alice", "private", user.PermissionRead))
+	testHookBeforeSubscribe = func() {
+		require.Nil(t, s.userManager.ResetAccess("alice", "private"))
+	}
+	t.Cleanup(func() {
+		testHookBeforeSubscribe = nil
+	})
+	done := make(chan int)
+	go func() {
+		rr := request(t, s, "GET", "/private/json", "", map[string]string{
+			"Authorization": util.BasicAuth("alice", "alice"),
+		})
+		done <- rr.Code
+	}()
+	select {
+	case code := <-done:
+		require.Equal(t, 403, code)
+	case <-time.After(3 * time.Second):
+		t.Fatal("the stream subscribed after the revoke stayed open")
+	}
+}

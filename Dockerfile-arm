@@ -15,6 +15,8 @@ LABEL org.opencontainers.image.version="$VERSION"
 # Alpine does not support adding "tzdata" on ARM anymore, see
 # https://github.com/binwiederhier/ntfy/issues/894
 
+RUN apk upgrade --no-cache
+
 COPY ntfy /usr/bin
 
 EXPOSE 80/tcp

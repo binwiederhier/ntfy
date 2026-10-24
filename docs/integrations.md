@@ -106,6 +106,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Ntfy Desktop](https://github.com/emmaexe/ntfyDesktop) - Fully featured desktop client for Linux, built with Qt and C++.
 - [Ntfy App](https://github.com/rubix-studios-pty-ltd/ntfy-app) - Tauri/Rust desktop client for Windows, Linux and MacOS with push notifications.
 - [mac_ntfy](https://github.com/wangty163/mac_ntfy) - Native macOS client for ntfy (Swift)
+- [NtfyBar](https://github.com/roypadina/NtfyBar) - Native macOS menu-bar client: per-topic popups that stay, notifications, clipboard or shell-command actions, rules, history and sandboxed JavaScript plugins (Swift)
 
 ## Projects + scripts 
 
@@ -202,6 +203,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [epokio](https://github.com/8rulerstar/epokio) - Alerts when an ML training run stalls, hits NaN or finishes, by reading its existing logs (Python)
 - [Pethost](https://pethost.dev/templates/ntfy/) - One-click ntfy server on Pethost, with an admin user made at the first start and anonymous access denied
 - [Sanctumd](https://github.com/Phioster/sanctum_daemon) - Android app for Jellyfin and the *arr stack; subscribes to ntfy topics for live pushes with images, priorities and action buttons (Kotlin)
+- [MeetAlert](https://github.com/roypadina/MeetAlert) - macOS meeting alerts from your calendars; when you're away from the Mac it escalates to your phone via ntfy with Ack/Join/Snooze actions (Swift)
 
 ## Blog + forum posts
 

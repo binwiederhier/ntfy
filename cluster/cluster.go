@@ -106,7 +106,7 @@ type Cluster interface {
 	// without a subscriber for the topic drop it. It is fire-and-forget and must not block the
 	// caller's request path.
 	ForwardMessage(m *model.Message) error
-	// BroadcastState pushes a state delta (first-subscriber hints, subscriber cancels) to all
+	// BroadcastState pushes a state delta (first-subscriber hints, access changes, deleted users) to all
 	// peers. Nop single-node.
 	BroadcastState(state *State)
 	// IsLeader reports whether this node is the one that should run the cluster's singleton jobs

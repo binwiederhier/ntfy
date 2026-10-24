@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 
@@ -250,21 +249,6 @@ const (
 	`
 )
 
-// sqliteSelectAccessCacheUsersQuery builds the per-users cache-load query
-// with a "?, ?, ..." IN clause sized for n usernames.
-func sqliteSelectAccessCacheUsersQuery(n int) string {
-	var sb strings.Builder
-	sb.WriteString(`SELECT u.user, a.topic, a.read, a.write FROM user_access a JOIN user u ON u.id = a.user_id WHERE u.user IN (`)
-	for i := 0; i < n; i++ {
-		if i > 0 {
-			sb.WriteString(",")
-		}
-		sb.WriteString("?")
-	}
-	sb.WriteString(")")
-	return sb.String()
-}
-
 var sqliteQueries = queries{
 	selectUserByID:                 sqliteSelectUserByIDQuery,
 	selectUserByName:               sqliteSelectUserByNameQuery,
@@ -290,7 +274,6 @@ var sqliteQueries = queries{
 	deleteUsersProvisioned:         sqliteDeleteUsersProvisionedQuery,
 	selectTopicPerms:               sqliteSelectTopicPermsQuery,
 	selectAccessCacheAll:           sqliteSelectAccessCacheAllQuery,
-	selectAccessCacheUsers:         sqliteSelectAccessCacheUsersQuery,
 	selectUserAllAccess:            sqliteSelectUserAllAccessQuery,
 	selectUserAccess:               sqliteSelectUserAccessQuery,
 	selectUserReservations:         sqliteSelectUserReservationsQuery,

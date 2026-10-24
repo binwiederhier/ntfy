@@ -23,15 +23,17 @@ import (
 // fakeCluster records relayed messages and topic announcements so tests can assert that every
 // publish path passes through the cluster exactly once, and that subscription hooks fire.
 type fakeCluster struct {
-	mu         sync.Mutex
-	messages   []*model.Message
-	announced  []string
-	notLeader  bool
-	notHealthy bool
-	notReady   bool
-	role       cluster.Role // Empty means active
-	draining   bool
-	peers      cluster.Peers
+	mu            sync.Mutex
+	messages      []*model.Message
+	announced     []string
+	deletedUsers  []string
+	accessChanged int
+	notLeader     bool
+	notHealthy    bool
+	notReady      bool
+	role          cluster.Role // Empty means active
+	draining      bool
+	peers         cluster.Peers
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -47,6 +49,10 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.announced = append(b.announced, state.AddedTopics...)
+	b.deletedUsers = append(b.deletedUsers, state.DeletedUserIDs...)
+	if state.AccessChanged {
+		b.accessChanged++
+	}
 }
 
 func (b *fakeCluster) Ready() bool {
@@ -126,6 +132,18 @@ func (b *fakeCluster) Messages() []*model.Message {
 	return append([]*model.Message{}, b.messages...)
 }
 
+func (b *fakeCluster) AccessChanged() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.accessChanged
+}
+
+func (b *fakeCluster) DeletedUsers() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.deletedUsers
+}
+
 func (b *fakeCluster) Announced() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -178,7 +196,7 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 		defer mu.Unlock()
 		received = append(received, m)
 		return nil
-	}, "", func() {})
+	}, nil, func() {})
 	// A valid fan-out request against the PUBLIC handler must not deliver
 	response := request(t, s, "POST", "/v1/cluster/message",
 		`{"message":{"id":"x1","time":1,"event":"message","topic":"mytopic","message":"sneaky"}}`,
@@ -258,7 +276,7 @@ func TestServer_Cluster_ActiveWithPassivePeer(t *testing.T) {
 			defer mu.Unlock()
 			received = append(received, m.Message)
 			return nil
-		}, "", func() {})
+		}, nil, func() {})
 		return func() []string {
 			mu.Lock()
 			defer mu.Unlock()
@@ -308,7 +326,7 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 		defer mu.Unlock()
 		received = append(received, m)
 		return nil
-	}, "", func() {})
+	}, nil, func() {})
 	// Publish on node A
 	response := request(t, sA, "PUT", "/mytopic", "hello cluster", nil)
 	require.Equal(t, 200, response.Code)
@@ -338,7 +356,7 @@ func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 		defer mu.Unlock()
 		received = append(received, m)
 		return nil
-	}, "", func() {})
+	}, nil, func() {})
 	m := model.NewDefaultMessage("mytopic", "from peer")
 	m.Sender = netip.MustParseAddr("5.6.7.8")
 	s.deliverFromBus(m)

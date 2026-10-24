@@ -303,9 +303,21 @@ type AccessChange struct {
 	Topic    string // Topic or topic pattern, with * wildcards (as passed to AllowAccess)
 }
 
-// AccessChangedFunc is told about access entries that an access cache reload found changed.
-// The server uses it to re-check the live subscribers on the affected topics.
+// AccessChangedFunc is called after any access cache reload that found a difference, whoever
+// made the change:
+//   - our own write, since the write reloads the cache right away;
+//   - a peer's change, through the reload its signal triggers;
+//   - the ntfy access CLI or a lost signal, through the periodic reload.
+//
+// The server uses it to re-check the live subscribers on the affected topics. For a write by
+// this process, it is called before AccessWrittenFunc.
 type AccessChangedFunc func(changes []*AccessChange)
+
+// AccessWrittenFunc is called only after this process wrote access entries, for example a
+// reservation or an admin revoke handled here; never after a reload alone, which would loop
+// between nodes. The server uses it to tell the other nodes, which then reload their access
+// cache (see AccessChangedFunc).
+type AccessWrittenFunc func()
 
 // Config holds the configuration for the user Manager
 type Config struct {
@@ -322,7 +334,7 @@ type Config struct {
 	AccessCacheEnabled           bool                // Enables the in-memory ACL cache (high volume servers only)
 	AccessCacheReloadInterval    time.Duration       // Reload interval for access cache, relevant for ACL writes from CLI
 	AccessChangedFunc            AccessChangedFunc   // Told about access entries a cache reload found added, changed or removed (to re-check live subscribers); may be nil
-	AccessWrittenFunc            func()              // Told after this process wrote access entries (to tell the other cluster nodes); may be nil
+	AccessWrittenFunc            AccessWrittenFunc   // Told after this process wrote access entries (to tell the other cluster nodes); may be nil
 	ExpiredMagicLinkReapInterval time.Duration       // Interval for sweeping expired email-verify/password-reset links
 }
 

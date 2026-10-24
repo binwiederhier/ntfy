@@ -299,8 +299,8 @@ const (
 // AccessChange names one access entry (user_access row) that an access cache reload found
 // added, changed or removed
 type AccessChange struct {
-	Username string // User name, or Everyone
-	Topic    string // Topic or topic pattern, with * wildcards (as passed to AllowAccess)
+	Username     string // User name, or Everyone
+	TopicPattern string // Topic or topic pattern, with * wildcards (as passed to AllowAccess)
 }
 
 // AccessCacheChangedFunc is called after any access cache reload that found a difference, whoever

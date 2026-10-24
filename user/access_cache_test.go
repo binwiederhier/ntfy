@@ -333,28 +333,28 @@ func TestACLCache_DiffACLEntries(t *testing.T) {
 	})
 	require.ElementsMatch(t, []*AccessChange{
 		{
-			Username: "phil",
-			Topic:    "removed",
+			Username:     "phil",
+			TopicPattern: "removed",
 		},
 		{
-			Username: "phil",
-			Topic:    "downgraded",
+			Username:     "phil",
+			TopicPattern: "downgraded",
 		},
 		{
-			Username: "phil",
-			Topic:    "up_*",
+			Username:     "phil",
+			TopicPattern: "up_*",
 		},
 		{
-			Username: "phil",
-			Topic:    "added",
+			Username:     "phil",
+			TopicPattern: "added",
 		},
 		{
-			Username: "ben",
-			Topic:    "new*",
+			Username:     "ben",
+			TopicPattern: "new*",
 		},
 		{
-			Username: "*",
-			Topic:    "public",
+			Username:     "*",
+			TopicPattern: "public",
 		},
 	}, diffACLEntries(before.exact, before.pattern, after.exact, after.pattern))
 

@@ -35,17 +35,17 @@ type accessCache struct {
 var testHookReloadScanned func()
 
 // aclEntry mirrors one user_access row. length feeds better()'s "longer
-// pattern wins" tie-break. topic is the stored (escaped) topic or pattern; it
+// pattern wins" tie-break. escapedTopicPattern is the stored topic or pattern; it
 // is only used to report changed entries after a reload, never for lookups
 // (surfacing wildcard "topics" like "up%" alongside real ones would invite
 // misuse). pattern is the compiled regex form of the LIKE pattern; nil for
 // exact entries.
 type aclEntry struct {
-	topic   string
-	length  int
-	pattern *regexp.Regexp
-	read    bool
-	write   bool
+	escapedTopicPattern string
+	length              int
+	pattern             *regexp.Regexp
+	read                bool
+	write               bool
 }
 
 func newAccessCache(d *db.DB, query string) *accessCache {
@@ -158,20 +158,20 @@ func diffACLEntries(oldExact map[string]map[string]aclEntry, oldPattern map[stri
 	return changes
 }
 
-// aclKey identifies one access entry: a user and a stored (escaped, SQL wildcard) topic
+// aclKey identifies one access entry
 type aclKey struct {
-	username string
-	topic    string
+	username            string
+	escapedTopicPattern string
 }
 
 // flattenACLEntries indexes every exact and wildcard entry by user and stored topic
 func flattenACLEntries(exact map[string]map[string]aclEntry, pattern map[string][]aclEntry) map[aclKey]aclEntry {
 	entries := make(map[aclKey]aclEntry)
 	for username, byTopic := range exact {
-		for topic, entry := range byTopic {
+		for escapedTopic, entry := range byTopic {
 			key := aclKey{
-				username: username,
-				topic:    topic,
+				username:            username,
+				escapedTopicPattern: escapedTopic,
 			}
 			entries[key] = entry
 		}
@@ -179,8 +179,8 @@ func flattenACLEntries(exact map[string]map[string]aclEntry, pattern map[string]
 	for username, patterns := range pattern {
 		for _, entry := range patterns {
 			key := aclKey{
-				username: username,
-				topic:    entry.topic,
+				username:            username,
+				escapedTopicPattern: entry.escapedTopicPattern,
 			}
 			entries[key] = entry
 		}
@@ -191,8 +191,8 @@ func flattenACLEntries(exact map[string]map[string]aclEntry, pattern map[string]
 // newAccessChange returns the change for one entry, with * wildcards
 func newAccessChange(key aclKey) *AccessChange {
 	return &AccessChange{
-		Username: key.username,
-		Topic:    fromSQLWildcard(key.topic),
+		Username:     key.username,
+		TopicPattern: fromSQLWildcard(key.escapedTopicPattern),
 	}
 }
 
@@ -232,10 +232,10 @@ func (c *accessCache) lookupNoLock(username, topic, escapedTopic string) (*aclEn
 // entries leave entry.pattern nil.
 func toACLEntry(escapedTopic string, read, write bool) (entry aclEntry, hasWildcard bool, err error) {
 	entry = aclEntry{
-		topic:  escapedTopic,
-		length: len(escapedTopic),
-		read:   read,
-		write:  write,
+		escapedTopicPattern: escapedTopic,
+		length:              len(escapedTopic),
+		read:                read,
+		write:               write,
 	}
 	if !strings.Contains(escapedTopic, "%") {
 		return entry, false, nil

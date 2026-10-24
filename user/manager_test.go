@@ -2464,20 +2464,20 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 		require.Nil(t, reader.maybeReloadAccessCache())
 		require.ElementsMatch(t, []*AccessChange{
 			{
-				Username: "phil",
-				Topic:    "my_topic",
+				Username:     "phil",
+				TopicPattern: "my_topic",
 			},
 			{
-				Username: Everyone,
-				Topic:    "my_topic",
+				Username:     Everyone,
+				TopicPattern: "my_topic",
 			},
 			{
-				Username: "phil",
-				Topic:    "up_*",
+				Username:     "phil",
+				TopicPattern: "up_*",
 			},
 			{
-				Username: "phil",
-				Topic:    "downgraded",
+				Username:     "phil",
+				TopicPattern: "downgraded",
 			},
 		}, takeChanges())
 
@@ -2486,8 +2486,8 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 		require.Nil(t, reader.maybeReloadAccessCache())
 		require.Equal(t, []*AccessChange{
 			{
-				Username: "phil",
-				Topic:    "up_*",
+				Username:     "phil",
+				TopicPattern: "up_*",
 			},
 		}, takeChanges())
 

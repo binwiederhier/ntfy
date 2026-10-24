@@ -255,7 +255,7 @@ func (s *Server) handleUsersDeleted(userIDs []string) {
 // database query; a deleted user's streams end through handleUsersDeleted instead.
 func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
 	for _, change := range changes {
-		for _, t := range s.topicsForAccessChange(change.Topic) {
+		for _, t := range s.topicsForAccessChange(change.TopicPattern) {
 			t.CancelSubscribersWhere(func(u *user.User) bool {
 				if change.Username != user.Everyone && (u == nil || u.Name != change.Username) {
 					return false // The entry does not apply to this subscriber

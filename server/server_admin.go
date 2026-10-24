@@ -251,24 +251,17 @@ func (s *Server) handleUsersDeleted(userIDs []string) {
 
 // reauthorizeSubscribers ends the subscriptions that changed access entries no longer allow, checking
 // only matching topics. The user manager calls it after an access cache reload that found changes.
-// It authorizes each subscriber's user as of subscribing, against the cache, without a database
-// query; a deleted user's streams end through handleUsersDeleted instead.
+// It authorizes each subscription's own user as of subscribing, against the cache, without a
+// database query; a deleted user's streams end through handleUsersDeleted instead.
 func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
 	for _, change := range changes {
 		for _, t := range s.topicsForAccessChange(change.Topic) {
-			for userID, u := range t.SubscriberUsers() {
+			t.CancelSubscribersWhere(func(u *user.User) bool {
 				if change.Username != user.Everyone && (u == nil || u.Name != change.Username) {
-					continue // The entry does not apply to this subscriber
-				} else if s.userManager.Authorize(u, t.ID, user.PermissionRead) == nil {
-					continue // Still allowed
+					return false // The entry does not apply to this subscriber
 				}
-				log.Tag(tagSubscribe).With(t).Debug("Canceling subscribers of user %s: access to the topic changed", userID)
-				if userID == "" {
-					t.CancelAnonymousSubscribers()
-				} else {
-					t.CancelSubscriberUser(userID)
-				}
-			}
+				return s.userManager.Authorize(u, t.ID, user.PermissionRead) != nil
+			})
 		}
 	}
 }

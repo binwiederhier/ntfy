@@ -257,19 +257,15 @@ func TestTopic_CancelSubscriberUser_AllOfTheUsersSubscribers(t *testing.T) {
 	subscribe("")
 	subscribe("")
 	subscribe("u_carol")
-	users := to.SubscriberUsers()
-	require.Len(t, users, 3)
-	require.Equal(t, "u_alice", users["u_alice"].ID)
-	require.Equal(t, "u_carol", users["u_carol"].ID)
-	require.Nil(t, users[""]) // Anonymous
-
 	to.CancelSubscriberUser("u_alice")
 	to.CancelSubscriberUser("") // An empty user ID cancels nobody: anonymous streams need the explicit call
 	mu.Lock()
 	require.Equal(t, map[string]int{"u_alice": 2}, canceled)
 	mu.Unlock()
 
-	to.CancelAnonymousSubscribers()
+	to.CancelSubscribersWhere(func(u *user.User) bool {
+		return u == nil // Anonymous
+	})
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, map[string]int{"u_alice": 2, "": 2}, canceled)
@@ -298,7 +294,9 @@ func TestTopic_CancelSubscribersWithContextLoggingDoesNotDeadlock(t *testing.T) 
 	done := make(chan struct{})
 	go func() {
 		to.CancelSubscriberUser("u_revoked")
-		to.CancelAnonymousSubscribers()
+		to.CancelSubscribersWhere(func(u *user.User) bool {
+			return u == nil
+		})
 		to.CancelSubscribersExceptUser("u_owner")
 		close(done)
 	}()

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/stretchr/testify/require"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"sync/atomic"
@@ -603,4 +604,40 @@ func TestAccess_ExternalRevocationCaughtByAccessReload(t *testing.T) {
 		t.Fatal("carol's stream was canceled, but she can still read the topic")
 	default:
 	}
+}
+
+func TestAccess_RecheckUsesEachSubscriptionsOwnUser(t *testing.T) {
+	// Two streams of one user can carry different users as of subscribing, e.g. one opened before a
+	// demotion (admin) and one after (user). A revoke is checked against each stream's own user: the
+	// regular stream ends, the admin one stays (an accepted limit until it reconnects).
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.AuthDefault = user.PermissionDenyAll
+	conf.AuthAccessCacheEnabled = true
+	conf.AuthAccessCacheReloadInterval = time.Hour
+	s := newTestServer(t, conf)
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+	require.Nil(t, s.userManager.AllowAccess("ben", "private", user.PermissionRead))
+	ben, err := s.userManager.User("ben")
+	require.Nil(t, err)
+	benAsAdmin := &user.User{
+		ID:   ben.ID,
+		Name: ben.Name,
+		Role: user.RoleAdmin,
+	}
+	topics, err := s.topicsFromIDs(nil, "private")
+	require.Nil(t, err)
+	var adminCanceled, userCanceled atomic.Bool
+	noop := func(*visitor, *model.Message) error {
+		return nil
+	}
+	topics[0].Subscribe(noop, benAsAdmin, func() {
+		adminCanceled.Store(true)
+	})
+	topics[0].Subscribe(noop, ben, func() {
+		userCanceled.Store(true)
+	})
+
+	require.Nil(t, s.userManager.ResetAccess("ben", "private")) // Reloads the cache and re-checks
+	require.True(t, userCanceled.Load())
+	require.False(t, adminCanceled.Load())
 }

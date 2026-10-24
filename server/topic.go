@@ -255,50 +255,41 @@ func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
 // CancelSubscriberUser kills all subscribers with the given user ID; an empty ID matches nobody
 func (t *topic) CancelSubscriberUser(userID string) {
 	if userID == "" {
-		return // Anonymous subscribers are only ever canceled on purpose, see CancelAnonymousSubscribers
+		return // Anonymous subscribers are only ever canceled on purpose, see CancelSubscribersWhere
 	}
-	t.cancelSubscribersWithUserID(userID)
+	t.CancelSubscribersWhere(func(u *user.User) bool {
+		return u != nil && u.ID == userID
+	})
 }
 
-// CancelAnonymousSubscribers kills all subscribers without a user
-func (t *topic) CancelAnonymousSubscribers() {
-	t.cancelSubscribersWithUserID("")
-}
-
-func (t *topic) cancelSubscribersWithUserID(userID string) {
+// CancelSubscribersWhere kills the subscribers for whose user (as of subscribing, nil if anonymous)
+// cancel returns true. cancel runs without the topic lock held, so it may authorize the user.
+func (t *topic) CancelSubscribersWhere(cancel func(u *user.User) bool) {
 	subscribers := t.subscribersMatching(func(s *topicSubscriber) bool {
-		return s.userID() == userID
+		return cancel(s.user)
 	})
 	for _, s := range subscribers {
 		t.cancelUserSubscriber(s)
 	}
 }
 
-// subscribersMatching returns the subscribers that match, so that the caller cancels them without
-// holding t.mu: canceling logs the topic's context, which takes t.mu, and a canceled stream's
-// Unsubscribe waits for it
+// subscribersMatching returns the subscribers that match. Neither match nor the caller's cancels
+// run under t.mu: canceling logs the topic's context, which takes t.mu, and a canceled stream's
+// Unsubscribe waits for it.
 func (t *topic) subscribersMatching(match func(s *topicSubscriber) bool) []*topicSubscriber {
 	t.mu.RLock()
-	defer t.mu.RUnlock()
-	matching := make([]*topicSubscriber, 0)
+	all := make([]*topicSubscriber, 0, len(t.subscribers))
 	for _, s := range t.subscribers {
+		all = append(all, s)
+	}
+	t.mu.RUnlock()
+	matching := make([]*topicSubscriber, 0)
+	for _, s := range all {
 		if match(s) {
 			matching = append(matching, s)
 		}
 	}
 	return matching
-}
-
-// SubscriberUsers returns the distinct users of this topic's subscribers by user ID, as of when
-// they subscribed; "" maps to nil for the anonymous ones
-func (t *topic) SubscriberUsers() map[string]*user.User {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	users := make(map[string]*user.User)
-	for _, s := range t.subscribers {
-		users[s.userID()] = s.user
-	}
-	return users
 }
 
 func (t *topic) cancelUserSubscriber(s *topicSubscriber) {

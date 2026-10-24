@@ -303,7 +303,7 @@ type AccessChange struct {
 	Topic    string // Topic or topic pattern, with * wildcards (as passed to AllowAccess)
 }
 
-// AccessChangedFunc is called after any access cache reload that found a difference, whoever
+// AccessCacheChangedFunc is called after any access cache reload that found a difference, whoever
 // made the change:
 //   - our own write, since the write reloads the cache right away;
 //   - a peer's change, through the reload its signal triggers;
@@ -311,31 +311,31 @@ type AccessChange struct {
 //
 // The server uses it to re-check the live subscribers on the affected topics. For a write by
 // this process, it is called after AccessWrittenFunc.
-type AccessChangedFunc func(changes []*AccessChange)
+type AccessCacheChangedFunc func(changes []*AccessChange)
 
 // AccessWrittenFunc is called only after this process wrote access entries, for example a
 // reservation or an admin revoke handled here, before this node reloads its own access cache;
 // never after a reload alone, which would loop between nodes. The server uses it to tell the
-// other nodes, which then reload their access cache (see AccessChangedFunc).
+// other nodes, which then reload their access cache (see AccessCacheChangedFunc).
 type AccessWrittenFunc func()
 
 // Config holds the configuration for the user Manager
 type Config struct {
-	Filename                     string              // Database filename, e.g. "/var/lib/ntfy/user.db" (SQLite)
-	DatabaseURL                  string              // Database connection string (PostgreSQL)
-	StartupQueries               string              // Queries to run on startup, e.g. to create initial users or tiers (SQLite only)
-	DefaultAccess                Permission          // Default permission if no ACL matches
-	ProvisionEnabled             bool                // Hack: Enable auto-provisioning of users and access grants, disabled for "ntfy user" commands
-	Users                        []*User             // Predefined users to create on startup
-	Access                       map[string][]*Grant // Predefined access grants to create on startup (username -> []*Grant)
-	Tokens                       map[string][]*Token // Predefined users to create on startup (username -> []*Token)
-	QueueWriterInterval          time.Duration       // Interval for the async queue writer to flush stats and token updates to the database
-	BcryptCost                   int                 // Cost of generated passwords; lowering makes testing faster
-	AccessCacheEnabled           bool                // Enables the in-memory ACL cache (high volume servers only)
-	AccessCacheReloadInterval    time.Duration       // Reload interval for access cache, relevant for ACL writes from CLI
-	AccessChangedFunc            AccessChangedFunc   // Told about access entries a cache reload found added, changed or removed (to re-check live subscribers); may be nil
-	AccessWrittenFunc            AccessWrittenFunc   // Told after this process wrote access entries (to tell the other cluster nodes); may be nil
-	ExpiredMagicLinkReapInterval time.Duration       // Interval for sweeping expired email-verify/password-reset links
+	Filename                     string                 // Database filename, e.g. "/var/lib/ntfy/user.db" (SQLite)
+	DatabaseURL                  string                 // Database connection string (PostgreSQL)
+	StartupQueries               string                 // Queries to run on startup, e.g. to create initial users or tiers (SQLite only)
+	DefaultAccess                Permission             // Default permission if no ACL matches
+	ProvisionEnabled             bool                   // Hack: Enable auto-provisioning of users and access grants, disabled for "ntfy user" commands
+	Users                        []*User                // Predefined users to create on startup
+	Access                       map[string][]*Grant    // Predefined access grants to create on startup (username -> []*Grant)
+	Tokens                       map[string][]*Token    // Predefined users to create on startup (username -> []*Token)
+	QueueWriterInterval          time.Duration          // Interval for the async queue writer to flush stats and token updates to the database
+	BcryptCost                   int                    // Cost of generated passwords; lowering makes testing faster
+	AccessCacheEnabled           bool                   // Enables the in-memory ACL cache (high volume servers only)
+	AccessCacheReloadInterval    time.Duration          // Reload interval for access cache, relevant for ACL writes from CLI
+	AccessCacheChangedFunc       AccessCacheChangedFunc // Told about access entries a cache reload found added, changed or removed (to re-check live subscribers); may be nil
+	AccessWrittenFunc            AccessWrittenFunc      // Told after this process wrote access entries (to tell the other cluster nodes); may be nil
+	ExpiredMagicLinkReapInterval time.Duration          // Interval for sweeping expired email-verify/password-reset links
 }
 
 // Error constants used by the package

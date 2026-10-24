@@ -2447,7 +2447,7 @@ func TestAccessCache_ReloadReportsChanges(t *testing.T) {
 			BcryptCost:                bcrypt.MinCost,
 			AccessCacheEnabled:        true,
 			AccessCacheReloadInterval: time.Hour,
-			AccessChangedFunc: func(c []*AccessChange) {
+			AccessCacheChangedFunc: func(c []*AccessChange) {
 				mu.Lock()
 				defer mu.Unlock()
 				changes = append(changes, c...)
@@ -2689,7 +2689,7 @@ func TestManager_AccessWriteTellsPeersBeforeReloading(t *testing.T) {
 			AccessWrittenFunc: func() {
 				record("written")
 			},
-			AccessChangedFunc: func(_ []*AccessChange) {
+			AccessCacheChangedFunc: func(_ []*AccessChange) {
 				record("changed")
 			},
 		})

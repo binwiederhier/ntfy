@@ -316,7 +316,7 @@ func New(conf *Config) (*Server, error) {
 			QueueWriterInterval:       conf.AuthStatsQueueWriterInterval,
 			AccessCacheEnabled:        conf.AuthAccessCacheEnabled,
 			AccessCacheReloadInterval: conf.AuthAccessCacheReloadInterval,
-			AccessChangedFunc:         s.reauthorizeSubscribers,
+			AccessCacheChangedFunc:    s.reauthorizeSubscribers,
 			AccessWrittenFunc:         s.broadcastAccessChanged,
 		}
 		if pool != nil {

@@ -106,7 +106,7 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 
 // ReloadAccessCache reloads the whole in-memory access cache from the primary database, e.g. when
 // another cluster node changed access entries; entries that changed are reported to
-// Config.AccessChangedFunc. No-op when the cache is disabled.
+// Config.AccessCacheChangedFunc. No-op when the cache is disabled.
 func (a *Manager) ReloadAccessCache() error {
 	return a.maybeReloadAccessCache()
 }
@@ -129,7 +129,7 @@ func (a *Manager) RequestAccessCacheReload() {
 // (about 15 ms for ntfy.sh's 5,500 entries, so there is no point in reloading parts of it). No-op
 // when the cache is disabled.
 //
-// Entries the reload finds changed are reported to Config.AccessChangedFunc before it returns.
+// Entries the reload finds changed are reported to Config.AccessCacheChangedFunc before it returns.
 // No reload runs under a.mu, so the function may call back into the manager.
 func (a *Manager) maybeReloadAccessCache() error {
 	if a.accessCache == nil {
@@ -139,8 +139,8 @@ func (a *Manager) maybeReloadAccessCache() error {
 	if err != nil {
 		return err
 	}
-	if a.config.AccessChangedFunc != nil && len(changes) > 0 {
-		a.config.AccessChangedFunc(changes)
+	if a.config.AccessCacheChangedFunc != nil && len(changes) > 0 {
+		a.config.AccessCacheChangedFunc(changes)
 	}
 	return nil
 }

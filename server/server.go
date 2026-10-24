@@ -2066,19 +2066,29 @@ func (s *Server) topicFromID(v *visitor, id string) (*topic, error) {
 
 // topicsFromPattern returns a list of topics matching the given pattern, but it does not create them.
 func (s *Server) topicsFromPattern(pattern string) ([]*topic, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	patternRegexp, err := regexp.Compile("^" + strings.ReplaceAll(pattern, "*", ".*") + "$")
 	if err != nil {
 		return nil, err
 	}
 	topics := make([]*topic, 0)
-	for _, t := range s.topics {
+	for _, t := range s.allTopics() {
 		if patternRegexp.MatchString(t.ID) {
 			topics = append(topics, t)
 		}
 	}
 	return topics, nil
+}
+
+// allTopics returns all topics. Callers that scan them (~313k on ntfy.sh) do so without s.mu held,
+// which every request that creates a visitor or topic needs.
+func (s *Server) allTopics() []*topic {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	topics := make([]*topic, 0, len(s.topics))
+	for _, t := range s.topics {
+		topics = append(topics, t)
+	}
+	return topics
 }
 
 func (s *Server) runSMTPServer() error {

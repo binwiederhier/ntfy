@@ -124,9 +124,10 @@ func (c *accessCache) Reload() ([]*AccessChange, error) {
 	if testHookReloadScanned != nil {
 		testHookReloadScanned()
 	}
-	// Replace the internal maps
-	c.mu.Lock()
+	// Diff without c.mu, so lookups do not wait for it: only reloads replace the maps, and this one
+	// holds reloadMu. Then replace the maps.
 	changes := diffACLEntries(c.exact, c.pattern, exacts, patterns)
+	c.mu.Lock()
 	c.exact = exacts
 	c.pattern = patterns
 	c.mu.Unlock()

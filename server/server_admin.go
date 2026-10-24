@@ -242,13 +242,7 @@ func (s *Server) userDeleted(u *user.User) {
 // after a local delete or a peer's, never re-broadcasting. An access cache reload does not find
 // them: a user without access entries (e.g. an admin) leaves nothing in the cache to compare.
 func (s *Server) handleUsersDeleted(userIDs []string) {
-	s.mu.RLock()
-	topics := make([]*topic, 0, len(s.topics))
-	for _, t := range s.topics {
-		topics = append(topics, t)
-	}
-	s.mu.RUnlock()
-	for _, t := range topics {
+	for _, t := range s.allTopics() {
 		for _, userID := range userIDs {
 			t.CancelSubscriberUser(userID) // An empty user ID cancels nobody
 		}

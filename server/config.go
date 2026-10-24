@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/netip"
 	"reflect"
+	"runtime"
 	"text/template"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 
 // Defines default config settings (excluding limits, see below)
 const (
+	DefaultAdminSocketMode                      = fs.FileMode(0660) // Owner (the ntfy user) and the ntfy group; root bypasses anyway
 	DefaultListenHTTP                           = ":80"
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultCacheBatchTimeout                    = time.Duration(0)
@@ -130,6 +132,7 @@ type Config struct {
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
+	AdminSocket                          string // Path of the local admin socket (CLI access without credentials); empty disables it
 	KeyFile                              string
 	CertFile                             string
 	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
@@ -244,6 +247,18 @@ type Config struct {
 	BuildCommit                          string        // Injected by App
 }
 
+// DefaultAdminSocket returns the default admin socket path. On Windows there is none: unix socket
+// file permissions do not protect it there, so the CLI uses the database or --server instead.
+func DefaultAdminSocket() string {
+	switch runtime.GOOS {
+	case "windows":
+		return ""
+	case "darwin":
+		return "/var/run/ntfy/admin.sock"
+	}
+	return "/run/ntfy/admin.sock"
+}
+
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
@@ -253,6 +268,7 @@ func NewConfig() *Config {
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,
+		AdminSocket:                          DefaultAdminSocket(),
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",

@@ -52,7 +52,7 @@ func TestServer_Drain_ClosesStreamsGradually(t *testing.T) {
 
 func TestServer_Drain_DrainingIsReadOnly(t *testing.T) {
 	// While draining, new streams and all publishes get 503: the load balancers stopped sending
-	// requests during the entering phase, so these are stragglers. Reads (polls) are still served.
+	// requests during the withdrawing phase, so these are stragglers. Reads (polls) are still served.
 	s, _ := newDrainTestServer(t, 3*time.Second, true)
 	rr := request(t, s, "PUT", "/mytopic", "published before", nil)
 	require.Equal(t, 200, rr.Code)
@@ -93,8 +93,8 @@ func TestServer_Drain_DrainingIsReadOnly(t *testing.T) {
 	require.JSONEq(t, `{"ready":false,"role":"passive","draining":true}`, rr.Body.String())
 }
 
-func TestServer_Drain_EnteringServesEverything(t *testing.T) {
-	// While entering, the node is not ready, so the readiness agents take it out of the load
+func TestServer_Drain_WithdrawingServesEverything(t *testing.T) {
+	// While withdrawing, the node is not ready, so the readiness agents take it out of the load
 	// balancers, but it still serves everything: requests already on their way must succeed
 	s, cl := newDrainTestServer(t, time.Second, true)
 	s.config.ClusterDrainDelay = 2 * time.Second
@@ -131,7 +131,7 @@ func TestServer_Drain_EnteringServesEverything(t *testing.T) {
 	require.Equal(t, 503, rr.Code)
 }
 
-func TestServer_Drain_CanceledWhileEntering(t *testing.T) {
+func TestServer_Drain_CanceledWhileWithdrawing(t *testing.T) {
 	s, _ := newDrainTestServer(t, time.Second, true)
 	s.config.ClusterDrainDelay = time.Minute
 	openDrainTestStream(s, "/mytopic/json")
@@ -151,7 +151,7 @@ func TestServer_Drain_CanceledWhileEntering(t *testing.T) {
 	select {
 	case <-drained:
 	case <-time.After(2 * time.Second):
-		t.Fatal("drain did not stop when canceled while entering")
+		t.Fatal("drain did not stop when canceled while withdrawing")
 	}
 	require.False(t, s.readOnly.Load())
 }
@@ -171,7 +171,7 @@ func TestServer_Drain_SkippedWithoutAnotherActiveNode(t *testing.T) {
 }
 
 func TestServer_Drain_ZeroDurationClosesAllAtOnce(t *testing.T) {
-	// A drain duration of 0 still drains (not ready, then read-only), but closes every stream at once
+	// A drain duration of 0 still drains (withdrawing, then read-only), but closes every stream at once
 	s, cl := newDrainTestServer(t, 0, true)
 	streams := make([]<-chan struct{}, 0)
 	for i := 0; i < 5; i++ {

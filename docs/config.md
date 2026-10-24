@@ -2291,7 +2291,7 @@ Restarting a node drops all of its subscriber connections at once, and all of it
 in one burst. To avoid that, an active node that gets `SIGTERM` while another active node is up **drains** before it
 exits, moving its clients to the other nodes gradually, and without failed requests:
 
-1. **Not ready** (`experimental-cluster-drain-delay`, default 15 seconds): `/v1/ready` fails at once, so your load
+1. **Withdrawing** (`experimental-cluster-drain-delay`, default 15 seconds): `/v1/ready` fails at once, so your load
    balancer stops sending the node new requests, but the node still serves everything, so requests already on their
    way succeed. In the cluster, the node acts as passive from now on: another node takes over the leader's jobs, and
    it sends no scheduled (delayed) messages.
@@ -2300,7 +2300,7 @@ exits, moving its clients to the other nodes gradually, and without failed reque
    closed evenly over the duration (all at once with `0`). The clients reconnect, through the load balancer, to the
    other nodes, and catch up on what they missed. Once no connections are left, the node exits.
 
-| | Active | Passive | Draining: not ready | Draining: read-only |
+| | Active | Passive | Draining: withdrawing | Draining: read-only |
 |---|---|---|---|---|
 | `/v1/ready` | 200 | 503 | 503, `"role": "passive", "draining": true` | 503, `"role": "passive", "draining": true` |
 | New subscriptions (streams, WebSockets) | accepted | accepted | accepted | 503 |
@@ -2518,7 +2518,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `experimental-cluster-secret`              | `NTFY_EXPERIMENTAL_CLUSTER_SECRET`              | *string*                                            | -                 | Experimental, not ready for production. Shared secret authenticating node-to-node traffic; must match on all nodes.                                                                                                                      |
 | `experimental-cluster-batch-linger`        | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
 | `experimental-cluster-role`                | `NTFY_EXPERIMENTAL_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
-| `experimental-cluster-drain-delay`         | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY`         | *duration*                                          | `15s`             | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long a node is not ready but still serves everything, so the load balancer stops sending it requests before the node turns read-only. |
+| `experimental-cluster-drain-delay`         | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY`         | *duration*                                          | `15s`             | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long a node withdraws: it is not ready but still serves everything, so the load balancer stops sending it requests before the node turns read-only. |
 | `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` closes them all at once. The service manager's stop timeout must be longer than the delay plus this. |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |

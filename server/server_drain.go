@@ -26,14 +26,16 @@ var (
 )
 
 // Drain moves this node's clients to the other nodes before a shutdown, in two phases, and returns
-// when no streams are left, or right away when ctx is canceled (a second SIGTERM).
+// when no streams are left, or right away when ctx is canceled (a second SIGTERM):
 //
-// First, for ClusterDrainDelay, /v1/ready fails, so the readiness agents take the node out of the
-// load balancers, but it still serves everything, so requests already on their way succeed. It acts
-// as passive in the cluster from the start: leadership moves, and it claims no delayed messages.
-// Then, for ClusterDrainDuration, it is read-only (new subscriptions and publishes get 503) and
-// closes its streams evenly (all at once with a duration of 0), so their clients reconnect to the other nodes a few at a time instead
-// of all at once. Clients resume with since=, so nothing is lost. Polls and the mesh keep working.
+//   - Phase 1, withdrawing (ClusterDrainDelay): /v1/ready fails, so the readiness agents take the
+//     node out of the load balancers, but it still serves everything, so requests already on their
+//     way succeed. It acts as passive in the cluster from the start: leadership moves, and it claims
+//     no delayed messages.
+//   - Phase 2, read-only (ClusterDrainDuration): new subscriptions and publishes get 503, and its
+//     streams are closed evenly (all at once with a duration of 0), so their clients reconnect to the
+//     other nodes a few at a time instead of all at once. Clients resume with since=, so nothing is
+//     lost. Polls and the mesh keep working.
 //
 // Only an active node with another active node drains: otherwise there is nowhere for its clients
 // to go, and a drain would only delay the shutdown.
@@ -44,11 +46,11 @@ func (s *Server) Drain(ctx context.Context) {
 		}
 		return
 	}
-	s.cluster.SetDraining(true) // Acts as passive: not ready, peers stop counting it, leadership moves
-
-	// Not ready, but still serving everything, since requests already on their way must not fail
+	// Phase 1: Withdrawing. Acts as passive (not ready, peers stop counting it, leadership moves),
+	// but still serves everything, since requests already on their way must not fail
+	s.cluster.SetDraining(true)
 	if delay := s.config.ClusterDrainDelay; delay > 0 {
-		log.Tag(tagDrain).Info("Draining: not ready, still serving for %v until the load balancers stop sending requests", delay)
+		log.Tag(tagDrain).Info("Draining: withdrawing, still serving for %v until the load balancers stop sending requests", delay)
 		select {
 		case <-ctx.Done():
 			log.Tag(tagDrain).Info("Drain canceled")
@@ -57,7 +59,7 @@ func (s *Server) Drain(ctx context.Context) {
 		}
 	}
 
-	// Read-only, and the streams are closed evenly over the drain duration
+	// Phase 2: Read-only. The streams are closed evenly over the drain duration
 	s.readOnly.Store(true)
 	total := s.streams.Len()
 	duration := s.config.ClusterDrainDuration

@@ -32,7 +32,7 @@ const (
 	DefaultStripePriceCacheDuration             = 3 * time.Hour          // Time to keep Stripe prices cached in memory before a refresh is needed
 	DefaultClusterBatchLinger                   = 500 * time.Millisecond // How long fan-out messages wait to form a per-peer batch (experimental clustering)
 	DefaultClusterRole                          = cluster.RoleActive     // Active nodes take client traffic, lead and fence (experimental clustering)
-	DefaultClusterDrainDelay                    = 15 * time.Second       // On shutdown, how long a draining node still serves everything (not ready); with the drain duration, fits systemd's default stop timeout (90s) (experimental clustering)
+	DefaultClusterDrainDelay                    = 15 * time.Second       // On shutdown, how long a draining node withdraws (not ready, still serves everything); with the drain duration, fits systemd's default stop timeout (90s) (experimental clustering)
 	DefaultClusterDrainDuration                 = time.Minute            // On shutdown, how long a draining node takes to close its streams, read-only (experimental clustering)
 )
 
@@ -142,7 +142,7 @@ type Config struct {
 	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	ClusterRole                          cluster.Role  // Active (default) or passive: a passive node never leads and never fences
-	ClusterDrainDelay                    time.Duration // On shutdown, how long a draining node still serves everything (not ready) before it turns read-only
+	ClusterDrainDelay                    time.Duration // On shutdown, how long a draining node withdraws (not ready, still serves everything) before it turns read-only
 	ClusterDrainDuration                 time.Duration // On shutdown, how long an active node takes to close its streams so they reconnect to other nodes; 0 disables
 	FirebaseKeyFile                      string
 	CacheFile                            string

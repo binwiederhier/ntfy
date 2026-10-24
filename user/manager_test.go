@@ -2671,6 +2671,39 @@ func TestManager_RequestAccessCacheReloadCoalesces(t *testing.T) {
 	})
 }
 
+func TestManager_AccessWriteTellsPeersBeforeReloading(t *testing.T) {
+	// The peers are told first, so their reloads start without waiting for this node's
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		var mu sync.Mutex
+		calls := make([]string, 0)
+		record := func(call string) {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, call)
+		}
+		a := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess:             PermissionReadWrite,
+			BcryptCost:                bcrypt.MinCost,
+			AccessCacheEnabled:        true,
+			AccessCacheReloadInterval: time.Hour,
+			AccessWrittenFunc: func() {
+				record("written")
+			},
+			AccessChangedFunc: func(_ []*AccessChange) {
+				record("changed")
+			},
+		})
+		require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
+		mu.Lock()
+		calls = calls[:0]
+		mu.Unlock()
+		require.Nil(t, a.AllowAccess("phil", "secret", PermissionRead))
+		mu.Lock()
+		defer mu.Unlock()
+		require.Equal(t, []string{"written", "changed"}, calls)
+	})
+}
+
 func TestManager_AccessWritesTellPeers(t *testing.T) {
 	// Every access write is passed on (the server tells the other cluster nodes, which reload their
 	// access cache); a reload alone is not a write, so passing it on would loop between nodes

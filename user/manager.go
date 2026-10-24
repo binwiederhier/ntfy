@@ -145,15 +145,15 @@ func (a *Manager) maybeReloadAccessCache() error {
 	return nil
 }
 
-// accessWritten is called after this process wrote access entries (or users): it reloads the
-// access cache, so the change applies here at once, and tells Config.AccessWrittenFunc, so that
-// the other cluster nodes reload theirs. Never called for a reload alone, which would loop.
+// accessWritten is called after this process wrote access entries (or users): it tells
+// Config.AccessWrittenFunc first, so that the other cluster nodes start reloading their access
+// cache right away, then reloads this node's cache, so the change applies here before the write
+// returns. Never called for a reload alone, which would loop.
 func (a *Manager) accessWritten() error {
-	err := a.maybeReloadAccessCache()
 	if a.config.AccessWrittenFunc != nil {
-		a.config.AccessWrittenFunc() // Even if the reload failed: the write happened
+		a.config.AccessWrittenFunc()
 	}
-	return err
+	return a.maybeReloadAccessCache()
 }
 
 // asyncAccessCacheReloadLoop periodically bulk-reloads the access cache so that

@@ -310,13 +310,13 @@ type AccessChange struct {
 //   - the ntfy access CLI or a lost signal, through the periodic reload.
 //
 // The server uses it to re-check the live subscribers on the affected topics. For a write by
-// this process, it is called before AccessWrittenFunc.
+// this process, it is called after AccessWrittenFunc.
 type AccessChangedFunc func(changes []*AccessChange)
 
 // AccessWrittenFunc is called only after this process wrote access entries, for example a
-// reservation or an admin revoke handled here; never after a reload alone, which would loop
-// between nodes. The server uses it to tell the other nodes, which then reload their access
-// cache (see AccessChangedFunc).
+// reservation or an admin revoke handled here, before this node reloads its own access cache;
+// never after a reload alone, which would loop between nodes. The server uses it to tell the
+// other nodes, which then reload their access cache (see AccessChangedFunc).
 type AccessWrittenFunc func()
 
 // Config holds the configuration for the user Manager

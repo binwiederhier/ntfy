@@ -17,45 +17,6 @@ const (
 	apiTierReset = "-" // Tier value that removes a user's tier (PUT /v1/users); same marker the CLI uses
 )
 
-// adminHandler returns the handler for an admin API route, or nil if the request is not one.
-// Routes that must not be reachable from the network are only returned when socket is true, i.e.
-// when the request came in over the admin socket (see server_admin_socket.go).
-func (s *Server) adminHandler(r *http.Request, socket bool) handleFunc {
-	switch {
-	case r.Method == http.MethodGet && r.URL.Path == apiVersionPath:
-		return s.handleVersion
-	case r.Method == http.MethodGet && r.URL.Path == apiUsersPath:
-		return s.handleUsersGet
-	case r.Method == http.MethodPost && r.URL.Path == apiUsersPath:
-		return s.handleUsersAdd
-	case r.Method == http.MethodPut && r.URL.Path == apiUsersPath:
-		return s.handleUsersUpdate
-	case r.Method == http.MethodDelete && r.URL.Path == apiUsersPath:
-		return s.handleUsersDelete
-	case (r.Method == http.MethodPut || r.Method == http.MethodPost) && r.URL.Path == apiUsersAccessPath:
-		return s.handleAccessAllow
-	case r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath:
-		return s.handleAccessReset
-	case r.Method == http.MethodGet && r.URL.Path == apiUsersTokensPath:
-		return s.handleUsersTokensGet
-	case r.Method == http.MethodPost && r.URL.Path == apiUsersTokensPath:
-		return s.handleUsersTokensAdd
-	case r.Method == http.MethodDelete && r.URL.Path == apiUsersTokensPath:
-		return s.handleUsersTokensDelete
-	case r.Method == http.MethodPost && r.URL.Path == apiUsersPasswordResetPath:
-		return s.handleUsersPasswordReset
-	case r.Method == http.MethodGet && r.URL.Path == apiAdminTiersPath:
-		return s.handleAdminTiersGet
-	case r.Method == http.MethodPost && r.URL.Path == apiAdminTiersPath:
-		return s.handleAdminTiersAdd
-	case r.Method == http.MethodPut && r.URL.Path == apiAdminTiersPath:
-		return s.handleAdminTiersUpdate
-	case r.Method == http.MethodDelete && r.URL.Path == apiAdminTiersPath:
-		return s.handleAdminTiersDelete
-	}
-	return nil
-}
-
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	return s.writeJSON(w, &apiVersionResponse{
 		Version: s.config.BuildVersion,

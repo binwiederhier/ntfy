@@ -3,11 +3,13 @@ package server
 import (
 	"fmt"
 	"github.com/stretchr/testify/require"
+	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -524,6 +526,31 @@ func TestAccount_Delete_Success(t *testing.T) {
 	})
 }
 
+func TestAccount_Delete_EndsStreamsEverywhere(t *testing.T) {
+	// Deleting your own account ends your streams here and tells the other cluster nodes, like an
+	// admin's delete: an admin without access entries leaves nothing for an access reload to find
+	conf := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, conf)
+	cl := &fakeCluster{}
+	s.cluster = cl
+	require.Nil(t, s.userManager.AddUser("phil", "mypass", user.RoleAdmin, false))
+	phil, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	headers := map[string]string{
+		"Authorization": util.BasicAuth("phil", "mypass"),
+	}
+	stream := subscribeStream(t, s, "mytopic", headers)
+
+	rr := request(t, s, "DELETE", "/v1/account", `{"password":"mypass"}`, headers)
+	require.Equal(t, 200, rr.Code)
+	select {
+	case <-stream.ended:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the deleted user's stream stayed open")
+	}
+	require.Equal(t, []string{phil.ID}, cl.DeletedUsers())
+}
+
 func TestAccount_Delete_Not_Allowed(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		conf := newTestConfigWithAuthFile(t, databaseURL)
@@ -925,6 +952,104 @@ func TestAccount_TokenUpdate_NilUserRace_NoPanic(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, 401, httpErr.HTTPCode)
 	})
+}
+
+func TestAccount_Reservation_TakeoverCancelsPeerSubscribers(t *testing.T) {
+	// Reserving a public topic on node A must end an anonymous stream on node B, and B must deny
+	// the reconnect right away: its access cache would otherwise still say "public" until the
+	// next periodic reload
+	sA, sB := newReservationTestNodes(t, true, time.Hour)
+	stream := subscribeStream(t, sB, "mytopic", nil)
+
+	reserveDenyAll(t, sA, "mytopic")
+	select {
+	case <-stream.ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("anonymous stream on node B was not canceled after the reservation on node A")
+	}
+	require.Equal(t, 403, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+
+	// The owner's messages, published on either node, stay private
+	phil := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
+	require.Equal(t, 200, request(t, sA, "PUT", "/mytopic", "secret from A", phil).Code)
+	require.Equal(t, 200, request(t, sB, "PUT", "/mytopic", "secret from B", phil).Code)
+	require.NotContains(t, stream.body(), "secret")
+}
+
+func TestAccount_Reservation_LostCancelCaughtByAccessReload(t *testing.T) {
+	// The relay is best effort: if node B never hears about the reservation (here: the nodes are
+	// not even clustered), B's next access cache reload finds the changed entries and ends the
+	// streams that may no longer read the topic
+	sA, sB := newReservationTestNodes(t, false, 500*time.Millisecond)
+	stream := subscribeStream(t, sB, "mytopic", nil)
+
+	reserveDenyAll(t, sA, "mytopic")
+	select {
+	case <-stream.ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("anonymous stream on node B was not canceled by its access cache reload")
+	}
+	require.Equal(t, 403, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+}
+
+// newReservationTestNodes starts nodes A and B on one Postgres schema, with reservations and the
+// access cache on as on ntfy.sh, and user phil (tier with reservations) to reserve topics.
+// With clustered, A tells B about its access changes; without, B never hears about them.
+func newReservationTestNodes(t *testing.T, clustered bool, accessReloadInterval time.Duration) (sA, sB *Server) {
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newConf := func() *Config {
+		conf := newTestConfig(t, schemaDSN)
+		conf.AuthDefault = user.PermissionReadWrite
+		conf.AuthAccessCacheEnabled = true
+		conf.AuthAccessCacheReloadInterval = accessReloadInterval
+		conf.EnableReservations = true
+		return conf
+	}
+	confB := newConf()
+	if clustered {
+		listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+		require.Nil(t, err)
+		confB.ClusterNodeID = "node-b"
+		confB.ClusterListen = listenerB.Addr().String()
+		confB.ClusterSecret = "s3cret"
+		confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
+		sB = newTestServer(t, confB)
+		srvB := &http.Server{Handler: sB.cluster}
+		go srvB.Serve(listenerB)
+		t.Cleanup(func() {
+			srvB.Close()
+		})
+	} else {
+		sB = newTestServer(t, confB)
+	}
+	confA := newConf()
+	if clustered {
+		confA.ClusterNodeID = "node-a"
+		confA.ClusterListen = "127.0.0.1:1" // Enables clustering; A only sends in these tests
+		confA.ClusterSecret = "s3cret"
+		confA.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	}
+	sA = newTestServer(t, confA)
+	require.Nil(t, sA.userManager.AddTier(&user.Tier{
+		Code:             "pro",
+		MessageLimit:     100,
+		ReservationLimit: 2,
+	}))
+	require.Nil(t, sA.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, sA.userManager.ChangeTier("phil", "pro"))
+	if clustered {
+		waitFor(t, func() bool {
+			return len(sA.cluster.Members()) == 2
+		})
+	}
+	return sA, sB
+}
+
+func reserveDenyAll(t *testing.T, s *Server, topic string) {
+	response := request(t, s, "POST", "/v1/account/reservation", `{"topic":"`+topic+`","everyone":"deny-all"}`, map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, response.Code)
 }
 
 // TestAccount_PhoneNumberAdd_WrongCode ensures that a wrong verification code is rejected, and

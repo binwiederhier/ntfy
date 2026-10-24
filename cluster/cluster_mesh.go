@@ -24,7 +24,7 @@ const (
 	peerQueueSize      = 1024            // Bounded per-peer fan-out queue (drop on overflow)
 	batchMaxMessages   = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
-	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, cancels)
+	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, deleted users)
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -154,16 +154,19 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 
 // BroadcastState tells all live peers about state changes that must not wait: topics that
 // gained their first local subscriber (a hint for peers' cached rate-visitor lookups, never
-// used for routing) and subscriber cancels.
+// used for routing), changed access entries and deleted users.
 func (c *meshCluster) BroadcastState(state *State) {
-	if len(state.AddedTopics) == 0 && len(state.SubscriberCancels) == 0 {
+	if len(state.AddedTopics) == 0 && len(state.DeletedUserIDs) == 0 && !state.AccessChanged {
 		return
 	}
 	peers := c.registry.Peers()
 	if len(peers) == 0 {
 		return
 	}
-	envelope := &apiState{Cancels: state.SubscriberCancels}
+	envelope := &apiState{
+		DeletedUserIDs: state.DeletedUserIDs,
+		AccessChanged:  state.AccessChanged,
+	}
 	if len(state.AddedTopics) > 0 {
 		envelope.Topics = &apiStateTopics{Added: state.AddedTopics}
 	}
@@ -171,7 +174,7 @@ func (c *meshCluster) BroadcastState(state *State) {
 	if err != nil {
 		return
 	}
-	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d cancels) to %d peer(s)", len(state.AddedTopics), len(state.SubscriberCancels), len(peers))
+	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d deleted users, access changed: %t) to %d peer(s)", len(state.AddedTopics), len(state.DeletedUserIDs), state.AccessChanged, len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
 			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {

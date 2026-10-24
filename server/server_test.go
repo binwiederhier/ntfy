@@ -1964,7 +1964,7 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 		require.NotNil(t, s.topics["mytopic"])
 
 		// Fudge with last access, but subscribe, and see that it won't get pruned (because of subscriber)
-		subID := s.topics["mytopic"].Subscribe(subFn, "", func() {})
+		subID := s.topics["mytopic"].Subscribe(subFn, nil, func() {})
 		s.topics["mytopic"].mu.Lock()
 		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
 		s.topics["mytopic"].mu.Unlock()
@@ -5934,4 +5934,31 @@ func TestServer_PublishTimezoneWithoutDelay(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 		require.InDelta(t, time.Now().Unix(), toMessage(t, response.Body.String()).Time, 2)
 	})
+}
+
+// testStream is a live JSON stream subscription; ended is closed when the server ends it
+type testStream struct {
+	ended chan struct{}
+	rr    *httptest.ResponseRecorder
+}
+
+func (s *testStream) body() string {
+	<-s.ended
+	return s.rr.Body.String()
+}
+
+// subscribeStream opens a JSON stream to topic (headers may be nil) and waits until it is live
+func subscribeStream(t *testing.T, s *Server, topic string, headers map[string]string) *testStream {
+	topics, err := s.topicsFromIDs(nil, topic)
+	require.Nil(t, err)
+	before := topics[0].SubscribersCount()
+	stream := &testStream{ended: make(chan struct{})}
+	go func() {
+		stream.rr = request(t, s, "GET", "/"+topic+"/json", "", headers)
+		close(stream.ended)
+	}()
+	waitFor(t, func() bool {
+		return topics[0].SubscribersCount() > before
+	})
+	return stream
 }

@@ -10,6 +10,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"heckel.io/ntfy/v2/log"
@@ -22,6 +23,17 @@ const (
 )
 
 var (
+	// adminSocketPaths are the paths served over the admin socket. All of them are admin-only
+	// routes in handleInternal (ensureAdmin), which the socket's synthetic admin user passes.
+	adminSocketPaths = []string{
+		apiVersionPath,
+		apiUsersPath,
+		apiUsersAccessPath,
+		apiUsersTokensPath,
+		apiUsersPasswordResetPath,
+		apiAdminTiersPath,
+	}
+
 	// adminSocketUser is the synthetic admin every socket request runs as. Its name is one that
 	// user.AllowedUsername rejects, so it can never collide with a real account.
 	adminSocketUser = &user.User{
@@ -99,12 +111,11 @@ func (s *Server) handleAdminSocket(w http.ResponseWriter, r *http.Request) {
 	r = withContext(r, map[contextKey]any{contextAdminSocket: true})
 	v := newVisitor(s.config, s.messageCache, s.userManager, netip.AddrFrom4([4]byte{127, 0, 0, 1}), adminSocketUser)
 	adminLog(v, r).Debug("Admin socket request")
-	h := s.adminHandler(r, true)
-	if h == nil || s.userManager == nil {
-		s.handleError(w, r, v, errHTTPNotFound) // No auth configured means nothing to administer, same as ensureUserManager
+	if !slices.Contains(adminSocketPaths, r.URL.Path) {
+		s.handleError(w, r, v, errHTTPNotFound) // Publishing, subscribing, the web app, etc. are not served here
 		return
 	}
-	if err := h(w, r, v); err != nil {
+	if err := s.handleInternal(w, r, v); err != nil {
 		s.handleError(w, r, v, err)
 	}
 }

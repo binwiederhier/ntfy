@@ -330,22 +330,22 @@ func TestMesh_HealthyReflectsRegistration(t *testing.T) {
 	require.True(t, mesh.Healthy())
 }
 
-func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
-	// A subscriber-cancel broadcast from node A must invoke node B's CancelFunc; node A's own
-	// callback must not fire (no loop).
+func TestMesh_UsersDeletedBroadcast(t *testing.T) {
+	// Users deleted on node A must reach node B's UsersDeletedFunc; node A's own callback must not
+	// fire (no loop).
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	var mu sync.Mutex
-	var receivedB []*SubscriberCancel
-	canceledA := 0
+	var receivedB []string
+	deletedA := 0
 
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
-	confB.CancelFunc = func(cancel *SubscriberCancel) {
+	confB.UsersDeletedFunc = func(userIDs []string) {
 		mu.Lock()
 		defer mu.Unlock()
-		receivedB = append(receivedB, cancel)
+		receivedB = append(receivedB, userIDs...)
 	}
 	meshB, err := newMeshCluster(confB, poolB, nil)
 	require.Nil(t, err)
@@ -355,24 +355,17 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	defer srvB.Close()
 
 	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	confA.CancelFunc = func(_ *SubscriberCancel) {
+	confA.UsersDeletedFunc = func(_ []string) {
 		mu.Lock()
 		defer mu.Unlock()
-		canceledA++
+		deletedA++
 	}
 	meshA, err := newMeshCluster(confA, poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
 
 	meshA.BroadcastState(&State{
-		SubscriberCancels: []*SubscriberCancel{
-			{
-				UserID: "u_deleted",
-			},
-			{
-				UserID: "u_other",
-			},
-		},
+		DeletedUserIDs: []string{"u_deleted", "u_other"},
 	})
 	waitFor(t, func() bool {
 		mu.Lock()
@@ -381,9 +374,8 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	})
 	mu.Lock()
 	defer mu.Unlock()
-	require.Equal(t, "u_deleted", receivedB[0].UserID)
-	require.Equal(t, "u_other", receivedB[1].UserID)
-	require.Equal(t, 0, canceledA)
+	require.Equal(t, []string{"u_deleted", "u_other"}, receivedB)
+	require.Equal(t, 0, deletedA)
 }
 
 func TestMesh_ForwardsEveryTopicToEveryPeer(t *testing.T) {

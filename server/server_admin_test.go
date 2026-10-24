@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/v2/cluster"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -517,15 +516,11 @@ func TestAccess_WritesTellPeers(t *testing.T) {
 		rr := request(t, s, "DELETE", "/v1/users/access", `{"username": "ben", "topic":"gol*"}`, admin)
 		require.Equal(t, 200, rr.Code)
 		require.Greater(t, b.AccessChanged(), before)
-		require.Empty(t, b.Cancels())
+		require.Empty(t, b.DeletedUsers())
 
 		rr = request(t, s, "DELETE", "/v1/users", `{"username": "ben"}`, admin)
 		require.Equal(t, 200, rr.Code)
-		require.Equal(t, []*cluster.SubscriberCancel{
-			{
-				UserID: ben.ID,
-			},
-		}, b.Cancels())
+		require.Equal(t, []string{ben.ID}, b.DeletedUsers())
 	})
 }
 
@@ -557,16 +552,14 @@ func TestAccess_PeerAccessChangedReloadsAndCancels(t *testing.T) {
 	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
 }
 
-func TestAccess_PeerUserCancelCancels(t *testing.T) {
+func TestAccess_PeerUsersDeletedCancels(t *testing.T) {
 	// A peer deleted a user: this node cancels the user's streams
 	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleAdmin, false))
 	ben, err := s.userManager.User("ben")
 	require.Nil(t, err)
 	stream := subscribeStream(t, s, "mytopic", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
-	s.applySubscriberCancel(&cluster.SubscriberCancel{
-		UserID: ben.ID,
-	})
+	s.handleUsersDeleted([]string{ben.ID})
 	select {
 	case <-stream.ended:
 	case <-time.After(5 * time.Second):

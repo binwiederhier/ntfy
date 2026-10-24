@@ -156,7 +156,10 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	} else if err != nil {
 		return err
 	}
-	s.killUserSubscriberEverywhere(u) // FIXME super inefficient
+	s.handleUsersDeleted([]string{u.ID}) // FIXME super inefficient
+	s.cluster.BroadcastState(&cluster.State{
+		DeletedUserIDs: []string{u.ID},
+	})
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -229,22 +232,10 @@ func (s *Server) handlePeerAccessChanged() {
 	s.userManager.RequestAccessCacheReload() // Coalesced: a burst of peer changes costs at most two reloads
 }
 
-// killUserSubscriberEverywhere ends a deleted user's streams on this node and on the other cluster
-// nodes. An access cache reload does not find them: a user without access entries (e.g. an admin)
-// leaves nothing in the cache to compare.
-func (s *Server) killUserSubscriberEverywhere(u *user.User) {
-	cancel := &cluster.SubscriberCancel{
-		UserID: u.ID,
-	}
-	s.applySubscriberCancel(cancel)
-	s.cluster.BroadcastState(&cluster.State{
-		SubscriberCancels: []*cluster.SubscriberCancel{cancel},
-	})
-}
-
-// applySubscriberCancel ends all of a user's streams on this node, on every topic: for a peer's
-// cancel (a deleted user), never re-broadcast, and for a local delete
-func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
+// handleUsersDeleted ends all streams of the given (deleted) users on this node, on every topic,
+// after a local delete or a peer's, never re-broadcasting. An access cache reload does not find
+// them: a user without access entries (e.g. an admin) leaves nothing in the cache to compare.
+func (s *Server) handleUsersDeleted(userIDs []string) {
 	s.mu.RLock()
 	topics := make([]*topic, 0, len(s.topics))
 	for _, t := range s.topics {
@@ -252,14 +243,16 @@ func (s *Server) applySubscriberCancel(cancel *cluster.SubscriberCancel) {
 	}
 	s.mu.RUnlock()
 	for _, t := range topics {
-		t.CancelSubscriberUser(cancel.UserID) // An empty user ID cancels nobody
+		for _, userID := range userIDs {
+			t.CancelSubscriberUser(userID) // An empty user ID cancels nobody
+		}
 	}
 }
 
 // reauthorizeSubscribers ends the subscriptions that changed access entries no longer allow, checking
 // only matching topics. The user manager calls it after an access cache reload that found changes.
 // It authorizes each subscriber's user as of subscribing, against the cache, without a database
-// query; a deleted user's streams end through killUserSubscriberEverywhere instead.
+// query; a deleted user's streams end through handleUsersDeleted instead.
 func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
 	for _, change := range changes {
 		for _, t := range s.topicsForAccessChange(change.Topic) {

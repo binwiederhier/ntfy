@@ -19,7 +19,7 @@ type Config struct {
 	NodeTTL           time.Duration     // Registry rows older than this do not count as live peers
 	BatchLinger       time.Duration     // How long messages wait in a peer queue to form a batch; 0 = send immediately
 	MaxMessageBytes   int64             // Upper bound for a single message on the wire (batch limits derive from this)
-	CancelFunc        CancelFunc        // Applies a peer's subscriber-cancel request to local connections; may be nil
+	UsersDeletedFunc  UsersDeletedFunc  // Told that a peer deleted users; may be nil
 	AccessChangedFunc AccessChangedFunc // Told that a peer changed access entries; may be nil
 	TopicsAddedFunc   TopicsAddedFunc   // Told about topics that just gained their first subscriber on a peer; may be nil
 	IsolatedFunc      IsolatedFunc      // Called while this node is cut off from the cluster; may be nil
@@ -31,23 +31,17 @@ type DeliverFunc func(m *model.Message)
 
 // State is a state delta for Cluster.BroadcastState.
 type State struct {
-	AddedTopics       []string            // Topics that just gained their first local subscriber on this node
-	SubscriberCancels []*SubscriberCancel // Requests to cancel matching live subscriber connections on peer nodes
-	AccessChanged     bool                // Access entries changed (written by this node): peers reload their access cache
+	AddedTopics    []string // Topics that just gained their first local subscriber on this node
+	DeletedUserIDs []string // Users this node just deleted: peers end their streams
+	AccessChanged  bool     // Access entries changed (written by this node): peers reload their access cache
 }
 
-// SubscriberCancel asks peer nodes to cancel all live subscriber connections of a user, e.g. one
-// that was deleted. Access changes do not need it, since peers reload their access cache and end
-// the streams that lost access themselves (see State.AccessChanged), but a deleted user without
-// access entries leaves nothing in the cache to compare.
-type SubscriberCancel struct {
-	UserID string `json:"user_id"`
-}
-
-// CancelFunc applies a peer's subscriber-cancel request to this node's local connections. The
-// server supplies it (same inversion as DeliverFunc); it must only cancel locally, never
-// re-broadcast (loop prevention).
-type CancelFunc func(cancel *SubscriberCancel)
+// UsersDeletedFunc is called with the IDs of users a peer just deleted (State.DeletedUserIDs). The
+// server supplies it to end those users' streams on this node; it must not re-broadcast (loop
+// prevention). Access changes do not need this, since peers reload their access cache and end
+// the streams that lost access themselves (see AccessChangedFunc), but a deleted user without
+// access entries (e.g. an admin) leaves nothing in the cache to compare.
+type UsersDeletedFunc func(userIDs []string)
 
 // TopicsAddedFunc is called with topics a peer announced as having just gained their first
 // subscriber there. The server supplies it to drop cached negative rate-visitor lookups for
@@ -127,9 +121,9 @@ type apiHealth struct {
 // apiState is the peer state-exchange envelope. Each concern is an optional section; future
 // concerns (rate limit counters, stats) become siblings of Topics.
 type apiState struct {
-	Topics        *apiStateTopics     `json:"topics,omitempty"`
-	Cancels       []*SubscriberCancel `json:"cancels,omitempty"`
-	AccessChanged bool                `json:"access_changed,omitempty"`
+	Topics         *apiStateTopics `json:"topics,omitempty"`
+	DeletedUserIDs []string        `json:"deleted_user_ids,omitempty"`
+	AccessChanged  bool            `json:"access_changed,omitempty"`
 }
 
 // apiStateTopics carries topics that just gained their first subscriber on the sending node.

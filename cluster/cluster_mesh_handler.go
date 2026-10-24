@@ -92,11 +92,9 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 		log.Tag(tag).Debug("Peer %s changed access entries, reloading the access cache", origin)
 		c.conf.AccessChangedFunc()
 	}
-	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
-		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)
-		for _, cancel := range state.Cancels {
-			c.conf.CancelFunc(cancel)
-		}
+	if len(state.DeletedUserIDs) > 0 && c.conf.UsersDeletedFunc != nil {
+		log.Tag(tag).Debug("Peer %s deleted %d user(s)", origin, len(state.DeletedUserIDs))
+		c.conf.UsersDeletedFunc(state.DeletedUserIDs)
 	}
 	w.WriteHeader(http.StatusOK)
 }

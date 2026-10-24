@@ -26,7 +26,7 @@ type fakeCluster struct {
 	mu            sync.Mutex
 	messages      []*model.Message
 	announced     []string
-	cancels       []*cluster.SubscriberCancel
+	deletedUsers  []string
 	accessChanged int
 	notLeader     bool
 	notHealthy    bool
@@ -47,7 +47,7 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.announced = append(b.announced, state.AddedTopics...)
-	b.cancels = append(b.cancels, state.SubscriberCancels...)
+	b.deletedUsers = append(b.deletedUsers, state.DeletedUserIDs...)
 	if state.AccessChanged {
 		b.accessChanged++
 	}
@@ -114,10 +114,10 @@ func (b *fakeCluster) AccessChanged() int {
 	return b.accessChanged
 }
 
-func (b *fakeCluster) Cancels() []*cluster.SubscriberCancel {
+func (b *fakeCluster) DeletedUsers() []string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return b.cancels
+	return b.deletedUsers
 }
 
 func (b *fakeCluster) Announced() []string {

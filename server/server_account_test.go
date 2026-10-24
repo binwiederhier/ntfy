@@ -969,7 +969,7 @@ func TestAccount_Reservation_LostCancelCaughtByAccessReload(t *testing.T) {
 
 // newReservationTestNodes starts nodes A and B on one Postgres schema, with reservations and the
 // access cache on as on ntfy.sh, and user phil (tier with reservations) to reserve topics.
-// With clustered, A relays its subscriber cancels to B; without, B never hears about them.
+// With clustered, A tells B about its access changes; without, B never hears about them.
 func newReservationTestNodes(t *testing.T, clustered bool, accessReloadInterval time.Duration) (sA, sB *Server) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	newConf := func() *Config {

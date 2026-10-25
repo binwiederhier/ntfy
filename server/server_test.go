@@ -3565,9 +3565,11 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Usage().Count(limit.KindMessages))
 		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
 
-		// Expire visitor
+		// Expire visitor, and its rate visitor assignment in the topic table (which outlives the
+		// visitor in memory, see TestServer_UnifiedPush_RateVisitorSurvivesTopicEviction)
 		s.visitors["ip:1.2.3.4"].seen = time.Now().Add(-1 * 25 * time.Hour)
 		s.pruneVisitors()
+		backdateTopic(t, s, "upAAAAAAAAAAAA", 25*time.Hour)
 
 		// Publish message again, observe that rateVisitor is not used anymore and is reset
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)

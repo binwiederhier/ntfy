@@ -93,6 +93,9 @@ var (
 	ClusterQueueDropped = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_queue_dropped_total",
 	})
+	ClusterUsageEntries = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_usage_entries_total",
+	})
 	UsageRowsWritten = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_usage_rows_written_total",
 	})
@@ -155,6 +158,7 @@ func init() {
 		ClusterBatchesSent,
 		ClusterSendErrors,
 		ClusterQueueDropped,
+		ClusterUsageEntries,
 		UsageRowsWritten,
 		UsageFlushErrors,
 		LimitKeys,

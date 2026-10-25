@@ -2271,6 +2271,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Daily quotas (messages, e-mails, phone calls) are kept in a database (`usage-file` for SQLite, or `database-url`) and survive a restart; a crash loses at most 5 seconds of counting. Before, every restart reset them (see [message limits](config.md#message-limits))
 * In an experimental cluster, the rate limits are shared across the nodes: daily quotas through the database, request and other rate limit buckets through the node mesh, so a client spread over several nodes gets the configured rate instead of several times it, and a brute force attempt spread over the nodes is caught at the same point as on one node
 * Idle visitors are dropped from memory after a few minutes instead of a day when usage is persisted, which cuts the server's memory on busy instances
+* Topics without subscribers are dropped from memory after a few minutes instead of 16 hours when usage is persisted: who a UnifiedPush topic bills to and when it was last subscribed to are kept in a `topic` table instead, so any node (and a restarted one) knows them
+* UnifiedPush: a push (`?up=1`) to a topic nobody has subscribed to for 7 days answers `404` instead of `507`, as RFC 8030 prescribes for an expired subscription, so app servers like Mastodon stop sending to it; the Matrix push gateway's `rejected` answer after 12 hours now works across nodes and restarts too ([#664](https://github.com/binwiederhier/ntfy/issues/664), thanks to [@ShadowJonathan](https://github.com/ShadowJonathan) for reporting)
 
 **Behavior changes:**
 

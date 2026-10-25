@@ -187,7 +187,7 @@ func TestTopic_ExpireDelivered(t *testing.T) {
 	to := newTopic("mytopic")
 	to.delivered["old"] = time.Now().Add(-topicDeliveredRetain - time.Second)
 	to.delivered["new"] = time.Now()
-	require.False(t, to.Stale())
+	require.False(t, to.Stale(topicExpungeAfter))
 	_, ok := to.DeliveredAt("old")
 	require.True(t, ok)
 

@@ -294,6 +294,13 @@ func (v *visitor) Usage() limit.Usage {
 	return v.limiter.Usage(v.key)
 }
 
+// Key returns the visitor's limiter key ("ip:<prefix>" or "user:<id>", see visitor.Key)
+func (v *visitor) Key() string {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+	return v.key
+}
+
 // User returns the visitor user, or nil if there is none
 func (v *visitor) User() *user.User {
 	v.mu.RLock()

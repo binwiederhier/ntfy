@@ -2,6 +2,7 @@ package limit
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -141,5 +142,42 @@ func TestStore_Reopen_KeepsRows(t *testing.T) {
 		rows, err := s.readKeys(context.Background(), "2026-10-25", []string{"user:u_1"})
 		require.Nil(t, err)
 		require.Equal(t, map[string]int64{"user:u_1/messages": 7}, rowsByKeyKind(rows))
+	})
+}
+
+func TestStore_MigrateFrom1To2_AddsTopicTable(t *testing.T) {
+	// A usage database of the first version (the usage table only) gains the topic table, and
+	// ends up with the same schema as a fresh one
+	const usageV1 = `
+		CREATE TABLE usage (key TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, count %[1]s NOT NULL DEFAULT 0, updated_at %[1]s NOT NULL, PRIMARY KEY (key, day, kind));
+		CREATE INDEX idx_usage_day_updated_at ON usage (day, updated_at);
+	`
+	t.Run("sqlite", func(t *testing.T) {
+		dir := t.TempDir()
+		old, err := sql.Open("sqlite3", filepath.Join(dir, "old.db"))
+		require.Nil(t, err)
+		_, err = old.Exec(fmt.Sprintf(usageV1, "INT") + `CREATE TABLE schemaVersion (id INT PRIMARY KEY, version INT NOT NULL, min_version INT NOT NULL DEFAULT 1); INSERT INTO schemaVersion VALUES (1, 1, 1);`)
+		require.Nil(t, err)
+		require.Nil(t, old.Close())
+		migrated, err := NewSQLiteStore(filepath.Join(dir, "old.db"))
+		require.Nil(t, err)
+		defer migrated.Close()
+		fresh, err := NewSQLiteStore(filepath.Join(dir, "fresh.db"))
+		require.Nil(t, err)
+		defer fresh.Close()
+		require.Equal(t, dbtest.SQLiteSchema(t, fresh.db), dbtest.SQLiteSchema(t, migrated.db))
+		require.Contains(t, dbtest.SQLiteSchema(t, migrated.db), "table topic")
+	})
+	t.Run("postgres", func(t *testing.T) {
+		old := dbtest.CreateTestPostgres(t)
+		_, err := old.Exec(fmt.Sprintf(usageV1, "BIGINT") + `CREATE TABLE schema_version (store TEXT PRIMARY KEY, version INT NOT NULL, min_version INT NOT NULL DEFAULT 1); INSERT INTO schema_version VALUES ('usage', 1, 1);`)
+		require.Nil(t, err)
+		_, err = NewPostgresStore(old)
+		require.Nil(t, err)
+		fresh := dbtest.CreateTestPostgres(t)
+		_, err = NewPostgresStore(fresh)
+		require.Nil(t, err)
+		require.Equal(t, dbtest.PostgresSchema(t, fresh), dbtest.PostgresSchema(t, old))
+		require.Contains(t, dbtest.PostgresSchema(t, old), "table topic")
 	})
 }

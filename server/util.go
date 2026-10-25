@@ -206,3 +206,9 @@ func isMarkdownContentType(contentType string) bool {
 	}
 	return strings.ToLower(mediaType) == "text/markdown"
 }
+
+// isUnifiedPushTopic reports whether the topic looks like a UnifiedPush topic ("up" and 12 more
+// characters), whose publishes are billed to the subscriber (see visitor-subscriber-rate-limiting)
+func isUnifiedPushTopic(id string) bool {
+	return strings.HasPrefix(id, unifiedPushTopicPrefix) && len(id) == unifiedPushTopicLength
+}

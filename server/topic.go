@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
@@ -17,6 +18,24 @@ const (
 	// time for more requests to come in, so that we can send a {"rejected":["<pushkey>"]} response back.
 	topicExpungeAfter = 16 * time.Hour
 
+	// topicExpungeAfterPersisted is the same when the topic table exists (a usage file or a
+	// database): what the topic has to remember while idle (who it bills to, when it was last
+	// subscribed to) is in the table, so memory only has to hold the active topics
+	topicExpungeAfterPersisted = 5 * time.Minute
+
+	// upTopicAbandonedAfter is how long a UnifiedPush topic can go without a subscriber before a
+	// push to it answers 404 (the endpoint is gone, stop using it) instead of 507 (no subscriber
+	// right now, try later). See plans/261025-shared-rate-limits.md, "UnifiedPush and topic eviction".
+	upTopicAbandonedAfter = 7 * 24 * time.Hour
+
+	// topicRecordInterval throttles the topic table's writes to one per topic and kind (subscriber,
+	// publish) per interval, so the table stays off the hot path
+	topicRecordInterval = 5 * time.Minute
+
+	// topicTableInfoTTL is how long a topic remembers a read of its table row, so pushes to a topic
+	// without a subscriber (which can come by the thousand) cost one read per interval, not one each
+	topicTableInfoTTL = 30 * time.Second
+
 	// topicDeliveredRetain is how long a topic at least remembers that a message went out to its
 	// subscribers, so the tail (see PublishMissed) does not send it again. It must cover the write
 	// delay plus how long the tail waits for a row committed out of order (tailHoleTimeout). Entries
@@ -27,12 +46,16 @@ const (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID          string
-	subscribers map[int]*topicSubscriber
-	rateVisitor *visitor
-	lastAccess  time.Time
-	delivered   map[string]time.Time // When recent messages went out to the subscribers, by message ID
-	mu          sync.RWMutex
+	ID            string
+	subscribers   map[int]*topicSubscriber
+	rateVisitor   *visitor
+	lastAccess    time.Time
+	delivered     map[string]time.Time // When recent messages went out to the subscribers, by message ID
+	recordedSubAt time.Time            // When a subscriber was last written to the topic table (throttle, see ShouldRecord)
+	recordedPubAt time.Time            // When a publish was last written to the topic table
+	tableInfo     *limit.TopicInfo     // The topic table's row as of tableInfoAt; nil if it had none
+	tableInfoAt   time.Time            // When tableInfo was read; zero if never
+	mu            sync.RWMutex
 }
 
 type topicSubscriber struct {
@@ -106,13 +129,50 @@ func (t *topic) ExpireDelivered() {
 	}
 }
 
-func (t *topic) Stale() bool {
+// Stale reports whether the topic can be removed from memory: no subscribers, no live rate
+// visitor, and no access for expungeAfter (see Server.topicExpungeAfter)
+func (t *topic) Stale(expungeAfter time.Duration) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
 		return false
 	}
-	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpungeAfter
+	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > expungeAfter
+}
+
+// ShouldRecord reports whether a subscriber (or a publish, if publish is true) should be written
+// to the topic table now, and if so, notes that it is: one write per topic per topicRecordInterval
+func (t *topic) ShouldRecord(publish bool) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	last := &t.recordedSubAt
+	if publish {
+		last = &t.recordedPubAt
+	}
+	if time.Since(*last) < topicRecordInterval {
+		return false
+	}
+	*last = time.Now()
+	return true
+}
+
+// TableInfo returns the topic table's row as read within topicTableInfoTTL, and whether there is
+// such a read; info is nil if the topic had no row
+func (t *topic) TableInfo() (info *limit.TopicInfo, ok bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if t.tableInfoAt.IsZero() || time.Since(t.tableInfoAt) > topicTableInfoTTL {
+		return nil, false
+	}
+	return t.tableInfo, true
+}
+
+// SetTableInfo caches the topic table's row (nil if it had none)
+func (t *topic) SetTableInfo(info *limit.TopicInfo) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.tableInfo = info
+	t.tableInfoAt = time.Now()
 }
 
 func (t *topic) LastAccess() time.Time {

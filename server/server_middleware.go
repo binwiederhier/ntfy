@@ -34,6 +34,9 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 		if err != nil {
 			return err
 		}
+		if s.config.VisitorSubscriberRateLimiting && isUnifiedPushTopic(t.ID) {
+			s.maybeLoadRateVisitor(t)
+		}
 		vrate := v
 		if rateVisitor := t.RateVisitor(); rateVisitor != nil {
 			vrate = rateVisitor

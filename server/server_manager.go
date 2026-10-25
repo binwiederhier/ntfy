@@ -35,10 +35,11 @@ func (s *Server) execManager() {
 		Timing(func() {
 			s.mu.Lock()
 			defer s.mu.Unlock()
+			expungeAfter := s.topicExpungeAfter()
 			for _, t := range s.topics {
 				subs, lastAccess := t.Stats()
 				ev := log.Tag(tagManager).With(t)
-				if t.Stale() {
+				if t.Stale(expungeAfter) {
 					if ev.IsTrace() {
 						ev.Trace("- topic %s: Deleting stale topic (%d subscribers, accessed %s)", t.ID, subs, util.FormatTime(lastAccess))
 					}
@@ -135,6 +136,9 @@ func (s *Server) pruneVisitors() {
 func (s *Server) pruneUsage() {
 	if err := s.limiter.PruneStore(); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Error pruning old usage rows")
+	}
+	if err := s.limiter.PruneTopics(); err != nil {
+		log.Tag(tagManager).Err(err).Warn("Error pruning idle topic rows")
 	}
 }
 

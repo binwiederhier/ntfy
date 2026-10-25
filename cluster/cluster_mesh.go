@@ -195,6 +195,7 @@ func (c *meshCluster) BroadcastUsage(deltas []limit.Delta) {
 	if err != nil {
 		return
 	}
+	metrics.ClusterUsageEntries.Add(float64(len(deltas)))
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {

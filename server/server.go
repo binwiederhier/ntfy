@@ -1051,6 +1051,12 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
+		// That removal is exactly what we want once nobody has subscribed for upTopicAbandonedAfter:
+		// then the answer is 404, which RFC 8030 prescribes for an expired subscription.
+		if s.limiter.Persistent() && time.Since(s.topicIdleSince(t)) > upTopicAbandonedAfter {
+			return nil, errHTTPNotFoundUnifiedPushTopicAbandoned.With(t)
+		}
+		s.noteTopic(t)
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
@@ -1138,6 +1144,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 			return nil, err
 		}
 	}
+	s.recordPublish(v, t)
 	s.mu.Lock()
 	s.messages++
 	s.mu.Unlock()
@@ -1163,7 +1170,8 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		metrics.MessagesPublishedFailure.Inc()
 		metrics.MatrixPublishedFailure.Inc()
-		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
+		var e *errHTTP
+		if errors.As(err, &e) && (e.Code == errHTTPInsufficientStorageUnifiedPush.Code || e.Code == errHTTPNotFoundUnifiedPushTopicAbandoned.Code) {
 			topic, err := fromContext[*topic](r, contextTopic)
 			if err != nil {
 				return err
@@ -1172,7 +1180,7 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 			if err != nil {
 				return err
 			}
-			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
+			if time.Since(s.topicIdleSince(topic)) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
 				return writeMatrixResponse(w, pushKey)
 			}
 		}
@@ -1660,6 +1668,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
 		return err
 	}
+	s.recordSubscribers(v, topics)
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	w.Header().Set("Content-Type", contentType+"; charset=utf-8")                    // Android/Volley client needs charset!
 	if poll {
@@ -1712,6 +1721,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			for _, t := range topics {
 				t.Keepalive()
 			}
+			s.recordSubscribers(v, topics)
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
@@ -1804,6 +1814,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				for _, t := range topics {
 					t.Keepalive()
 				}
+				s.recordSubscribers(v, topics)
 				if err := ping(); err != nil {
 					return err
 				}
@@ -1824,6 +1835,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
 		return err
 	}
+	s.recordSubscribers(v, topics)
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if poll {
 		for _, t := range topics {
@@ -1897,7 +1909,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	// Make a list of topics that we'll actually set the RateVisitor on
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
+		if isUnifiedPushTopic(t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
@@ -1940,6 +1952,7 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
 		t.SetRateVisitor(v)
+		s.recordRateVisitor(v, t)
 	}
 	return nil
 }

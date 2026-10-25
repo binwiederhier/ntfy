@@ -50,6 +50,33 @@ type queries struct {
 	upsertRow      string // SQLite only: one row of it
 	upsertConflict string // SQLite only: its ON CONFLICT clause
 	prune          string
+	topics         topicQueries
+}
+
+// topicQueries are the dialect's statements for the topic table (see topics.go)
+type topicQueries struct {
+	upsertSubscriber  string
+	upsertPublish     string
+	upsertRateVisitor string
+	insert            string
+	selectTopic       string
+	prune             string
+}
+
+// query returns the dialect's statement of the given kind
+func (q *topicQueries) query(statement topicStatement) string {
+	switch statement {
+	case topicUpsertSubscriber:
+		return q.upsertSubscriber
+	case topicUpsertPublish:
+		return q.upsertPublish
+	case topicUpsertRateVisitor:
+		return q.upsertRateVisitor
+	case topicInsert:
+		return q.insert
+	default:
+		return q.prune
+	}
 }
 
 // clock returns the database's time as unix seconds

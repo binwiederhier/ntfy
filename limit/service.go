@@ -143,9 +143,10 @@ type entry struct {
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
 // then start at the rule's burst. Tokens may go negative (debt) when peers' usage is charged in.
 type bucket struct {
-	tokens float64
-	last   int64 // Unix nanoseconds of the last refill, 0 if never used
-	burst  int64 // Burst of the rule the bucket was last used with; caps refunds and debt
+	tokens   float64
+	last     int64         // Unix nanoseconds of the last refill, 0 if never used
+	burst    int64         // Burst of the rule the bucket was last used with; caps refunds and debt
+	interval time.Duration // Refill of the rule the bucket was last used with, so Burn and Refund can refill to now
 }
 
 // New creates the service on the given store (nil for in-memory only) and starts its loops
@@ -252,9 +253,13 @@ func (s *Service) Refund(key string, kind Kind, n int64) {
 	}
 	b := &e.buckets[kind]
 	if b.last != 0 {
+		b.catchUp(s.now())
 		b.tokens = math.Min(b.tokens+float64(n), float64(b.burst))
 	}
 	e.unflushed[kind] = max(-e.baseline[kind], e.unflushed[kind]-n) // The total cannot go below zero; a negative unflushed is a refund still to be written
+	if meshKinds[kind] {
+		e.meshDelta[kind] -= n // Cancels what was not sent yet; if it was, the next round carries the correction (negative)
+	}
 }
 
 // Usage returns the key's usage today, of every kind, as this node knows it (see Lookup for the
@@ -322,7 +327,7 @@ func (s *Service) TakeDeltas() []Delta {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
-				if e.meshDelta[kind] > 0 && e.deltaWorthSending(kind) {
+				if e.meshDelta[kind] != 0 && e.deltaWorthSending(kind) {
 					deltas = append(deltas, Delta{Key: key, Kind: kind, N: e.meshDelta[kind]})
 					e.meshDelta[kind] = 0
 				}
@@ -336,7 +341,9 @@ func (s *Service) TakeDeltas() []Delta {
 // Burn charges usage that happened on a peer into the key's bucket of the kind, with the debt
 // capped at one burst, so a neighbor's burst behind a shared prefix cannot lock the key out for
 // long. It does not count as this node's usage. A key or bucket this node never served is left
-// alone: it has a full bucket here anyway (one burst per node, once).
+// alone: it has a full bucket here anyway (one burst per node, once). A negative n is a peer's
+// refund of usage it had already sent (see Refund), credited back up to the burst. The bucket is
+// refilled to now first, so the charge lands on today's tokens, not stale ones.
 func (s *Service) Burn(key string, kind Kind, n int64) {
 	sh := &s.shards[shardIndex(key)]
 	sh.mu.Lock()
@@ -349,7 +356,12 @@ func (s *Service) Burn(key string, kind Kind, n int64) {
 	if b.last == 0 || b.burst <= 0 {
 		return
 	}
-	b.tokens = math.Max(b.tokens-float64(n), -float64(b.burst))
+	b.catchUp(s.now())
+	if n >= 0 {
+		b.tokens = math.Max(b.tokens-float64(n), -float64(b.burst))
+	} else {
+		b.tokens = math.Min(b.tokens-float64(n), float64(b.burst)) // A peer's refund (see Refund)
+	}
 }
 
 // Forget drops the key from memory, unless it has counts still to be written; its rows stay in
@@ -866,7 +878,8 @@ func (e *entry) anyPromoted() bool {
 // is the kind of key the peers need to hear about)
 func (e *entry) deltaWorthSending(kind Kind) bool {
 	b := &e.buckets[kind]
-	return e.meshDelta[kind] >= deltaMinUnits || (b.burst > 0 && b.tokens < float64(b.burst)/2)
+	delta := e.meshDelta[kind]
+	return delta >= deltaMinUnits || delta <= -deltaMinUnits || (b.burst > 0 && b.tokens < float64(b.burst)/2)
 }
 
 // pending reports whether the entry has counts that are still to be written
@@ -893,6 +906,21 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 	}
 	b.last = nowNanos
 	b.burst = rule.Burst
+	b.interval = rule.Refill
+}
+
+// catchUp adds the tokens earned since the last refill, with the rule the bucket was last used
+// with, before something other than Allow (a peer's usage, a refund) changes it. Without it, the
+// next refill would credit the whole idle interval, including what was charged meanwhile.
+func (b *bucket) catchUp(now time.Time) {
+	nowNanos := now.UnixNano()
+	if b.last == 0 {
+		return
+	}
+	if b.interval > 0 && nowNanos > b.last {
+		b.tokens = math.Min(b.tokens+float64(nowNanos-b.last)/float64(b.interval), float64(b.burst))
+	}
+	b.last = nowNanos
 }
 
 // wait returns how long until the bucket has n tokens, or 0 if it never will (no refill)

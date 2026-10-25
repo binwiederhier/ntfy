@@ -260,3 +260,34 @@ func evictVisitor(t *testing.T, s *Server, key string) {
 		return s.limiter.Forget(key)
 	})
 }
+
+func TestVisitor_LookupAllocations(t *testing.T) {
+	// The visitor lookup is on every request: it must not rebuild the keying config, and an
+	// IP-keyed visitor shares the config-based limits instead of resolving its own copy
+	s := newTestServer(t, newTestConfig(t, ""))
+	ip := netip.MustParseAddr("1.2.3.4")
+	s.visitor(ip, nil)
+	allocs := testing.AllocsPerRun(1000, func() {
+		s.visitor(ip, nil)
+	})
+	require.LessOrEqual(t, allocs, 2.0) // The key string ("ip:" + address) and nothing else
+	other := s.visitor(netip.MustParseAddr("5.6.7.8"), nil)
+	require.Same(t, s.visitor(ip, nil).Limits(), other.Limits())
+}
+
+func BenchmarkVisitor_Lookup(b *testing.B) {
+	conf := NewConfig()
+	conf.CacheDuration = 0
+	s, err := New(conf)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer s.Stop()
+	ip := netip.MustParseAddr("1.2.3.4")
+	s.visitor(ip, nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.visitor(ip, nil)
+	}
+}

@@ -46,6 +46,7 @@ import (
 	"heckel.io/ntfy/v2/twilio"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	vis "heckel.io/ntfy/v2/visitor" // Aliased: the server has its own visitor type
 	"heckel.io/ntfy/v2/webpush"
 )
 
@@ -66,6 +67,8 @@ type Server struct {
 	topics            map[string]*topic
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
 	limiter           *limit.Service      // Decides on and counts the visitors' usage, keyed by visitor key
+	visitorConfig     *vis.Config         // Keying and limit-resolution config, built once (the lookup runs on every request)
+	ipLimits          *vis.Limits         // The config-based limits, shared by all IP-keyed visitors (read-only)
 	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
@@ -308,9 +311,11 @@ func New(conf *Config) (*Server, error) {
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
 		visitors:        make(map[string]*visitor),
 		limiter:         limiter,
+		visitorConfig:   visitorConfigFrom(conf),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
+	s.ipLimits = vis.LimitsFor(s.visitorConfig, nil)
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager
 	if conf.AuthFile != "" || pool != nil {
@@ -2366,10 +2371,10 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	id := visitorID(ip, user, s.config)
+	id := vis.Key(ip, user, s.visitorConfig)
 	v, exists := s.visitors[id]
 	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.limiter, s.messageCache, s.userManager, ip, user)
+		s.visitors[id] = newVisitorWith(s.config, s.visitorConfig, s.ipLimits, s.limiter, s.messageCache, s.userManager, ip, user)
 		return s.visitors[id]
 	}
 	v.Keepalive()

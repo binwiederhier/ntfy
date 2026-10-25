@@ -40,6 +40,7 @@ const (
 type visitor struct {
 	config        *Config
 	limitsConfig  *vis.Config    // The parts of config that keying and limit resolution need (see visitorConfigFrom)
+	ipLimits      *vis.Limits    // The config-based limits, shared by all IP-keyed visitors (read-only); nil resolves them per visitor
 	limiter       *limit.Service // Decides on and counts usage, keyed by key
 	messageCache  *message.Cache
 	userManager   *user.Manager      // May be nil
@@ -73,9 +74,16 @@ type visitorStats struct {
 }
 
 func newVisitor(conf *Config, limiter *limit.Service, messageCache *message.Cache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
+	return newVisitorWith(conf, visitorConfigFrom(conf), nil, limiter, messageCache, userManager, ip, user)
+}
+
+// newVisitorWith is newVisitor with the keying config and the IP-keyed limits built once by the
+// server and shared by all visitors (ipLimits may be nil: then they are resolved per visitor)
+func newVisitorWith(conf *Config, limitsConfig *vis.Config, ipLimits *vis.Limits, limiter *limit.Service, messageCache *message.Cache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
 	v := &visitor{
 		config:        conf,
-		limitsConfig:  visitorConfigFrom(conf),
+		limitsConfig:  limitsConfig,
+		ipLimits:      ipLimits,
 		limiter:       limiter,
 		messageCache:  messageCache,
 		userManager:   userManager, // May be nil
@@ -362,12 +370,15 @@ func (v *visitor) Limits() *vis.Limits {
 	return v.limits
 }
 
+// limitsNoLock resolves the visitor's limits: from its tier, or the config-based limits shared by
+// all IP-keyed visitors (read-only, see ipLimits). The caller must hold v.mu.
 func (v *visitor) limitsNoLock() *vis.Limits {
-	var tier *user.Tier
-	if v.user != nil {
-		tier = v.user.Tier // May be nil, which resolves the config-based limits
+	if v.user != nil && v.user.Tier != nil {
+		return vis.LimitsFor(v.limitsConfig, v.user.Tier)
+	} else if v.ipLimits != nil {
+		return v.ipLimits
 	}
-	return vis.LimitsFor(v.limitsConfig, tier)
+	return vis.LimitsFor(v.limitsConfig, nil)
 }
 
 // The rules the visitor's limits translate to, built per call (they are small values); the

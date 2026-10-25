@@ -30,6 +30,7 @@ var expectedMetricNames = []string{
 	"ntfy_cluster_peers",
 	"ntfy_cluster_queue_dropped_total",
 	"ntfy_cluster_send_errors_total",
+	"ntfy_cluster_usage_entries_total",
 	"ntfy_db_pool_connections_idle",
 	"ntfy_db_pool_connections_in_use",
 	"ntfy_db_pool_connections_max",

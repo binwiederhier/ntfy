@@ -108,7 +108,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	}
 	role := user.RoleUser
 	if req.Role != "" {
-		if role, err = readAdminRole(r, req.Role); err != nil {
+		if role, err = checkRoleChange(r, req.Role); err != nil {
 			return err
 		}
 	}
@@ -150,7 +150,7 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	var role user.Role
 	if req.Role != "" {
-		if role, err = readAdminRole(r, req.Role); err != nil {
+		if role, err = checkRoleChange(r, req.Role); err != nil {
 			return err
 		}
 	}
@@ -591,8 +591,8 @@ func (s *Server) readAdminTokenUser(r *http.Request, username string) (*user.Use
 	return u, nil
 }
 
-// readAdminRole validates a role in an admin request. Roles can only be set over the admin socket.
-func readAdminRole(r *http.Request, role string) (user.Role, error) {
+// checkRoleChange validates a requested role change. Roles can only be set over the admin socket.
+func checkRoleChange(r *http.Request, role string) (user.Role, error) {
 	if !isAdminSocketRequest(r) {
 		return "", errHTTPForbiddenAdminSocketOnly
 	} else if !user.AllowedRole(user.Role(role)) {

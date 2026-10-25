@@ -15,6 +15,7 @@ package limit
 import (
 	"context"
 	"math"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -77,17 +78,25 @@ type Service struct {
 	conf        *Config
 	now         func() time.Time // Injectable clock, for tests
 	shards      [shardCount]shard
-	store       atomic.Pointer[Store] // Nil when nothing is persisted or shared; atomic so the hot path never takes mu
-	day         string                // The usage day the counts refer to (see today)
-	clockOffset time.Duration         // The store's clock minus this node's, as of the last flush; the day follows the store's clock
-	pulledAt    int64                 // Store clock watermark of the last read-back; 0 before the first
+	store       atomic.Pointer[Store]           // Nil when nothing is persisted or shared; atomic so the hot path never takes mu
+	day         string                          // The usage day the counts refer to (see today)
+	clockOffset time.Duration                   // The store's clock minus this node's, as of the last flush; the day follows the store's clock
+	pulledAt    int64                           // Store clock watermark of the last read-back; 0 before the first
+	dayOverride string                          // Tests only: the day today returns (see rollDayForTest)
+	carried     map[string]map[carriedKey]int64 // Counts of earlier days not written yet, by day (see maybeRollDay)
 	closeChan   chan struct{}
 	closeOnce   sync.Once
 	wg          sync.WaitGroup
 	misses      []string      // Keys whose rows have not been read yet (see readMisses)
 	missSignal  chan struct{} // Wakes the miss loop as soon as a key is queued; buffered, so a signal is never lost or waited for
 	missMu      sync.Mutex    // Protects misses
-	mu          sync.Mutex    // Protects day, clockOffset and pulledAt
+	mu          sync.Mutex    // Protects day, clockOffset, pulledAt, dayOverride and carried
+}
+
+// carriedKey identifies a key's count of one kind, carried over a day rollover
+type carriedKey struct {
+	key  string
+	kind Kind
 }
 
 // shard is one independently locked part of the key space
@@ -136,6 +145,7 @@ func newService(conf *Config, now func() time.Time, store *Store) *Service {
 		now:        now,
 		closeChan:  make(chan struct{}),
 		missSignal: make(chan struct{}, 1),
+		carried:    make(map[string]map[carriedKey]int64),
 	}
 	s.store.Store(store)
 	for i := range s.shards {
@@ -421,6 +431,7 @@ func (s *Service) flush() {
 // leaves its keys' increments where they are for the next round, and the keys before it are
 // retired, so nothing is written twice.
 func (s *Service) write(ctx context.Context, store *Store) {
+	s.writeCarried(ctx, store)
 	s.mu.Lock()
 	day := s.day
 	s.mu.Unlock()
@@ -554,9 +565,46 @@ func (s *Service) applyRows(day string, rows []usageRow, loadedKeys []string) {
 	}
 }
 
+// writeCarried writes the pending counts of earlier days (see maybeRollDay), oldest first. A day's
+// rows that could not be written stay carried for the next round.
+func (s *Service) writeCarried(ctx context.Context, store *Store) {
+	s.mu.Lock()
+	days := make([]string, 0, len(s.carried))
+	for day := range s.carried {
+		days = append(days, day)
+	}
+	s.mu.Unlock()
+	slices.Sort(days)
+	for _, day := range days {
+		s.mu.Lock()
+		pending := s.carried[day]
+		rows := make([]usageRow, 0, len(pending))
+		for k, count := range pending {
+			rows = append(rows, usageRow{key: k.key, kind: k.kind, count: count})
+		}
+		s.mu.Unlock()
+		written, err := store.flush(ctx, day, rows)
+		s.mu.Lock()
+		for _, r := range rows[:written] {
+			delete(pending, carriedKey{key: r.key, kind: r.kind})
+		}
+		if len(pending) == 0 {
+			delete(s.carried, day)
+		}
+		s.mu.Unlock()
+		metrics.UsageRowsWritten.Add(float64(written))
+		if err != nil {
+			log.Tag(tag).Err(err).Warn("Writing the usage of %s failed, %d of %d rows written; the rest is retried", day, written, len(rows))
+			metrics.UsageFlushErrors.Inc()
+			return
+		}
+	}
+}
+
 // maybeRollDay starts a new usage day if the clock says so: every count starts at zero, every
 // key is read back when it is next met (another node may have written the new day already),
-// and the watermark starts over
+// and the watermark starts over. What the promoted keys counted but did not write yet is
+// carried, per key and kind, and written under the old day (see writeCarried).
 func (s *Service) maybeRollDay() {
 	today := s.today()
 	s.mu.Lock()
@@ -564,14 +612,21 @@ func (s *Service) maybeRollDay() {
 		s.mu.Unlock()
 		return
 	}
+	previous := s.day
 	s.day = today
 	s.pulledAt = 0
 	s.mu.Unlock()
 	log.Tag(tag).Info("Usage day rolled over to %s; daily counts start over", today)
+	carry := make(map[carriedKey]int64)
 	for i := range s.shards {
 		sh := &s.shards[i]
 		sh.mu.Lock()
-		for _, e := range sh.entries {
+		for key, e := range sh.entries {
+			for kind := Kind(0); kind < numKinds; kind++ {
+				if e.promoted[kind] && e.unflushed[kind] != 0 {
+					carry[carriedKey{key: key, kind: kind}] += e.unflushed[kind]
+				}
+			}
 			e.baseline = [numKinds]int64{}
 			e.unflushed = [numKinds]int64{}
 			e.promoted = [numKinds]bool{}
@@ -580,32 +635,29 @@ func (s *Service) maybeRollDay() {
 		}
 		sh.mu.Unlock()
 	}
+	if len(carry) > 0 {
+		s.mu.Lock()
+		if s.carried[previous] == nil {
+			s.carried[previous] = make(map[carriedKey]int64)
+		}
+		for k, count := range carry {
+			s.carried[previous][k] += count
+		}
+		s.mu.Unlock()
+	}
 	s.missMu.Lock()
 	s.misses = nil
 	s.missMu.Unlock()
 }
 
-// rollDayForTest forces a day rollover to the given day, as if the clock had reached it. Tests
-// use it, because the day follows the store's clock, which a test cannot move.
+// rollDayForTest makes the clock read the given day from now on and rolls over to it, exactly as
+// flush does when the clock reaches a new day. Tests use it, because the day follows the store's
+// clock, which a test cannot move.
 func (s *Service) rollDayForTest(day string) {
-	rows := s.snapshot()
 	s.mu.Lock()
-	previous := s.day
-	s.mu.Unlock()
-	if store := s.store.Load(); store != nil && len(rows) > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), flushTimeout)
-		defer cancel()
-		if _, err := store.flush(ctx, previous, rows); err != nil {
-			log.Tag(tag).Err(err).Warn("Writing usage before the forced rollover failed")
-		}
-	}
-	s.mu.Lock()
-	s.day = ""
+	s.dayOverride = day
 	s.mu.Unlock()
 	s.maybeRollDay()
-	s.mu.Lock()
-	s.day = day
-	s.mu.Unlock()
 }
 
 // setStore replaces the store; tests use it to recover from a broken one
@@ -616,8 +668,11 @@ func (s *Service) setStore(store *Store) {
 // today returns the current usage day, by the store's clock if there is one
 func (s *Service) today() string {
 	s.mu.Lock()
-	offset := s.clockOffset
+	offset, override := s.clockOffset, s.dayOverride
 	s.mu.Unlock()
+	if override != "" {
+		return override
+	}
 	return s.dayFor(s.now().Add(offset))
 }
 

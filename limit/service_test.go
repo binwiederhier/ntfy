@@ -422,7 +422,7 @@ func TestService_Persist_DayRolloverKeepsYesterdaysRows(t *testing.T) {
 		s.rollDayForTest("2099-01-01")
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages))
 		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
-		s.write(context.Background(), store) // Not flush: that would sync the day back to the store's clock
+		s.flush()
 		rows, err := store.readKeys(context.Background(), today, []string{"user:u_1"})
 		require.Nil(t, err)
 		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
@@ -614,5 +614,55 @@ func TestService_Forget(t *testing.T) {
 		usage, err := s.Lookup("user:u_1")     // Back from the store
 		require.Nil(t, err)
 		require.Equal(t, int64(5), usage.Count(KindMessages))
+	})
+}
+
+func TestService_Persist_DayRolloverWritesYesterdaysPending(t *testing.T) {
+	// Codex review #2: the rollover cleared what was counted in the day's last flush interval
+	// before it was written, so every day lost its last few seconds of usage
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		clock := &testClock{t: time.Now()}
+		store := newStore()
+		s := newPersistentTestService(t, store, clock)
+		yesterday := s.today()
+		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 4).OK) // Not flushed
+		s.rollDayForTest("2099-01-01")
+		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages)) // The new day starts at zero
+		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+		s.flush()
+		rows, err := store.readKeys(context.Background(), yesterday, []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
+		rows, err = store.readKeys(context.Background(), "2099-01-01", []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 1}, rowsByKeyKind(rows))
+		s.flush() // Written once, not again
+		rows, err = store.readKeys(context.Background(), yesterday, []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
+	})
+}
+
+func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
+	// An outage spanning midnight must not lose the retained deltas of the day before
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		clock := &testClock{t: time.Now()}
+		good := newStore()
+		broken := newStore()
+		closed, err := sql.Open("sqlite3", ":memory:")
+		require.Nil(t, err)
+		require.Nil(t, closed.Close())
+		broken.db = db.New(&db.Host{DB: closed}, nil)
+		s := newPersistentTestService(t, broken, clock)
+		yesterday := s.today()
+		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 3).OK)
+		s.flush() // Fails: retained
+		s.rollDayForTest("2099-01-01")
+		s.flush() // Still failing: still retained
+		s.setStore(good)
+		s.flush()
+		rows, err := good.readKeys(context.Background(), yesterday, []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 3}, rowsByKeyKind(rows))
 	})
 }

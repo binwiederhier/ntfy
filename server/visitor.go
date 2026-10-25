@@ -182,6 +182,9 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 func (v *visitor) MessageAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
+	if v.limits.MessageLimit <= 0 {
+		return false // A daily limit of zero admits nothing; the limit service reads it as "no cap"
+	}
 	allowed := v.limiter.Allow(v.key, v.messageRule(), 1).OK
 	if allowed {
 		v.localMessages.Add(1)
@@ -205,6 +208,9 @@ func (v *visitor) EmailAllowed() bool {
 func (v *visitor) CallAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
+	if v.limits.CallLimit <= 0 {
+		return false // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
+	}
 	allowed := v.limiter.Allow(v.key, v.callRule(), 1).OK
 	if allowed {
 		v.localCalls.Add(1)
@@ -295,6 +301,9 @@ func (v *visitor) Keepalive() {
 func (v *visitor) BandwidthLimiter() util.Limiter {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
+	if v.limits.AttachmentBandwidthLimit <= 0 {
+		return util.NewFixedLimiter(0) // A bandwidth limit of zero admits nothing, as BandwidthAllowed
+	}
 	return v.limiter.Limiter(v.key, v.bandwidthRule())
 }
 

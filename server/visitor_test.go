@@ -163,3 +163,23 @@ func TestVisitor_EmailDailyLimitCapsBelowBurst(t *testing.T) {
 	require.Equal(t, 429, response.Code)
 	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
 }
+
+func TestVisitor_ZeroLimitsAdmitNothing(t *testing.T) {
+	// A limit of zero admits nothing, as main's FixedLimiter(0) and bytes limiter did; the limit
+	// service reads a zero cap as "no cap", so the visitor must not hand it a zero (Codex review #3:
+	// a user downgraded to a tier without calls kept calling)
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "zero", MessageLimit: 0, CallLimit: 0, AttachmentBandwidthLimit: 0}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "zero"))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+		require.False(t, v.MessageAllowed())
+		require.False(t, v.CallAllowed())
+		require.False(t, v.BandwidthAllowed(1))
+		require.False(t, v.BandwidthLimiter().AllowN(1))
+	})
+}

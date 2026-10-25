@@ -36,6 +36,10 @@ const (
 	// without a subscriber (which can come by the thousand) cost one read per interval, not one each
 	topicTableInfoTTL = 30 * time.Second
 
+	// rateVisitorTTL is how long a rate visitor assignment stays valid after the visitor's last
+	// activity on the topic (its subscription or a keepalive); the topic table uses the same TTL
+	rateVisitorTTL = 24 * time.Hour
+
 	// topicDeliveredRetain is how long a topic at least remembers that a message went out to its
 	// subscribers, so the tail (see PublishMissed) does not send it again. It must cover the write
 	// delay plus how long the tail waits for a row committed out of order (tailHoleTimeout). Entries
@@ -46,16 +50,17 @@ const (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID            string
-	subscribers   map[int]*topicSubscriber
-	rateVisitor   *visitor
-	lastAccess    time.Time
-	delivered     map[string]time.Time // When recent messages went out to the subscribers, by message ID
-	recordedSubAt time.Time            // When a subscriber was last written to the topic table (throttle, see ShouldRecord)
-	recordedPubAt time.Time            // When a publish was last written to the topic table
-	tableInfo     *limit.TopicInfo     // The topic table's row as of tableInfoAt; nil if it had none
-	tableInfoAt   time.Time            // When tableInfo was read; zero if never
-	mu            sync.RWMutex
+	ID              string
+	subscribers     map[int]*topicSubscriber
+	rateVisitor     *visitor
+	rateVisitorSeen time.Time // When the rate visitor last showed activity on this topic (subscribe, keepalive)
+	lastAccess      time.Time
+	delivered       map[string]time.Time // When recent messages went out to the subscribers, by message ID
+	recordedSubAt   time.Time            // When a subscriber was last written to the topic table (throttle, see ShouldRecord)
+	recordedPubAt   time.Time            // When a publish was last written to the topic table
+	tableInfo       *limit.TopicInfo     // The topic table's row as of tableInfoAt; nil if it had none
+	tableInfoAt     time.Time            // When tableInfo was read; zero if never
+	mu              sync.RWMutex
 }
 
 type topicSubscriber struct {
@@ -134,7 +139,7 @@ func (t *topic) ExpireDelivered() {
 func (t *topic) Stale(expungeAfter time.Duration) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
+	if t.rateVisitorLiveNoLock() {
 		return false
 	}
 	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > expungeAfter
@@ -192,21 +197,48 @@ func (t *topic) LastAccess() time.Time {
 // SetRateVisitor sets the visitor the topic bills to, and reports whether the topic had no live
 // rate visitor before (it just gained its first subscriber, as far as this node knows)
 func (t *topic) SetRateVisitor(v *visitor) (first bool) {
+	return t.SetRateVisitorSeen(v, time.Now())
+}
+
+// SetRateVisitorSeen is SetRateVisitor for an assignment last seen at the given time, e.g. one
+// read from the topic table (whose subscriber may be on another node)
+func (t *topic) SetRateVisitorSeen(v *visitor, seen time.Time) (first bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	first = t.rateVisitor == nil || t.rateVisitor.Stale()
+	first = !t.rateVisitorLiveNoLock()
 	t.rateVisitor = v
+	t.rateVisitorSeen = seen
 	t.lastAccess = time.Now()
 	return first
 }
 
+// KeepaliveRateVisitor notes activity of the visitor on this topic (a keepalive of its
+// subscription); it keeps the assignment alive if the visitor is the topic's rate visitor
+func (t *topic) KeepaliveRateVisitor(v *visitor) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.rateVisitor == v {
+		t.rateVisitorSeen = time.Now()
+	}
+}
+
+// RateVisitor returns the visitor the topic bills to, or nil if there is none or the assignment
+// expired (see rateVisitorLiveNoLock)
 func (t *topic) RateVisitor() *visitor {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && t.rateVisitor.Stale() {
+	if !t.rateVisitorLiveNoLock() {
 		t.rateVisitor = nil
 	}
 	return t.rateVisitor
+}
+
+// rateVisitorLiveNoLock reports whether the topic has a live rate visitor: one that is still in
+// memory and that showed activity on this topic within rateVisitorTTL. Its activity elsewhere does
+// not count, or an IP with other traffic would keep an abandoned topic billable forever. The
+// caller must hold t.mu.
+func (t *topic) rateVisitorLiveNoLock() bool {
+	return t.rateVisitor != nil && !t.rateVisitor.Stale() && time.Since(t.rateVisitorSeen) <= rateVisitorTTL
 }
 
 // Unsubscribe removes the subscription from the list of subscribers

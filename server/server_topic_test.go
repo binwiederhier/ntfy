@@ -221,3 +221,27 @@ func TestServer_RateVisitorCommittedBeforeAnnouncement(t *testing.T) {
 		require.True(t, committed)
 	})
 }
+
+func TestServer_UnifiedPush_ActiveVisitorDoesNotKeepAbandonedTopicAlive(t *testing.T) {
+	// Codex review #8: the in-memory rate visitor stayed valid while its key was active anywhere, so
+	// unrelated traffic of the subscriber's IP kept an abandoned topic billable and skipped the 404
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorSubscriberRateLimiting = true
+		s := newTestServer(t, c)
+		rr := request(t, s, "GET", "/upHHHHHHHHHHHH/json?poll=1", "", nil, func(r *http.Request) {
+			r.RemoteAddr = "1.2.3.4:1234"
+		})
+		require.Equal(t, 200, rr.Code)
+		backdateTopic(t, s, "upHHHHHHHHHHHH", upTopicAbandonedAfter+time.Hour)
+		s.mu.Lock()
+		tp := s.topics["upHHHHHHHHHHHH"]
+		s.mu.Unlock()
+		tp.mu.Lock()
+		tp.rateVisitorSeen = time.Now().Add(-upTopicAbandonedAfter - time.Hour) // Its last activity on this topic
+		tp.mu.Unlock()
+		s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Keepalive() // The visitor is busy elsewhere
+		rr = request(t, s, "POST", "/upHHHHHHHHHHHH?up=1", "some message", nil)
+		require.Equal(t, 404, rr.Code)
+	})
+}

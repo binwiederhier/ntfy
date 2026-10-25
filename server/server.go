@@ -1736,6 +1736,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			v.Keepalive()
 			for _, t := range topics {
 				t.Keepalive()
+				t.KeepaliveRateVisitor(v)
 			}
 			s.recordSubscribers(v, topics)
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
@@ -1829,6 +1830,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				v.Keepalive()
 				for _, t := range topics {
 					t.Keepalive()
+					t.KeepaliveRateVisitor(v)
 				}
 				s.recordSubscribers(v, topics)
 				if err := ping(); err != nil {

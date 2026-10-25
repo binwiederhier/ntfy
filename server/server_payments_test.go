@@ -132,9 +132,9 @@ func TestPayments_Tiers(t *testing.T) {
 		require.Equal(t, int64(888111), tier.Limits.AttachmentTotalSize)
 		require.Equal(t, int64(3600), tier.Limits.AttachmentExpiryDuration)
 
-		// The billing list moved to /v1/billing/tiers; /v1/tiers still returns it to non-admins (deprecated)
+		// The billing list moved to /v1/account/billing/tiers; /v1/tiers still returns it to non-admins, for older web apps
 		require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
-		billing := request(t, s, "GET", "/v1/billing/tiers", "", nil)
+		billing := request(t, s, "GET", "/v1/account/billing/tiers", "", nil)
 		require.Equal(t, 200, billing.Code)
 		legacy := request(t, s, "GET", "/v1/tiers", "", nil)
 		require.Equal(t, billing.Body.String(), legacy.Body.String())

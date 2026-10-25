@@ -9,7 +9,7 @@ import config from "./config";
 import emojisMapped from "./emojisMapped";
 import { THEME, DATE_FORMAT, TIME_FORMAT } from "./Prefs";
 
-export const tiersUrl = (baseUrl) => `${baseUrl}/v1/billing/tiers`;
+export const tiersUrl = (baseUrl) => `${baseUrl}/v1/account/billing/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;

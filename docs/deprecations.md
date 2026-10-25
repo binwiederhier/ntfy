@@ -37,16 +37,6 @@ for what to change depending on how you installed ntfy). To set up users before 
     ntfy error: no ntfy server answered on the admin socket /run/ntfy/admin.sock
     ```
 
-### Server: `GET /v1/tiers` will stop returning the price list
-> Active since 2026-10-25 (v2.33.0), behavior will change after 2026-11-22
-
-The public list of paid tiers and their prices, which the web app shows in the upgrade dialog, moved from
-`GET /v1/tiers` to `GET /v1/billing/tiers`. `/v1/tiers` is now the admin API for tiers: admins get all tiers, as they
-are stored, and can add, change and remove them. Until the behavior changes, `GET /v1/tiers` still returns the price
-list to everyone else, so that web apps from before v2.33.0 keep working. After that, it is admin-only.
-
-If you call `GET /v1/tiers` yourself (e.g. to show prices on your own website), switch to `GET /v1/billing/tiers`.
-
 ## Previous deprecations
 
 ### ntfy CLI: `ntfy publish --env-topic` will be removed

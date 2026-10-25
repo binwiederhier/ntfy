@@ -310,7 +310,7 @@ func (a *Admin) Tiers() ([]*AdminTier, error) {
 	}
 	for _, t := range tiers {
 		if t.ID == "" {
-			// Non-admins get the public price list here instead (deprecated, see docs/deprecations.md)
+			// Non-admins get the price list for the upgrade dialog here instead (until 2026-11-22)
 			return nil, &AdminError{
 				HTTPCode: http.StatusUnauthorized,
 				Code:     AdminErrCodeUnauthorized,

@@ -12,7 +12,7 @@ test.describe("upgrade banner", () => {
       await route.fulfill({ response, body });
     });
     const limits = { messages: 250, messages_expiry_duration: 43200, emails: 5, calls: 0, reservations: 0 };
-    await page.route("**/v1/billing/tiers", (route) => route.fulfill({ json: [{ limits }] }));
+    await page.route("**/v1/account/billing/tiers", (route) => route.fulfill({ json: [{ limits }] }));
   });
 
   test("does not cover the bottom of a long topic list", async ({ page }) => {

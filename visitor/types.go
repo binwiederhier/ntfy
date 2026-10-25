@@ -5,8 +5,6 @@ package visitor
 
 import (
 	"time"
-
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -74,12 +72,12 @@ type Config struct {
 type Limits struct {
 	Basis                    Basis
 	RequestLimitBurst        int
-	RequestLimitReplenish    rate.Limit
+	RequestLimitReplenish    time.Duration // Time to refill one request token
 	MessageLimit             int64
 	MessageExpiryDuration    time.Duration
 	EmailLimit               int64
 	EmailLimitBurst          int
-	EmailLimitReplenish      rate.Limit
+	EmailLimitReplenish      time.Duration // Time to refill one email token; 0 never refills
 	CallLimit                int64
 	ReservationsLimit        int64
 	AttachmentTotalSizeLimit int64

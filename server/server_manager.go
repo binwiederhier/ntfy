@@ -126,6 +126,7 @@ func (s *Server) pruneVisitors() {
 		}).
 		Field("stale_visitors", staleVisitors).
 		Debug("Finished deleting stale visitors")
+	s.limiter.Prune(visitorExpungeAfter) // The keys' buckets and counts go with the visitors
 }
 
 func (s *Server) pruneTokens() {

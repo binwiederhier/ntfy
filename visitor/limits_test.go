@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/time/rate"
 	"heckel.io/ntfy/v2/user"
 )
 
@@ -34,12 +33,12 @@ func TestLimitsFor_Config(t *testing.T) {
 	limits := LimitsFor(conf, nil)
 	require.Equal(t, BasisIP, limits.Basis)
 	require.Equal(t, 60, limits.RequestLimitBurst)
-	require.Equal(t, rate.Every(5*time.Second), limits.RequestLimitReplenish)
+	require.Equal(t, 5*time.Second, limits.RequestLimitReplenish)
 	require.Equal(t, int64(17280), limits.MessageLimit) // 24h / 5s, approximated from the request replenish
 	require.Equal(t, 12*time.Hour, limits.MessageExpiryDuration)
 	require.Equal(t, int64(24), limits.EmailLimit) // 24h / 1h
 	require.Equal(t, 16, limits.EmailLimitBurst)
-	require.Equal(t, rate.Every(time.Hour), limits.EmailLimitReplenish)
+	require.Equal(t, time.Hour, limits.EmailLimitReplenish)
 	require.Equal(t, int64(0), limits.CallLimit)
 	require.Equal(t, int64(0), limits.ReservationsLimit)
 	require.Equal(t, int64(100*1024*1024), limits.AttachmentTotalSizeLimit)
@@ -74,13 +73,13 @@ func TestLimitsFor_Tier(t *testing.T) {
 	}
 	limits := LimitsFor(conf, tier)
 	require.Equal(t, BasisTier, limits.Basis)
-	require.Equal(t, 500, limits.RequestLimitBurst)                                            // 5% of 10,000
-	require.Equal(t, rate.Limit(20000)*rate.Every(24*time.Hour), limits.RequestLimitReplenish) // 2 x 10,000 per day, faster than 1 per 5s
+	require.Equal(t, 500, limits.RequestLimitBurst)                    // 5% of 10,000
+	require.Equal(t, 24*time.Hour/20000, limits.RequestLimitReplenish) // 2 x 10,000 per day, faster than 1 per 5s
 	require.Equal(t, int64(10000), limits.MessageLimit)
 	require.Equal(t, 48*time.Hour, limits.MessageExpiryDuration)
 	require.Equal(t, int64(200), limits.EmailLimit)
 	require.Equal(t, 40, limits.EmailLimitBurst) // 20% of 200
-	require.Equal(t, rate.Limit(200)*rate.Every(24*time.Hour), limits.EmailLimitReplenish)
+	require.Equal(t, 24*time.Hour/200, limits.EmailLimitReplenish)
 	require.Equal(t, int64(10), limits.CallLimit)
 	require.Equal(t, int64(5), limits.ReservationsLimit)
 	require.Equal(t, int64(1024*1024*1024), limits.AttachmentTotalSizeLimit)
@@ -93,11 +92,18 @@ func TestLimitsFor_Tier(t *testing.T) {
 	small := &user.Tier{MessageLimit: 100, EmailLimit: 10}
 	limits = LimitsFor(conf, small)
 	require.Equal(t, 60, limits.RequestLimitBurst)
-	require.Equal(t, rate.Every(5*time.Second), limits.RequestLimitReplenish)
+	require.Equal(t, 5*time.Second, limits.RequestLimitReplenish)
 	require.Equal(t, 16, limits.EmailLimitBurst)
-	require.Equal(t, rate.Limit(10)*rate.Every(24*time.Hour), limits.EmailLimitReplenish) // Not clamped: a tiny tier really refills slowly
+	require.Equal(t, 24*time.Hour/10, limits.EmailLimitReplenish) // Not clamped: a tiny tier really refills slowly
 	huge := &user.Tier{MessageLimit: 1000000, EmailLimit: 100000}
 	limits = LimitsFor(conf, huge)
 	require.Equal(t, 1000, limits.RequestLimitBurst)
 	require.Equal(t, 150, limits.EmailLimitBurst)
+
+	// A tier without emails never refills the email bucket; a tier without messages keeps the
+	// config's request refill
+	none := &user.Tier{MessageLimit: 0, EmailLimit: 0}
+	limits = LimitsFor(conf, none)
+	require.Equal(t, time.Duration(0), limits.EmailLimitReplenish)
+	require.Equal(t, 5*time.Second, limits.RequestLimitReplenish)
 }

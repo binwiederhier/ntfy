@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"net/netip"
@@ -345,7 +346,7 @@ func TestMaybeTruncateFCMMessage_NotTooLong(t *testing.T) {
 func TestToFirebaseSender_Abuse(t *testing.T) {
 	sender := &testFirebaseSender{allowed: 2}
 	client := newFirebaseClient(sender, &testAuther{})
-	visitor := newVisitor(newTestConfig(t, ""), newMemTestCache(t), nil, netip.MustParseAddr("1.2.3.4"), nil)
+	visitor := newVisitor(newTestConfig(t, ""), limit.New(&limit.Config{}), newMemTestCache(t), nil, netip.MustParseAddr("1.2.3.4"), nil)
 
 	require.Nil(t, client.Send(visitor, &model.Message{Topic: "mytopic"}))
 	require.Equal(t, 1, len(sender.Messages()))

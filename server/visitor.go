@@ -192,26 +192,33 @@ func (v *visitor) MessageAllowed() bool {
 	return allowed
 }
 
+// EmailAllowed decides on and counts one email. The limiter may read the key's usage row first
+// (emails cost money, see limit.syncLoadKinds), so it is asked without holding v.mu: a slow read
+// must not block the visitor's other users, Keepalive among them (which runs under the server lock).
 func (v *visitor) EmailAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
-	defer v.mu.RUnlock()
-	if v.limits.EmailLimitBurst <= 0 {
+	key, rule, burst := v.key, v.emailRule(), v.limits.EmailLimitBurst
+	v.mu.RUnlock()
+	if burst <= 0 {
 		return false // No email bucket means no emails, as before
 	}
-	allowed := v.limiter.Allow(v.key, v.emailRule(), 1).OK
+	allowed := v.limiter.Allow(key, rule, 1).OK
 	if allowed {
 		v.localEmails.Add(1)
 	}
 	return allowed
 }
 
+// CallAllowed decides on and counts one call; like EmailAllowed, it asks the limiter without
+// holding v.mu
 func (v *visitor) CallAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
-	defer v.mu.RUnlock()
-	if v.limits.CallLimit <= 0 {
+	key, rule, limit := v.key, v.callRule(), v.limits.CallLimit
+	v.mu.RUnlock()
+	if limit <= 0 {
 		return false // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
 	}
-	allowed := v.limiter.Allow(v.key, v.callRule(), 1).OK
+	allowed := v.limiter.Allow(key, rule, 1).OK
 	if allowed {
 		v.localCalls.Add(1)
 	}

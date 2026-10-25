@@ -125,3 +125,37 @@ func backdateTopic(t *testing.T, s *Server, id string, age time.Duration) {
 	}
 	require.Nil(t, err)
 }
+
+func TestServer_UnifiedPush_SubscriberAnnouncedToPeers(t *testing.T) {
+	// A UnifiedPush topic gaining a rate visitor is announced, so peers drop their cached miss
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	b := &fakeCluster{}
+	s.cluster = b
+	rr := request(t, s, "GET", "/upDDDDDDDDDDDD/json?poll=1", "", nil, func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	})
+	require.Equal(t, 200, rr.Code)
+	require.Equal(t, []string{"upDDDDDDDDDDDD"}, b.Announced())
+}
+
+func TestServer_UnifiedPush_PeerAnnouncementClearsCachedMiss(t *testing.T) {
+	// Lab finding (case "up", 2026-10-25): a push before the subscription cached "no row" on this
+	// node for 30 s, so a subscription on another node went unseen and pushes got 507
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorSubscriberRateLimiting = true
+		s := newTestServer(t, c)
+		rr := request(t, s, "POST", "/upEEEEEEEEEEEE?up=1", "m", nil)
+		require.Equal(t, 507, rr.Code) // Caches the miss
+		other := newOtherNodeLimiter(t, s)
+		require.Nil(t, other.SetTopicRateVisitor("upEEEEEEEEEEEE", "ip:1.2.3.4", ""))
+		require.Nil(t, other.Close())
+		rr = request(t, s, "POST", "/upEEEEEEEEEEEE?up=1", "m", nil)
+		require.Equal(t, 507, rr.Code) // Still cached
+		s.handlePeerTopicsAdded([]string{"upEEEEEEEEEEEE"})
+		rr = request(t, s, "POST", "/upEEEEEEEEEEEE?up=1", "m", nil)
+		require.Equal(t, 200, rr.Code)
+	})
+}

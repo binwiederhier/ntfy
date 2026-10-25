@@ -167,6 +167,14 @@ func (t *topic) TableInfo() (info *limit.TopicInfo, ok bool) {
 	return t.tableInfo, true
 }
 
+// ClearTableInfo forgets the cached read of the topic table's row, so the next lookup reads it again
+func (t *topic) ClearTableInfo() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.tableInfo = nil
+	t.tableInfoAt = time.Time{}
+}
+
 // SetTableInfo caches the topic table's row (nil if it had none)
 func (t *topic) SetTableInfo(info *limit.TopicInfo) {
 	t.mu.Lock()
@@ -181,11 +189,15 @@ func (t *topic) LastAccess() time.Time {
 	return t.lastAccess
 }
 
-func (t *topic) SetRateVisitor(v *visitor) {
+// SetRateVisitor sets the visitor the topic bills to, and reports whether the topic had no live
+// rate visitor before (it just gained its first subscriber, as far as this node knows)
+func (t *topic) SetRateVisitor(v *visitor) (first bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	first = t.rateVisitor == nil || t.rateVisitor.Stale()
 	t.rateVisitor = v
 	t.lastAccess = time.Now()
+	return first
 }
 
 func (t *topic) RateVisitor() *visitor {

@@ -135,6 +135,18 @@ func (s *Server) visitorFromKey(key, userID string) (*visitor, error) {
 	return s.visitor(ip, (*user.User)(nil)), nil
 }
 
+// handlePeerTopicsAdded drops the cached table reads of topics a peer announced as having just
+// gained a subscriber, so the next push reads the table again
+func (s *Server) handlePeerTopicsAdded(ids []string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, id := range ids {
+		if t, ok := s.topics[id]; ok {
+			t.ClearTableInfo()
+		}
+	}
+}
+
 func (s *Server) logTopicError(topicID string, err error) {
 	if err != nil {
 		log.Tag(tagTopic).Err(err).Warn("Cannot write topic %s to the topic table", topicID)

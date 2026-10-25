@@ -369,6 +369,7 @@ func New(conf *Config) (*Server, error) {
 		AccessChangedFunc: s.handlePeerAccessChanged,
 		IsolatedFunc:      s.maybeCloseLocalSubscribers,
 		UsageFunc:         s.handlePeerUsage,
+		TopicsAddedFunc:   s.handlePeerTopicsAdded,
 		MaxMessageBytes:   int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
@@ -1946,13 +1947,21 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 }
 
 func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
+	added := make([]string, 0)
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v)
+		if t.SetRateVisitor(v) {
+			added = append(added, t.ID)
+		}
 		s.recordRateVisitor(v, t)
+	}
+	if len(added) > 0 {
+		// Peers may have cached that these topics have no subscriber (see topicTableInfo); the
+		// announcement makes them read the table again instead of answering 507 for up to 30 s
+		s.cluster.BroadcastState(&cluster.State{AddedTopics: added})
 	}
 	return nil
 }

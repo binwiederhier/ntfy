@@ -32,6 +32,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/model"
@@ -1310,61 +1311,17 @@ func TestServer_StatsResetter(t *testing.T) {
 	})
 }
 
-func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		// This tests that the messageLimiter (the only fixed limiter) and the emailsLimiter (token bucket)
-		// is reset by the stats resetter
-
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		s := newTestServer(t, c)
-		s.mailer = &testMailer{}
-
-		// Publish some messages, and check stats
-		for i := 0; i < 3; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", nil)
-			require.Equal(t, 200, response.Code)
-		}
-		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-			"Email": "test@email.com",
-		})
-		require.Equal(t, 200, response.Code)
-
-		rr := request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, rr.Code)
-		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(4), account.Stats.Messages)
-		require.Equal(t, int64(1), account.Stats.Emails)
-		v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-		require.Equal(t, int64(4), v.Stats().Messages)
-		require.Equal(t, int64(1), v.Stats().Emails)
-
-		// Reset stats and check again
-		s.resetStats()
-		rr = request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, rr.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-		require.Equal(t, int64(0), account.Stats.Emails)
-		v = s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-		require.Equal(t, int64(0), v.Stats().Messages)
-		require.Equal(t, int64(0), v.Stats().Emails)
-	})
-}
-
 func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()
 
-		// This tests that the daily message quota is prefilled originally from the database,
-		// if the visitor is unknown
+		// This tests that the daily message quota is read from the usage table if the visitor is
+		// unknown to this node: another node (a second limiter on the same table) counted it
 
 		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
 		s := newTestServer(t, c)
 
-		// Create user, and update it with some message and email stats
+		// Create user, and count some usage for it on "another node"
 		require.Nil(t, s.userManager.AddTier(&user.Tier{
 			Code: "test",
 		}))
@@ -1373,11 +1330,10 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 
 		u, err := s.userManager.User("phil")
 		require.Nil(t, err)
-		s.userManager.EnqueueUserStats(u.ID, &user.Stats{
-			Messages: 123456,
-			Emails:   999,
-		})
-		time.Sleep(400 * time.Millisecond)
+		other := newOtherNodeLimiter(t, s)
+		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindMessages}, 123456).OK)
+		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindEmails}, 999).OK)
+		require.Nil(t, other.Close()) // Writes the counts
 
 		// Get account and verify stats are read from the DB, and that the visitor also has these stats
 		rr := request(t, s, "GET", "/v1/account", "", map[string]string{
@@ -5292,7 +5248,9 @@ func newTestConfig(t *testing.T, databaseURL string) *Config {
 	} else {
 		conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
 		conf.CacheStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
+		conf.UsageFile = filepath.Join(t.TempDir(), "usage.db")
 	}
+	conf.UsageFlushInterval = 300 * time.Millisecond
 	conf.AttachmentCacheDir = t.TempDir()
 	conf.TemplateDir = t.TempDir()
 	return conf
@@ -5311,6 +5269,21 @@ func newTestConfigWithAuthFile(t *testing.T, databaseURL string) *Config {
 	conf := newTestConfig(t, databaseURL)
 	conf = configureAuth(t, conf)
 	return conf
+}
+
+// newOtherNodeLimiter returns a second limiter on the server's usage table, standing in for
+// another cluster node (or an earlier run of this one); Close writes what it counted
+func newOtherNodeLimiter(t *testing.T, s *Server) *limit.Service {
+	t.Helper()
+	var store *limit.Store
+	var err error
+	if s.db != nil {
+		store, err = limit.NewPostgresStore(s.db)
+	} else {
+		store, err = limit.NewSQLiteStore(s.config.UsageFile)
+	}
+	require.Nil(t, err)
+	return limit.New(&limit.Config{ResetTime: s.config.VisitorStatsResetTime, FlushInterval: time.Hour}, store)
 }
 
 func newTestServer(t *testing.T, config *Config) *Server {

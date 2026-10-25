@@ -15,6 +15,7 @@ func (s *Server) execManager() {
 	// leader only. Without clustering, IsLeader is always true.
 	s.pruneVisitors()
 	if s.cluster.IsLeader() {
+		s.pruneUsage()
 		s.pruneTokens()
 		s.pruneAttachments()
 		s.pruneMessages()
@@ -126,7 +127,15 @@ func (s *Server) pruneVisitors() {
 		}).
 		Field("stale_visitors", staleVisitors).
 		Debug("Finished deleting stale visitors")
-	s.limiter.Prune(visitorExpungeAfter) // The keys' buckets and counts go with the visitors
+	s.limiter.Prune(visitorExpungeAfterFor(s.limiter)) // The keys' buckets and counts go with the visitors
+	metrics.LimitKeys.Set(float64(s.limiter.Size()))
+}
+
+// pruneUsage deletes old days from the usage table; leader only, like the other shared-database jobs
+func (s *Server) pruneUsage() {
+	if err := s.limiter.PruneStore(); err != nil {
+		log.Tag(tagManager).Err(err).Warn("Error pruning old usage rows")
+	}
 }
 
 func (s *Server) pruneTokens() {

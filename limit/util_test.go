@@ -19,6 +19,16 @@ func TestShardIndex(t *testing.T) {
 	require.Greater(t, len(seen), 3) // Spreads
 }
 
+func TestDayFor(t *testing.T) {
+	midnight := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
+	require.Equal(t, "2026-10-25", dayFor(time.Date(2026, 10, 25, 23, 59, 59, 0, time.UTC), midnight))
+	require.Equal(t, "2026-10-26", dayFor(time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC), midnight))
+	require.Equal(t, "2026-10-25", dayFor(time.Date(2026, 10, 26, 1, 0, 0, 0, time.FixedZone("CEST", 2*3600)), midnight)) // 23:00 UTC
+	sixThirty := time.Date(0, 0, 0, 6, 30, 0, 0, time.UTC)
+	require.Equal(t, "2026-10-25", dayFor(time.Date(2026, 10, 26, 6, 29, 0, 0, time.UTC), sixThirty))
+	require.Equal(t, "2026-10-26", dayFor(time.Date(2026, 10, 26, 6, 30, 0, 0, time.UTC), sixThirty))
+}
+
 func TestUntilReset(t *testing.T) {
 	resetTime := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC) // Midnight UTC
 	now := time.Date(2026, 10, 25, 23, 59, 0, 0, time.UTC)

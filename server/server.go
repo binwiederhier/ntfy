@@ -235,6 +235,10 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	usageStore, err := createUsageStore(conf, pool)
+	if err != nil {
+		return nil, err
+	}
 	var wp *webpush.Store
 	if conf.WebPushPublicKey != "" {
 		if pool != nil {
@@ -302,7 +306,7 @@ func New(conf *Config) (*Server, error) {
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
 		visitors:        make(map[string]*visitor),
-		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime}),
+		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime, FlushInterval: conf.UsageFlushInterval}, usageStore),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
@@ -390,6 +394,17 @@ func (s *Server) dbPoolStats() []*metrics.DBPool {
 		})
 	}
 	return pools
+}
+
+// createUsageStore opens the usage table: on the shared pool if there is one, in the usage file
+// if one is configured, or not at all (usage is then counted in memory only, as before)
+func createUsageStore(conf *Config, pool *db.DB) (*limit.Store, error) {
+	if pool != nil {
+		return limit.NewPostgresStore(pool)
+	} else if conf.UsageFile != "" {
+		return limit.NewSQLiteStore(conf.UsageFile)
+	}
+	return nil, nil
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -584,6 +599,9 @@ func (s *Server) stop() {
 	}
 	if s.tail != nil {
 		s.tail.Close() // Before the databases close under it
+	}
+	if err := s.limiter.Close(); err != nil { // Writes what is unflushed, before the pool closes under it
+		log.Tag(tagStartup).Err(err).Warn("Closing the usage store failed")
 	}
 	s.closeDatabases()
 	if s.ban != nil {
@@ -2163,7 +2181,6 @@ func (s *Server) resetStats() {
 	log.Info("Resetting all visitor stats (daily task)")
 	s.mu.Lock()
 	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
-	s.limiter.ResetUsage()
 	for _, v := range s.visitors {
 		v.ResetStats()
 	}

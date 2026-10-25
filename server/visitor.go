@@ -18,10 +18,21 @@ const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter defines how long a visitor is active before it is removed from memory. This number
-	// has to be very high to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since
-	// they are replenished faster (typically).
+	// visitorExpungeAfter defines how long a visitor is active before it is removed from memory when
+	// usage is counted in memory only (no usage file, no database). This number has to be very high
+	// to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since they are
+	// replenished faster (typically).
 	visitorExpungeAfter = oneDay
+
+	// visitorExpungeAfterPersisted is the same when usage is persisted: a visitor's daily counts are
+	// in the usage table (or it never had any worth a row) and its buckets refill anyway, so the
+	// map only has to hold the active visitors
+	visitorExpungeAfterPersisted = 5 * time.Minute
+
+	// visitorThresholdRate is the share of a daily quota at which an IP-keyed visitor's usage gets a
+	// row in the usage table (see limit.Rule.Threshold); user-keyed visitors get one from the first
+	// unit, as the row is what the account page and billing read
+	visitorThresholdRate = 100
 )
 
 // visitor represents an API user: its identity (the IP, or the user) and the limits that apply to it.
@@ -40,6 +51,7 @@ type visitor struct {
 	subscriptions *util.FixedLimiter // Gauge of this node's open subscriptions for the visitor; never shared, it protects this node
 	firebase      time.Time          // Next allowed Firebase message
 	seen          time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
+	expungeAfter  time.Duration      // How long after seen the visitor is removed from memory (see visitorExpungeAfterFor)
 	localMessages atomic.Int64       // Messages this visitor object admitted; the user stats deltas are measured on these, not on the shared counts (see enqueueUserStatsDeltaNoLock)
 	localEmails   atomic.Int64       // Emails this visitor object admitted
 	localCalls    atomic.Int64       // Calls this visitor object admitted
@@ -76,6 +88,7 @@ func newVisitor(conf *Config, limiter *limit.Service, messageCache *message.Cach
 		user:          user,
 		firebase:      time.Unix(0, 0),
 		seen:          time.Now(),
+		expungeAfter:  visitorExpungeAfterFor(limiter),
 		subscriptions: util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
 	}
 	v.resetLimitsNoLock()
@@ -288,7 +301,7 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 func (v *visitor) Stale() bool {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
-	return time.Since(v.seen) > visitorExpungeAfter
+	return time.Since(v.seen) > v.expungeAfter
 }
 
 func (v *visitor) Stats() *user.Stats {
@@ -298,7 +311,10 @@ func (v *visitor) Stats() *user.Stats {
 }
 
 func (v *visitor) statsNoLock() *user.Stats {
-	usage := v.limiter.Usage(v.key)
+	return statsFromUsage(v.limiter.Usage(v.key))
+}
+
+func statsFromUsage(usage limit.Usage) *user.Stats {
 	return &user.Stats{
 		Messages: usage.Count(limit.KindMessages),
 		Emails:   usage.Count(limit.KindEmails),
@@ -410,19 +426,12 @@ func (v *visitor) MaybeUserID() string {
 	return ""
 }
 
-// resetLimitsNoLock re-resolves the key and the limits from the current user, and seeds the key's
-// daily counts from the user's persisted stats if the key is new to the limiter. The caller must
-// hold v.mu.
+// resetLimitsNoLock re-resolves the key and the limits from the current user. The key's daily
+// counts are the limiter's (read from the usage table as needed), so nothing is seeded. The
+// caller must hold v.mu.
 func (v *visitor) resetLimitsNoLock() {
 	v.key = vis.Key(v.ip, v.user, v.limitsConfig)
 	v.limits = v.limitsNoLock()
-	if v.user != nil && v.user.Tier != nil {
-		var usage limit.Usage
-		usage.Set(limit.KindMessages, v.user.Stats.Messages)
-		usage.Set(limit.KindEmails, v.user.Stats.Emails)
-		usage.Set(limit.KindCalls, v.user.Stats.Calls)
-		v.limiter.Seed(v.key, usage)
-	}
 	v.resetLocalStatsNoLock()                                            // What was admitted so far belongs to the previous key and user, and was flushed by SetUser if it was owed
 	log.Fields(v.contextNoLock()).Debug("Rate limits reset for visitor") // Must be after function, because contextNoLock() describes rate limits
 }
@@ -449,15 +458,25 @@ func (v *visitor) requestRule() limit.Rule {
 }
 
 func (v *visitor) messageRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindMessages, Daily: v.limits.MessageLimit}
+	return limit.Rule{Kind: limit.KindMessages, Daily: v.limits.MessageLimit, Threshold: v.thresholdNoLock(v.limits.MessageLimit)}
 }
 
 func (v *visitor) emailRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindEmails, Burst: int64(v.limits.EmailLimitBurst), Refill: v.limits.EmailLimitReplenish, Daily: v.limits.EmailLimit}
+	return limit.Rule{Kind: limit.KindEmails, Burst: int64(v.limits.EmailLimitBurst), Refill: v.limits.EmailLimitReplenish, Daily: v.limits.EmailLimit, Threshold: v.thresholdNoLock(v.limits.EmailLimit)}
 }
 
 func (v *visitor) callRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindCalls, Daily: v.limits.CallLimit}
+	return limit.Rule{Kind: limit.KindCalls, Daily: v.limits.CallLimit, Threshold: v.thresholdNoLock(v.limits.CallLimit)}
+}
+
+// thresholdNoLock returns the daily count from which the visitor's usage is persisted: from the
+// first unit for a user with a tier, past a share of the quota for everyone else, so that the
+// one-shot visitors of a day never get a row. The caller must hold v.mu.
+func (v *visitor) thresholdNoLock(daily int64) int64 {
+	if v.user != nil && v.user.Tier != nil {
+		return 0
+	}
+	return daily / visitorThresholdRate
 }
 
 // bandwidthRule is a bucket of the daily bandwidth bytes that refills over a day
@@ -485,14 +504,21 @@ func (v *visitor) authRule() limit.Rule {
 	return limit.Rule{Kind: limit.KindAuth, Burst: int64(v.config.VisitorAuthFailureLimitBurst), Refill: v.config.VisitorAuthFailureLimitReplenish}
 }
 
+// Info returns the visitor's limits and stats for the account page. The daily counts come from
+// the usage table if this node has not read them yet, so a node that never saw the visitor
+// answers with the same numbers as one that did.
 func (v *visitor) Info() (*visitorInfo, error) {
 	v.mu.RLock()
-	info := v.infoLightNoLock()
+	key, limits := v.key, v.limits
 	v.mu.RUnlock()
+	usage, err := v.limiter.Lookup(key)
+	if err != nil {
+		return nil, err
+	}
+	info := infoFromUsage(limits, usage)
 
 	// Attachment stats from database
 	var attachmentsBytesUsed int64
-	var err error
 	u := v.User()
 	if u != nil {
 		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(u.ID)
@@ -520,8 +546,11 @@ func (v *visitor) Info() (*visitorInfo, error) {
 }
 
 func (v *visitor) infoLightNoLock() *visitorInfo {
-	stats := v.statsNoLock()
-	limits := v.limits
+	return infoFromUsage(v.limits, v.limiter.Usage(v.key))
+}
+
+func infoFromUsage(limits *vis.Limits, usage limit.Usage) *visitorInfo {
+	stats := statsFromUsage(usage)
 	return &visitorInfo{
 		Limits: limits,
 		Stats: &visitorStats{
@@ -540,6 +569,15 @@ func zeroIfNegative(value int64) int64 {
 		return 0
 	}
 	return value
+}
+
+// visitorExpungeAfterFor returns how long an idle visitor stays in memory: minutes when its daily
+// counts are persisted, a day when they only live in memory
+func visitorExpungeAfterFor(limiter *limit.Service) time.Duration {
+	if limiter.Persistent() {
+		return visitorExpungeAfterPersisted
+	}
+	return visitorExpungeAfter
 }
 
 // visitorID returns a unique identifier for a visitor based on user or IP, using configurable prefix bits for IPv4/IPv6

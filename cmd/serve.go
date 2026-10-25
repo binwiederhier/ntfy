@@ -125,6 +125,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-public-key", Aliases: []string{"web_push_public_key"}, EnvVars: []string{"NTFY_WEB_PUSH_PUBLIC_KEY"}, Usage: "public key used for web push notifications"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-private-key", Aliases: []string{"web_push_private_key"}, EnvVars: []string{"NTFY_WEB_PUSH_PRIVATE_KEY"}, Usage: "private key used for web push notifications"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-file", Aliases: []string{"web_push_file"}, EnvVars: []string{"NTFY_WEB_PUSH_FILE"}, Usage: "file used to store web push subscriptions"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "usage-file", Aliases: []string{"usage_file"}, EnvVars: []string{"NTFY_USAGE_FILE"}, Usage: "file used to store the visitors' daily usage (messages, emails, calls), so quotas survive a restart"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-email-address", Aliases: []string{"web_push_email_address"}, EnvVars: []string{"NTFY_WEB_PUSH_EMAIL_ADDRESS"}, Usage: "e-mail address of sender, required to use browser push services"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-startup-queries", Aliases: []string{"web_push_startup_queries"}, EnvVars: []string{"NTFY_WEB_PUSH_STARTUP_QUERIES"}, Usage: "queries run when the web push database is initialized"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "web-push-expiry-duration", Aliases: []string{"web_push_expiry_duration"}, EnvVars: []string{"NTFY_WEB_PUSH_EXPIRY_DURATION"}, Value: util.FormatDuration(server.DefaultWebPushExpiryDuration), Usage: "automatically expire unused subscriptions after this time"}),
@@ -177,6 +178,7 @@ func execServe(c *cli.Context) error {
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
 	webPushFile := c.String("web-push-file")
+	usageFile := c.String("usage-file")
 	webPushEmailAddress := c.String("web-push-email-address")
 	webPushStartupQueries := c.String("web-push-startup-queries")
 	webPushExpiryDurationStr := c.String("web-push-expiry-duration")
@@ -351,8 +353,8 @@ func execServe(c *cli.Context) error {
 	// Check values
 	if databaseURL != "" && !strings.HasPrefix(databaseURL, "postgres://") && !strings.HasPrefix(databaseURL, "postgresql://") {
 		return errors.New("if database-url is set, it must start with postgres:// or postgresql://")
-	} else if databaseURL != "" && (authFile != "" || cacheFile != "" || webPushFile != "") {
-		return errors.New("if database-url is set, auth-file, cache-file, and web-push-file must not be set")
+	} else if databaseURL != "" && (authFile != "" || cacheFile != "" || webPushFile != "" || usageFile != "") {
+		return errors.New("if database-url is set, auth-file, cache-file, web-push-file, and usage-file must not be set")
 	} else if len(databaseReplicaURLs) > 0 && databaseURL == "" {
 		return errors.New("database-replica-urls can only be used if database-url is also set")
 	} else if clusterListen != "" && databaseURL == "" {
@@ -616,6 +618,7 @@ func execServe(c *cli.Context) error {
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey
 	conf.WebPushFile = webPushFile
+	conf.UsageFile = usageFile
 	conf.WebPushEmailAddress = webPushEmailAddress
 	conf.WebPushStartupQueries = webPushStartupQueries
 	conf.WebPushExpiryDuration = webPushExpiryDuration

@@ -12,6 +12,7 @@ import (
 
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/cluster"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/user"
 )
 
@@ -219,6 +220,8 @@ type Config struct {
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
+	UsageFile                            string         // SQLite file for the daily usage counts (messages, emails, calls); empty keeps them in memory only, and database-url replaces it
+	UsageFlushInterval                   time.Duration  // How often usage is written to and read back from the usage table (limit.DefaultFlushInterval); tests shorten it
 	BehindProxy                          bool           // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
 	ProxyForwardedHeader                 string         // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
 	ProxyTrustedPrefixes                 []netip.Prefix // List of trusted proxy networks (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
@@ -337,6 +340,8 @@ func NewConfig() *Config {
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
 		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
+		UsageFile:                            "",
+		UsageFlushInterval:                   limit.DefaultFlushInterval,
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address
 		ProxyForwardedHeader:                 "X-Forwarded-For",            // Default header for reverse proxy client IPs

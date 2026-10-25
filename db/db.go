@@ -67,6 +67,11 @@ func (d *DB) QueryContext(ctx context.Context, query string, args ...any) (*sql.
 	return d.primary.DB.QueryContext(ctx, query, args...)
 }
 
+// QueryRowContext delegates to the primary database.
+func (d *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return d.primary.DB.QueryRowContext(ctx, query, args...)
+}
+
 // Begin delegates to the primary database.
 func (d *DB) Begin() (*sql.Tx, error) {
 	return d.primary.DB.Begin()

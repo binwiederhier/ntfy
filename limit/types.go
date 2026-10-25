@@ -28,10 +28,11 @@ var kindNames = [numKinds]string{"requests", "messages", "emails", "calls", "ban
 // Rule says how much of a kind a key may use: a token bucket of Burst tokens refilling one token
 // per Refill, a Daily cap, or both. A zero Rule allows everything.
 type Rule struct {
-	Kind   Kind
-	Burst  int64         // Token bucket size; 0 for no bucket
-	Refill time.Duration // Time to refill one token; 0 for a bucket that never refills
-	Daily  int64         // Daily cap; 0 for none
+	Kind      Kind
+	Burst     int64         // Token bucket size; 0 for no bucket
+	Refill    time.Duration // Time to refill one token; 0 for a bucket that never refills
+	Daily     int64         // Daily cap; 0 for none
+	Threshold int64         // Daily count from which the key's usage of the kind is persisted; 0 persists from the first unit
 }
 
 // Decision is the answer to Allow: whether the usage was admitted, and if not, how long until
@@ -46,10 +47,12 @@ type Usage struct {
 	counts [numKinds]int64
 }
 
-// Config configures the service. ResetTime is the wall-clock time of day (UTC) at which daily
-// counts start over.
+// Config configures the service. ResetTime is the wall-clock time of day (UTC) at which the
+// usage day starts over. FlushInterval is how often usage is written to and read from the store
+// (DefaultFlushInterval when 0); tests set it.
 type Config struct {
-	ResetTime time.Time
+	ResetTime     time.Time
+	FlushInterval time.Duration
 }
 
 // limiter is the util.Limiter view of one key's bucket for one rule (see Service.Limiter)
@@ -80,11 +83,6 @@ func ParseKind(name string) (Kind, bool) {
 // Count returns the usage of the given kind
 func (u Usage) Count(kind Kind) int64 {
 	return u.counts[kind]
-}
-
-// Set sets the usage of the given kind (see Service.Seed)
-func (u *Usage) Set(kind Kind, count int64) {
-	u.counts[kind] = count
 }
 
 // Allow uses one unit, or returns false if the limit has been reached

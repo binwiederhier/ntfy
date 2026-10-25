@@ -976,7 +976,7 @@ func TestTiers_AddListUpdateRemove(t *testing.T) {
 		auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
 
 		// Add
-		rr := request(t, s, "POST", "/v1/admin/tiers", `{"code":"pro","name":"Pro","messages_limit":1000,"messages_expiry_duration":86400,"attachment_file_size_limit":1048576}`, auth)
+		rr := request(t, s, "POST", "/v1/tiers", `{"code":"pro","name":"Pro","messages_limit":1000,"messages_expiry_duration":86400,"attachment_file_size_limit":1048576}`, auth)
 		require.Equal(t, 200, rr.Code)
 		tier, err := s.userManager.Tier("pro")
 		require.Nil(t, err)
@@ -985,7 +985,7 @@ func TestTiers_AddListUpdateRemove(t *testing.T) {
 		require.Nil(t, s.userManager.ChangeTier("ben", "pro"))
 
 		// List
-		rr = request(t, s, "GET", "/v1/admin/tiers", "", auth)
+		rr = request(t, s, "GET", "/v1/tiers", "", auth)
 		require.Equal(t, 200, rr.Code)
 		var tiers []*apiAdminTier
 		require.Nil(t, json.NewDecoder(rr.Body).Decode(&tiers))
@@ -997,7 +997,7 @@ func TestTiers_AddListUpdateRemove(t *testing.T) {
 		require.Equal(t, int64(1), tiers[0].Users)
 
 		// Update
-		rr = request(t, s, "PUT", "/v1/admin/tiers", `{"code":"pro","name":"Pro Plus","messages_limit":2000}`, auth)
+		rr = request(t, s, "PUT", "/v1/tiers", `{"code":"pro","name":"Pro Plus","messages_limit":2000}`, auth)
 		require.Equal(t, 200, rr.Code)
 		tier, err = s.userManager.Tier("pro")
 		require.Nil(t, err)
@@ -1005,11 +1005,11 @@ func TestTiers_AddListUpdateRemove(t *testing.T) {
 		require.Equal(t, int64(2000), tier.MessageLimit)
 
 		// Remove: refused while in use, works after moving the user
-		rr = request(t, s, "DELETE", "/v1/admin/tiers", `{"code":"pro"}`, auth)
+		rr = request(t, s, "DELETE", "/v1/tiers", `{"code":"pro"}`, auth)
 		require.Equal(t, 409, rr.Code)
 		require.Equal(t, 40910, toHTTPError(t, rr.Body.String()).Code)
 		require.Nil(t, s.userManager.ResetTier("ben"))
-		rr = request(t, s, "DELETE", "/v1/admin/tiers", `{"code":"pro"}`, auth)
+		rr = request(t, s, "DELETE", "/v1/tiers", `{"code":"pro"}`, auth)
 		require.Equal(t, 200, rr.Code)
 		_, err = s.userManager.Tier("pro")
 		require.ErrorIs(t, err, user.ErrTierNotFound)
@@ -1026,22 +1026,31 @@ func TestTiers_Failures(t *testing.T) {
 		auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
 
 		// Duplicate, bad code, missing name
-		rr := request(t, s, "POST", "/v1/admin/tiers", `{"code":"pro","name":"Pro"}`, auth)
+		rr := request(t, s, "POST", "/v1/tiers", `{"code":"pro","name":"Pro"}`, auth)
 		require.Equal(t, 40909, toHTTPError(t, rr.Body.String()).Code)
-		rr = request(t, s, "POST", "/v1/admin/tiers", `{"code":"not valid","name":"X"}`, auth)
+		rr = request(t, s, "POST", "/v1/tiers", `{"code":"not valid","name":"X"}`, auth)
 		require.Equal(t, 40062, toHTTPError(t, rr.Body.String()).Code)
-		rr = request(t, s, "POST", "/v1/admin/tiers", `{"code":"x"}`, auth)
+		rr = request(t, s, "POST", "/v1/tiers", `{"code":"x"}`, auth)
 		require.Equal(t, 40062, toHTTPError(t, rr.Body.String()).Code)
 
 		// Update or remove a missing tier
-		rr = request(t, s, "PUT", "/v1/admin/tiers", `{"code":"missing","name":"Missing"}`, auth)
+		rr = request(t, s, "PUT", "/v1/tiers", `{"code":"missing","name":"Missing"}`, auth)
 		require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)
-		rr = request(t, s, "DELETE", "/v1/admin/tiers", `{"code":"missing"}`, auth)
+		rr = request(t, s, "DELETE", "/v1/tiers", `{"code":"missing"}`, auth)
 		require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)
 
-		// Non-admins cannot use the API
-		rr = request(t, s, "GET", "/v1/admin/tiers", "", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
+		// Non-admins cannot change tiers; listing them is the (deprecated) billing list, which needs payments
+		ben := map[string]string{"Authorization": util.BasicAuth("ben", "ben")}
+		rr = request(t, s, "POST", "/v1/tiers", `{"code":"ben","name":"Ben"}`, ben)
 		require.Equal(t, 401, rr.Code)
+		rr = request(t, s, "DELETE", "/v1/tiers", `{"code":"pro"}`, ben)
+		require.Equal(t, 401, rr.Code)
+		rr = request(t, s, "GET", "/v1/tiers", "", ben)
+		require.Equal(t, 404, rr.Code)
+		rr = request(t, s, "GET", "/v1/tiers", "", nil)
+		require.Equal(t, 404, rr.Code)
+		rr = request(t, s, "GET", "/v1/admin/tiers", "", auth) // Gone, never released
+		require.Equal(t, 404, rr.Code)
 	})
 }
 

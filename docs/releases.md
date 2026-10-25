@@ -2217,7 +2217,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
 * Export PostgreSQL connection pool metrics (`ntfy_db_pool_*`: connections in use, and queries that waited for a free connection, per pool), to size `pool_max_conns` (see [PostgreSQL](config.md#postgresql))
-* Admin API: manage tokens of other users (`/v1/users/tokens`), tiers (`/v1/admin/tiers`) and password reset links (`/v1/users/password/reset`); `GET /v1/users` also returns tier names, provisioned users and grants and the default access, `PUT /v1/users` can remove a tier (`"tier": "-"`), and `DELETE /v1/users/access` can reset all of a user's entries or the whole ACL
+* Admin API: manage tokens of other users (`/v1/users/tokens`), tiers (`/v1/tiers`; the public price list for the web app moved to `/v1/billing/tiers`, see [deprecations](deprecations.md)) and password reset links (`/v1/users/password/reset`); `GET /v1/users` also returns tier names, provisioned users and grants and the default access, `PUT /v1/users` can remove a tier (`"tier": "-"`), and `DELETE /v1/users/access` can reset all of a user's entries or the whole ACL
 
 **Security:**
 

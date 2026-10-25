@@ -400,7 +400,7 @@ func fromAdminTier(t *client.AdminTier) *user.Tier {
 }
 
 // directError maps user manager errors to the admin API errors the server returns for them
-// (see mapAdminUserError in server/server_admin.go), so the commands see the same codes
+// (see mapUserErrorToHTTP in server/server_admin.go), so the commands see the same codes
 func directError(err error) error {
 	switch {
 	case err == nil:

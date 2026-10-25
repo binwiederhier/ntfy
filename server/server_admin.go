@@ -137,7 +137,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	}
 	if req.Tier != "" {
 		if _, err := s.userManager.Tier(req.Tier); err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 	}
 	password, hashed := req.Password, false
@@ -146,11 +146,11 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	}
 	adminLog(v, r).Info("Adding user %s (role %s)", req.Username, role)
 	if err := s.userManager.AddUser(req.Username, password, role, hashed); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	if req.Tier != "" {
 		if err := s.userManager.ChangeTier(req.Username, req.Tier); err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -173,7 +173,7 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	if req.Tier != "" && req.Tier != apiTierReset {
 		if _, err := s.userManager.Tier(req.Tier); err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 	}
 	u, err := s.userManager.User(req.Username)
@@ -191,7 +191,7 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 				err = s.userManager.ChangePassword(req.Username, req.Password, false)
 			}
 			if err != nil {
-				return mapAdminUserError(err)
+				return mapUserErrorToHTTP(err)
 			}
 		}
 	} else if req.Role != "" {
@@ -204,24 +204,24 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		adminLog(v, r).Info("Adding user %s (role %s)", req.Username, user.RoleUser)
 		if err := s.userManager.AddUser(req.Username, password, user.RoleUser, hashed); err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 	}
 	if req.Tier == apiTierReset {
 		adminLog(v, r).Info("Removing tier of user %s", req.Username)
 		if err := s.userManager.ResetTier(req.Username); err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 	} else if req.Tier != "" {
 		adminLog(v, r).Info("Changing tier of user %s to %s", req.Username, req.Tier)
 		if err := s.userManager.ChangeTier(req.Username, req.Tier); err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 	}
 	if req.Role != "" {
 		adminLog(v, r).Info("Changing role of user %s to %s", req.Username, role)
 		if err := s.userManager.ChangeRole(req.Username, role); err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -234,7 +234,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	u, err := s.userManager.User(req.Username)
 	if err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	} else if u.Name == user.Everyone {
 		return errHTTPBadRequest.Wrap("cannot remove the everyone user")
 	} else if !u.IsUser() && !isAdminSocketRequest(r) {
@@ -242,7 +242,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	adminLog(v, r).Info("Removing user %s", req.Username)
 	if err := s.userManager.RemoveUser(req.Username); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	if s.webPush != nil {
 		if err := s.webPush.RemoveSubscriptionsByUserID(u.ID); err != nil {
@@ -262,7 +262,7 @@ func (s *Server) handleAccessAllow(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	u, err := s.userManager.User(req.Username)
 	if err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	} else if u.IsAdmin() {
 		return errHTTPBadRequestAccessAdminUser
 	}
@@ -272,7 +272,7 @@ func (s *Server) handleAccessAllow(w http.ResponseWriter, r *http.Request, v *vi
 	}
 	adminLog(v, r).Info("Granting %s access to topic %s for user %s", permission, req.Topic, req.Username)
 	if err := s.userManager.AllowAccess(req.Username, req.Topic, permission); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
@@ -287,12 +287,12 @@ func (s *Server) handleAccessReset(w http.ResponseWriter, r *http.Request, v *vi
 	var u *user.User
 	if req.Username != "" {
 		if u, err = s.userManager.User(req.Username); err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 	}
 	adminLog(v, r).Info("Resetting access for user %s, topic %s", req.Username, req.Topic)
 	if err := s.userManager.ResetAccess(req.Username, req.Topic); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	// Without a username, the whole ACL is gone. Subscribers are not killed here; the periodic
 	// re-authorization of long-lived subscriptions catches up with them.
@@ -313,7 +313,7 @@ func (s *Server) handleUsersTokensGet(w http.ResponseWriter, r *http.Request, v 
 	if username := r.URL.Query().Get("username"); username != "" {
 		u, err := s.userManager.User(username)
 		if err != nil {
-			return mapAdminUserError(err)
+			return mapUserErrorToHTTP(err)
 		}
 		users = []*user.User{u}
 	} else {
@@ -359,7 +359,7 @@ func (s *Server) handleUsersTokensAdd(w http.ResponseWriter, r *http.Request, v 
 	adminLog(v, r).Info("Creating token for user %s", req.Username)
 	token, err := s.userManager.CreateToken(u.ID, req.Label, expires, netip.IPv4Unspecified(), false)
 	if err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	return s.writeJSON(w, newAPIUserTokenResponse(u.Name, token))
 }
@@ -375,7 +375,7 @@ func (s *Server) handleUsersTokensDelete(w http.ResponseWriter, r *http.Request,
 	}
 	adminLog(v, r).Info("Removing token for user %s", req.Username)
 	if err := s.userManager.RemoveToken(u.ID, req.Token); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
@@ -389,7 +389,7 @@ func (s *Server) handleUsersPasswordReset(w http.ResponseWriter, r *http.Request
 	}
 	u, err := s.userManager.User(req.Username)
 	if err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	} else if u.Provisioned {
 		return errHTTPConflictProvisionedUserChange
 	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
@@ -471,7 +471,7 @@ func (s *Server) handleAdminTiersAdd(w http.ResponseWriter, r *http.Request, v *
 	}
 	adminLog(v, r).Info("Adding tier %s", tier.Code)
 	if err := s.userManager.AddTier(tier); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
@@ -482,11 +482,11 @@ func (s *Server) handleAdminTiersUpdate(w http.ResponseWriter, r *http.Request, 
 		return err
 	}
 	if _, err := s.userManager.Tier(tier.Code); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	adminLog(v, r).Info("Updating tier %s", tier.Code)
 	if err := s.userManager.UpdateTier(tier); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
@@ -497,7 +497,7 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 		return err
 	}
 	if _, err := s.userManager.Tier(req.Code); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	counts, err := s.userManager.TierUsersCount()
 	if err != nil {
@@ -507,7 +507,7 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 	}
 	adminLog(v, r).Info("Removing tier %s", req.Code)
 	if err := s.userManager.RemoveTier(req.Code); err != nil {
-		return mapAdminUserError(err)
+		return mapUserErrorToHTTP(err)
 	}
 	return s.writeJSON(w, newSuccessResponse())
 }
@@ -609,7 +609,7 @@ func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
 func (s *Server) readAdminTokenUser(r *http.Request, username string) (*user.User, error) {
 	u, err := s.userManager.User(username)
 	if err != nil {
-		return nil, mapAdminUserError(err)
+		return nil, mapUserErrorToHTTP(err)
 	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
 		return nil, errHTTPForbiddenAdminSocketOnly
 	}
@@ -663,8 +663,8 @@ func newAPIUserTokenResponse(username string, t *user.Token) *apiUserTokenRespon
 	}
 }
 
-// mapAdminUserError maps user manager errors of admin operations to HTTP errors
-func mapAdminUserError(err error) error {
+// mapUserErrorToHTTP maps user manager errors to HTTP errors
+func mapUserErrorToHTTP(err error) error {
 	switch {
 	case errors.Is(err, user.ErrUserNotFound):
 		return errHTTPBadRequestUserNotFound

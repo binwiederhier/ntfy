@@ -422,7 +422,7 @@ func TestService_Persist_DayRolloverKeepsYesterdaysRows(t *testing.T) {
 		s.rollDayForTest("2099-01-01")
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages))
 		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
-		s.write(context.Background(), store) // Not flush: that would sync the day back to the store's clock
+		s.flush()
 		rows, err := store.readKeys(context.Background(), today, []string{"user:u_1"})
 		require.Nil(t, err)
 		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
@@ -747,4 +747,112 @@ func TestService_Burn_ThreeNodesConverge(t *testing.T) {
 		clock.advance(5 * time.Second)
 	}
 	require.InDelta(t, 840, admitted, 30) // vs 780 ideal and 2,340 today (see the cluster doc, section 10)
+}
+
+func TestService_Persist_DayRolloverWritesYesterdaysPending(t *testing.T) {
+	// Codex review #2: the rollover cleared what was counted in the day's last flush interval
+	// before it was written, so every day lost its last few seconds of usage
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		clock := &testClock{t: time.Now()}
+		store := newStore()
+		s := newPersistentTestService(t, store, clock)
+		yesterday := s.today()
+		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 4).OK) // Not flushed
+		s.rollDayForTest("2099-01-01")
+		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages)) // The new day starts at zero
+		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+		s.flush()
+		rows, err := store.readKeys(context.Background(), yesterday, []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
+		rows, err = store.readKeys(context.Background(), "2099-01-01", []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 1}, rowsByKeyKind(rows))
+		s.flush() // Written once, not again
+		rows, err = store.readKeys(context.Background(), yesterday, []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
+	})
+}
+
+func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
+	// An outage spanning midnight must not lose the retained deltas of the day before
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		clock := &testClock{t: time.Now()}
+		good := newStore()
+		broken := newStore()
+		closed, err := sql.Open("sqlite3", ":memory:")
+		require.Nil(t, err)
+		require.Nil(t, closed.Close())
+		broken.db = db.New(&db.Host{DB: closed}, nil)
+		s := newPersistentTestService(t, broken, clock)
+		yesterday := s.today()
+		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 3).OK)
+		s.flush() // Fails: retained
+		s.rollDayForTest("2099-01-01")
+		s.flush() // Still failing: still retained
+		s.setStore(good)
+		s.flush()
+		rows, err := good.readKeys(context.Background(), yesterday, []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 3}, rowsByKeyKind(rows))
+	})
+}
+
+// Codex review #1: a read of the store and a write's retirement must not interleave. Both tests
+// start from a key that another node counted to 10 and this node to 3 (written, not yet read).
+
+func newReadWriteRaceSetup(t *testing.T, newStore func() *Store) *Service {
+	t.Helper()
+	clock := &testClock{t: time.Now()}
+	other := newPersistentTestService(t, newStore(), clock)
+	require.True(t, other.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 100}, 10).OK)
+	require.Nil(t, other.Close())
+	s := newPersistentTestService(t, newStore(), clock)
+	require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 100}, 3).OK) // Queued for a read-back
+	return s
+}
+
+// runConcurrently starts f and waits for it a little (long enough to finish if nothing holds it
+// up); the returned channel closes when f is done
+func runConcurrently(f func()) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		f()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(300 * time.Millisecond):
+	}
+	return done
+}
+
+func TestService_Persist_ReadAfterCommitBeforeRetire(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newReadWriteRaceSetup(t, newStore)
+		var read <-chan struct{}
+		s.afterWriteHook = func() {
+			read = runConcurrently(s.readMisses) // Reads 13, which already includes the 3 about to be retired
+		}
+		s.write(context.Background(), s.store.Load())
+		<-read
+		require.Equal(t, int64(13), s.Usage("user:u_1").Count(KindMessages)) // Not 16
+	})
+}
+
+func TestService_Persist_ReadBeforeCommitAppliedAfterRetire(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newReadWriteRaceSetup(t, newStore)
+		var written <-chan struct{}
+		s.beforeApplyHook = func() {
+			s.beforeApplyHook = nil
+			written = runConcurrently(func() {
+				s.write(context.Background(), s.store.Load()) // Commits and retires the 3 the read did not see
+			})
+		}
+		s.readMisses() // Reads 10
+		<-written
+		require.Equal(t, int64(13), s.Usage("user:u_1").Count(KindMessages)) // Not 10
+	})
 }

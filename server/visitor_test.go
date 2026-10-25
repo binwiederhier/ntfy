@@ -1,9 +1,12 @@
 package server
 
 import (
+	"context"
+	"database/sql"
 	"io"
 	"net/http"
 	"net/netip"
+	"sync"
 	"testing"
 	"time"
 
@@ -310,4 +313,55 @@ func TestVisitor_ZeroLimitsAdmitNothing(t *testing.T) {
 		require.False(t, v.BandwidthAllowed(1))
 		require.False(t, v.BandwidthLimiter().AllowN(1))
 	})
+}
+
+func TestVisitor_SlowUsageLoadDoesNotHoldTheVisitorLock(t *testing.T) {
+	// Codex review #4: EmailAllowed and CallAllowed read the key's usage row before the first
+	// decision, and held the visitor's lock meanwhile. Keepalive, called with the server lock held,
+	// then waited too, and with it every other request's visitor lookup.
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		s := newTestServer(t, c)
+		release := lockUsageTable(t, s)
+		v := s.visitor(netip.MustParseAddr("7.7.7.7"), nil)
+		go v.EmailAllowed() // Blocks on the locked table
+		time.Sleep(200 * time.Millisecond)
+		start := time.Now()
+		v.Keepalive()
+		require.Less(t, time.Since(start), time.Second)
+		release()
+	})
+}
+
+// lockUsageTable locks the usage table from another connection until the returned func is called
+// (or the test ends), so every read of it blocks
+func lockUsageTable(t *testing.T, s *Server) func() {
+	t.Helper()
+	ctx := context.Background()
+	var d *sql.DB
+	statements := []string{`BEGIN`, `LOCK TABLE usage IN ACCESS EXCLUSIVE MODE`}
+	if s.db != nil {
+		d = s.db.Primary()
+	} else {
+		var err error
+		d, err = sql.Open("sqlite3", s.config.UsageFile)
+		require.Nil(t, err)
+		t.Cleanup(func() { d.Close() })
+		statements = []string{`BEGIN EXCLUSIVE`}
+	}
+	conn, err := d.Conn(ctx)
+	require.Nil(t, err)
+	for _, statement := range statements {
+		_, err := conn.ExecContext(ctx, statement)
+		require.Nil(t, err)
+	}
+	var once sync.Once
+	release := func() {
+		once.Do(func() {
+			conn.ExecContext(ctx, `ROLLBACK`)
+			conn.Close()
+		})
+	}
+	t.Cleanup(release) // Runs before the server's cleanup (last in, first out), which would wait for the lock
+	return release
 }

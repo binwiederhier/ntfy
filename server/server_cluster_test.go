@@ -16,6 +16,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 )
@@ -28,6 +29,7 @@ type fakeCluster struct {
 	announced     []string
 	deletedUsers  []string
 	accessChanged int
+	usage         []limit.Delta
 	notLeader     bool
 	notHealthy    bool
 	notReady      bool
@@ -53,6 +55,18 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	if state.AccessChanged {
 		b.accessChanged++
 	}
+}
+
+func (b *fakeCluster) BroadcastUsage(deltas []limit.Delta) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.usage = append(b.usage, deltas...)
+}
+
+func (b *fakeCluster) Usage() []limit.Delta {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]limit.Delta(nil), b.usage...)
 }
 
 func (b *fakeCluster) Ready() bool {
@@ -572,4 +586,26 @@ func TestServer_ReadyWithoutClustering(t *testing.T) {
 	rr := request(t, s, "GET", "/v1/ready", "", nil)
 	require.Equal(t, 200, rr.Code)
 	require.JSONEq(t, `{"ready":true,"role":"active"}`, rr.Body.String())
+}
+
+func TestServer_Cluster_UsageGossipRoundTrip(t *testing.T) {
+	// What this node admits goes out as deltas; what a peer sends in is charged into the buckets
+	c := newTestConfig(t, "")
+	c.VisitorRequestLimitBurst = 10
+	c.VisitorRequestLimitReplenish = time.Hour
+	s := newTestServer(t, c)
+	b := &fakeCluster{}
+	s.cluster = b
+	for i := 0; i < 5; i++ {
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+	}
+	s.cluster.BroadcastUsage(s.limiter.TakeDeltas())
+	require.Equal(t, []limit.Delta{{Key: "ip:9.9.9.9", Kind: limit.KindRequests, N: 5}}, b.Usage())
+
+	// Two peers admitted 5 each for the same key: this node's bucket goes to zero, capped at one
+	// burst of debt, so the next request is denied here too
+	s.handlePeerUsage([]limit.Delta{{Key: "ip:9.9.9.9", Kind: limit.KindRequests, N: 5}, {Key: "ip:9.9.9.9", Kind: limit.KindRequests, N: 5}})
+	rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+	require.Equal(t, 429, rr.Code)
+	require.Equal(t, 42901, toHTTPError(t, rr.Body.String()).Code)
 }

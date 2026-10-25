@@ -18,12 +18,13 @@ const (
 	KindTopics                // Topics created in the server's in-memory topic map
 	KindAccount               // Account actions: signups and password reset requests
 	KindAuth                  // Failed authentication attempts
+	KindStrikes               // Weighted strikes of the abuse ban feed, keyed by prefix (see package ban)
 	numKinds                  // Sentinel, keep last
 )
 
 // kindNames are the stable names of the kinds, used in the usage table and on the wire; they
 // must never change once released
-var kindNames = [numKinds]string{"requests", "messages", "emails", "calls", "bandwidth", "topics", "account", "auth"}
+var kindNames = [numKinds]string{"requests", "messages", "emails", "calls", "bandwidth", "topics", "account", "auth", "strikes"}
 
 // Rule says how much of a kind a key may use: a token bucket of Burst tokens refilling one token
 // per Refill, a Daily cap, or both. A zero Rule allows everything.
@@ -40,6 +41,13 @@ type Rule struct {
 type Decision struct {
 	OK         bool
 	RetryAfter time.Duration
+}
+
+// Delta is what a node tells its peers: the key used n units of the kind since the last round
+type Delta struct {
+	Key  string
+	Kind Kind
+	N    int64
 }
 
 // Usage is a key's usage of every kind today

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/netip"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
@@ -26,6 +27,36 @@ func marshalMessage(m *model.Message) ([]byte, error) {
 // lines, avoiding a second JSON marshal of the messages.
 func assembleMessageBody(lines [][]byte) []byte {
 	return append(bytes.Join(lines, []byte("\n")), '\n')
+}
+
+// marshalUsage serializes a round of usage deltas (see BroadcastUsage)
+func marshalUsage(deltas []limit.Delta) ([]byte, error) {
+	usage := &apiUsage{Deltas: make([]*apiUsageDelta, len(deltas))}
+	for i, d := range deltas {
+		usage.Deltas[i] = &apiUsageDelta{Key: d.Key, Kind: d.Kind.String(), N: d.N}
+	}
+	return json.Marshal(usage)
+}
+
+// unmarshalUsage decodes a round of usage deltas; an entry of a kind this build does not know
+// (a newer peer) is skipped, not fatal
+func unmarshalUsage(body []byte) ([]limit.Delta, error) {
+	var usage apiUsage
+	if err := json.Unmarshal(body, &usage); err != nil {
+		return nil, err
+	}
+	deltas := make([]limit.Delta, 0, len(usage.Deltas))
+	for _, d := range usage.Deltas {
+		if d == nil {
+			continue
+		}
+		kind, ok := limit.ParseKind(d.Kind)
+		if !ok {
+			continue
+		}
+		deltas = append(deltas, limit.Delta{Key: d.Key, Kind: kind, N: d.N})
+	}
+	return deltas, nil
 }
 
 // decodeMessageBody reads NDJSON apiMessage lines from r, reattaches the non-JSON fields

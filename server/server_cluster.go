@@ -3,9 +3,19 @@ package server
 import (
 	"time"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
+)
+
+const (
+	// usageGossipInterval is how often a node tells its peers what its keys used of the rate
+	// buckets (requests, topic creations, account actions, auth failures, attachment bytes, ban
+	// strikes), see docs/10-cluster.md, section 10. It bounds how long a burst spread over the
+	// nodes goes unnoticed: with the debt capped at one burst, the cluster admits N bursts once
+	// and then the configured rate.
+	usageGossipInterval = 2 * time.Second
 )
 
 // deliverFromBus delivers a message received from a peer node (via the cluster) to this
@@ -23,6 +33,29 @@ func (s *Server) deliverFromBus(m *model.Message) {
 	v := s.visitor(m.Sender, nil)
 	if err := t.Publish(v, m); err != nil {
 		logvm(v, m).Err(err).Warn("Cluster: unable to deliver fan-out message to local subscribers")
+	}
+}
+
+// runUsageGossip sends the rate buckets' usage deltas to the peers every usageGossipInterval
+// until shutdown (cluster mode only)
+func (s *Server) runUsageGossip() {
+	ticker := time.NewTicker(usageGossipInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.cluster.BroadcastUsage(s.limiter.TakeDeltas())
+		case <-s.closeChan:
+			return
+		}
+	}
+}
+
+// handlePeerUsage charges what a peer's keys used into this node's buckets (see
+// limit.Service.Burn); the cluster calls it with every usage round it receives
+func (s *Server) handlePeerUsage(deltas []limit.Delta) {
+	for _, d := range deltas {
+		s.limiter.Burn(d.Key, d.Kind, d.N)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -35,6 +36,10 @@ const (
 	// StatusPath reports this node's view of the cluster for operators: its role and leadership,
 	// and per peer what it sent there and received from there (see Status)
 	StatusPath = "/v1/cluster/status"
+	// UsagePath receives a peer's usage deltas (JSON apiUsage): what its keys used of the mesh
+	// kinds since its last round, to be charged into this node's buckets. A node that does not
+	// know the path (an older build) answers 404 and is left alone.
+	UsagePath = "/v1/cluster/usage"
 )
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer
@@ -109,6 +114,11 @@ type Cluster interface {
 	// BroadcastState pushes a state delta (first-subscriber hints, access changes, deleted users) to all
 	// peers. Nop single-node.
 	BroadcastState(state *State)
+	// BroadcastUsage sends the usage deltas of this node's rate buckets (see limit.Service.TakeDeltas)
+	// to all peers, which charge them into their own buckets (Config.UsageFunc). Each peer has a
+	// single-slot queue: a round that finds the previous one still in flight to a peer is dropped
+	// for that peer, so a wedged peer costs at most its own rounds. Nop single-node.
+	BroadcastUsage(deltas []limit.Delta)
 	// IsLeader reports whether this node is the one that should run the cluster's singleton jobs
 	// (e.g. the Firebase keepaliver). It is derived from membership, not held as a lock, and it is
 	// a belief with a lease rather than a fence: see registry.IsLeader for what it does and does

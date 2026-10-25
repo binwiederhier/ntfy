@@ -55,6 +55,11 @@ func (c *Client) SendState(ctx context.Context, baseURL string, body []byte) err
 	return c.post(ctx, stateURL(baseURL), contentTypeJSON, body)
 }
 
+// SendUsage posts a JSON usage round to a peer's usage endpoint
+func (c *Client) SendUsage(ctx context.Context, baseURL string, body []byte) error {
+	return c.post(ctx, usageURL(baseURL), contentTypeJSON, body)
+}
+
 // Health asks a peer whether it is healthy; any answer other than a 200 with a health body is an
 // error, since a proxy, a captive portal or a parked domain answers 200 too
 func (c *Client) Health(ctx context.Context, baseURL string) (bool, error) {
@@ -123,6 +128,11 @@ func messageURL(advertiseURL string) string {
 // stateURL derives the peer's state endpoint URL from its advertise URL.
 func stateURL(advertiseURL string) string {
 	return strings.TrimRight(advertiseURL, "/") + StatePath
+}
+
+// usageURL derives the peer's usage endpoint URL from its advertise URL.
+func usageURL(advertiseURL string) string {
+	return strings.TrimRight(advertiseURL, "/") + UsagePath
 }
 
 // statusURL derives a node's status endpoint URL from its cluster base URL.

@@ -1,6 +1,9 @@
 // Package ban implements the abuse ban-feed: it tracks per-prefix weighted "strikes" from rejected
 // requests and appends breaching prefixes to a ban file that fail2ban tails. Keying by prefix (not
 // by visitor) makes the accounting match the unit fail2ban bans, even for shared account visitors.
+// The strikes are a kind of usage in the limit service (limit.KindStrikes, one bucket per prefix),
+// so in a cluster the nodes share them like the other buckets and a brute force spread over the
+// nodes trips the threshold at the same point as on one node.
 package ban
 
 import (
@@ -10,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/time/rate"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 )
 
@@ -18,6 +21,7 @@ const (
 	tag           = "ban"
 	pruneInterval = 10 * time.Minute
 	writeInterval = 3 * time.Second
+	keyPrefix     = "ban:" // Limiter keys of the strike buckets: "ban:<prefix>"
 )
 
 // Config is the Service's config, kept separate from server.Config to avoid an import cycle.
@@ -30,38 +34,40 @@ type Config struct {
 	PrefixBitsIPv6 int           // Mask width for the ban unit, e.g. 64
 }
 
-// tracker is the per-prefix strike state: a weighted breach detector plus timestamps for pruning and throttling.
-type tracker struct {
-	limiter *rate.Limiter
-	seen    time.Time // Last strike, for pruning idle prefixes
-	emitted time.Time // Last ban-line write for this prefix, throttles re-emits to once per Window
-}
-
-// Service owns the ban-feed: per-prefix strike accounting, buffered file writes, and idle-prefix
-// pruning. The caller owns the enable/disable decision -- only construct a Service when the feature
-// is on (see server.New, which builds one only when a ban file is configured).
+// Service owns the ban-feed: per-prefix strike accounting (in the limit service), buffered file
+// writes, and the once-per-window emit throttle. The caller owns the enable/disable decision --
+// only construct a Service when the feature is on (see server.New, which builds one only when a
+// ban file is configured).
 type Service struct {
 	conf      *Config
-	mu        sync.Mutex // Guards trackers and pending
-	trackers  map[netip.Prefix]*tracker
-	pending   []string      // Formatted ban lines buffered by Record, flushed to the ban file by runWriteLoop
-	writeDone chan struct{} // Closed when runWriteLoop exits after its final flush
+	limiter   *limit.Service             // Holds the strike buckets, one per prefix (see Key)
+	emitted   map[netip.Prefix]time.Time // Last ban-line write per prefix, throttles re-emits to once per Window
+	pending   []string                   // Formatted ban lines buffered by Record, flushed to the ban file by runWriteLoop
+	writeDone chan struct{}              // Closed when runWriteLoop exits after its final flush
 	closeChan chan struct{}
 	closeOnce sync.Once
+	mu        sync.Mutex // Protects emitted and pending
 }
 
-// NewService builds a Service and starts its background loops. The caller must only call it when the
-// feature is enabled (conf non-nil, File non-empty); the Service does not model a disabled state.
-func NewService(conf *Config) *Service {
+// NewService builds a Service on the given limiter and starts its background loops. The caller
+// must only call it when the feature is enabled (conf non-nil, File non-empty); the Service does
+// not model a disabled state.
+func NewService(conf *Config, limiter *limit.Service) *Service {
 	s := &Service{
 		conf:      conf,
-		trackers:  make(map[netip.Prefix]*tracker),
+		limiter:   limiter,
+		emitted:   make(map[netip.Prefix]time.Time),
 		closeChan: make(chan struct{}),
 		writeDone: make(chan struct{}),
 	}
 	go s.runPruneLoop()
 	go s.runWriteLoop()
 	return s
+}
+
+// Key returns the limiter key of the prefix's strike bucket
+func Key(prefix netip.Prefix) string {
+	return keyPrefix + prefix.String()
 }
 
 // Record counts one rejection against the IP's prefix bucket and, on breach, buffers a ban line
@@ -76,23 +82,21 @@ func (s *Service) Record(ip netip.Addr, httpCode, errorCode int) {
 	}
 	prefix := s.prefix(ip)
 	now := time.Now()
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	t := s.trackers[prefix]
-	if t == nil {
-		t = &tracker{limiter: rate.NewLimiter(rate.Limit(float64(s.conf.Threshold)/s.conf.Window.Seconds()), s.conf.Threshold)}
-		s.trackers[prefix] = t
-	}
-	t.seen = now
-	if t.limiter.AllowN(now, weight) {
+	if s.limiter.Allow(Key(prefix), s.rule(), int64(weight)).OK {
 		return // Within the strike budget, no breach
 	}
-	if !t.emitted.IsZero() && now.Sub(t.emitted) < s.conf.Window {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if emitted, ok := s.emitted[prefix]; ok && now.Sub(emitted) < s.conf.Window {
 		return // Already emitted this prefix within the window (one ban line per prefix per window)
 	}
-	t.emitted = now
+	s.emitted[prefix] = now
 	s.pending = append(s.pending, formatBanLine(now, ip, prefix, httpCode, errorCode))
+}
+
+// rule is the strike bucket: Threshold weighted strikes, refilling over the Window
+func (s *Service) rule() limit.Rule {
+	return limit.Rule{Kind: limit.KindStrikes, Burst: int64(s.conf.Threshold), Refill: s.conf.Window / time.Duration(s.conf.Threshold)}
 }
 
 // prefix masks ip to the ban unit (PrefixBitsIPv4/IPv6) -- what fail2ban bans, e.g. a whole /64.
@@ -163,15 +167,16 @@ func (s *Service) flush() {
 	}
 }
 
-// prune drops prefixes idle for a full Window -- their bucket has refilled, so forgetting them is a
-// no-op that bounds memory under a flood of distinct IPs.
+// prune forgets emits older than a full Window -- the throttle has run out, so forgetting them is a
+// no-op that bounds memory under a flood of distinct IPs. The strike buckets are the limiter's,
+// which prunes its own idle keys.
 func (s *Service) prune() {
 	now := time.Now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for prefix, t := range s.trackers {
-		if now.Sub(t.seen) >= s.conf.Window {
-			delete(s.trackers, prefix)
+	for prefix, emitted := range s.emitted {
+		if now.Sub(emitted) >= s.conf.Window {
+			delete(s.emitted, prefix)
 		}
 	}
 }

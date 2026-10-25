@@ -616,3 +616,135 @@ func TestService_Forget(t *testing.T) {
 		require.Equal(t, int64(5), usage.Count(KindMessages))
 	})
 }
+
+// The mesh tests below cover what a node tells its peers about its buckets (TakeDeltas) and
+// what it does with what the peers tell it (Burn): see docs/10-cluster.md, section 10.
+
+func TestService_TakeDeltas_NonTrivialOnly(t *testing.T) {
+	s, _ := newTestServiceWithClock(t)
+	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	for i := 0; i < 4; i++ {
+		require.True(t, s.Allow("quiet", rule, 1).OK)
+	}
+	for i := 0; i < 5; i++ {
+		require.True(t, s.Allow("busy", rule, 1).OK)
+	}
+	for i := 0; i < 31; i++ {
+		require.True(t, s.Allow("low", rule, 1).OK) // Bucket below half
+	}
+	deltas := s.TakeDeltas()
+	require.ElementsMatch(t, []Delta{
+		{Key: "busy", Kind: KindRequests, N: 5},
+		{Key: "low", Kind: KindRequests, N: 31},
+	}, deltas)
+
+	// Taken deltas are gone; the quiet key's delta keeps accumulating until it is worth sending
+	require.Empty(t, s.TakeDeltas())
+	require.True(t, s.Allow("quiet", rule, 1).OK)
+	require.Equal(t, []Delta{{Key: "quiet", Kind: KindRequests, N: 5}}, s.TakeDeltas())
+
+	// A key whose bucket is below half sends every delta, however small
+	require.True(t, s.Allow("low", rule, 1).OK)
+	require.Equal(t, []Delta{{Key: "low", Kind: KindRequests, N: 1}}, s.TakeDeltas())
+}
+
+func TestService_TakeDeltas_MeshKindsOnly(t *testing.T) {
+	// Daily quotas go through the store, not the mesh; bytes and strikes do go through the mesh
+	s, _ := newTestServiceWithClock(t)
+	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 100}, 50).OK)
+	require.True(t, s.Allow("k", Rule{Kind: KindEmails, Burst: 10, Refill: time.Hour, Daily: 10}, 5).OK)
+	require.True(t, s.Allow("k", Rule{Kind: KindBandwidth, Burst: 1000, Refill: time.Second}, 600).OK)
+	require.True(t, s.Allow("k", Rule{Kind: KindStrikes, Burst: 100, Refill: 6 * time.Second}, 10).OK)
+	require.ElementsMatch(t, []Delta{
+		{Key: "k", Kind: KindBandwidth, N: 600},
+		{Key: "k", Kind: KindStrikes, N: 10},
+	}, s.TakeDeltas())
+}
+
+func TestService_Burn_DebtCappedAtOneBurst(t *testing.T) {
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	for i := 0; i < 60; i++ {
+		require.True(t, s.Allow("k", rule, 1).OK)
+	}
+	s.Burn("k", KindRequests, 120) // Two peers admitted 60 each
+	require.Equal(t, int64(0), s.Tokens("k", rule))
+	d := s.Allow("k", rule, 1)
+	require.False(t, d.OK)
+	require.Equal(t, 61*5*time.Second, d.RetryAfter) // One burst of debt, not two: 5 min to the first token
+	clock.advance(5 * time.Minute)
+	require.False(t, s.Allow("k", rule, 1).OK)
+	clock.advance(5 * time.Second)
+	require.True(t, s.Allow("k", rule, 1).OK)
+
+	// Burning never counts as this node's usage, so it is not gossiped back
+	require.Equal(t, int64(61), s.Usage("k").Count(KindRequests))
+	s.TakeDeltas()
+	s.Burn("k", KindRequests, 10)
+	require.Empty(t, s.TakeDeltas())
+}
+
+func TestService_Burn_UnknownKeyOrBucketIgnored(t *testing.T) {
+	// A key this node never served has a full bucket here anyway (one burst per node, once);
+	// nothing to charge until it shows up
+	s, _ := newTestServiceWithClock(t)
+	s.Burn("unknown", KindRequests, 100)
+	require.Equal(t, 0, s.Size())
+	rule := Rule{Kind: KindRequests, Burst: 10, Refill: time.Hour}
+	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+	s.Burn("k", KindRequests, 100) // Known key, but its request bucket was never used
+	require.Equal(t, int64(10), s.Tokens("k", rule))
+}
+
+func TestService_Burn_ThreeNodesConverge(t *testing.T) {
+	// The plan's bound: three nodes, an abuser spread evenly, burst 60 and 1 token per 5 s.
+	// 180 go through in the first round; after the exchange every bucket is at one burst of
+	// debt, and from then on the cluster admits the configured rate, not three times it.
+	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
+	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	nodes := []*Service{newService(conf, clock.now, nil), newService(conf, clock.now, nil), newService(conf, clock.now, nil)}
+	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	admitted := 0
+	exchange := func() {
+		deltas := make([][]Delta, len(nodes))
+		for i, n := range nodes {
+			deltas[i] = n.TakeDeltas()
+		}
+		for i, n := range nodes {
+			for j, ds := range deltas {
+				if i == j {
+					continue
+				}
+				for _, d := range ds {
+					n.Burn(d.Key, d.Kind, d.N)
+				}
+			}
+		}
+	}
+	// Minute one: 5 s rounds, the abuser hammers every node between rounds
+	for round := 0; round < 12; round++ {
+		for i := 0; i < 100; i++ {
+			for _, n := range nodes {
+				if n.Allow("abuser", rule, 1).OK {
+					admitted++
+				}
+			}
+		}
+		exchange()
+		clock.advance(5 * time.Second)
+	}
+	require.Equal(t, 180, admitted) // The first round; the debt then locks every node for 5 min
+	// Hour one: 180 once, then 12 per minute from minute six, shared across the nodes
+	for round := 12; round < 720; round++ {
+		for i := 0; i < 100; i++ {
+			for _, n := range nodes {
+				if n.Allow("abuser", rule, 1).OK {
+					admitted++
+				}
+			}
+		}
+		exchange()
+		clock.advance(5 * time.Second)
+	}
+	require.InDelta(t, 840, admitted, 30) // vs 780 ideal and 2,340 today (see the cluster doc, section 10)
+}

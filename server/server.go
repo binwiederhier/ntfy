@@ -276,6 +276,7 @@ func New(conf *Config) (*Server, error) {
 		CallFormat:    conf.TwilioCallFormat,
 		BuildVersion:  conf.BuildVersion,
 	})
+	limiter := limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime, FlushInterval: conf.UsageFlushInterval}, usageStore)
 	var banner *ban.Service
 	if conf.BanFile != "" {
 		banner = ban.NewService(&ban.Config{
@@ -285,7 +286,7 @@ func New(conf *Config) (*Server, error) {
 			Weights:        conf.BanWeights,
 			PrefixBitsIPv4: conf.VisitorPrefixBitsIPv4,
 			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
-		})
+		}, limiter)
 	}
 	// Peers reach this node on the dedicated cluster listener, never on the public ones
 	advertiseURL := conf.ClusterAdvertiseURL
@@ -306,7 +307,7 @@ func New(conf *Config) (*Server, error) {
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
 		visitors:        make(map[string]*visitor),
-		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime, FlushInterval: conf.UsageFlushInterval}, usageStore),
+		limiter:         limiter,
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
@@ -367,6 +368,7 @@ func New(conf *Config) (*Server, error) {
 		UsersDeletedFunc:  s.handleUsersDeleted,
 		AccessChangedFunc: s.handlePeerAccessChanged,
 		IsolatedFunc:      s.maybeCloseLocalSubscribers,
+		UsageFunc:         s.handlePeerUsage,
 		MaxMessageBytes:   int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
@@ -547,6 +549,9 @@ func (s *Server) Run() error {
 	}
 	s.mu.Unlock()
 	go s.runManager()
+	if s.config.ClusterListen != "" {
+		go s.runUsageGossip()
+	}
 	go s.runStatsResetter()
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()

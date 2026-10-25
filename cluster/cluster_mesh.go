@@ -13,6 +13,7 @@ import (
 
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
@@ -26,6 +27,7 @@ const (
 	batchMaxMessages   = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, deleted users)
+	usageMaxBytes      = 8 * 1024 * 1024 // Upper bound for inbound usage rounds (thousands of entries at most, see BroadcastUsage)
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -48,6 +50,7 @@ type meshCluster struct {
 	client         *Client
 	mux            *http.ServeMux            // The internal peer API; Cluster is an http.Handler
 	queues         map[NodeID]*peerQueue     // per-peer send queues; reconciled against the registry
+	usageQueues    map[NodeID]*usageQueue    // per-peer usage round queues (single slot); reconciled against the registry
 	closed         bool                      // Guards against ForwardMessage spawning new workers after Close
 	knownPeers     map[NodeID]*registry.Peer // Peers seen in the last reconcile, for join/leave logging and fencing
 	stats          map[NodeID]*peerStats     // Per-peer batch counters for Status; kept after a peer leaves
@@ -56,7 +59,7 @@ type meshCluster struct {
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
 	draining       atomic.Bool // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
-	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
+	mu             sync.Mutex  // Protects queues, usageQueues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -94,6 +97,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		registry:       reg,
 		client:         NewClient(conf.Secret, conf.NodeID),
 		queues:         make(map[NodeID]*peerQueue),
+		usageQueues:    make(map[NodeID]*usageQueue),
 		lastRegistered: time.Now(), // The synchronous Register above just succeeded
 		knownPeers:     make(map[NodeID]*registry.Peer),
 		stats:          make(map[NodeID]*peerStats),
@@ -103,6 +107,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	c.mux = http.NewServeMux()
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
 	c.mux.HandleFunc("POST "+StatePath, c.authenticated(c.handleState))
+	c.mux.HandleFunc("POST "+UsagePath, c.authenticated(c.handleUsage))
 	c.mux.HandleFunc("GET "+MembersPath, c.secretAuthenticated(c.handleMembers))
 	c.mux.HandleFunc("GET "+HealthPath, c.secretAuthenticated(c.handleHealth))
 	c.mux.HandleFunc("GET "+StatusPath, c.secretAuthenticated(c.handleStatus))
@@ -173,6 +178,38 @@ func (c *meshCluster) BroadcastState(state *State) {
 				return c.client.SendState(c.ctx, p.AdvertiseURL, body)
 			})
 		}(p)
+	}
+}
+
+// BroadcastUsage sends a round of usage deltas to every live peer (see the Cluster interface).
+// The body is marshaled once; a peer whose previous round is still in flight skips this one.
+func (c *meshCluster) BroadcastUsage(deltas []limit.Delta) {
+	if len(deltas) == 0 {
+		return
+	}
+	peers := c.registry.Peers()
+	if len(peers) == 0 {
+		return
+	}
+	body, err := marshalUsage(deltas)
+	if err != nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return
+	}
+	for _, p := range peers {
+		q := c.usageQueueForNoLock(p)
+		select {
+		case q.slot <- body:
+		default:
+			log.Tag(tag).Debug("Usage round for peer %s skipped, the previous one is still in flight", p.NodeID)
+		}
+	}
+	if ev := log.Tag(tag); ev.IsTrace() {
+		ev.Trace("Queued usage round of %d entries (%d bytes) for %d peer(s)", len(deltas), len(body), len(peers))
 	}
 }
 
@@ -314,6 +351,10 @@ func (c *meshCluster) Close() error {
 		q.queue.Close()
 		delete(c.queues, nodeID)
 	}
+	for nodeID, q := range c.usageQueues {
+		close(q.slot)
+		delete(c.usageQueues, nodeID)
+	}
 	c.mu.Unlock()
 	// Wait for the loops BEFORE deregistering: an in-flight heartbeat's Register would otherwise
 	// re-insert our row right after Deregister deleted it
@@ -412,6 +453,12 @@ func (c *meshCluster) reconcilePeers(peers Peers) {
 			delete(c.queues, nodeID)
 		}
 	}
+	for nodeID, q := range c.usageQueues {
+		if p, ok := alive[nodeID]; !ok || q.advertiseURL != p.AdvertiseURL {
+			close(q.slot) // The worker sends what is in the slot and exits
+			delete(c.usageQueues, nodeID)
+		}
+	}
 	c.mu.Unlock()
 }
 
@@ -489,6 +536,42 @@ func (c *meshCluster) queueForNoLock(p *registry.Peer) *peerQueue {
 	c.wg.Add(1)
 	go c.peerWorker(nodeID, q)
 	return q
+}
+
+// usageQueueForNoLock returns the usage queue for the given peer, creating it (and its worker)
+// if it does not exist yet. The caller must hold c.mu.
+func (c *meshCluster) usageQueueForNoLock(p *registry.Peer) *usageQueue {
+	nodeID := NodeID(p.NodeID)
+	q, ok := c.usageQueues[nodeID]
+	if ok {
+		return q
+	}
+	q = &usageQueue{
+		advertiseURL: p.AdvertiseURL,
+		slot:         make(chan []byte, 1),
+	}
+	c.usageQueues[nodeID] = q
+	c.wg.Add(1)
+	go c.usageWorker(nodeID, q)
+	return q
+}
+
+// usageWorker sends the usage rounds queued for a single peer, one at a time; it exits when the
+// queue is closed. A round the peer rejects as unknown (404: an older build during a rolling
+// deploy) is dropped quietly, any other failure is logged; usage is never retried, the next round
+// carries new deltas anyway.
+func (c *meshCluster) usageWorker(nodeID NodeID, q *usageQueue) {
+	defer c.wg.Done()
+	for body := range q.slot {
+		err := c.client.SendUsage(c.ctx, q.advertiseURL, body)
+		var httpErr *HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+			log.Tag(tag).Debug("Peer %s does not know the usage endpoint (older build), dropping the round", nodeID)
+		} else if err != nil && c.ctx.Err() == nil {
+			metrics.ClusterSendErrors.Inc()
+			log.Tag(tag).Err(err).Warn("Failed to send usage round to peer %s", nodeID)
+		}
+	}
 }
 
 // peerWorker delivers batches of queued fan-out messages to a single peer. Batches form in the

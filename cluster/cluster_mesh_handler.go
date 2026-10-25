@@ -99,6 +99,27 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 }
 
+// handleUsage receives a peer's usage round and hands the deltas to the server (UsageFunc)
+func (c *meshCluster) handleUsage(origin NodeID, w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, usageMaxBytes))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	deltas, err := unmarshalUsage(body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if len(deltas) > 0 && c.conf.UsageFunc != nil {
+		if ev := log.Tag(tag); ev.IsTrace() {
+			ev.Trace("Received usage round of %d entries from peer %s", len(deltas), origin)
+		}
+		c.conf.UsageFunc(deltas)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // handleMembers lists the live cluster members for the load balancers' agents
 func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)

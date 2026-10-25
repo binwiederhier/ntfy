@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/limit"
 )
 
 var testIP = netip.MustParseAddr("1.2.3.4")
@@ -17,6 +18,8 @@ var testIP = netip.MustParseAddr("1.2.3.4")
 // threshold, and weights, plus a 1-minute window (so the emit throttle only fires once per test).
 func newTestService(t *testing.T, banFile string, threshold int, weights map[string]int) *Service {
 	t.Helper()
+	limiter := limit.New(&limit.Config{}, nil)
+	t.Cleanup(func() { limiter.Close() })
 	s := NewService(&Config{
 		File:           banFile,
 		Window:         time.Minute,
@@ -24,7 +27,7 @@ func newTestService(t *testing.T, banFile string, threshold int, weights map[str
 		Weights:        weights,
 		PrefixBitsIPv4: 32,
 		PrefixBitsIPv6: 64,
-	})
+	}, limiter)
 	t.Cleanup(s.Close)
 	return s
 }
@@ -217,7 +220,7 @@ func TestService_Record_BuffersUntilFlush(t *testing.T) {
 func TestService_Close_FlushesPending(t *testing.T) {
 	// Close must flush buffered bans so nothing is lost on shutdown, and must block until it has.
 	banFile := filepath.Join(t.TempDir(), "ban.log")
-	s := NewService(&Config{File: banFile, Window: time.Minute, Threshold: 1, Weights: Weights{"*": 1}, PrefixBitsIPv4: 32, PrefixBitsIPv6: 64})
+	s := NewService(&Config{File: banFile, Window: time.Minute, Threshold: 1, Weights: Weights{"*": 1}, PrefixBitsIPv4: 32, PrefixBitsIPv6: 64}, limit.New(&limit.Config{}, nil))
 	for i := 0; i < 3; i++ {
 		s.Record(testIP, 429, 42901)
 	}
@@ -228,26 +231,43 @@ func TestService_Close_FlushesPending(t *testing.T) {
 	require.Len(t, strings.Split(strings.TrimRight(string(data), "\n"), "\n"), 1)
 }
 
-func TestService_Prune_DropsIdlePrefixes(t *testing.T) {
-	// A prefix idle for a full window has a refilled bucket, so prune drops it to bound memory. An
-	// active prefix (seen within the window) is kept.
+func TestService_Prune_DropsOldEmits(t *testing.T) {
+	// An emit older than a full window has no throttle left to apply, so prune drops it to bound
+	// memory. A recent emit is kept.
 	banFile := filepath.Join(t.TempDir(), "ban.log")
-	s := newTestService(t, banFile, 10, map[string]int{"*": 1})
+	s := newTestService(t, banFile, 1, map[string]int{"*": 1})
 	idle := netip.MustParseAddr("9.9.9.9")
 	s.Record(idle, 400, 40001)
+	s.Record(idle, 400, 40001) // Breach: emitted
 	s.Record(testIP, 400, 40001)
-	require.Len(t, s.trackers, 2)
+	s.Record(testIP, 400, 40001) // Breach: emitted
+	require.Len(t, s.emitted, 2)
 
-	// Backdate the idle prefix past the window, then prune.
+	// Backdate the idle prefix's emit past the window, then prune.
 	idlePrefix := s.prefix(idle)
 	s.mu.Lock()
-	s.trackers[idlePrefix].seen = time.Now().Add(-2 * time.Minute)
+	s.emitted[idlePrefix] = time.Now().Add(-2 * time.Minute)
 	s.mu.Unlock()
 	s.prune()
 
-	require.Len(t, s.trackers, 1)
-	_, ok := s.trackers[idlePrefix]
+	require.Len(t, s.emitted, 1)
+	_, ok := s.emitted[idlePrefix]
 	require.False(t, ok) // idle prefix dropped
-	_, ok = s.trackers[s.prefix(testIP)]
+	_, ok = s.emitted[s.prefix(testIP)]
 	require.True(t, ok) // active prefix kept
+}
+
+func TestService_Record_PeerStrikesCount(t *testing.T) {
+	// Strikes recorded on other nodes reach this node's bucket through the limiter (the mesh
+	// burns them in), so a brute force spread over the cluster breaches at the same point
+	banFile := filepath.Join(t.TempDir(), "ban.log")
+	s := newTestService(t, banFile, 10, map[string]int{"*": 1})
+	for i := 0; i < 5; i++ {
+		s.Record(testIP, 400, 40001)
+	}
+	s.limiter.Burn(Key(s.prefix(testIP)), limit.KindStrikes, 5) // Five more elsewhere
+	s.Record(testIP, 400, 40001)                                // The 11th cluster-wide: breach
+	lines := flushAndRead(t, s, banFile)
+	require.Len(t, lines, 1)
+	require.Equal(t, "ban:1.2.3.4/32", Key(s.prefix(testIP)))
 }

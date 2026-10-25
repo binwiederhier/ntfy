@@ -3,6 +3,7 @@ package cluster
 import (
 	"net/http"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -20,6 +21,10 @@ func (c *nopCluster) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (c *nopCluster) BroadcastState(_ *State) {
+	// No peers to tell
+}
+
+func (c *nopCluster) BroadcastUsage(_ []limit.Delta) {
 	// No peers to tell
 }
 

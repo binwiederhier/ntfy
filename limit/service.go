@@ -50,6 +50,11 @@ const (
 	// usageRetention is how long old days' rows are kept before PruneStore deletes them
 	usageRetention = 7 * 24 * time.Hour
 
+	// deltaMinUnits is the delta from which a key's usage of a kind is worth telling the peers
+	// about, unless the bucket is below half (then every unit is sent): the keys that poll every
+	// few seconds never cross it, which is what keeps a round to a few thousand entries
+	deltaMinUnits = 5
+
 	// promotedRetention is how long a key with a row (one near its quota, see Rule.Threshold)
 	// stays in memory however idle it is, so that going idle for a few minutes does not get a
 	// fresh local count ahead of the read-back
@@ -62,6 +67,18 @@ var persistedKinds = [numKinds]bool{
 	KindMessages: true,
 	KindEmails:   true,
 	KindCalls:    true,
+}
+
+// meshKinds are the kinds whose buckets converge across nodes through the mesh: each node tells
+// its peers what it admitted (TakeDeltas) and charges what they admitted into its own buckets
+// (Burn). The persisted kinds go through the store instead.
+var meshKinds = [numKinds]bool{
+	KindRequests:  true,
+	KindBandwidth: true,
+	KindTopics:    true,
+	KindAccount:   true,
+	KindAuth:      true,
+	KindStrikes:   true,
 }
 
 // syncLoadKinds are the persisted kinds whose first use of a key reads the key's rows before
@@ -104,6 +121,7 @@ type entry struct {
 	buckets   [numKinds]bucket
 	baseline  [numKinds]int64 // The key's count in the store as of the last read, per kind
 	unflushed [numKinds]int64 // Counted here, not yet written, per kind
+	meshDelta [numKinds]int64 // Admitted here since the last TakeDeltas, per mesh kind
 	promoted  [numKinds]bool  // Whether the kind's count of this key is written to the store (see Rule.Threshold)
 	loaded    bool            // Whether the key's rows were read back (or there is no store)
 	missNoted bool            // Whether the key waits in misses for its read-back
@@ -175,6 +193,9 @@ func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 		b.tokens -= float64(n)
 	}
 	e.unflushed[rule.Kind] += n
+	if meshKinds[rule.Kind] {
+		e.meshDelta[rule.Kind] += n
+	}
 	if store != nil && persistedKinds[rule.Kind] {
 		if !e.promoted[rule.Kind] && total+n >= rule.Threshold {
 			e.promoted[rule.Kind] = true
@@ -281,6 +302,46 @@ func (s *Service) Prune(idle time.Duration) {
 		}
 		sh.mu.Unlock()
 	}
+}
+
+// TakeDeltas returns what the node's peers should charge into their buckets: the units each key
+// used of each mesh kind since the last call, for keys whose delta is worth sending (see
+// deltaWorthSending), and forgets them. Keys below that keep accumulating.
+func (s *Service) TakeDeltas() []Delta {
+	deltas := make([]Delta, 0)
+	for i := range s.shards {
+		sh := &s.shards[i]
+		sh.mu.Lock()
+		for key, e := range sh.entries {
+			for kind := Kind(0); kind < numKinds; kind++ {
+				if e.meshDelta[kind] > 0 && e.deltaWorthSending(kind) {
+					deltas = append(deltas, Delta{Key: key, Kind: kind, N: e.meshDelta[kind]})
+					e.meshDelta[kind] = 0
+				}
+			}
+		}
+		sh.mu.Unlock()
+	}
+	return deltas
+}
+
+// Burn charges usage that happened on a peer into the key's bucket of the kind, with the debt
+// capped at one burst, so a neighbor's burst behind a shared prefix cannot lock the key out for
+// long. It does not count as this node's usage. A key or bucket this node never served is left
+// alone: it has a full bucket here anyway (one burst per node, once).
+func (s *Service) Burn(key string, kind Kind, n int64) {
+	sh := &s.shards[shardIndex(key)]
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	e, ok := sh.entries[key]
+	if !ok {
+		return
+	}
+	b := &e.buckets[kind]
+	if b.last == 0 || b.burst <= 0 {
+		return
+	}
+	b.tokens = math.Max(b.tokens-float64(n), -float64(b.burst))
 }
 
 // Forget drops the key from memory, unless it has counts still to be written; its rows stay in
@@ -711,6 +772,14 @@ func (e *entry) anyPromoted() bool {
 		}
 	}
 	return false
+}
+
+// deltaWorthSending reports whether the entry's delta of the kind should go to the peers now: it
+// is at least deltaMinUnits, or the bucket is below half (then every unit counts, since the key
+// is the kind of key the peers need to hear about)
+func (e *entry) deltaWorthSending(kind Kind) bool {
+	b := &e.buckets[kind]
+	return e.meshDelta[kind] >= deltaMinUnits || (b.burst > 0 && b.tokens < float64(b.burst)/2)
 }
 
 // pending reports whether the entry has counts that are still to be written

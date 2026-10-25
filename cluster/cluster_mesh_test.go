@@ -16,12 +16,15 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -921,4 +924,73 @@ func TestMesh_AccessChangedBroadcast(t *testing.T) {
 		return changedB.Load() == 1
 	})
 	require.Equal(t, int32(0), changedA.Load())
+}
+
+func TestMesh_UsageBroadcast(t *testing.T) {
+	// A usage round from node A reaches node B's UsageFunc with the deltas as sent; node A's own
+	// callback must not fire (no loop)
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	var receivedB []limit.Delta
+	receivedA := 0
+
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
+	confB.UsageFunc = func(deltas []limit.Delta) {
+		mu.Lock()
+		defer mu.Unlock()
+		receivedB = append(receivedB, deltas...)
+	}
+	meshB, err := newMeshCluster(confB, poolB, nil)
+	require.Nil(t, err)
+	defer meshB.Close()
+	srvB := &http.Server{Handler: meshB}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+
+	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	confA.UsageFunc = func(_ []limit.Delta) {
+		mu.Lock()
+		defer mu.Unlock()
+		receivedA++
+	}
+	meshA, err := newMeshCluster(confA, poolA, nil)
+	require.Nil(t, err)
+	defer meshA.Close()
+
+	meshA.BroadcastUsage([]limit.Delta{
+		{Key: "ip:1.2.3.4", Kind: limit.KindRequests, N: 60},
+		{Key: "ban:1.2.3.0/24", Kind: limit.KindStrikes, N: 15},
+	})
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(receivedB) == 2
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, []limit.Delta{
+		{Key: "ip:1.2.3.4", Kind: limit.KindRequests, N: 60},
+		{Key: "ban:1.2.3.0/24", Kind: limit.KindStrikes, N: 15},
+	}, receivedB)
+	require.Equal(t, 0, receivedA)
+}
+
+func TestMesh_UsageBroadcast_OldPeerAnswers404(t *testing.T) {
+	// A peer that does not know the usage endpoint (an older build during a rolling deploy)
+	// answers 404; the round is dropped without counting as a send error
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	old := httptest.NewServer(http.NotFoundHandler())
+	defer old.Close()
+	registerFakePeer(t, pool, "node-old", old.URL)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	before := testutil.ToFloat64(metrics.ClusterSendErrors)
+	mesh.BroadcastUsage([]limit.Delta{{Key: "ip:1.2.3.4", Kind: limit.KindRequests, N: 60}})
+	time.Sleep(300 * time.Millisecond)
+	require.Equal(t, before, testutil.ToFloat64(metrics.ClusterSendErrors))
 }

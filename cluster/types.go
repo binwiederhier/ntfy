@@ -3,6 +3,7 @@ package cluster
 import (
 	"time"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/util"
 )
@@ -23,6 +24,7 @@ type Config struct {
 	AccessChangedFunc AccessChangedFunc // Told that a peer changed access entries; may be nil
 	TopicsAddedFunc   TopicsAddedFunc   // Told about topics that just gained their first subscriber on a peer; may be nil
 	IsolatedFunc      IsolatedFunc      // Called while this node is cut off from the cluster; may be nil
+	UsageFunc         UsageFunc         // Told what a peer's keys used of the mesh kinds (see BroadcastUsage); may be nil
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The
@@ -53,6 +55,11 @@ type TopicsAddedFunc func(topics []string)
 // supplies it to reload its access cache, which ends the local streams that lost access; it must
 // not re-broadcast (loop prevention). A lost signal is caught by the periodic access cache reload.
 type AccessChangedFunc func()
+
+// UsageFunc is called with the usage deltas a peer sent (see Cluster.BroadcastUsage). The
+// server supplies it to charge the deltas into its own buckets; it must not re-broadcast (loop
+// prevention). A lost round costs one round of convergence, never a lost message.
+type UsageFunc func(deltas []limit.Delta)
 
 // IsolatedFunc is called while this node lost its registration but a peer is healthy: peers no
 // longer forward messages to it, so the server closes its subscribers, which reconnect to a
@@ -129,6 +136,25 @@ type apiState struct {
 // apiStateTopics carries topics that just gained their first subscriber on the sending node.
 type apiStateTopics struct {
 	Added []string `json:"added,omitempty"`
+}
+
+// apiUsage is a round of usage deltas (see BroadcastUsage); short field names, since a round can
+// carry thousands of entries
+type apiUsage struct {
+	Deltas []*apiUsageDelta `json:"d"`
+}
+
+// apiUsageDelta is one entry of a round: key k used n units of kind since the sender's last round
+type apiUsageDelta struct {
+	Key  string `json:"k"`
+	Kind string `json:"kind"`
+	N    int64  `json:"n"`
+}
+
+// usageQueue is the single-slot send queue of usage rounds for one peer (see BroadcastUsage)
+type usageQueue struct {
+	advertiseURL string
+	slot         chan []byte
 }
 
 // peerQueue is the bounded, batching send queue for a single peer, pinned to the advertise URL

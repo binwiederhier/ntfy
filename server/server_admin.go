@@ -34,7 +34,7 @@ var (
 		apiUsersAccessPath,
 		apiUsersTokensPath,
 		apiUsersPasswordResetPath,
-		apiAdminTiersPath,
+		apiTiersPath,
 	}
 
 	// adminSocketUser is the synthetic admin every socket request runs as. Its name is one that

@@ -43,6 +43,7 @@ var expectedMetricNames = []string{
 	"ntfy_firebase_published_failure",
 	"ntfy_firebase_published_success",
 	"ntfy_http_requests_total",
+	"ntfy_limit_keys",
 	"ntfy_matrix_published_failure",
 	"ntfy_matrix_published_success",
 	"ntfy_message_publish_duration_ms",
@@ -55,6 +56,8 @@ var expectedMetricNames = []string{
 	"ntfy_tail_messages_read_total",
 	"ntfy_topics_total",
 	"ntfy_unifiedpush_published_success",
+	"ntfy_usage_flush_errors_total",
+	"ntfy_usage_rows_written_total",
 	"ntfy_users_total",
 	"ntfy_visitors_total",
 }

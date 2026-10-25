@@ -3,12 +3,15 @@ package server
 import (
 	"database/sql"
 	"net/http"
+	"net/http/httptest"
 	"net/netip"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/limit"
 )
 
@@ -137,6 +140,9 @@ func TestServer_UnifiedPush_SubscriberAnnouncedToPeers(t *testing.T) {
 		r.RemoteAddr = "1.2.3.4:1234"
 	})
 	require.Equal(t, 200, rr.Code)
+	waitFor(t, func() bool { // Announced by the topic writer, after the assignment is committed
+		return len(b.Announced()) == 1
+	})
 	require.Equal(t, []string{"upDDDDDDDDDDDD"}, b.Announced())
 }
 
@@ -157,5 +163,61 @@ func TestServer_UnifiedPush_PeerAnnouncementClearsCachedMiss(t *testing.T) {
 		s.handlePeerTopicsAdded([]string{"upEEEEEEEEEEEE"})
 		rr = request(t, s, "POST", "/upEEEEEEEEEEEE?up=1", "m", nil)
 		require.Equal(t, 200, rr.Code)
+	})
+}
+
+func TestServer_TopicTableWritesDoNotBlockTheCaller(t *testing.T) {
+	// Codex review #5: "go s.logTopicError(..., s.limiter.X(...))" ran the SQL on the caller (Go
+	// evaluates a goroutine's arguments first), so a slow database stalled publishes and keepalives
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorSubscriberRateLimiting = true
+		s := newTestServer(t, c)
+		v := s.visitor(netip.MustParseAddr("1.2.3.4"), nil)
+		topics, err := s.topicsFromIDs(v, "mytopic", "upFFFFFFFFFFFF")
+		require.Nil(t, err)
+		lockUsageTable(t, s, "topic")
+		start := time.Now()
+		s.recordPublish(v, topics[0])
+		s.recordSubscribers(v, topics)
+		s.noteTopic(topics[1])
+		require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/", nil), v, topics[1:]))
+		require.Less(t, time.Since(start), 500*time.Millisecond)
+	})
+}
+
+func TestServer_RateVisitorCommittedBeforeAnnouncement(t *testing.T) {
+	// A peer that hears about a topic's first subscriber reads the table at once (see
+	// handlePeerTopicsAdded), so the assignment must be committed before the announcement
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorSubscriberRateLimiting = true
+		s := newTestServer(t, c)
+		var mu sync.Mutex
+		var announced, committed bool
+		b := &fakeCluster{onBroadcast: func(state *cluster.State) {
+			_, _, err := s.limiter.TopicRateVisitor("upGGGGGGGGGGGG")
+			mu.Lock()
+			defer mu.Unlock()
+			announced, committed = true, err == nil
+		}}
+		s.cluster = b
+		release := lockUsageTable(t, s, "topic")
+		go func() {
+			time.Sleep(300 * time.Millisecond)
+			release()
+		}()
+		rr := request(t, s, "GET", "/upGGGGGGGGGGGG/json?poll=1", "", nil, func(r *http.Request) {
+			r.RemoteAddr = "1.2.3.4:1234"
+		})
+		require.Equal(t, 200, rr.Code)
+		waitFor(t, func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+			return announced
+		})
+		mu.Lock()
+		defer mu.Unlock()
+		require.True(t, committed)
 	})
 }

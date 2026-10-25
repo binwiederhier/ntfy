@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/user"
@@ -19,6 +20,8 @@ import (
 
 const (
 	tagTopic             = "topic"
+	topicWriteQueueSize  = 10000   // Topic table writes waiting for a writer; beyond it, a write is dropped (they are throttled hints)
+	topicWriteWorkers    = 4       // Writers running the queued topic table writes
 	visitorKeyIPPrefix   = "ip:"   // See visitor.Key
 	visitorKeyUserPrefix = "user:" // See visitor.Key
 )
@@ -41,7 +44,10 @@ func (s *Server) recordSubscribers(v *visitor, topics []*topic) {
 	key := v.Key()
 	for _, t := range topics {
 		if t.ShouldRecord(false) {
-			go s.logTopicError(t.ID, s.limiter.RecordTopicSubscriber(t.ID, key))
+			id := t.ID
+			s.enqueueTopicWrite(func() {
+				s.logTopicError(id, s.limiter.RecordTopicSubscriber(id, key))
+			})
 		}
 	}
 }
@@ -49,24 +55,72 @@ func (s *Server) recordSubscribers(v *visitor, topics []*topic) {
 // recordPublish writes a successful publish to the topic table, throttled per topic, in the background
 func (s *Server) recordPublish(v *visitor, t *topic) {
 	if s.limiter.Persistent() && t.ShouldRecord(true) {
-		key := v.Key()
-		go s.logTopicError(t.ID, s.limiter.RecordTopicPublish(t.ID, key))
+		id, key := t.ID, v.Key()
+		s.enqueueTopicWrite(func() {
+			s.logTopicError(id, s.limiter.RecordTopicPublish(id, key))
+		})
 	}
 }
 
-// recordRateVisitor writes the topic's new rate visitor to the topic table, in the background
-func (s *Server) recordRateVisitor(v *visitor, t *topic) {
-	if s.limiter.Persistent() {
-		key, userID := v.Key(), v.MaybeUserID()
-		go s.logTopicError(t.ID, s.limiter.SetTopicRateVisitor(t.ID, key, userID))
+// recordRateVisitors writes the topics' new rate visitor to the topic table in the background,
+// and then announces the topics that just gained their first subscriber to the peers. The order
+// matters: a peer reads the table as soon as it hears about the topic (see handlePeerTopicsAdded),
+// so the assignment must be committed first.
+func (s *Server) recordRateVisitors(v *visitor, topics []*topic, added []string) {
+	if !s.limiter.Persistent() {
+		if len(added) > 0 {
+			s.cluster.BroadcastState(&cluster.State{AddedTopics: added})
+		}
+		return
 	}
+	key, userID := v.Key(), v.MaybeUserID()
+	ids := make([]string, len(topics))
+	for i, t := range topics {
+		ids[i] = t.ID
+	}
+	s.enqueueTopicWrite(func() {
+		for _, id := range ids {
+			s.logTopicError(id, s.limiter.SetTopicRateVisitor(id, key, userID))
+		}
+		if len(added) > 0 {
+			// Peers may have cached that these topics have no subscriber (see topicTableInfo); the
+			// announcement makes them read the table again instead of answering 507 for up to 30 s
+			s.cluster.BroadcastState(&cluster.State{AddedTopics: added})
+		}
+	})
 }
 
 // noteTopic writes the topic's existence to the topic table if it has no row yet, in the
 // background; a refused UnifiedPush push uses it, so the topic ages from its first push on
 func (s *Server) noteTopic(t *topic) {
 	if s.limiter.Persistent() && t.ShouldRecord(true) {
-		go s.logTopicError(t.ID, s.limiter.NoteTopic(t.ID))
+		id := t.ID
+		s.enqueueTopicWrite(func() {
+			s.logTopicError(id, s.limiter.NoteTopic(id))
+		})
+	}
+}
+
+// enqueueTopicWrite queues a topic table write for the topic writers, so that the caller (a
+// publish, a subscribe, a keepalive) never waits for the database. A full queue drops the write:
+// the writes are throttled liveness hints, the next one comes within topicRecordInterval.
+func (s *Server) enqueueTopicWrite(write func()) {
+	select {
+	case s.topicWrites <- write:
+	default:
+		log.Tag(tagTopic).Warn("Topic table write queue full, dropping a write")
+	}
+}
+
+// runTopicWriter runs queued topic table writes until shutdown
+func (s *Server) runTopicWriter() {
+	for {
+		select {
+		case write := <-s.topicWrites:
+			write()
+		case <-s.topicWritesQuit:
+			return
+		}
 	}
 }
 

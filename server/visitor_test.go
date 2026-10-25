@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -333,13 +334,17 @@ func TestVisitor_SlowUsageLoadDoesNotHoldTheVisitorLock(t *testing.T) {
 	})
 }
 
-// lockUsageTable locks the usage table from another connection until the returned func is called
-// (or the test ends), so every read of it blocks
-func lockUsageTable(t *testing.T, s *Server) func() {
+// lockUsageTable locks the usage table (or the given tables of the usage database) from another
+// connection until the returned func is called (or the test ends), so every access blocks. On
+// SQLite the whole file is locked.
+func lockUsageTable(t *testing.T, s *Server, tables ...string) func() {
 	t.Helper()
 	ctx := context.Background()
 	var d *sql.DB
-	statements := []string{`BEGIN`, `LOCK TABLE usage IN ACCESS EXCLUSIVE MODE`}
+	if len(tables) == 0 {
+		tables = []string{"usage"}
+	}
+	statements := []string{`BEGIN`, `LOCK TABLE ` + strings.Join(tables, ", ") + ` IN ACCESS EXCLUSIVE MODE`}
 	if s.db != nil {
 		d = s.db.Primary()
 	} else {

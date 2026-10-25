@@ -69,6 +69,8 @@ type Server struct {
 	limiter           *limit.Service      // Decides on and counts the visitors' usage, keyed by visitor key
 	visitorConfig     *vis.Config         // Keying and limit-resolution config, built once (the lookup runs on every request)
 	ipLimits          *vis.Limits         // The config-based limits, shared by all IP-keyed visitors (read-only)
+	topicWrites       chan func()         // Queued topic table writes, run by the topic writers (see enqueueTopicWrite)
+	topicWritesQuit   chan struct{}       // Closed on shutdown: the topic writers exit
 	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
@@ -312,10 +314,17 @@ func New(conf *Config) (*Server, error) {
 		visitors:        make(map[string]*visitor),
 		limiter:         limiter,
 		visitorConfig:   visitorConfigFrom(conf),
+		topicWrites:     make(chan func(), topicWriteQueueSize),
+		topicWritesQuit: make(chan struct{}),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
 	s.ipLimits = vis.LimitsFor(s.visitorConfig, nil)
+	if limiter.Persistent() {
+		for i := 0; i < topicWriteWorkers; i++ {
+			go s.runTopicWriter()
+		}
+	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager
 	if conf.AuthFile != "" || pool != nil {
@@ -610,6 +619,7 @@ func (s *Server) stop() {
 	if s.tail != nil {
 		s.tail.Close() // Before the databases close under it
 	}
+	close(s.topicWritesQuit)                  // The topic table writer stops before the pool closes under it
 	if err := s.limiter.Close(); err != nil { // Writes what is unflushed, before the pool closes under it
 		log.Tag(tagStartup).Err(err).Warn("Closing the usage store failed")
 	}
@@ -1961,13 +1971,8 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 		if t.SetRateVisitor(v) {
 			added = append(added, t.ID)
 		}
-		s.recordRateVisitor(v, t)
 	}
-	if len(added) > 0 {
-		// Peers may have cached that these topics have no subscriber (see topicTableInfo); the
-		// announcement makes them read the table again instead of answering 507 for up to 30 s
-		s.cluster.BroadcastState(&cluster.State{AddedTopics: added})
-	}
+	s.recordRateVisitors(v, rateTopics, added)
 	return nil
 }
 

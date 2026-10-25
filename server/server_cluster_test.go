@@ -30,6 +30,7 @@ type fakeCluster struct {
 	deletedUsers  []string
 	accessChanged int
 	usage         []limit.Delta
+	onBroadcast   func(state *cluster.State) // Called with every state broadcast, outside the lock; may be nil
 	notLeader     bool
 	notHealthy    bool
 	notReady      bool
@@ -48,6 +49,9 @@ func (b *fakeCluster) ForwardMessage(m *model.Message) error {
 func (b *fakeCluster) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {}
 
 func (b *fakeCluster) BroadcastState(state *cluster.State) {
+	if b.onBroadcast != nil {
+		b.onBroadcast(state)
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.announced = append(b.announced, state.AddedTopics...)

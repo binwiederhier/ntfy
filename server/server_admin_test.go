@@ -1050,7 +1050,7 @@ func TestTiers_Failures(t *testing.T) {
 		rr = request(t, s, "DELETE", "/v1/tiers", `{"code":"missing"}`, auth)
 		require.Equal(t, 40030, toHTTPError(t, rr.Body.String()).Code)
 
-		// Non-admins cannot change tiers; listing them is the (deprecated) billing list, which needs payments
+		// Non-admins cannot change tiers; listing them is the billing list (for older web apps), which needs payments
 		ben := map[string]string{"Authorization": util.BasicAuth("ben", "ben")}
 		rr = request(t, s, "POST", "/v1/tiers", `{"code":"ben","name":"Ben"}`, ben)
 		require.Equal(t, 401, rr.Code)

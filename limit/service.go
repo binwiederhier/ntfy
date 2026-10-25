@@ -75,22 +75,25 @@ var syncLoadKinds = [numKinds]bool{
 
 // Service keeps the per-key state and decides on usage. See the package comment.
 type Service struct {
-	conf        *Config
-	now         func() time.Time // Injectable clock, for tests
-	shards      [shardCount]shard
-	store       atomic.Pointer[Store]           // Nil when nothing is persisted or shared; atomic so the hot path never takes mu
-	day         string                          // The usage day the counts refer to (see today)
-	clockOffset time.Duration                   // The store's clock minus this node's, as of the last flush; the day follows the store's clock
-	pulledAt    int64                           // Store clock watermark of the last read-back; 0 before the first
-	dayOverride string                          // Tests only: the day today returns (see rollDayForTest)
-	carried     map[string]map[carriedKey]int64 // Counts of earlier days not written yet, by day (see maybeRollDay)
-	closeChan   chan struct{}
-	closeOnce   sync.Once
-	wg          sync.WaitGroup
-	misses      []string      // Keys whose rows have not been read yet (see readMisses)
-	missSignal  chan struct{} // Wakes the miss loop as soon as a key is queued; buffered, so a signal is never lost or waited for
-	missMu      sync.Mutex    // Protects misses
-	mu          sync.Mutex    // Protects day, clockOffset, pulledAt, dayOverride and carried
+	conf            *Config
+	now             func() time.Time // Injectable clock, for tests
+	shards          [shardCount]shard
+	store           atomic.Pointer[Store]           // Nil when nothing is persisted or shared; atomic so the hot path never takes mu
+	day             string                          // The usage day the counts refer to (see today)
+	clockOffset     time.Duration                   // The store's clock minus this node's, as of the last flush; the day follows the store's clock
+	pulledAt        int64                           // Store clock watermark of the last read-back; 0 before the first
+	dayOverride     string                          // Tests only: the day today returns (see rollDayForTest)
+	carried         map[string]map[carriedKey]int64 // Counts of earlier days not written yet, by day (see maybeRollDay)
+	syncMu          sync.Mutex                      // Serializes every store read and the apply of its rows with every write and its retirement (see write)
+	afterWriteHook  func()                          // Tests only: runs between a write's commit and its retirement
+	beforeApplyHook func()                          // Tests only: runs between a read's query and applying its rows
+	closeChan       chan struct{}
+	closeOnce       sync.Once
+	wg              sync.WaitGroup
+	misses          []string      // Keys whose rows have not been read yet (see readMisses)
+	missSignal      chan struct{} // Wakes the miss loop as soon as a key is queued; buffered, so a signal is never lost or waited for
+	missMu          sync.Mutex    // Protects misses
+	mu              sync.Mutex    // Protects day, clockOffset, pulledAt, dayOverride and carried
 }
 
 // carriedKey identifies a key's count of one kind, carried over a day rollover
@@ -258,14 +261,9 @@ func (s *Service) Lookup(key string) (Usage, error) {
 		return s.Usage(key), nil
 	}
 	sh.mu.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), flushTimeout)
-	defer cancel()
-	day := s.today()
-	rows, err := store.readKeys(ctx, day, []string{key})
-	if err != nil {
+	if err := s.readAndApply(store, []string{key}); err != nil {
 		return s.Usage(key), err
 	}
-	s.applyRows(day, rows, []string{key})
 	return s.Usage(key), nil
 }
 
@@ -430,7 +428,14 @@ func (s *Service) flush() {
 // statement per chunk. Counts stay unflushed until their own row is written: a failed statement
 // leaves its keys' increments where they are for the next round, and the keys before it are
 // retired, so nothing is written twice.
+//
+// A write holds syncMu from its snapshot to its retirement, and so does every read of the store
+// from its query to applying the rows. Otherwise a snapshot read after a commit but applied before
+// the retirement counts the increments twice, and one read before a commit but applied after the
+// retirement drops them. The hot path (Allow) never takes syncMu.
 func (s *Service) write(ctx context.Context, store *Store) {
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
 	s.writeCarried(ctx, store)
 	s.mu.Lock()
 	day := s.day
@@ -440,6 +445,9 @@ func (s *Service) write(ctx context.Context, store *Store) {
 		return
 	}
 	written, err := store.flush(ctx, day, rows)
+	if s.afterWriteHook != nil {
+		s.afterWriteHook()
+	}
 	s.retire(day, rows[:written])
 	if err != nil {
 		log.Tag(tag).Err(err).Warn("Writing usage failed, %d of %d rows written; the rest is retried", written, len(rows))
@@ -460,6 +468,8 @@ func (s *Service) readBack(ctx context.Context, store *Store, dbNow int64) {
 		s.setPulledAt(dbNow)
 		return
 	}
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
 	rows, err := store.readSince(ctx, day, since-int64(readOverlap.Seconds()))
 	if err != nil {
 		log.Tag(tag).Err(err).Warn("Reading usage back failed; totals serve stale until the next round")
@@ -481,19 +491,13 @@ func (s *Service) readMisses() {
 	if store == nil || len(keys) == 0 {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), flushTimeout)
-	defer cancel()
-	day := s.today()
-	rows, err := store.readKeys(ctx, day, keys)
-	if err != nil {
+	if err := s.readAndApply(store, keys); err != nil {
 		log.Tag(tag).Err(err).Warn("Reading the usage of %d new key(s) failed; they are served from local counts until the next try", len(keys))
 		metrics.UsageFlushErrors.Inc()
 		s.missMu.Lock()
 		s.misses = append(keys, s.misses...)
 		s.missMu.Unlock()
-		return
 	}
-	s.applyRows(day, rows, keys)
 }
 
 // snapshot returns the unflushed counts of the promoted keys as rows to write
@@ -535,10 +539,11 @@ func (s *Service) retire(day string, rows []usageRow) {
 	}
 }
 
-// applyRows marks the given keys as loaded (creating them if needed, so a looked-up key keeps
-// its rows), then sets the baseline of the keys this node holds from the store's rows; a loaded
-// key without rows is at zero. Rows of another day than the current one are discarded (the day
-// rolled over while reading).
+// applyRows sets the baselines of the keys this node holds from the store's rows, and marks the
+// given keys as loaded, creating them if needed so a looked-up key keeps its rows; a loaded key
+// without rows is at zero. Each key's loaded flag and baselines change under one lock, so no
+// decision sees a key loaded without its counts. Rows of another day than the current one are
+// discarded (the day rolled over while reading). The caller must hold syncMu.
 func (s *Service) applyRows(day string, rows []usageRow, loadedKeys []string) {
 	s.mu.Lock()
 	rolled := s.day != day
@@ -546,20 +551,34 @@ func (s *Service) applyRows(day string, rows []usageRow, loadedKeys []string) {
 	if rolled {
 		return
 	}
-	now := s.now()
+	byKey := make(map[string][]usageRow, len(loadedKeys))
+	for _, r := range rows {
+		byKey[r.key] = append(byKey[r.key], r)
+	}
+	loading := make(map[string]bool, len(loadedKeys))
 	for _, key := range loadedKeys {
+		loading[key] = true
+		if _, ok := byKey[key]; !ok {
+			byKey[key] = nil
+		}
+	}
+	now := s.now()
+	for key, keyRows := range byKey {
 		sh := &s.shards[shardIndex(key)]
 		sh.mu.Lock()
-		e := sh.entryNoLock(key, now, false)
-		e.loaded = true
-		e.missNoted = false
-		sh.mu.Unlock()
-	}
-	for _, r := range rows {
-		sh := &s.shards[shardIndex(r.key)]
-		sh.mu.Lock()
-		if e, ok := sh.entries[r.key]; ok {
-			e.baseline[r.kind] = r.count
+		e, ok := sh.entries[key]
+		if !ok && loading[key] {
+			e = sh.entryNoLock(key, now, false)
+			ok = true
+		}
+		if ok {
+			for _, r := range keyRows {
+				e.baseline[r.kind] = r.count
+			}
+			if loading[key] {
+				e.loaded = true
+				e.missNoted = false
+			}
 		}
 		sh.mu.Unlock()
 	}
@@ -713,16 +732,29 @@ func (s *Service) maybeLoadNow(store *Store, sh *shard, key string) {
 	if loaded {
 		return
 	}
+	if err := s.readAndApply(store, []string{key}); err != nil {
+		log.Tag(tag).Err(err).Warn("Reading the usage of key %s failed; it is decided on its local count", key)
+		metrics.UsageFlushErrors.Inc()
+	}
+}
+
+// readAndApply reads the given keys' rows of today and applies them, as one step with respect to
+// writes (see write)
+func (s *Service) readAndApply(store *Store, keys []string) error {
+	s.syncMu.Lock()
+	defer s.syncMu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), flushTimeout)
 	defer cancel()
 	day := s.today()
-	rows, err := store.readKeys(ctx, day, []string{key})
+	rows, err := store.readKeys(ctx, day, keys)
 	if err != nil {
-		log.Tag(tag).Err(err).Warn("Reading the usage of key %s failed; it is decided on its local count", key)
-		metrics.UsageFlushErrors.Inc()
-		return
+		return err
 	}
-	s.applyRows(day, rows, []string{key})
+	if s.beforeApplyHook != nil {
+		s.beforeApplyHook()
+	}
+	s.applyRows(day, rows, keys)
+	return nil
 }
 
 // reset fills the key's bucket of the kind and zeroes its count (see limiter.Reset)

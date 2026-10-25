@@ -666,3 +666,61 @@ func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
 		require.Equal(t, map[string]int64{"user:u_1/messages": 3}, rowsByKeyKind(rows))
 	})
 }
+
+// Codex review #1: a read of the store and a write's retirement must not interleave. Both tests
+// start from a key that another node counted to 10 and this node to 3 (written, not yet read).
+
+func newReadWriteRaceSetup(t *testing.T, newStore func() *Store) *Service {
+	t.Helper()
+	clock := &testClock{t: time.Now()}
+	other := newPersistentTestService(t, newStore(), clock)
+	require.True(t, other.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 100}, 10).OK)
+	require.Nil(t, other.Close())
+	s := newPersistentTestService(t, newStore(), clock)
+	require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 100}, 3).OK) // Queued for a read-back
+	return s
+}
+
+// runConcurrently starts f and waits for it a little (long enough to finish if nothing holds it
+// up); the returned channel closes when f is done
+func runConcurrently(f func()) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		f()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(300 * time.Millisecond):
+	}
+	return done
+}
+
+func TestService_Persist_ReadAfterCommitBeforeRetire(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newReadWriteRaceSetup(t, newStore)
+		var read <-chan struct{}
+		s.afterWriteHook = func() {
+			read = runConcurrently(s.readMisses) // Reads 13, which already includes the 3 about to be retired
+		}
+		s.write(context.Background(), s.store.Load())
+		<-read
+		require.Equal(t, int64(13), s.Usage("user:u_1").Count(KindMessages)) // Not 16
+	})
+}
+
+func TestService_Persist_ReadBeforeCommitAppliedAfterRetire(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newReadWriteRaceSetup(t, newStore)
+		var written <-chan struct{}
+		s.beforeApplyHook = func() {
+			s.beforeApplyHook = nil
+			written = runConcurrently(func() {
+				s.write(context.Background(), s.store.Load()) // Commits and retires the 3 the read did not see
+			})
+		}
+		s.readMisses() // Reads 10
+		<-written
+		require.Equal(t, int64(13), s.Usage("user:u_1").Count(KindMessages)) // Not 10
+	})
+}

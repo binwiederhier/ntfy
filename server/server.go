@@ -120,7 +120,6 @@ var (
 	apiStatsPath                                         = "/v1/stats"
 	apiWebPushPath                                       = "/v1/webpush"
 	apiTiersPath                                         = "/v1/tiers"
-	apiBillingTiersPath                                  = "/v1/billing/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
 	apiUsersTokensPath                                   = "/v1/users/tokens"
@@ -140,6 +139,7 @@ var (
 	apiAccountEmailResendPath                            = "/v1/account/email/resend"
 	apiAccountPasswordResetRequestPath                   = "/v1/account/password/reset/request"
 	apiAccountPasswordResetPath                          = "/v1/account/password/reset"
+	apiAccountBillingTiersPath                           = "/v1/account/billing/tiers"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -783,10 +783,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiBillingTiersPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountBillingTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
-		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v) // Deprecated for non-admins, for web apps before v2.33.0
+		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v) // Non-admins: web apps before v2.33.0, remove after 2026-11-22
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {

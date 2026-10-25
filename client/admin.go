@@ -50,7 +50,7 @@ const (
 	adminPathAccess       = "/v1/users/access"
 	adminPathTokens       = "/v1/users/tokens"
 	adminPathReset        = "/v1/users/password/reset"
-	adminPathTiers        = "/v1/admin/tiers"
+	adminPathTiers        = "/v1/tiers"
 )
 
 var (
@@ -307,6 +307,16 @@ func (a *Admin) Tiers() ([]*AdminTier, error) {
 	var tiers []*AdminTier
 	if err := a.do(http.MethodGet, adminPathTiers, nil, &tiers); err != nil {
 		return nil, err
+	}
+	for _, t := range tiers {
+		if t.ID == "" {
+			// Non-admins get the public price list here instead (deprecated, see docs/deprecations.md)
+			return nil, &AdminError{
+				HTTPCode: http.StatusUnauthorized,
+				Code:     AdminErrCodeUnauthorized,
+				Message:  "unauthorized: the server returned the public price list, the token must belong to an admin user",
+			}
+		}
 	}
 	return tiers, nil
 }

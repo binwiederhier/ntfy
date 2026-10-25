@@ -41,7 +41,7 @@ func TestAdmin_RequestsAndResponses(t *testing.T) {
 			w.Write([]byte(`{"username":"ben","token":"tk_new","expires":0,"last_access":1700000000,"last_origin":"0.0.0.0"}`))
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/users/password/reset":
 			w.Write([]byte(`{"link":"https://ntfy.example.com/account/password/reset/abc","email":"ben@example.com"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/admin/tiers":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/tiers":
 			w.Write([]byte(`[{"id":"ti_1","code":"pro","name":"Pro","messages_limit":10,"users":2}]`))
 		default:
 			w.Write([]byte(`{"success":true}`))
@@ -85,7 +85,7 @@ func TestAdmin_RequestsAndResponses(t *testing.T) {
 		{Method: "PUT", Path: "/v1/users/access", Auth: "Bearer tk_admin", Body: map[string]any{"username": "*", "topic": "up*", "permission": "write-only"}},
 		{Method: "DELETE", Path: "/v1/users/access", Auth: "Bearer tk_admin", Body: map[string]any{"username": "", "topic": ""}},
 		{Method: "DELETE", Path: "/v1/users/tokens", Auth: "Bearer tk_admin", Body: map[string]any{"username": "ben", "token": "tk_abc"}},
-		{Method: "DELETE", Path: "/v1/admin/tiers", Auth: "Bearer tk_admin", Body: map[string]any{"code": "pro"}},
+		{Method: "DELETE", Path: "/v1/tiers", Auth: "Bearer tk_admin", Body: map[string]any{"code": "pro"}},
 	}, requests)
 
 	// Tokens
@@ -190,4 +190,17 @@ func TestAdmin_SocketPermissionDenied(t *testing.T) {
 	err = NewAdminSocket(socket).Ping()
 	require.ErrorIs(t, err, ErrAdminUnreachable)
 	require.ErrorIs(t, err, fs.ErrPermission)
+}
+
+func TestAdmin_TiersNotAdmin(t *testing.T) {
+	// For non-admins, the server answers GET /v1/tiers with the public price list (deprecated);
+	// its entries have no ID, which the client must not mistake for tiers
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`[{"limits":{"basis":"ip","messages":250}},{"code":"pro","name":"Pro","prices":{"month":500,"year":5000},"limits":{"basis":"tier"}}]`))
+	}))
+	defer server.Close()
+	_, err := NewAdmin(server.URL, "tk_user").Tiers()
+	var apiErr *AdminError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, AdminErrCodeUnauthorized, apiErr.Code)
 }

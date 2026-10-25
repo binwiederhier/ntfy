@@ -552,7 +552,6 @@ func (s *Server) Run() error {
 	if s.config.ClusterListen != "" {
 		go s.runUsageGossip()
 	}
-	go s.runStatsResetter()
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
 
@@ -1138,10 +1137,6 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
 		}
-	}
-	u := v.User()
-	if s.userManager != nil && u != nil && u.Tier != nil {
-		go v.EnqueueUserStatsDelta()
 	}
 	s.mu.Lock()
 	s.messages++
@@ -2159,39 +2154,6 @@ func (s *Server) runManager() {
 				Debug("Manager finished")
 		case <-s.closeChan:
 			return
-		}
-	}
-}
-
-// runStatsResetter runs once a day (usually midnight UTC) to reset all the visitor's message and
-// email counters. The stats are used to display the counters in the web app, as well as for rate limiting.
-func (s *Server) runStatsResetter() {
-	for {
-		runAt := util.NextOccurrenceUTC(s.config.VisitorStatsResetTime, time.Now())
-		timer := time.NewTimer(time.Until(runAt))
-		log.Tag(tagResetter).Debug("Waiting until %v to reset visitor stats", runAt)
-		select {
-		case <-timer.C:
-			log.Tag(tagResetter).Debug("Running stats resetter")
-			s.resetStats()
-		case <-s.closeChan:
-			log.Tag(tagResetter).Debug("Stopping stats resetter")
-			timer.Stop()
-			return
-		}
-	}
-}
-
-func (s *Server) resetStats() {
-	log.Info("Resetting all visitor stats (daily task)")
-	s.mu.Lock()
-	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
-	for _, v := range s.visitors {
-		v.ResetStats()
-	}
-	if s.userManager != nil {
-		if err := s.userManager.ResetStats(); err != nil {
-			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
 		}
 	}
 }

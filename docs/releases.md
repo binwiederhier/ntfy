@@ -2264,6 +2264,21 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.35.0 (UNRELEASED)
+
+**Features:**
+
+* Daily quotas (messages, e-mails, phone calls) are kept in a database (`usage-file` for SQLite, or `database-url`) and survive a restart; a crash loses at most 5 seconds of counting. Before, every restart reset them (see [message limits](config.md#message-limits))
+* In an experimental cluster, the rate limits are shared across the nodes: daily quotas through the database, request and other rate limit buckets through the node mesh, so a client spread over several nodes gets the configured rate instead of several times it, and a brute force attempt spread over the nodes is caught at the same point as on one node
+* Idle visitors are dropped from memory after a few minutes instead of a day when usage is persisted, which cuts the server's memory on busy instances
+
+**Behavior changes:**
+
+* The daily e-mail limit (the number shown on the account page) is now enforced as a daily cap on top of the e-mail bucket; before, only the bucket's refill rate approximated it
+* A tier change applies on the next request without handing back full rate limit buckets, and a changed limit on an existing tier applies at once
+* A rejected attachment chunk refunds the bandwidth it was charged (e.g. when the file size limit rejects it)
+* The daily reset job is gone: the usage day starts over at midnight UTC by itself, and the `stats_*` columns of the user table are no longer written or read (the account page reads the usage table)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

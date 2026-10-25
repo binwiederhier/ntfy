@@ -410,7 +410,7 @@ This generator helps you configure your self-hosted ntfy instance. It's not full
 </div>
 
 ## Database options
-ntfy uses a database for storing messages ([message cache](#message-cache)), users and [access control](#access-control), and [web push](#web-push) subscriptions.
+ntfy uses a database for storing messages ([message cache](#message-cache)), users and [access control](#access-control), [web push](#web-push) subscriptions, and the visitors' daily usage counts ([rate limiting](#message-limits)).
 You can choose between **SQLite** and **PostgreSQL** as the database backend.
 
 ### SQLite
@@ -420,6 +420,8 @@ no external dependencies:
 * `cache-file`: Database file for the [message cache](#message-cache).
 * `auth-file`: Database file for authentication and [access control](#access-control). If set, enables auth.
 * `web-push-file`: Database file for [web push](#web-push) subscriptions.
+* `usage-file`: Database file for the visitors' daily usage counts (messages, emails, calls), so the daily
+  quotas survive a restart (see [message limits](#message-limits)).
 
 ### PostgreSQL
 As an alternative, you can configure ntfy to use PostgreSQL for **all** database-backed stores by setting the
@@ -1926,7 +1928,16 @@ For instance, if the request limit allows for 15,000 requests per day, and all o
 to publish messages, then that is the daily message limit.
 
 To limit the number of daily messages per visitor, you can set `visitor-message-daily-limit`. This defines the number 
-of messages a visitor can send in a day. This counter is reset every day at midnight (UTC).
+of messages a visitor can send in a day. The usage day starts over every day at midnight (UTC).
+
+The daily counts (messages, e-mails and phone calls) are kept in a database if `usage-file` (SQLite) or `database-url`
+(PostgreSQL) is set, so they survive a restart; a crash loses at most the last 5 seconds of counting. Without either, they
+are counted in memory only and start over with every restart. With a database, idle visitors are also dropped from
+memory after a few minutes instead of a day, since their counts are in the database (an anonymous visitor only gets a
+row once it has used 1% of a daily quota, so the many visitors that publish once or twice never touch it). In an
+[experimental cluster](#clustering-experimental), the counts are shared by all nodes through the database, and the
+request, e-mail and other rate limit buckets converge across the nodes within seconds, so a client spread over several
+nodes gets the configured rate rather than several times it.
 
 ### Attachment limits
 Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 
@@ -2584,6 +2595,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `web-push-public-key`                      | `NTFY_WEB_PUSH_PUBLIC_KEY`                      | *string*                                            | -                 | Web Push: Public Key. Run `ntfy webpush keys` to generate                                                                                                                                                                               |
 | `web-push-private-key`                     | `NTFY_WEB_PUSH_PRIVATE_KEY`                     | *string*                                            | -                 | Web Push: Private Key. Run `ntfy webpush keys` to generate                                                                                                                                                                              |
 | `web-push-file`                            | `NTFY_WEB_PUSH_FILE`                            | *string*                                            | -                 | Web Push: Database file that stores subscriptions                                                                                                                                                                                       |
+| `usage-file`                               | `NTFY_USAGE_FILE`                               | *string*                                            | -                 | Rate limiting: Database file that stores the visitors' daily usage counts (messages, e-mails, calls), so quotas survive a restart; not needed with `database-url`                                                                           |
 | `web-push-email-address`                   | `NTFY_WEB_PUSH_EMAIL_ADDRESS`                   | *string*                                            | -                 | Web Push: Sender email address                                                                                                                                                                                                          |
 | `web-push-startup-queries`                 | `NTFY_WEB_PUSH_STARTUP_QUERIES`                 | *string*                                            | -                 | Web Push: SQL queries to run against subscription database at startup                                                                                                                                                                   |
 | `web-push-expiry-duration`                 | `NTFY_WEB_PUSH_EXPIRY_DURATION`                 | *duration*                                          | 60d               | Web Push: Duration after which a subscription is considered stale and will be deleted. This is to prevent stale subscriptions.                                                                                                          |
@@ -2695,6 +2707,7 @@ OPTIONS:
    --web-push-public-key value, --web_push_public_key value                                                               public key used for web push notifications [$NTFY_WEB_PUSH_PUBLIC_KEY]
    --web-push-private-key value, --web_push_private_key value                                                             private key used for web push notifications [$NTFY_WEB_PUSH_PRIVATE_KEY]
    --web-push-file value, --web_push_file value                                                                           file used to store web push subscriptions [$NTFY_WEB_PUSH_FILE]
+   --usage-file value, --usage_file value                                                                                 file used to store the visitors' daily usage (messages, emails, calls), so quotas survive a restart [$NTFY_USAGE_FILE]
    --web-push-email-address value, --web_push_email_address value                                                         e-mail address of sender, required to use browser push services [$NTFY_WEB_PUSH_EMAIL_ADDRESS]
    --web-push-startup-queries value, --web_push_startup_queries value                                                     queries run when the web push database is initialized [$NTFY_WEB_PUSH_STARTUP_QUERIES]
    --web-push-expiry-duration value, --web_push_expiry_duration value                                                     automatically expire unused subscriptions after this time (default: "60d") [$NTFY_WEB_PUSH_EXPIRY_DURATION]

@@ -362,8 +362,6 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 		require.Equal(t, payments.PriceRecurringInterval(""), u.Billing.StripeSubscriptionInterval)
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionPaidUntil.Unix())
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
-		require.Equal(t, int64(0), u.Stats.Messages) // Messages and emails are not persisted for no-tier users!
-		require.Equal(t, int64(0), u.Stats.Emails)
 
 		// Simulate Stripe success return URL call (no user context)
 		rr = request(t, s, "GET", "/v1/account/billing/subscription/success/SOMETOKEN", "", nil)
@@ -379,8 +377,6 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 		require.Equal(t, payments.PriceRecurringInterval(stripe.PriceRecurringIntervalMonth), u.Billing.StripeSubscriptionInterval)
 		require.Equal(t, int64(123456789), u.Billing.StripeSubscriptionPaidUntil.Unix())
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
 
 		// Now for the fun part: Verify that new rate limits are immediately applied
 		// This only tests the request limiter, which kicks in before the message limiter.

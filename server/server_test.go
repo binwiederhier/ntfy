@@ -1216,7 +1216,6 @@ func TestServer_StatsResetter(t *testing.T) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorStatsResetTime = time.Now().Add(2 * time.Second)
 		s := newTestServer(t, c)
-		go s.runStatsResetter()
 
 		// Create user with tier (tieruser) and user without tier (phil)
 		require.Nil(t, s.userManager.AddTier(&user.Tier{
@@ -1345,8 +1344,8 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 		require.Equal(t, int64(123456), account.Stats.Messages)
 		require.Equal(t, int64(999), account.Stats.Emails)
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		require.Equal(t, int64(123456), v.Stats().Messages)
-		require.Equal(t, int64(999), v.Stats().Emails)
+		require.Equal(t, int64(123456), v.Usage().Count(limit.KindMessages))
+		require.Equal(t, int64(999), v.Usage().Count(limit.KindEmails))
 	})
 }
 
@@ -3562,8 +3561,8 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		// Publish message, observe rate visitor tokens being decreased
 		response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].Stats().Messages)
-		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
+		require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].Usage().Count(limit.KindMessages))
+		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Usage().Count(limit.KindMessages))
 		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
 
 		// Expire visitor
@@ -3573,7 +3572,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		// Publish message again, observe that rateVisitor is not used anymore and is reset
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].Stats().Messages)
+		require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].Usage().Count(limit.KindMessages))
 		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
 		require.Nil(t, s.visitors["ip:1.2.3.4"])
 	})

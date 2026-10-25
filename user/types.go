@@ -19,7 +19,6 @@ type User struct {
 	Role        Role
 	Prefs       *Prefs
 	Tier        *Tier
-	Stats       *Stats
 	Billing     *Billing
 	SyncTopic   string
 	Provisioned bool // Whether the user was provisioned by the config file
@@ -151,13 +150,6 @@ type NotificationPrefs struct {
 	Sound       *string `json:"sound,omitempty"`
 	MinPriority *int    `json:"min_priority,omitempty"`
 	DeleteAfter *int    `json:"delete_after,omitempty"`
-}
-
-// Stats is a struct holding daily user statistics
-type Stats struct {
-	Messages int64
-	Emails   int64
-	Calls    int64
 }
 
 // Billing is a struct holding a user's billing information
@@ -377,8 +369,6 @@ type queries struct {
 	updateUserRole                 string
 	updateUserProvisioned          string
 	updateUserPrefs                string
-	updateUserStats                string
-	updateUserStatsResetAll        string
 	updateUserTier                 string
 	updateUserDeleted              string
 	deleteUser                     string

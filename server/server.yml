@@ -42,8 +42,8 @@
 # firebase-key-file: <filename>
 
 # If "database-url" is set, ntfy will use PostgreSQL for all database-backed stores (message cache,
-# user manager, and web push subscriptions) instead of SQLite. When set, the "cache-file",
-# "auth-file", and "web-push-file" options must not be set.
+# user manager, web push subscriptions, and the daily usage counts) instead of SQLite. When set, the
+# "cache-file", "auth-file", "web-push-file", and "usage-file" options must not be set.
 #
 # Note: Setting "database-url" implicitly enables authentication and access control.
 # The default access is "read-write" (see "auth-default-access").
@@ -398,11 +398,19 @@
 # visitor-request-limit-replenish: "5s"
 # visitor-request-limit-exempt-hosts: ""
 
-# Rate limiting: Hard daily limit of messages per visitor and day. The limit is reset
-# every day at midnight UTC. If the limit is not set (or set to zero), the request
+# Rate limiting: Hard daily limit of messages per visitor and day. The usage day starts
+# over every day at midnight UTC. If the limit is not set (or set to zero), the request
 # limit (see above) governs the upper limit.
 #
 # visitor-message-daily-limit: 0
+
+# Rate limiting: Database file for the visitors' daily usage counts (messages, emails, calls),
+# e.g. /var/cache/ntfy/usage.db. With it, the daily quotas survive a restart (without it they
+# are counted in memory only and start over with every restart), and idle visitors are
+# dropped from memory after minutes instead of a day. Not required if "database-url" is set
+# (the counts are stored in PostgreSQL instead, shared by all cluster nodes).
+#
+# usage-file:
 
 # Rate limiting: Allowed emails per visitor:
 # - visitor-email-limit-burst is the initial bucket of emails each visitor has

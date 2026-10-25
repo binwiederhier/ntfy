@@ -3,7 +3,6 @@ package server
 import (
 	"net/netip"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"heckel.io/ntfy/v2/limit"
@@ -52,10 +51,6 @@ type visitor struct {
 	firebase      time.Time          // Next allowed Firebase message
 	seen          time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
 	expungeAfter  time.Duration      // How long after seen the visitor is removed from memory (see visitorExpungeAfterFor)
-	localMessages atomic.Int64       // Messages this visitor object admitted; the user stats deltas are measured on these, not on the shared counts (see enqueueUserStatsDeltaNoLock)
-	localEmails   atomic.Int64       // Emails this visitor object admitted
-	localCalls    atomic.Int64       // Calls this visitor object admitted
-	statsEnqueued user.Stats         // The local counts already handed to the user manager's write queue
 	mu            sync.RWMutex
 }
 
@@ -182,11 +177,7 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 func (v *visitor) MessageAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
-	allowed := v.limiter.Allow(v.key, v.messageRule(), 1).OK
-	if allowed {
-		v.localMessages.Add(1)
-	}
-	return allowed
+	return v.limiter.Allow(v.key, v.messageRule(), 1).OK
 }
 
 func (v *visitor) EmailAllowed() bool {
@@ -195,21 +186,13 @@ func (v *visitor) EmailAllowed() bool {
 	if v.limits.EmailLimitBurst <= 0 {
 		return false // No email bucket means no emails, as before
 	}
-	allowed := v.limiter.Allow(v.key, v.emailRule(), 1).OK
-	if allowed {
-		v.localEmails.Add(1)
-	}
-	return allowed
+	return v.limiter.Allow(v.key, v.emailRule(), 1).OK
 }
 
 func (v *visitor) CallAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
-	allowed := v.limiter.Allow(v.key, v.callRule(), 1).OK
-	if allowed {
-		v.localCalls.Add(1)
-	}
-	return allowed
+	return v.limiter.Allow(v.key, v.callRule(), 1).OK
 }
 
 func (v *visitor) SubscriptionAllowed() bool {
@@ -304,73 +287,11 @@ func (v *visitor) Stale() bool {
 	return time.Since(v.seen) > v.expungeAfter
 }
 
-func (v *visitor) Stats() *user.Stats {
+// Usage returns the visitor's usage today as this node knows it (see limit.Service.Usage)
+func (v *visitor) Usage() limit.Usage {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
-	return v.statsNoLock()
-}
-
-func (v *visitor) statsNoLock() *user.Stats {
-	return statsFromUsage(v.limiter.Usage(v.key))
-}
-
-func statsFromUsage(usage limit.Usage) *user.Stats {
-	return &user.Stats{
-		Messages: usage.Count(limit.KindMessages),
-		Emails:   usage.Count(limit.KindEmails),
-		Calls:    usage.Count(limit.KindCalls),
-	}
-}
-
-// ResetStats zeroes the visitor's local counts and with them the enqueued seeds its deltas are
-// measured against, at the daily rollover, because the caller zeroes the user's database row and
-// the limiter's counts in the same pass (in a cluster that row is reset once, by the leader).
-// Only the stats resetter calls this.
-func (v *visitor) ResetStats() {
-	v.mu.Lock() // Also protects statsEnqueued
-	defer v.mu.Unlock()
-	v.resetLocalStatsNoLock() // The database row is zeroed by the (leader's) daily reset
-}
-
-// EnqueueUserStatsDelta enqueues the visitor's not-yet-persisted stats increments to the user
-// manager's write queue. Deltas add up across cluster nodes (see Manager.EnqueueUserStats).
-func (v *visitor) EnqueueUserStatsDelta() {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.enqueueUserStatsDeltaNoLock()
-}
-
-// enqueueUserStatsDeltaNoLock measures the deltas on what this visitor object admitted, not on
-// the limiter's counts: those are shared by every visitor object with the same key, and would be
-// enqueued by each of them. The caller must hold v.mu.
-func (v *visitor) enqueueUserStatsDeltaNoLock() {
-	u := v.user // Pinned for the whole function: SetUser(nil) must not turn this into a nil deref
-	if v.userManager == nil || u == nil {
-		return
-	}
-	current := user.Stats{
-		Messages: v.localMessages.Load(),
-		Emails:   v.localEmails.Load(),
-		Calls:    v.localCalls.Load(),
-	}
-	delta := user.Stats{
-		Messages: current.Messages - v.statsEnqueued.Messages,
-		Emails:   current.Emails - v.statsEnqueued.Emails,
-		Calls:    current.Calls - v.statsEnqueued.Calls,
-	}
-	if delta == (user.Stats{}) {
-		return
-	}
-	v.statsEnqueued = current
-	v.userManager.EnqueueUserStats(u.ID, &delta)
-}
-
-// resetLocalStatsNoLock zeroes the local counts and what was enqueued of them. The caller must hold v.mu.
-func (v *visitor) resetLocalStatsNoLock() {
-	v.localMessages.Store(0)
-	v.localEmails.Store(0)
-	v.localCalls.Store(0)
-	v.statsEnqueued = user.Stats{}
+	return v.limiter.Usage(v.key)
 }
 
 // User returns the visitor user, or nil if there is none
@@ -401,13 +322,6 @@ func (v *visitor) SetUser(u *user.User) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	shouldResetLimits := v.user.TierID() != u.TierID() // TierID works with nil receiver
-	if shouldResetLimits && v.user != nil && v.user.Tier != nil {
-		// Flush increments counted under the old key, under the old account, before the key is
-		// replaced below; the new key is re-seeded from the new user's persisted stats. Usage of
-		// an IP-keyed visitor (no user, or no tier) is never persisted, so it must not land on
-		// the new account.
-		v.enqueueUserStatsDeltaNoLock()
-	}
 	tierChanged := shouldResetLimits || (u != nil && u.Tier != nil && *v.user.Tier != *u.Tier)
 	v.user = u // u may be nil!
 	if tierChanged {
@@ -432,7 +346,6 @@ func (v *visitor) MaybeUserID() string {
 func (v *visitor) resetLimitsNoLock() {
 	v.key = vis.Key(v.ip, v.user, v.limitsConfig)
 	v.limits = v.limitsNoLock()
-	v.resetLocalStatsNoLock()                                            // What was admitted so far belongs to the previous key and user, and was flushed by SetUser if it was owed
 	log.Fields(v.contextNoLock()).Debug("Rate limits reset for visitor") // Must be after function, because contextNoLock() describes rate limits
 }
 
@@ -550,16 +463,16 @@ func (v *visitor) infoLightNoLock() *visitorInfo {
 }
 
 func infoFromUsage(limits *vis.Limits, usage limit.Usage) *visitorInfo {
-	stats := statsFromUsage(usage)
+	messages, emails, calls := usage.Count(limit.KindMessages), usage.Count(limit.KindEmails), usage.Count(limit.KindCalls)
 	return &visitorInfo{
 		Limits: limits,
 		Stats: &visitorStats{
-			Messages:          stats.Messages,
-			MessagesRemaining: zeroIfNegative(limits.MessageLimit - stats.Messages),
-			Emails:            stats.Emails,
-			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - stats.Emails),
-			Calls:             stats.Calls,
-			CallsRemaining:    zeroIfNegative(limits.CallLimit - stats.Calls),
+			Messages:          messages,
+			MessagesRemaining: zeroIfNegative(limits.MessageLimit - messages),
+			Emails:            emails,
+			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - emails),
+			Calls:             calls,
+			CallsRemaining:    zeroIfNegative(limits.CallLimit - calls),
 		},
 	}
 }

@@ -13,58 +13,6 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-func TestVisitor_UserStatsDeltaFlush(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 300 * time.Millisecond
-		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{
-			Code:         "test",
-			MessageLimit: 100,
-		}))
-		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
-
-		// Publish 3 messages; the visitor enqueues a stats delta after each publish
-		for i := 0; i < 3; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-		}
-
-		// After two flush intervals, the persisted count must be exactly 3: per-publish
-		// enqueues must be deltas, not absolute snapshots (snapshots would add up to 1+2+3=6)
-		time.Sleep(time.Second)
-		u, err := s.userManager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(3), u.Stats.Messages)
-	})
-}
-
-func TestVisitor_SetUser_DoesNotChargeAnonymousUsage(t *testing.T) {
-	// A user who gets a tier takes over their IP-keyed visitor (e.g. the billing callback). What
-	// that visitor counted anonymously must not land on the account.
-	c := newTestConfigWithAuthFile(t, "")
-	c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
-	s := newTestServer(t, c)
-	require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "test", MessageLimit: 100}))
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
-	u, err := s.userManager.User("phil")
-	require.Nil(t, err)
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	for i := 0; i < 3; i++ {
-		require.True(t, v.MessageAllowed())
-	}
-
-	v.SetUser(u)
-	time.Sleep(500 * time.Millisecond)
-	u, err = s.userManager.User("phil")
-	require.Nil(t, err)
-	require.Equal(t, int64(0), u.Stats.Messages)
-}
-
 func TestVisitor_BandwidthRefund(t *testing.T) {
 	// A revert on the bandwidth limiter (what util.LimitReader and util.LimitWriter do when a
 	// later limiter rejects a chunk) hands the bytes back; it used to be a no-op
@@ -223,7 +171,7 @@ func TestVisitor_EvictedBelowThresholdResumesAtZero(t *testing.T) {
 		evictVisitor(t, s, "ip:9.9.9.9")
 		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "test", nil).Code)
 		waitFor(t, func() bool {
-			return s.visitor(netip.MustParseAddr("9.9.9.9"), nil).Stats().Messages == 1
+			return s.visitor(netip.MustParseAddr("9.9.9.9"), nil).Usage().Count(limit.KindMessages) == 1
 		})
 	})
 }
@@ -240,7 +188,7 @@ func TestVisitor_EvictedPastThresholdContinues(t *testing.T) {
 		evictVisitor(t, s, "ip:9.9.9.9")
 		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "test", nil).Code)
 		waitFor(t, func() bool {
-			return s.visitor(netip.MustParseAddr("9.9.9.9"), nil).Stats().Messages == 6
+			return s.visitor(netip.MustParseAddr("9.9.9.9"), nil).Usage().Count(limit.KindMessages) == 6
 		})
 	})
 }

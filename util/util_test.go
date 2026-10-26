@@ -80,6 +80,12 @@ func TestContainsAll(t *testing.T) {
 	require.False(t, ContainsAll([]int{1, 1}, []int{1, 2}))
 }
 
+func TestDedup(t *testing.T) {
+	require.Equal(t, []string{"b", "a", "c"}, Dedup([]string{"b", "a", "b", "c", "a"}))
+	require.Equal(t, []int{1, 2}, Dedup([]int{1, 1, 2}))
+	require.Empty(t, Dedup([]string{}))
+}
+
 func TestContainsIP(t *testing.T) {
 	require.True(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("1.1.1.1")))
 	require.True(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("fd12:1234:5678::9876")))

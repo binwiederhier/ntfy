@@ -108,17 +108,28 @@ docker-dev:
 
 # Ubuntu-specific
 
+# The Azure apt mirrors on GitHub runners sometimes stall mid-download, and apt then waits forever.
+# A timeout fails the stalled download, and the retries fetch it again.
+APT_GET := sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+#
+# The Azure mirror also trickles for minutes without stalling, which no apt timeout catches, so
+# GitHub runners use the main Ubuntu archive instead (a no-op elsewhere). Their ubuntu.sources points
+# at a mirror list (mirror+file:/etc/apt/apt-mirrors.txt) with the Azure mirror first, so both change.
+APT_SOURCES := /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt
+
 build-deps-ubuntu:
-	sudo apt-get update
-	sudo apt-get install -y \
+	for f in $(APT_SOURCES); do [ ! -f $$f ] || sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' $$f; done
+	$(APT_GET) update
+	$(APT_GET) install -y \
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
 		gcc-mingw-w64-x86-64 \
 		python3 \
 		python3-venv \
+		qemu-user \
 		jq
-	which pip3 || sudo apt-get install -y python3-pip
+	which pip3 || $(APT_GET) install -y python3-pip
 
 
 # Documentation

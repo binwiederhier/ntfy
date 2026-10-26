@@ -2,8 +2,12 @@ package server
 
 import (
 	"errors"
-	"heckel.io/ntfy/v2/user"
 	"net/http"
+	"strings"
+
+	"heckel.io/ntfy/v2/cluster"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/user"
 )
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -152,9 +156,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	} else if err != nil {
 		return err
 	}
-	if err := s.killUserSubscriber(u, "*"); err != nil { // FIXME super inefficient
-		return err
-	}
+	s.userDeleted(u) // FIXME super inefficient
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -206,4 +208,95 @@ func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
 		t.CancelSubscriberUser(u.ID)
 	}
 	return nil
+}
+
+// broadcastAccessChanged tells the other cluster nodes that this node changed access entries, so
+// they reload their access cache, which ends the streams that lost access there (see
+// reauthorizeSubscribers). The user manager calls it after every access write. The signal is
+// best effort: the periodic reload catches a lost one.
+func (s *Server) broadcastAccessChanged() {
+	s.cluster.BroadcastState(&cluster.State{
+		AccessChanged: true,
+	})
+}
+
+// handlePeerAccessChanged has the access cache reloaded after a peer changed access entries, never
+// re-broadcasting it (loop prevention)
+func (s *Server) handlePeerAccessChanged() {
+	if s.userManager == nil {
+		return
+	}
+	s.userManager.RequestAccessCacheReload() // Coalesced: a burst of peer changes costs at most two reloads
+}
+
+// userDeleted ends a deleted user's streams on this node and tells the other cluster nodes, which end
+// theirs (see handleUsersDeleted). Called by both deletes: by an admin, and of one's own account.
+func (s *Server) userDeleted(u *user.User) {
+	s.handleUsersDeleted([]string{u.ID})
+	s.cluster.BroadcastState(&cluster.State{
+		DeletedUserIDs: []string{u.ID},
+	})
+}
+
+// handleUsersDeleted ends all streams of the given (deleted) users on this node, on every topic,
+// after a local delete or a peer's, never re-broadcasting. An access cache reload does not find
+// them: a user without access entries (e.g. an admin) leaves nothing in the cache to compare.
+func (s *Server) handleUsersDeleted(userIDs []string) {
+	for _, t := range s.allTopics() {
+		for _, userID := range userIDs {
+			t.CancelSubscriberUser(userID) // An empty user ID cancels nobody
+		}
+	}
+}
+
+// reauthorizeSubscribers ends the subscriptions that changed access entries no longer allow, checking
+// only matching topics. The user manager calls it after an access cache reload that found changes.
+// It authorizes each subscription's own user as of subscribing, against the cache, without a
+// database query; a deleted user's streams end through handleUsersDeleted instead.
+func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
+	for _, change := range changes {
+		for _, t := range s.topicsForAccessChange(change.TopicPattern) {
+			t.CancelSubscribersWhere(func(u *user.User) bool {
+				if change.Username != user.Everyone && (u == nil || u.Name != change.Username) {
+					return false // The entry does not apply to this subscriber
+				}
+				return s.userManager.Authorize(u, t.ID, user.PermissionRead) != nil
+			})
+		}
+	}
+}
+
+// authorizeSubscribed authorizes a new stream once more, right after it subscribed. An access change
+// whose re-check (see reauthorizeSubscribers) ran between the request's authorization and its
+// subscribing would otherwise miss the stream for good. Each check sees the other: the re-check runs
+// after the cache was swapped, so either it finds the subscription or this check finds the new
+// entries. Only with the access cache, where it is a lookup in memory and re-checks happen at all.
+func (s *Server) authorizeSubscribed(v *visitor, topics []*topic) error {
+	if s.userManager == nil || !s.config.AuthAccessCacheEnabled {
+		return nil
+	}
+	for _, t := range topics {
+		if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionRead); err != nil {
+			return errHTTPForbidden
+		}
+	}
+	return nil
+}
+
+// topicsForAccessChange returns the local topics a changed access entry's topic or pattern matches
+func (s *Server) topicsForAccessChange(topicPattern string) []*topic {
+	if !strings.Contains(topicPattern, "*") {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		if t, ok := s.topics[topicPattern]; ok {
+			return []*topic{t}
+		}
+		return nil
+	}
+	topics, err := s.topicsFromPattern(topicPattern)
+	if err != nil {
+		log.Tag(tagSubscribe).Err(err).Warn("Cannot match topics against access pattern %s", topicPattern)
+		return nil
+	}
+	return topics
 }

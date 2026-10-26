@@ -71,7 +71,8 @@ func TestPostgresStore_CreatesTopicPublishedIDIndex(t *testing.T) {
 	_, err := NewPostgresStore(d, 0, 0)
 	require.Nil(t, err)
 	var definition string
-	require.Nil(t, d.Primary().QueryRow(`SELECT indexdef FROM pg_indexes WHERE tablename = 'message' AND indexname = 'idx_message_topic_published_id'`).Scan(&definition))
+	// pg_indexes spans every schema: without the schema filter, a parallel test dropping its schema fails this one
+	require.Nil(t, d.Primary().QueryRow(`SELECT indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename = 'message' AND indexname = 'idx_message_topic_published_id'`).Scan(&definition))
 	require.Contains(t, definition, "(topic, published, id)")
 }
 

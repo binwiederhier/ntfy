@@ -1,7 +1,18 @@
 {
-  "prefs_legal_contact_title": "যোগাযোগ:",
-  "prefs_legal_name": "নাম",
-  "prefs_legal_email": "ইমেইল",
-  "prefs_legal_notice": "আইনি বিজ্ঞপ্তি",
-  "prefs_privacy_policy": "গোপনীয়তা নীতি"
+    "prefs_legal_contact_title": "যোগাযোগ:",
+    "prefs_legal_name": "নাম",
+    "prefs_legal_email": "ইমেইল",
+    "prefs_legal_notice": "আইনি বিজ্ঞপ্তি",
+    "prefs_privacy_policy": "গোপনীয়তা নীতি",
+    "common_cancel": "বাতিল করুন",
+    "common_save": "সংরক্ষণ করুন",
+    "common_add": "যোগ করুন",
+    "common_back": "পেছনে যান",
+    "common_close": "বন্ধ করুন",
+    "common_copy_to_clipboard": "ক্লিপবোর্ডে কপি করুন",
+    "common_refresh": "রিফ্রেশ করুন",
+    "email_verify_progress_title": "আপনার ইমেইল যাচাই করা হচ্ছে..।",
+    "email_verify_success_title": "ইমেইল যাচাই করা হয়েছে",
+    "email_verify_success_description": "আপনার ইমেইল যাচাই করা হয়েছে এবং অ্যাকাউন্টে যোগ করা হয়েছে।",
+    "email_verify_error_title": "যাচাইকরণ ব্যর্থ হয়েছে"
 }

@@ -102,7 +102,7 @@ const (
 	sqliteSelectAttachmentsWithSizesQuery    = `SELECT mid, attachment_size FROM messages WHERE attachment_expires > ? AND attachment_deleted = 0`
 
 	sqliteSelectStatsQuery       = `SELECT value FROM stats WHERE key = 'messages'`
-	sqliteUpdateStatsQuery       = `UPDATE stats SET value = ? WHERE key = 'messages'`
+	sqliteUpdateStatsQuery       = `UPDATE stats SET value = value + ? WHERE key = 'messages'`
 	sqliteUpdateMessageTimeQuery = `UPDATE messages SET time = ? WHERE mid = ?`
 )
 
@@ -147,7 +147,7 @@ func NewSQLiteStore(filename, startupQueries string, cacheDuration time.Duration
 	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {
 		return nil, err
 	}
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
 		return nil, err
 	}
 	return newCache(db.New(&db.Host{DB: d}, nil), sqliteQueries, &sync.Mutex{}, batchSize, batchTimeout, nop), nil

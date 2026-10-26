@@ -6,8 +6,7 @@ import (
 
 // Initial PostgreSQL schema
 const (
-	postgresCurrentSchemaVersion = 17
-	postgresCreateTablesQuery    = `
+	postgresCreateTablesQuery = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
 			mid TEXT NOT NULL,
@@ -75,9 +74,9 @@ var (
 
 	// postgresMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
-	postgresMigrations = map[int]schema.MigrateFunc{
-		14: schema.AsMigrateFunc(postgresMigrate14To15CreateIndexQuery),
-		15: schema.AsMigrateFunc(postgresMigrate15To16AddClaimedAtQuery),
-		16: schema.AsMigrateFunc(postgresMigrate16To17CreateIndexQuery),
+	postgresMigrations = schema.Migrations{
+		{From: 14, To: 15}: schema.Query(postgresMigrate14To15CreateIndexQuery),
+		{From: 15, To: 16}: schema.Query(postgresMigrate15To16AddClaimedAtQuery),
+		{From: 16, To: 17}: schema.Query(postgresMigrate16To17CreateIndexQuery),
 	}
 )

@@ -181,7 +181,7 @@ func TestRegistry_SchemaVersionWritten(t *testing.T) {
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, pool.QueryRow(`SELECT version FROM schema_version WHERE store = $1`, schemaStoreKey).Scan(&version))
-	require.Equal(t, schemaVersion, version)
+	require.Equal(t, 2, version)
 	// Setup is idempotent: a second node boots against the migrated schema
 	_, err = New(pool, "node-2", "http://10.0.0.2:2587", RoleActive, time.Minute)
 	require.Nil(t, err)
@@ -663,4 +663,35 @@ func TestRegistry_PruneKeepsRecentlyLiveActiveNodes(t *testing.T) {
 	require.Equal(t, 1, countRows(t, pool, "app0"))
 	tick(t, a)
 	require.False(t, a.IsLeader())
+}
+
+func TestRegistry_SetRolePassiveHandsLeadershipOver(t *testing.T) {
+	// A draining node acts as passive at runtime: it stops leading at once, and its
+	// peers see the new role at its next heartbeat and take over
+	t.Parallel()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	a, err := New(pool, "app1", "http://10.0.0.1:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	b, err := New(pool, "app2", "http://10.0.0.2:2587", RoleActive, leaderTestTTL)
+	require.Nil(t, err)
+	waitForLeader(t, a, b)
+	a.SetRole(RolePassive)
+	require.False(t, a.IsLeader())
+	tick(t, a, b)
+	peers := b.Peers()
+	require.Len(t, peers, 1)
+	require.Equal(t, RolePassive, peers[0].Role)
+	waitForLeader(t, b, a)
+}
+
+func TestPeers_HasActive(t *testing.T) {
+	// Whether there is somewhere for a node's clients to go: a passive peer takes none
+	require.False(t, Peers(nil).HasActive())
+	require.False(t, Peers{
+		&Peer{NodeID: "app2", Role: RolePassive},
+	}.HasActive())
+	require.True(t, Peers{
+		&Peer{NodeID: "app2", Role: RolePassive},
+		&Peer{NodeID: "app3", Role: RoleActive},
+	}.HasActive())
 }

@@ -124,7 +124,7 @@ const (
 		RETURNING mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 	`
 
-	postgresUpdateStatsQuery       = `UPDATE message_stats SET value = $1 WHERE key = 'messages'`
+	postgresUpdateStatsQuery       = `UPDATE message_stats SET value = value + $1 WHERE key = 'messages'`
 	postgresUpdateMessageTimeQuery = `UPDATE message SET time = $1 WHERE mid = $2`
 )
 
@@ -159,7 +159,7 @@ var postgresQueries = queries{
 
 // NewPostgresStore creates a new PostgreSQL-backed message cache store using an existing database connection pool.
 func NewPostgresStore(d *db.DB, batchSize int, batchTimeout time.Duration) (*Cache, error) {
-	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, postgresMigrations); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCreateTables, postgresMigrations); err != nil {
 		return nil, err
 	}
 	return newCache(d, postgresQueries, nil, batchSize, batchTimeout, false), nil

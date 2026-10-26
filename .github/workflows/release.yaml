@@ -5,7 +5,7 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:17
@@ -42,6 +42,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
       - name: Install dependencies
+        timeout-minutes: 10 # A stalled apt mirror must fail the run, not hang it
         run: make build-deps-ubuntu
       - name: Build and publish
         run: make release

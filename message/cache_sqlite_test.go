@@ -256,7 +256,7 @@ func checkSqliteSchemaVersion(t *testing.T, filename string) {
 	db, err := sql.Open("sqlite3", filename)
 	require.Nil(t, err)
 	defer db.Close()
-	rows, err := db.Query(`SELECT version FROM schemaVersion`)
+	rows, err := db.Query(`SELECT version FROM schemaVersion WHERE id = 1`)
 	require.Nil(t, err)
 	require.True(t, rows.Next())
 	var schemaVersion int

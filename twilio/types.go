@@ -7,9 +7,14 @@ import (
 	"text/template"
 )
 
-// ErrVerificationExpired is returned by CheckVerify if the verification code has
-// expired, or if it never existed in the first place
-var ErrVerificationExpired = errors.New("phone number verification expired or does not exist")
+var (
+	// ErrVerificationExpired is returned by CheckVerify if the verification code has
+	// expired, or if it never existed in the first place
+	ErrVerificationExpired = errors.New("phone number verification expired or does not exist")
+
+	// ErrVerificationCodeInvalid is returned by CheckVerify if the verification code is wrong
+	ErrVerificationCodeInvalid = errors.New("phone number verification code invalid")
+)
 
 // Config holds the Twilio configuration for the client
 type Config struct {
@@ -45,6 +50,11 @@ var defaultCallFormatTemplate = template.Must(template.New("twiml").Parse(`
 	</Say>
 	<Say>Goodbye.</Say>
 </Response>`))
+
+// verificationCheckResponse is the relevant part of the Twilio Verify VerificationCheck response
+type verificationCheckResponse struct {
+	Status string `json:"status"` // "approved" if the code is correct, "pending" otherwise
+}
 
 // CallData holds the data passed to the Twilio call format template. String fields are
 // XML-escaped before the template is executed, so callers pass them unescaped.

@@ -53,6 +53,7 @@ ADD ./ban ./ban
 ADD ./metrics ./metrics
 ADD ./twilio ./twilio
 ADD ./cluster ./cluster
+ADD ./visitor ./visitor
 ADD ./template/gotext ./template/gotext
 
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build make VERSION=$VERSION COMMIT=$COMMIT cli-linux-server

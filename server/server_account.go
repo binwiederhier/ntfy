@@ -245,6 +245,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 	if err := s.userManager.MarkUserRemoved(u); err != nil {
 		return err
 	}
+	s.userDeleted(u)
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -553,7 +554,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-	t.CancelSubscribersExceptUser(u.ID)
+	t.CancelSubscribersExceptUser(u.ID) // The other nodes end theirs when they reload their access cache, see broadcastAccessChanged
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -656,6 +657,8 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 	if err := s.twilio.CheckVerify(req.Number, req.Code); err != nil {
 		if errors.Is(err, twilio.ErrVerificationExpired) {
 			return errHTTPGonePhoneVerificationExpired
+		} else if errors.Is(err, twilio.ErrVerificationCodeInvalid) {
+			return errHTTPBadRequestPhoneVerificationCodeInvalid
 		}
 		return err
 	}

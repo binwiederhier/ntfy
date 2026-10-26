@@ -92,7 +92,7 @@ func TestServer_Tail_SubscriberErrorDoesNotCrash(t *testing.T) {
 	topics[0].Subscribe(func(_ *visitor, _ *model.Message) error {
 		calls.Add(1)
 		return errors.New("broken pipe")
-	}, "", func() {})
+	}, nil, func() {})
 	require.Nil(t, s.messageCache.AddMessages([]*model.Message{model.NewDefaultMessage("mytopic", "from peer")}))
 	waitFor(t, func() bool { return calls.Load() == 1 })
 	time.Sleep(200 * time.Millisecond) // The failure is logged after the call

@@ -113,10 +113,6 @@ const (
 	sqliteBuiltinStartupQueries = `PRAGMA foreign_keys = ON;`
 )
 
-const (
-	sqliteCurrentSchemaVersion = 9
-)
-
 // Schema migrations for SQLite
 const (
 	// 1 -> 2 (complex migration!)
@@ -373,15 +369,15 @@ var (
 
 	// sqliteMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
-	sqliteMigrations = map[int]schema.MigrateFunc{
-		1: sqliteMigrateFrom1,
-		2: schema.AsMigrateFunc(sqliteMigrate2To3UpdateQueries),
-		3: schema.AsMigrateFunc(sqliteMigrate3To4UpdateQueries),
-		4: schema.AsMigrateFunc(sqliteMigrate4To5UpdateQueries),
-		5: schema.AsMigrateFunc(sqliteMigrate5To6UpdateQueries),
-		6: schema.AsMigrateFunc(sqliteMigrate6To7UpdateQueries),
-		7: schema.AsMigrateFunc(sqliteMigrate7To8UpdateQueries),
-		8: schema.AsMigrateFunc(sqliteMigrate8To9UpdateQueries),
+	sqliteMigrations = schema.Migrations{
+		{From: 1, To: 2}: schema.Func(sqliteMigrateFrom1),
+		{From: 2, To: 3}: schema.Query(sqliteMigrate2To3UpdateQueries),
+		{From: 3, To: 4}: schema.Query(sqliteMigrate3To4UpdateQueries),
+		{From: 4, To: 5}: schema.Query(sqliteMigrate4To5UpdateQueries),
+		{From: 5, To: 6}: schema.Query(sqliteMigrate5To6UpdateQueries),
+		{From: 6, To: 7}: schema.Query(sqliteMigrate6To7UpdateQueries),
+		{From: 7, To: 8}: schema.Query(sqliteMigrate7To8UpdateQueries),
+		{From: 8, To: 9}: schema.Query(sqliteMigrate8To9UpdateQueries),
 	}
 )
 

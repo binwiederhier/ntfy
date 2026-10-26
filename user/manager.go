@@ -41,7 +41,7 @@ const (
 	DefaultUserStatsQueueWriterInterval = 33 * time.Second
 	DefaultUserPasswordBcryptCost       = 10
 	DefaultAccessCacheEnabled           = false
-	DefaultAccessCacheReloadInterval    = 87 * time.Second
+	DefaultAccessCacheReloadInterval    = 67 * time.Second
 	DefaultExpiredMagicLinkReapInterval = time.Hour // How often expired email-verify/password-reset links are swept
 )
 
@@ -58,7 +58,7 @@ type Manager struct {
 	queries     queries
 	statsQueue  map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
 	tokenQueue  map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
-	accessCache *accessCache            // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
+	accessCache *accessCache            // In-memory snapshot of user_access; reloaded by accessWritten after every ACL mutation
 	quit        chan struct{}           // Closed by Close() to signal background goroutines to stop
 	mu          sync.Mutex
 }
@@ -90,49 +90,39 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 		return nil, err
 	}
 	if config.AccessCacheEnabled {
-		manager.accessCache = newAccessCache()
-		if err := manager.maybeReloadAccessCache(); err != nil {
+		manager.accessCache = newAccessCache(d, queries.selectAccessCacheAll, config.AccessCacheChangedFunc)
+		if err := manager.accessCache.Start(config.AccessCacheReloadInterval); err != nil {
 			return nil, err
 		}
-		go manager.asyncAccessCacheReloadLoop(manager.config.AccessCacheReloadInterval)
 	}
 	go manager.asyncQueueWriteLoop(manager.config.QueueWriterInterval)
 	go manager.asyncExpiredMagicLinkReapLoop(manager.config.ExpiredMagicLinkReapInterval)
 	return manager, nil
 }
 
-// maybeReloadAccessCache refreshes the in-memory access cache from the
-// primary database. No-op when the cache is disabled. With no usernames it
-// does a full bulk reload; with one or more it refreshes only those users'
-// slices in a single DB round-trip via an IN clause.
-func (a *Manager) maybeReloadAccessCache(usernames ...string) error {
+// RequestAccessCacheReload asks for a reload of the whole access cache soon, e.g. because another
+// cluster node changed access entries, and returns at once; bursts are coalesced (see
+// accessCache.RequestReload). No-op when the cache is disabled.
+func (a *Manager) RequestAccessCacheReload() {
+	if a.accessCache == nil {
+		return
+	}
+	a.accessCache.RequestReload()
+}
+
+// accessWritten is called after this process wrote access entries (or users): it tells
+// Config.AccessWrittenFunc first, so that the other cluster nodes start reloading their access
+// cache right away, then reloads this node's cache, so the change applies here before the write
+// returns. Never called for a reload alone, which would loop. No reload runs under a.mu, so
+// Config.AccessCacheChangedFunc may call back into the manager.
+func (a *Manager) accessWritten() error {
+	if a.config.AccessWrittenFunc != nil {
+		a.config.AccessWrittenFunc()
+	}
 	if a.accessCache == nil {
 		return nil
 	}
-	if len(usernames) == 0 {
-		return a.accessCache.Reload(a.db, a.queries.selectAccessCacheAll)
-	}
-	return a.accessCache.Reload(a.db, a.queries.selectAccessCacheUsers(len(usernames)), usernames...)
-}
-
-// asyncAccessCacheReloadLoop periodically bulk-reloads the access cache so that
-// writes made by other processes against the same database (most notably the
-// `ntfy access` CLI subcommand running while a server holds the cache) become
-// visible within the configured interval. This Manager's own mutations do
-// not depend on the poller -- they refresh affected users synchronously.
-func (a *Manager) asyncAccessCacheReloadLoop(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-a.quit:
-			return
-		case <-ticker.C:
-			if err := a.maybeReloadAccessCache(); err != nil {
-				log.Tag(tag).Err(err).Warn("Reloading ACL cache failed")
-			}
-		}
-	}
+	return a.accessCache.Reload()
 }
 
 // asyncExpiredMagicLinkReapLoop periodically deletes expired email-verification and
@@ -235,7 +225,7 @@ func (a *Manager) RemoveUser(username string) error {
 		return err
 	}
 	// Reload user-specific parts of the access cache
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // removeUserTx deletes the user with the given username
@@ -273,7 +263,7 @@ func (a *Manager) MarkUserRemoved(user *User) error {
 		return err
 	}
 	// Reload user-specific parts of the access cache
-	return a.maybeReloadAccessCache(user.Name, Everyone)
+	return a.accessWritten()
 }
 
 // RemoveDeletedUsers deletes all users that have been marked deleted
@@ -289,7 +279,7 @@ func (a *Manager) RemoveDeletedUsers() error {
 		return nil
 	}
 	// Full cache reload, because we don't know which users were affected.
-	return a.maybeReloadAccessCache()
+	return a.accessWritten()
 }
 
 // ChangePassword changes a user's password
@@ -327,7 +317,7 @@ func (a *Manager) ChangeRole(username string, role Role) error {
 		return err
 	}
 	// Full cache reload: Role changes are extremely rare.
-	return a.maybeReloadAccessCache()
+	return a.accessWritten()
 }
 
 // changeRoleTx changes a user's role
@@ -744,7 +734,7 @@ func (a *Manager) AllowAccess(username string, topicPattern string, permission P
 		return err
 	}
 	// Only this user's row set changed; refresh their slice only.
-	return a.maybeReloadAccessCache(username)
+	return a.accessWritten()
 }
 
 func (a *Manager) allowAccessTx(tx *sql.Tx, username string, topicPattern string, permission Permission, provisioned bool) error {
@@ -766,14 +756,7 @@ func (a *Manager) ResetAccess(username string, topicPattern string) error {
 	if err != nil {
 		return err
 	}
-	// Empty username -> deleteAllAccess affected every user, bulk reload.
-	// Otherwise refresh the named user plus Everyone, since resetUserAccessTx
-	// and deleteTopicAccess both touch rows owned by the user (typically the
-	// Everyone row from their reservations).
-	if username == "" {
-		return a.maybeReloadAccessCache()
-	}
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 func (a *Manager) resetAccessTx(tx *sql.Tx, username string, topicPattern string) error {
@@ -934,7 +917,7 @@ func (a *Manager) AddReservation(username string, topic string, everyone Permiss
 		return err
 	}
 	// Both user's and Everyone's rows changed.
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // RemoveReservations deletes the access control entries associated with the given username/topic,
@@ -962,7 +945,7 @@ func (a *Manager) RemoveReservations(username string, topics ...string) error {
 	}
 	// Mirror the DB: rows for this user and any Everyone rows owned by this
 	// user are gone. Refresh both slices.
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // Reservations returns all user-owned topics, and the associated everyone-access
@@ -1084,7 +1067,7 @@ func (a *Manager) RemoveExcessReservations(username string, limit int64) ([]stri
 	if len(removedTopics) > 0 {
 		// removeReservationAccessTx deletes rows owned by this user and the
 		// matching Everyone rows, so we refresh the access cache.
-		if err := a.maybeReloadAccessCache(username, Everyone); err != nil {
+		if err := a.accessWritten(); err != nil {
 			return nil, err
 		}
 	}
@@ -1983,6 +1966,9 @@ func (a *Manager) Close() error {
 		// Already closed
 	default:
 		close(a.quit)
+		if a.accessCache != nil {
+			a.accessCache.Close()
+		}
 	}
 	return a.db.Close()
 }

@@ -7,6 +7,7 @@ import (
 
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
 
@@ -35,11 +36,19 @@ type topic struct {
 }
 
 type topicSubscriber struct {
-	userID       string // User ID associated with this subscription, may be empty
+	user         *user.User // The user as of subscribing, nil if anonymous; lets a re-check authorize without the database
 	subscriber   subscriber
 	cancel       func()
 	subscribedAt time.Time     // When it subscribed; what went out before, it missed
 	sent         chan struct{} // Closed when the last batch of sends to this subscriber is done; the next one waits for it
+}
+
+// userID returns the subscriber's user ID, or "" if anonymous
+func (s *topicSubscriber) userID() string {
+	if s.user == nil {
+		return ""
+	}
+	return s.user.ID
 }
 
 // subscriber is a function that is called for every new message on a topic
@@ -55,8 +64,8 @@ func newTopic(id string) *topic {
 	}
 }
 
-// Subscribe subscribes to this topic
-func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscriberID int) {
+// Subscribe subscribes to this topic, as the given user (nil if anonymous)
+func (t *topic) Subscribe(s subscriber, u *user.User, cancel func()) (subscriberID int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	for i := 0; i < 5; i++ { // Best effort retry
@@ -67,7 +76,7 @@ func (t *topic) Subscribe(s subscriber, userID string, cancel func()) (subscribe
 		}
 	}
 	t.subscribers[subscriberID] = &topicSubscriber{
-		userID:       userID, // May be empty
+		user:         u, // May be nil
 		subscriber:   s,
 		cancel:       cancel,
 		subscribedAt: time.Now(),
@@ -225,34 +234,62 @@ func (t *topic) SubscribersCount() int {
 
 // CancelAllSubscribers calls the cancel function of every subscriber, closing their connections
 func (t *topic) CancelAllSubscribers() {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	for _, s := range t.subscribers {
+	subscribers := t.subscribersMatching(func(*topicSubscriber) bool {
+		return true
+	})
+	for _, s := range subscribers {
 		s.cancel()
 	}
 }
 
 // CancelSubscribersExceptUser calls the cancel function for all subscribers, forcing
 func (t *topic) CancelSubscribersExceptUser(exceptUserID string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	for _, s := range t.subscribers {
-		if s.userID != exceptUserID {
-			t.cancelUserSubscriber(s)
-		}
+	subscribers := t.subscribersMatching(func(s *topicSubscriber) bool {
+		return s.userID() != exceptUserID
+	})
+	for _, s := range subscribers {
+		t.cancelUserSubscriber(s)
 	}
 }
 
-// CancelSubscriberUser kills the subscriber with the given user ID
+// CancelSubscriberUser kills all subscribers with the given user ID; an empty ID matches nobody
 func (t *topic) CancelSubscriberUser(userID string) {
+	if userID == "" {
+		return // Anonymous subscribers are only ever canceled on purpose, see CancelSubscribersWhere
+	}
+	t.CancelSubscribersWhere(func(u *user.User) bool {
+		return u != nil && u.ID == userID
+	})
+}
+
+// CancelSubscribersWhere kills the subscribers for whose user (as of subscribing, nil if anonymous)
+// cancel returns true. cancel runs without the topic lock held, so it may authorize the user.
+func (t *topic) CancelSubscribersWhere(cancel func(u *user.User) bool) {
+	subscribers := t.subscribersMatching(func(s *topicSubscriber) bool {
+		return cancel(s.user)
+	})
+	for _, s := range subscribers {
+		t.cancelUserSubscriber(s)
+	}
+}
+
+// subscribersMatching returns the subscribers that match. Neither match nor the caller's cancels
+// run under t.mu: canceling logs the topic's context, which takes t.mu, and a canceled stream's
+// Unsubscribe waits for it.
+func (t *topic) subscribersMatching(match func(s *topicSubscriber) bool) []*topicSubscriber {
 	t.mu.RLock()
-	defer t.mu.RUnlock()
+	all := make([]*topicSubscriber, 0, len(t.subscribers))
 	for _, s := range t.subscribers {
-		if s.userID == userID {
-			t.cancelUserSubscriber(s)
-			return
+		all = append(all, s)
+	}
+	t.mu.RUnlock()
+	matching := make([]*topicSubscriber, 0)
+	for _, s := range all {
+		if match(s) {
+			matching = append(matching, s)
 		}
 	}
+	return matching
 }
 
 func (t *topic) cancelUserSubscriber(s *topicSubscriber) {
@@ -260,9 +297,9 @@ func (t *topic) cancelUserSubscriber(s *topicSubscriber) {
 		Tag(tagSubscribe).
 		With(t).
 		Fields(log.Context{
-			"user_id": s.userID,
+			"user_id": s.userID(),
 		}).
-		Debug("Canceling subscriber with user ID %s", s.userID)
+		Debug("Canceling subscriber with user ID %s", s.userID())
 	s.cancel()
 }
 
@@ -289,7 +326,7 @@ func (t *topic) subscribersCopy() map[int]*topicSubscriber {
 	subscribers := make(map[int]*topicSubscriber)
 	for k, sub := range t.subscribers {
 		subscribers[k] = &topicSubscriber{
-			userID:     sub.userID,
+			user:       sub.user,
 			subscriber: sub.subscriber,
 			cancel:     sub.cancel,
 		}

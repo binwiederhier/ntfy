@@ -6,8 +6,7 @@ import (
 
 // Initial PostgreSQL schema
 const (
-	postgresCurrentSchemaVersion = 16
-	postgresCreateTablesQuery    = `
+	postgresCreateTablesQuery = `
 		CREATE TABLE IF NOT EXISTS message (
 			id BIGSERIAL PRIMARY KEY,
 			mid TEXT NOT NULL,
@@ -39,6 +38,7 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_message_mid ON message (mid);
 		CREATE INDEX IF NOT EXISTS idx_message_sequence_id ON message (sequence_id);
 		CREATE INDEX IF NOT EXISTS idx_message_topic_published_time ON message (topic, published, time, id);
+		CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id);
 		CREATE INDEX IF NOT EXISTS idx_message_published_expires ON message (published, expires);
 		CREATE INDEX IF NOT EXISTS idx_message_attachment_expires ON message (attachment_expires) WHERE attachment_deleted = FALSE;
 		CREATE INDEX IF NOT EXISTS idx_message_sender_attachment_expires ON message (sender, attachment_expires) WHERE user_id = '';
@@ -62,6 +62,11 @@ const (
 	postgresMigrate15To16AddClaimedAtQuery = `
 		ALTER TABLE message ADD COLUMN IF NOT EXISTS claimed_at BIGINT NOT NULL DEFAULT 0;
 	`
+
+	// 16 -> 17: serves the rows after a since=<id> marker; ntfy.sh got it by hand on 2026-10-16, which IF NOT EXISTS keeps
+	postgresMigrate16To17CreateIndexQuery = `
+		CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id);
+	`
 )
 
 var (
@@ -69,8 +74,9 @@ var (
 
 	// postgresMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
-	postgresMigrations = map[int]schema.MigrateFunc{
-		14: schema.AsMigrateFunc(postgresMigrate14To15CreateIndexQuery),
-		15: schema.AsMigrateFunc(postgresMigrate15To16AddClaimedAtQuery),
+	postgresMigrations = schema.Migrations{
+		{From: 14, To: 15}: schema.Query(postgresMigrate14To15CreateIndexQuery),
+		{From: 15, To: 16}: schema.Query(postgresMigrate15To16AddClaimedAtQuery),
+		{From: 16, To: 17}: schema.Query(postgresMigrate16To17CreateIndexQuery),
 	}
 )

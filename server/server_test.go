@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 	"heckel.io/ntfy/v2/attachment"
+	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/log"
@@ -345,6 +346,11 @@ func TestServer_MetricsEnabled(t *testing.T) {
 		require.Equal(t, 200, rr.Code)
 		require.Contains(t, rr.Body.String(), "ntfy_messages_published_success")
 		require.Contains(t, rr.Body.String(), "ntfy_http_requests_total")
+		if databaseURL != "" {
+			// The connection pools of a PostgreSQL database, read at scrape time
+			require.Regexp(t, `ntfy_db_pool_connections_max\{host="[^"]+",role="`+db.PoolRolePrimary+`"\} 2`, rr.Body.String())
+			require.Contains(t, rr.Body.String(), "ntfy_db_pool_waits_total{")
+		}
 	})
 }
 
@@ -971,6 +977,25 @@ func TestServer_PollWithQueryFilters(t *testing.T) {
 			messages := toMessages(t, response.Body.String())
 			require.Equal(t, 0, len(messages), "Query failed: "+query)
 		}
+	})
+}
+
+func TestServer_SubscribeIncrementalHeader(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+
+		// Streaming responses ask proxies not to buffer them (RFC 10036)
+		for _, format := range []string{"sse", "json", "raw"} {
+			rr := httptest.NewRecorder()
+			subscribeCancel := subscribe(t, s, "/mytopic/"+format, rr)
+			subscribeCancel()
+			require.Equal(t, "?1", rr.Header().Get("Incremental"), format)
+		}
+
+		// Polling returns all messages at once
+		rr := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Equal(t, "", rr.Header().Get("Incremental"))
 	})
 }
 
@@ -1939,7 +1964,7 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 		require.NotNil(t, s.topics["mytopic"])
 
 		// Fudge with last access, but subscribe, and see that it won't get pruned (because of subscriber)
-		subID := s.topics["mytopic"].Subscribe(subFn, "", func() {})
+		subID := s.topics["mytopic"].Subscribe(subFn, nil, func() {})
 		s.topics["mytopic"].mu.Lock()
 		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
 		s.topics["mytopic"].mu.Unlock()
@@ -3009,6 +3034,46 @@ func TestServer_PollSizeLimit(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 		require.Empty(t, response.Header().Get("X-Messages-Truncated"))
 		require.Equal(t, 1, len(toMessages(t, response.Body.String())))
+	})
+}
+
+func TestServer_SubscribeDuplicateTopics(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A repeated topic must be replayed once, not once per repetition. Using more copies than
+		// subscribeTopicsLimit also checks that duplicates do not count against the limit.
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", fmt.Sprintf("message %d", i), nil).Code)
+		}
+		topics := strings.TrimSuffix(strings.Repeat("mytopic,", subscribeTopicsLimit+1), ",")
+
+		response := request(t, s, "GET", "/"+topics+"/json?poll=1&since=all", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, 3, len(toMessages(t, response.Body.String())))
+
+		response = request(t, s, "GET", "/"+topics+"/sse?poll=1&since=all", "", nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, 3, strings.Count(response.Body.String(), "data: "))
+	})
+}
+
+func TestServer_SubscribeTooManyTopics(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		ids := make([]string, 0)
+		for i := 0; i < subscribeTopicsLimit+1; i++ {
+			ids = append(ids, fmt.Sprintf("topic%d", i))
+		}
+		topics := strings.Join(ids, ",")
+		for _, path := range []string{"/json?poll=1", "/sse?poll=1", "/raw?poll=1"} {
+			response := request(t, s, "GET", "/"+topics+path, "", nil)
+			require.Equal(t, 400, response.Code, path)
+			require.Equal(t, 40061, toHTTPError(t, response.Body.String()).Code, path)
+		}
+
+		// WebSocket errors carry only the status code, no JSON body
+		response := request(t, s, "GET", "/"+topics+"/ws", "", map[string]string{"Upgrade": "websocket", "Connection": "Upgrade"})
+		require.Equal(t, 400, response.Code)
 	})
 }
 
@@ -4385,13 +4450,13 @@ func TestServer_MessageTemplate_FromNamedTemplate_Alertmanager(t *testing.T) {
 	s := &Server{config: NewConfig()}
 	s.config.TemplateDir = "templates"
 	m := &model.Message{}
-	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", alertmanagerFiringJSON))
+	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", alertmanagerFiringJSON, ""))
 	require.NotContains(t, m.Message, "Ends at:")
 
 	resolvedJSON := strings.ReplaceAll(alertmanagerFiringJSON, `"status": "firing"`, `"status": "resolved"`)
 	resolvedJSON = strings.Replace(resolvedJSON, "0001-01-01T00:00:00Z", "2025-07-17T07:30:00Z", 1)
 	m = &model.Message{}
-	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", resolvedJSON))
+	require.NoError(t, s.renderTemplateFromFile(context.Background(), m, "alertmanager", resolvedJSON, ""))
 	require.Contains(t, m.Message, "Starts at: 2025-07-17T07:00:00Z\nEnds at: 2025-07-17T07:30:00Z")
 }
 
@@ -4629,6 +4694,49 @@ priority: '{{if eq .level "critical"}}5{{else if eq .level "warning"}}4{{else}}3
 		require.Equal(t, 200, response.Code)
 		m = toMessage(t, response.Body.String())
 		require.Equal(t, 3, m.Priority)
+	})
+}
+
+func TestServer_MessageTemplate_Priority_FromRequestWithTemplateFile(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+		c := newTestConfig(t, databaseURL)
+		c.TemplateDir = t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(c.TemplateDir, "no-priority.yml"), []byte(`
+title: "Test {{.a}}"
+message: "Value {{.a}}"
+`), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(c.TemplateDir, "with-priority.yml"), []byte(`
+message: "Value {{.a}}"
+priority: "5"
+`), 0644))
+		s := newTestServer(t, c)
+
+		// Template file without priority falls back to the request priority (#2045)
+		response := request(t, s, "POST", "/mytopic?tpl=no-priority&p=2&ta=warning", `{"a":1}`, nil)
+		require.Equal(t, 200, response.Code)
+		m := toMessage(t, response.Body.String())
+		require.Equal(t, "Test 1", m.Title)
+		require.Equal(t, "Value 1", m.Message)
+		require.Equal(t, 2, m.Priority)
+		require.Equal(t, []string{"warning"}, m.Tags)
+
+		// Header works the same way
+		response = request(t, s, "POST", "/mytopic", `{"a":1}`, map[string]string{
+			"X-Template": "no-priority",
+			"X-Priority": "high",
+		})
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, 4, toMessage(t, response.Body.String()).Priority)
+
+		// Invalid request priority is rejected
+		response = request(t, s, "POST", "/mytopic?tpl=no-priority&p=invalid", `{"a":1}`, nil)
+		require.Equal(t, 400, response.Code)
+
+		// Priority from the template file wins over the request priority
+		response = request(t, s, "POST", "/mytopic?tpl=with-priority&p=2", `{"a":1}`, nil)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, 5, toMessage(t, response.Body.String()).Priority)
 	})
 }
 
@@ -5692,7 +5800,7 @@ func TestServer_RunDoesNotStartListenersAfterStop(t *testing.T) {
 	addr := ln.Addr().String()
 	require.Nil(t, ln.Close())
 	conf := newTestConfig(t, "")
-	conf.ListenHTTP = addr
+	conf.ListenHTTP = []string{addr}
 	s := newTestServer(t, conf)
 	s.Stop()
 
@@ -5705,6 +5813,48 @@ func TestServer_RunDoesNotStartListenersAfterStop(t *testing.T) {
 	}
 	_, err = net.DialTimeout("tcp", addr, time.Second)
 	require.Error(t, err, "listener was started after Stop")
+}
+
+func TestServer_RunListensOnSeveralAddresses(t *testing.T) {
+	// A load balancer reaches each upstream address from one source IP, so every extra address
+	// gives it another ~63k ports to this node
+	addrs := []string{freeTestAddr(t), freeTestAddr(t)}
+	conf := newTestConfig(t, "")
+	conf.ListenHTTP = addrs
+	s := newTestServer(t, conf)
+	done := make(chan error, 1)
+	go func() { done <- s.Run() }()
+	for _, addr := range addrs {
+		require.Eventually(t, func() bool {
+			resp, err := http.Get("http://" + addr + "/v1/health")
+			if err != nil {
+				return false
+			}
+			resp.Body.Close()
+			return resp.StatusCode == http.StatusOK
+		}, 10*time.Second, 50*time.Millisecond, "no answer on %s", addr)
+	}
+
+	// Stop closes every listener
+	s.Stop()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return after Stop")
+	}
+	for _, addr := range addrs {
+		_, err := net.DialTimeout("tcp", addr, time.Second)
+		require.Error(t, err, "listener %s still open after Stop", addr)
+	}
+}
+
+// freeTestAddr returns a local address that was free a moment ago
+func freeTestAddr(t *testing.T) string {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	addr := ln.Addr().String()
+	require.Nil(t, ln.Close())
+	return addr
 }
 
 func TestServer_StopIsBoundedWhenAStoreBlocks(t *testing.T) {
@@ -5812,4 +5962,31 @@ func TestServer_PublishTimezoneWithoutDelay(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 		require.InDelta(t, time.Now().Unix(), toMessage(t, response.Body.String()).Time, 2)
 	})
+}
+
+// testStream is a live JSON stream subscription; ended is closed when the server ends it
+type testStream struct {
+	ended chan struct{}
+	rr    *httptest.ResponseRecorder
+}
+
+func (s *testStream) body() string {
+	<-s.ended
+	return s.rr.Body.String()
+}
+
+// subscribeStream opens a JSON stream to topic (headers may be nil) and waits until it is live
+func subscribeStream(t *testing.T, s *Server, topic string, headers map[string]string) *testStream {
+	topics, err := s.topicsFromIDs(nil, topic)
+	require.Nil(t, err)
+	before := topics[0].SubscribersCount()
+	stream := &testStream{ended: make(chan struct{})}
+	go func() {
+		stream.rr = request(t, s, "GET", "/"+topic+"/json", "", headers)
+		close(stream.ended)
+	}()
+	waitFor(t, func() bool {
+		return topics[0].SubscribersCount() > before
+	})
+	return stream
 }

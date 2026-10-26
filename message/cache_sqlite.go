@@ -44,25 +44,38 @@ const (
 		WHERE topic = ? AND time >= ?
 		ORDER BY time DESC, id DESC
 	`
-	sqliteSelectMessageRowIDQuery       = `SELECT id, time FROM messages WHERE mid = ? LIMIT 1`
-	sqliteSelectRecentRowIDsQuery       = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
+	sqliteSelectMessageRowIDQuery = `SELECT id, time FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectRecentRowIDsQuery = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
+	// sqliteSelectMessagesAfterRowIDQuery: see postgresSelectMessagesAfterRowIDQuery
 	sqliteSelectMessagesAfterRowIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding, id, published
-		FROM messages
-		WHERE id > ? OR id IN (SELECT value FROM json_each(?))
+		FROM (
+			SELECT * FROM messages WHERE id > ?1
+			UNION ALL
+			SELECT * FROM messages WHERE id IN (SELECT value FROM json_each(?2)) AND id <= ?1
+		)
 		ORDER BY id
-		LIMIT ?
+		LIMIT ?3
 	`
+	// sqliteSelectMessagesSinceIDQuery: see postgresSelectMessagesSinceIDQuery
 	sqliteSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
-		FROM messages
-		WHERE topic = ?1 AND (id > ?2 OR (time >= ?3 AND id <> ?2)) AND published = 1
+		FROM (
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id <> ?2
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2 AND time + 0 < ?3
+		)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
-		FROM messages
-		WHERE topic = ?1 AND (id > ?2 OR (time >= ?3 AND id <> ?2) OR published = 0)
+		FROM (
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id <> ?2
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2 AND time + 0 < ?3
+			UNION ALL
+			SELECT * FROM messages WHERE topic = ?1 AND published = 0
+		)
 		ORDER BY time DESC, id DESC
 	`
 	sqliteSelectMessagesLatestQuery = `
@@ -89,7 +102,7 @@ const (
 	sqliteSelectAttachmentsWithSizesQuery    = `SELECT mid, attachment_size FROM messages WHERE attachment_expires > ? AND attachment_deleted = 0`
 
 	sqliteSelectStatsQuery       = `SELECT value FROM stats WHERE key = 'messages'`
-	sqliteUpdateStatsQuery       = `UPDATE stats SET value = ? WHERE key = 'messages'`
+	sqliteUpdateStatsQuery       = `UPDATE stats SET value = value + ? WHERE key = 'messages'`
 	sqliteUpdateMessageTimeQuery = `UPDATE messages SET time = ? WHERE mid = ?`
 )
 
@@ -134,7 +147,7 @@ func NewSQLiteStore(filename, startupQueries string, cacheDuration time.Duration
 	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {
 		return nil, err
 	}
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations(cacheDuration)); err != nil {
 		return nil, err
 	}
 	return newCache(db.New(&db.Host{DB: d}, nil), sqliteQueries, &sync.Mutex{}, batchSize, batchTimeout, nop), nil

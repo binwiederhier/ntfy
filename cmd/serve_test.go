@@ -522,6 +522,79 @@ func TestCLI_Serve_WebSocket(t *testing.T) {
 	require.Equal(t, "mytopic", m.Topic)
 }
 
+func TestParseListenHTTP_Success(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "single address",
+			input:    ":80",
+			expected: []string{":80"},
+		},
+		{
+			name:     "several addresses",
+			input:    "10.0.0.5:2586,10.0.0.5:2588,10.0.0.5:2589",
+			expected: []string{"10.0.0.5:2586", "10.0.0.5:2588", "10.0.0.5:2589"},
+		},
+		{
+			name:     "whitespace around commas",
+			input:    " 10.0.0.5:2586 , 10.0.0.5:2588 ",
+			expected: []string{"10.0.0.5:2586", "10.0.0.5:2588"},
+		},
+		{
+			name:     "unset default",
+			input:    "-",
+			expected: []string{},
+		},
+		{
+			name:     "empty",
+			input:    "",
+			expected: []string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseListenHTTP(tt.input)
+			require.Nil(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParseListenHTTP_Errors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		error string
+	}{
+		{
+			name:  "empty entry",
+			input: "10.0.0.5:2586,,10.0.0.5:2588",
+			error: "invalid listen-http: 10.0.0.5:2586,,10.0.0.5:2588, empty address",
+		},
+		{
+			name:  "trailing comma",
+			input: "10.0.0.5:2586,",
+			error: "invalid listen-http: 10.0.0.5:2586,, empty address",
+		},
+		{
+			name:  "duplicate address",
+			input: "10.0.0.5:2586,10.0.0.5:2586",
+			error: "invalid listen-http: 10.0.0.5:2586,10.0.0.5:2586, duplicate address 10.0.0.5:2586",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseListenHTTP(tt.input)
+			require.Error(t, err)
+			require.Nil(t, result)
+			assert.Equal(t, tt.error, err.Error())
+		})
+	}
+}
+
 func TestIP_Host_Parsing(t *testing.T) {
 	cases := map[string]string{
 		"1.1.1.1":          "1.1.1.1/32",
@@ -571,6 +644,21 @@ func TestCLI_Serve_ClusterValidation(t *testing.T) {
 	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-batch-linger=-1s"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster batch linger")
+	// The drain duration must not be negative either (0 disables draining)
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-duration=-1s"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster drain duration")
+	// The drain delay must not be negative either
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-delay=-1s"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster drain delay")
+	// 0 is valid (close all at once): the error is about the role, which is checked after the drain duration
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-duration=0", "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a", "--experimental-cluster-role=leader"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-role")
 	// The role must be one of the known ones: a typo would make a node half passive
 	app, _, _, _ = newTestApp()
 	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a", "--experimental-cluster-role=leader"})

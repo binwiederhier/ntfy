@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"math"
 	"net/netip"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	vis "heckel.io/ntfy/v2/visitor" // Aliased: the server has its own visitor type
 )
 
 const (
@@ -22,39 +22,12 @@ const (
 	// has to be very high to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since
 	// they are replenished faster (typically).
 	visitorExpungeAfter = oneDay
-
-	// visitorDefaultReservationsLimit is the amount of topic names a user without a tier is allowed to reserve.
-	// This number is zero, and changing it may have unintended consequences in the web app, or otherwise
-	visitorDefaultReservationsLimit = int64(0)
-
-	// visitorDefaultCallsLimit is the amount of calls a user without a tier is allowed to make.
-	// This number is zero, because phone numbers have to be verified first.
-	visitorDefaultCallsLimit = int64(0)
-)
-
-// Constants used to convert a tier-user's MessageSizeLimit (see user.Tier) into adequate request limiter
-// values (token bucket). This is only used to increase the values in server.yml, never decrease them.
-//
-// Example: Assuming a user.Tier's MessageSizeLimit is 10,000:
-// - the allowed burst is 500 (= 10,000 * 5%), which is < 1000 (the max)
-// - the replenish rate is 2 * 10,000 / 24 hours
-const (
-	visitorMessageToRequestLimitBurstRate       = 0.05
-	visitorMessageToRequestLimitBurstMax        = 1000
-	visitorMessageToRequestLimitReplenishFactor = 2
-)
-
-// Constants used to convert a tier-user's EmailLimit (see user.Tier) into adequate email limiter
-// values (token bucket). Example: Assuming a user.Tier's EmailLimit is 200, the allowed burst is
-// 40 (= 200 * 20%), which is <150 (the max).
-const (
-	visitorEmailLimitBurstRate = 0.2
-	visitorEmailLimitBurstMax  = 150
 )
 
 // visitor represents an API user, and its associated rate.Limiter used for rate limiting
 type visitor struct {
 	config               *Config
+	limitsConfig         *vis.Config // The parts of config that keying and limit resolution need (see visitorConfigFrom)
 	messageCache         *message.Cache
 	userManager          *user.Manager      // May be nil
 	ip                   netip.Addr         // Visitor IP address
@@ -75,25 +48,8 @@ type visitor struct {
 }
 
 type visitorInfo struct {
-	Limits *visitorLimits
+	Limits *vis.Limits
 	Stats  *visitorStats
-}
-
-type visitorLimits struct {
-	Basis                    visitorLimitBasis
-	RequestLimitBurst        int
-	RequestLimitReplenish    rate.Limit
-	MessageLimit             int64
-	MessageExpiryDuration    time.Duration
-	EmailLimit               int64
-	EmailLimitBurst          int
-	EmailLimitReplenish      rate.Limit
-	CallLimit                int64
-	ReservationsLimit        int64
-	AttachmentTotalSizeLimit int64
-	AttachmentFileSizeLimit  int64
-	AttachmentExpiryDuration time.Duration
-	AttachmentBandwidthLimit int64
 }
 
 type visitorStats struct {
@@ -109,15 +65,6 @@ type visitorStats struct {
 	AttachmentTotalSizeRemaining int64
 }
 
-// visitorLimitBasis describes how the visitor limits were derived, either from a user's
-// IP address (default config), or from its tier
-type visitorLimitBasis string
-
-const (
-	visitorLimitBasisIP   = visitorLimitBasis("ip")
-	visitorLimitBasisTier = visitorLimitBasis("tier")
-)
-
 func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Manager, ip netip.Addr, user *user.User) *visitor {
 	var messages, emails, calls int64
 	if user != nil {
@@ -127,6 +74,7 @@ func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Man
 	}
 	v := &visitor{
 		config:               conf,
+		limitsConfig:         visitorConfigFrom(conf),
 		messageCache:         messageCache,
 		userManager:          userManager, // May be nil
 		ip:                   ip,
@@ -462,63 +410,18 @@ func (v *visitor) resetLimitersNoLock(messages, emails, calls int64) {
 	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor")          // Must be after function, because contextNoLock() describes rate limiters
 }
 
-func (v *visitor) Limits() *visitorLimits {
+func (v *visitor) Limits() *vis.Limits {
 	v.mu.RLock()
 	defer v.mu.RUnlock()
 	return v.limitsNoLock()
 }
 
-func (v *visitor) limitsNoLock() *visitorLimits {
-	if v.user != nil && v.user.Tier != nil {
-		return tierBasedVisitorLimits(v.config, v.user.Tier)
+func (v *visitor) limitsNoLock() *vis.Limits {
+	var tier *user.Tier
+	if v.user != nil {
+		tier = v.user.Tier // May be nil, which resolves the config-based limits
 	}
-	return configBasedVisitorLimits(v.config)
-}
-
-func tierBasedVisitorLimits(conf *Config, tier *user.Tier) *visitorLimits {
-	return &visitorLimits{
-		Basis:                    visitorLimitBasisTier,
-		RequestLimitBurst:        util.MinMax(int(float64(tier.MessageLimit)*visitorMessageToRequestLimitBurstRate), conf.VisitorRequestLimitBurst, visitorMessageToRequestLimitBurstMax),
-		RequestLimitReplenish:    util.Max(rate.Every(conf.VisitorRequestLimitReplenish), dailyLimitToRate(tier.MessageLimit*visitorMessageToRequestLimitReplenishFactor)),
-		MessageLimit:             tier.MessageLimit,
-		MessageExpiryDuration:    tier.MessageExpiryDuration,
-		EmailLimit:               tier.EmailLimit,
-		EmailLimitBurst:          util.MinMax(int(float64(tier.EmailLimit)*visitorEmailLimitBurstRate), conf.VisitorEmailLimitBurst, visitorEmailLimitBurstMax),
-		EmailLimitReplenish:      dailyLimitToRate(tier.EmailLimit),
-		CallLimit:                tier.CallLimit,
-		ReservationsLimit:        tier.ReservationLimit,
-		AttachmentTotalSizeLimit: tier.AttachmentTotalSizeLimit,
-		AttachmentFileSizeLimit:  tier.AttachmentFileSizeLimit,
-		AttachmentExpiryDuration: tier.AttachmentExpiryDuration,
-		AttachmentBandwidthLimit: tier.AttachmentBandwidthLimit,
-	}
-}
-
-func configBasedVisitorLimits(conf *Config) *visitorLimits {
-	messagesLimit := replenishDurationToDailyLimit(conf.VisitorRequestLimitReplenish) // Approximation!
-	if conf.VisitorMessageDailyLimit > 0 {
-		messagesLimit = int64(conf.VisitorMessageDailyLimit)
-	}
-	var emailLimit int64
-	if conf.VisitorEmailLimitBurst > 0 {
-		emailLimit = replenishDurationToDailyLimit(conf.VisitorEmailLimitReplenish) // Approximation!
-	}
-	return &visitorLimits{
-		Basis:                    visitorLimitBasisIP,
-		RequestLimitBurst:        conf.VisitorRequestLimitBurst,
-		RequestLimitReplenish:    rate.Every(conf.VisitorRequestLimitReplenish),
-		MessageLimit:             messagesLimit,
-		MessageExpiryDuration:    conf.CacheDuration,
-		EmailLimit:               emailLimit,
-		EmailLimitBurst:          conf.VisitorEmailLimitBurst,
-		EmailLimitReplenish:      rate.Every(conf.VisitorEmailLimitReplenish),
-		CallLimit:                visitorDefaultCallsLimit,
-		ReservationsLimit:        visitorDefaultReservationsLimit,
-		AttachmentTotalSizeLimit: conf.VisitorAttachmentTotalSizeLimit,
-		AttachmentFileSizeLimit:  conf.AttachmentFileSizeLimit,
-		AttachmentExpiryDuration: conf.AttachmentExpiryDuration,
-		AttachmentBandwidthLimit: conf.VisitorAttachmentDailyBandwidthLimit,
-	}
+	return vis.LimitsFor(v.limitsConfig, tier)
 }
 
 func (v *visitor) Info() (*visitorInfo, error) {
@@ -580,23 +483,25 @@ func zeroIfNegative(value int64) int64 {
 	return value
 }
 
-func replenishDurationToDailyLimit(duration time.Duration) int64 {
-	return int64(oneDay / duration)
-}
-
-func dailyLimitToRate(limit int64) rate.Limit {
-	return rate.Limit(limit) * rate.Every(oneDay)
-}
-
 // visitorID returns a unique identifier for a visitor based on user or IP, using configurable prefix bits for IPv4/IPv6
 func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
-	if u != nil && u.Tier != nil {
-		return fmt.Sprintf("user:%s", u.ID)
+	return vis.Key(ip, u, visitorConfigFrom(conf))
+}
+
+// visitorConfigFrom assembles the keying and limit-resolution config from the server config
+func visitorConfigFrom(conf *Config) *vis.Config {
+	return &vis.Config{
+		PrefixBitsIPv4:                conf.VisitorPrefixBitsIPv4,
+		PrefixBitsIPv6:                conf.VisitorPrefixBitsIPv6,
+		RequestLimitBurst:             conf.VisitorRequestLimitBurst,
+		RequestLimitReplenish:         conf.VisitorRequestLimitReplenish,
+		MessageDailyLimit:             conf.VisitorMessageDailyLimit,
+		EmailLimitBurst:               conf.VisitorEmailLimitBurst,
+		EmailLimitReplenish:           conf.VisitorEmailLimitReplenish,
+		AttachmentTotalSizeLimit:      conf.VisitorAttachmentTotalSizeLimit,
+		AttachmentFileSizeLimit:       conf.AttachmentFileSizeLimit,
+		AttachmentExpiryDuration:      conf.AttachmentExpiryDuration,
+		AttachmentDailyBandwidthLimit: conf.VisitorAttachmentDailyBandwidthLimit,
+		MessageExpiryDuration:         conf.CacheDuration,
 	}
-	if ip.Is4() {
-		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv4).Masked().Addr()
-	} else if ip.Is6() {
-		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv6).Masked().Addr()
-	}
-	return fmt.Sprintf("ip:%s", ip.String())
 }

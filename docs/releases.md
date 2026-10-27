@@ -2264,6 +2264,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.34.1 (UNRELEASED)
+
+**Security:**
+
+* Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

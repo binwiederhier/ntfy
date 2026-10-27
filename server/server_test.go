@@ -2117,6 +2117,32 @@ func TestServer_MatrixGateway_Push_Success(t *testing.T) {
 	})
 }
 
+func TestServer_MatrixGateway_Push_InvalidTopicCannotBypassACL(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// The topic "secret" denies anonymous writes. A NUL in the pushkey topic made authorization
+		// check "sec\x00ret" (unmatched, so the default read-write applied), and the message was then
+		// stored as "secret" once the NUL was stripped.
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.AuthDefault = user.PermissionReadWrite
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddUser("alice", "alice12345", user.RoleUser, false))
+		require.Nil(t, s.userManager.AllowAccess("alice", "secret", user.PermissionReadWrite))
+		require.Nil(t, s.userManager.AllowAccess(user.Everyone, "secret", user.PermissionDenyAll))
+		require.Equal(t, 403, request(t, s, "POST", "/secret", "direct", nil).Code)
+
+		notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/sec%00ret?up=1"}]}}`
+		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40009, toHTTPError(t, response.Body.String()).Code)
+
+		response = request(t, s, "GET", "/secret/json?poll=1", "", map[string]string{
+			"Authorization": util.BasicAuth("alice", "alice12345"),
+		})
+		require.Equal(t, 200, response.Code)
+		require.Empty(t, response.Body.String())
+	})
+}
+
 func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfig(t, databaseURL)

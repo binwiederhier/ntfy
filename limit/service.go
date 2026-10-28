@@ -328,7 +328,11 @@ func (s *Service) TakeDeltas() []Delta {
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
 				if e.meshDelta[kind] != 0 && e.deltaWorthSending(kind) {
-					deltas = append(deltas, Delta{Key: key, Kind: kind, N: e.meshDelta[kind]})
+					deltas = append(deltas, Delta{
+						Key:  key,
+						Kind: kind,
+						N:    e.meshDelta[kind],
+					})
 					e.meshDelta[kind] = 0
 				}
 			}
@@ -393,7 +397,11 @@ func (s *Service) PruneStore() error {
 // Limiter returns a util.Limiter view of the key's bucket for the rule, for the readers and
 // writers in util that meter bytes. A negative AllowN refunds.
 func (s *Service) Limiter(key string, rule Rule) util.Limiter {
-	return &limiter{s: s, key: key, rule: rule}
+	return &limiter{
+		s:    s,
+		key:  key,
+		rule: rule,
+	}
 }
 
 // Persistent reports whether usage is written to a store, i.e. whether a key's daily counts
@@ -580,7 +588,11 @@ func (s *Service) snapshot() []usageRow {
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
 				if e.promoted[kind] && e.unflushed[kind] != 0 {
-					rows = append(rows, usageRow{key: key, kind: kind, count: e.unflushed[kind]})
+					rows = append(rows, usageRow{
+						key:   key,
+						kind:  kind,
+						count: e.unflushed[kind],
+					})
 				}
 			}
 		}
@@ -670,13 +682,20 @@ func (s *Service) writeCarried(ctx context.Context, store *Store) {
 		pending := s.carried[day]
 		rows := make([]usageRow, 0, len(pending))
 		for k, count := range pending {
-			rows = append(rows, usageRow{key: k.key, kind: k.kind, count: count})
+			rows = append(rows, usageRow{
+				key:   k.key,
+				kind:  k.kind,
+				count: count,
+			})
 		}
 		s.mu.Unlock()
 		written, err := store.flush(ctx, day, rows)
 		s.mu.Lock()
 		for _, r := range rows[:written] {
-			delete(pending, carriedKey{key: r.key, kind: r.kind})
+			delete(pending, carriedKey{
+				key:  r.key,
+				kind: r.kind,
+			})
 		}
 		if len(pending) == 0 {
 			delete(s.carried, day)
@@ -713,7 +732,10 @@ func (s *Service) maybeRollDay() {
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
 				if e.promoted[kind] && e.unflushed[kind] != 0 {
-					carry[carriedKey{key: key, kind: kind}] += e.unflushed[kind]
+					carry[carriedKey{
+						key:  key,
+						kind: kind,
+					}] += e.unflushed[kind]
 				}
 			}
 			e.baseline = [numKinds]int64{}
@@ -845,7 +867,10 @@ func (s *Service) reset(key string, kind Kind) {
 func (sh *shard) entryNoLock(key string, now time.Time, loaded bool) *entry {
 	e, ok := sh.entries[key]
 	if !ok {
-		e = &entry{seen: now.UnixNano(), loaded: loaded}
+		e = &entry{
+			seen:   now.UnixNano(),
+			loaded: loaded,
+		}
 		sh.entries[key] = e
 	}
 	return e

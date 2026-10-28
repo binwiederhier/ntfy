@@ -323,8 +323,7 @@ func (s *Service) Prune(idle time.Duration) {
 // deltaWorthSending), and forgets them. Keys below that keep accumulating.
 func (s *Service) TakeDeltas() []Delta {
 	deltas := make([]Delta, 0)
-	for i := range s.shards {
-		sh := &s.shards[i]
+	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
@@ -346,7 +345,7 @@ func (s *Service) TakeDeltas() []Delta {
 // refund of usage it had already sent (see Refund), credited back up to the burst. The bucket is
 // refilled to now first, so the charge lands on today's tokens, not stale ones.
 func (s *Service) Burn(key string, kind Kind, n int64) {
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]

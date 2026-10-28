@@ -94,7 +94,7 @@ var syncLoadKinds = [numKinds]bool{
 type Service struct {
 	conf            *Config
 	now             func() time.Time // Injectable clock, for tests
-	shards          [shardCount]shard
+	shards          [shardCount]*shard
 	store           atomic.Pointer[Store]           // Nil when nothing is persisted or shared; atomic so the hot path never takes mu
 	day             string                          // The usage day the counts refer to (see today)
 	clockOffset     time.Duration                   // The store's clock minus this node's, as of the last flush; the day follows the store's clock
@@ -171,7 +171,9 @@ func newService(conf *Config, now func() time.Time, store *Store) *Service {
 	}
 	s.store.Store(store)
 	for i := range s.shards {
-		s.shards[i].entries = make(map[string]*entry)
+		s.shards[i] = &shard{
+			entries: make(map[string]*entry),
+		}
 	}
 	s.day = s.today()
 	return s
@@ -182,7 +184,7 @@ func newService(conf *Config, now func() time.Time, store *Store) *Service {
 func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 	now := s.now()
 	store := s.store.Load()
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	if store != nil && syncLoadKinds[rule.Kind] {
 		s.maybeLoadNow(store, sh, key)
 	}
@@ -229,7 +231,7 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 		return 0
 	}
 	now := s.now()
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]
@@ -244,7 +246,7 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 // Refund hands n units of the kind back to the key, e.g. for bytes that were reserved but not
 // sent. The bucket cannot exceed its burst, and the daily count cannot go below zero.
 func (s *Service) Refund(key string, kind Kind, n int64) {
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]
@@ -265,7 +267,7 @@ func (s *Service) Refund(key string, kind Kind, n int64) {
 // Usage returns the key's usage today, of every kind, as this node knows it (see Lookup for the
 // store's numbers)
 func (s *Service) Usage(key string) Usage {
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]
@@ -279,7 +281,7 @@ func (s *Service) Usage(key string) Usage {
 // been read yet (a key the service never saw, or whose read-back is still pending)
 func (s *Service) Lookup(key string) (Usage, error) {
 	store := s.store.Load()
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	e, ok := sh.entries[key]
 	if store == nil || (ok && e.loaded) {
@@ -301,8 +303,7 @@ func (s *Service) Prune(idle time.Duration) {
 	now := s.now()
 	cutoff := now.Add(-idle).UnixNano()
 	promotedCutoff := now.Add(-max(idle, promotedRetention)).UnixNano()
-	for i := range s.shards {
-		sh := &s.shards[i]
+	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
 			if e.pending() {
@@ -367,7 +368,7 @@ func (s *Service) Burn(key string, kind Kind, n int64) {
 // Forget drops the key from memory, unless it has counts still to be written; its rows stay in
 // the store and are read back when it is next met. It reports whether the key was dropped.
 func (s *Service) Forget(key string) bool {
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]
@@ -405,8 +406,7 @@ func (s *Service) Persistent() bool {
 // Size returns the number of keys the service holds
 func (s *Service) Size() int {
 	size := 0
-	for i := range s.shards {
-		sh := &s.shards[i]
+	for _, sh := range s.shards {
 		sh.mu.Lock()
 		size += len(sh.entries)
 		sh.mu.Unlock()
@@ -576,8 +576,7 @@ func (s *Service) readMisses() {
 // snapshot returns the unflushed counts of the promoted keys as rows to write
 func (s *Service) snapshot() []usageRow {
 	rows := make([]usageRow, 0)
-	for i := range s.shards {
-		sh := &s.shards[i]
+	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
@@ -602,7 +601,7 @@ func (s *Service) retire(day string, rows []usageRow) {
 		return
 	}
 	for _, r := range rows {
-		sh := &s.shards[shardIndex(r.key)]
+		sh := s.shards[shardIndex(r.key)]
 		sh.mu.Lock()
 		if e, ok := sh.entries[r.key]; ok {
 			e.unflushed[r.kind] -= r.count
@@ -637,7 +636,7 @@ func (s *Service) applyRows(day string, rows []usageRow, loadedKeys []string) {
 	}
 	now := s.now()
 	for key, keyRows := range byKey {
-		sh := &s.shards[shardIndex(key)]
+		sh := s.shards[shardIndex(key)]
 		sh.mu.Lock()
 		e, ok := sh.entries[key]
 		if !ok && loading[key] {
@@ -710,8 +709,7 @@ func (s *Service) maybeRollDay() {
 	s.mu.Unlock()
 	log.Tag(tag).Info("Usage day rolled over to %s; daily counts start over", today)
 	carry := make(map[carriedKey]int64)
-	for i := range s.shards {
-		sh := &s.shards[i]
+	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
@@ -832,7 +830,7 @@ func (s *Service) readAndApply(store *Store, keys []string) error {
 
 // reset fills the key's bucket of the kind and zeroes its count (see limiter.Reset)
 func (s *Service) reset(key string, kind Kind) {
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]

@@ -1337,9 +1337,7 @@ func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
 		require.Equal(t, int64(1), account.Stats.Emails)
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		require.Equal(t, int64(4), v.Stats().Messages)
-		require.Equal(t, int64(4), v.messagesLimiter.Value())
 		require.Equal(t, int64(1), v.Stats().Emails)
-		require.Equal(t, int64(1), v.emailsLimiter.Value())
 
 		// Reset stats and check again
 		s.resetStats()
@@ -1351,9 +1349,7 @@ func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
 		require.Equal(t, int64(0), account.Stats.Emails)
 		v = s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		require.Equal(t, int64(0), v.Stats().Messages)
-		require.Equal(t, int64(0), v.messagesLimiter.Value())
 		require.Equal(t, int64(0), v.Stats().Emails)
-		require.Equal(t, int64(0), v.emailsLimiter.Value())
 	})
 }
 
@@ -1394,9 +1390,7 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 		require.Equal(t, int64(999), account.Stats.Emails)
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
 		require.Equal(t, int64(123456), v.Stats().Messages)
-		require.Equal(t, int64(123456), v.messagesLimiter.Value())
 		require.Equal(t, int64(999), v.Stats().Emails)
-		require.Equal(t, int64(999), v.emailsLimiter.Value())
 	})
 }
 
@@ -3612,8 +3606,8 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		// Publish message, observe rate visitor tokens being decreased
 		response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
-		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.messagesLimiter.Value())
+		require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].Stats().Messages)
+		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
 		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
 
 		// Expire visitor
@@ -3623,7 +3617,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		// Publish message again, observe that rateVisitor is not used anymore and is reset
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
+		require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].Stats().Messages)
 		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
 		require.Nil(t, s.visitors["ip:1.2.3.4"])
 	})
@@ -5555,7 +5549,7 @@ func TestServer_SubscribeHTTP_NoWriteAfterHandlerReturn(t *testing.T) {
 		// that copied the subscriber list before Unsubscribe ran. In production, this is exactly
 		// how the panic occurs: the goroutine spawned by topic.Publish calls sub() after the
 		// handler has already returned and Go has cleaned up the response writer.
-		v := newVisitor(s.config, s.messageCache, s.userManager, netip.MustParseAddr("9.9.9.9"), nil)
+		v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.MustParseAddr("9.9.9.9"), nil)
 		msg := model.NewDefaultMessage("mytopic", "straggler message")
 		_ = copiedSub(v, msg)
 
@@ -5575,7 +5569,7 @@ func TestServer_HandleError_SkipsWriteHeaderOnHijackedConnection(t *testing.T) {
 		r, _ := http.NewRequest("GET", "/mytopic/ws", nil)
 		r.Header.Set("Upgrade", "websocket")
 		r.Header.Set("Connection", "Upgrade")
-		v := newVisitor(s.config, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
+		v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
 
 		// Test post-upgrade errors wrapped with errWebSocketPostUpgrade (should NOT call WriteHeader)
 		postUpgradeErr := &errWebSocketPostUpgrade{errors.New("websocket: close 1000 (normal)")}

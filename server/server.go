@@ -36,6 +36,7 @@ import (
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/mail"
 	"heckel.io/ntfy/v2/message"
@@ -64,6 +65,7 @@ type Server struct {
 	mailer            mail.Sender
 	topics            map[string]*topic
 	visitors          map[string]*visitor // ip:<ip> or user:<user>
+	limiter           *limit.Service      // Decides on and counts the visitors' usage, keyed by visitor key
 	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
@@ -300,6 +302,7 @@ func New(conf *Config) (*Server, error) {
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
 		visitors:        make(map[string]*visitor),
+		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime}),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
@@ -2160,6 +2163,7 @@ func (s *Server) resetStats() {
 	log.Info("Resetting all visitor stats (daily task)")
 	s.mu.Lock()
 	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
+	s.limiter.ResetUsage()
 	for _, v := range s.visitors {
 		v.ResetStats()
 	}
@@ -2174,7 +2178,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
+	v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -2359,7 +2363,7 @@ func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
 	id := visitorID(ip, user, s.config)
 	v, exists := s.visitors[id]
 	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, ip, user)
+		s.visitors[id] = newVisitor(s.config, s.limiter, s.messageCache, s.userManager, ip, user)
 		return s.visitors[id]
 	}
 	v.Keepalive()

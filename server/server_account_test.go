@@ -223,7 +223,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 		require.Equal(t, int64(0), account.Stats.Messages)
 		require.Equal(t, int64(1004), account.Stats.MessagesRemaining)
 		require.Equal(t, int64(0), account.Stats.Emails)
-		require.Equal(t, int64(24), account.Stats.EmailsRemaining)
+		require.Equal(t, int64(16), account.Stats.EmailsRemaining) // What the bucket holds now (burst 16), below the day's 24
 		require.Equal(t, int64(0), account.Stats.Calls)
 		require.Equal(t, int64(0), account.Stats.CallsRemaining)
 
@@ -240,7 +240,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 		require.Equal(t, int64(2), account.Stats.Messages)
 		require.Equal(t, int64(1002), account.Stats.MessagesRemaining)
 		require.Equal(t, int64(1), account.Stats.Emails)
-		require.Equal(t, int64(23), account.Stats.EmailsRemaining)
+		require.Equal(t, int64(15), account.Stats.EmailsRemaining) // 16 - 1 in the bucket
 	})
 }
 

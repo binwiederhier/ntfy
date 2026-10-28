@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stripe/stripe-go/v74"
-	"golang.org/x/time/rate"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/payments"
 	"heckel.io/ntfy/v2/user"
@@ -398,7 +397,10 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 
 		// Now let's test the message limiter by faking a ridiculously generous rate limiter
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		v.requestLimiter = rate.NewLimiter(rate.Every(time.Millisecond), 1000000)
+		v.mu.Lock()
+		v.limits.RequestLimitBurst = 1000000
+		v.limits.RequestLimitReplenish = time.Nanosecond
+		v.mu.Unlock()
 
 		var wg sync.WaitGroup
 		for i := 0; i < 209; i++ {

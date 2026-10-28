@@ -102,7 +102,10 @@ func TestLimitsFor_Tier(t *testing.T) {
 
 	// A tier without emails never refills the email bucket; a tier without messages keeps the
 	// config's request refill
-	none := &user.Tier{MessageLimit: 0, EmailLimit: 0}
+	none := &user.Tier{
+		MessageLimit: 0,
+		EmailLimit:   0,
+	}
 	limits = LimitsFor(conf, none)
 	require.Equal(t, time.Duration(0), limits.EmailLimitReplenish)
 	require.Equal(t, 5*time.Second, limits.RequestLimitReplenish)

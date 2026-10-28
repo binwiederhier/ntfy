@@ -43,15 +43,35 @@ func TestStore_FlushAddsUp_ReadKeys(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		s := newStore()
 		written, err := s.flush(context.Background(), "2026-10-25", []usageRow{
-			{key: "ip:1.2.3.4", kind: KindMessages, count: 3},
-			{key: "ip:1.2.3.4", kind: KindEmails, count: 1},
-			{key: "user:u_1", kind: KindMessages, count: 10},
+			{
+				key:   "ip:1.2.3.4",
+				kind:  KindMessages,
+				count: 3,
+			},
+			{
+				key:   "ip:1.2.3.4",
+				kind:  KindEmails,
+				count: 1,
+			},
+			{
+				key:   "user:u_1",
+				kind:  KindMessages,
+				count: 10,
+			},
 		})
 		require.Nil(t, err)
 		require.Equal(t, 3, written)
 		written, err = s.flush(context.Background(), "2026-10-25", []usageRow{
-			{key: "ip:1.2.3.4", kind: KindMessages, count: 2}, // Adds up, not overwrites
-			{key: "user:u_1", kind: KindCalls, count: 1},
+			{
+				key:   "ip:1.2.3.4",
+				kind:  KindMessages,
+				count: 2,
+			}, // Adds up, not overwrites
+			{
+				key:   "user:u_1",
+				kind:  KindCalls,
+				count: 1,
+			},
 		})
 		require.Nil(t, err)
 		require.Equal(t, 2, written)
@@ -80,7 +100,11 @@ func TestStore_FlushManyRows_Chunked(t *testing.T) {
 		rows := make([]usageRow, 0, 2*flushChunkRows+7)
 		keys := make([]string, 0, cap(rows))
 		for i := 0; i < cap(rows); i++ {
-			rows = append(rows, usageRow{key: fmt.Sprintf("ip:10.0.%d.%d", i/256, i%256), kind: KindMessages, count: int64(i)})
+			rows = append(rows, usageRow{
+				key:   fmt.Sprintf("ip:10.0.%d.%d", i/256, i%256),
+				kind:  KindMessages,
+				count: int64(i),
+			})
 			keys = append(keys, rows[i].key)
 		}
 		written, err := s.flush(context.Background(), "2026-10-25", rows)
@@ -101,7 +125,11 @@ func TestStore_ReadSince_UsesDatabaseClock(t *testing.T) {
 		before, err := s.clock(context.Background())
 		require.Nil(t, err)
 		require.InDelta(t, time.Now().Unix(), before, 5) // The test database's clock is this host's
-		_, err = s.flush(context.Background(), "2026-10-25", []usageRow{{key: "ip:1.2.3.4", kind: KindMessages, count: 3}})
+		_, err = s.flush(context.Background(), "2026-10-25", []usageRow{{
+			key:   "ip:1.2.3.4",
+			kind:  KindMessages,
+			count: 3,
+		}})
 		require.Nil(t, err)
 		rows, err := s.readSince(context.Background(), "2026-10-25", before)
 		require.Nil(t, err)
@@ -119,11 +147,19 @@ func TestStore_Prune(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		s := newStore()
 		for _, day := range []string{"2026-10-17", "2026-10-18", "2026-10-25"} {
-			_, err := s.flush(context.Background(), day, []usageRow{{key: "ip:1.2.3.4", kind: KindMessages, count: 1}})
+			_, err := s.flush(context.Background(), day, []usageRow{{
+				key:   "ip:1.2.3.4",
+				kind:  KindMessages,
+				count: 1,
+			}})
 			require.Nil(t, err)
 		}
 		require.Nil(t, s.prune(context.Background(), "2026-10-18"))
-		for day, want := range map[string]int{"2026-10-17": 0, "2026-10-18": 1, "2026-10-25": 1} {
+		for day, want := range map[string]int{
+			"2026-10-17": 0,
+			"2026-10-18": 1,
+			"2026-10-25": 1,
+		} {
 			rows, err := s.readKeys(context.Background(), day, []string{"ip:1.2.3.4"})
 			require.Nil(t, err)
 			require.Len(t, rows, want, day)
@@ -134,7 +170,11 @@ func TestStore_Prune(t *testing.T) {
 func TestStore_Reopen_KeepsRows(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		s := newStore()
-		_, err := s.flush(context.Background(), "2026-10-25", []usageRow{{key: "user:u_1", kind: KindMessages, count: 7}})
+		_, err := s.flush(context.Background(), "2026-10-25", []usageRow{{
+			key:   "user:u_1",
+			kind:  KindMessages,
+			count: 7,
+		}})
 		require.Nil(t, err)
 		require.Nil(t, s.Close())
 		s = newStore() // Same file or schema: the migration must be idempotent, the rows kept

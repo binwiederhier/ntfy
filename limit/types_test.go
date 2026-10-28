@@ -21,8 +21,15 @@ func TestKind_String_ParseKind(t *testing.T) {
 
 func TestUsage_Count(t *testing.T) {
 	s := newTestService(t)
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 10}, 3).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindBandwidth, Burst: 100, Refill: time.Second}, 42).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 10,
+	}, 3).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindBandwidth,
+		Burst:  100,
+		Refill: time.Second,
+	}, 42).OK)
 	u := s.Usage("k")
 	require.Equal(t, int64(3), u.Count(KindMessages))
 	require.Equal(t, int64(42), u.Count(KindBandwidth))
@@ -31,7 +38,11 @@ func TestUsage_Count(t *testing.T) {
 
 func TestLimiter_AllowNRefundsNegative(t *testing.T) {
 	s := newTestService(t)
-	l := s.Limiter("k", Rule{Kind: KindBandwidth, Burst: 10, Refill: time.Hour})
+	l := s.Limiter("k", Rule{
+		Kind:   KindBandwidth,
+		Burst:  10,
+		Refill: time.Hour,
+	})
 	require.True(t, l.AllowN(8))
 	require.False(t, l.AllowN(3))
 	require.Equal(t, int64(8), l.Value())

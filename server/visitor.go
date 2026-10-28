@@ -470,19 +470,37 @@ func (v *visitor) limitsNoLock() *vis.Limits {
 // limiter keeps the state. The caller must hold v.mu.
 
 func (v *visitor) requestRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindRequests, Burst: int64(v.limits.RequestLimitBurst), Refill: v.limits.RequestLimitReplenish}
+	return limit.Rule{
+		Kind:   limit.KindRequests,
+		Burst:  int64(v.limits.RequestLimitBurst),
+		Refill: v.limits.RequestLimitReplenish,
+	}
 }
 
 func (v *visitor) messageRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindMessages, Daily: v.limits.MessageLimit, Threshold: v.thresholdNoLock(v.limits.MessageLimit)}
+	return limit.Rule{
+		Kind:      limit.KindMessages,
+		Daily:     v.limits.MessageLimit,
+		Threshold: v.thresholdNoLock(v.limits.MessageLimit),
+	}
 }
 
 func (v *visitor) emailRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindEmails, Burst: int64(v.limits.EmailLimitBurst), Refill: v.limits.EmailLimitReplenish, Daily: v.limits.EmailLimit, Threshold: v.thresholdNoLock(v.limits.EmailLimit)}
+	return limit.Rule{
+		Kind:      limit.KindEmails,
+		Burst:     int64(v.limits.EmailLimitBurst),
+		Refill:    v.limits.EmailLimitReplenish,
+		Daily:     v.limits.EmailLimit,
+		Threshold: v.thresholdNoLock(v.limits.EmailLimit),
+	}
 }
 
 func (v *visitor) callRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindCalls, Daily: v.limits.CallLimit, Threshold: v.thresholdNoLock(v.limits.CallLimit)}
+	return limit.Rule{
+		Kind:      limit.KindCalls,
+		Daily:     v.limits.CallLimit,
+		Threshold: v.thresholdNoLock(v.limits.CallLimit),
+	}
 }
 
 // thresholdNoLock returns the daily count from which the visitor's usage is persisted: from the
@@ -497,7 +515,10 @@ func (v *visitor) thresholdNoLock(daily int64) int64 {
 
 // bandwidthRule is a bucket of the daily bandwidth bytes that refills over a day
 func (v *visitor) bandwidthRule() limit.Rule {
-	rule := limit.Rule{Kind: limit.KindBandwidth, Burst: v.limits.AttachmentBandwidthLimit}
+	rule := limit.Rule{
+		Kind:  limit.KindBandwidth,
+		Burst: v.limits.AttachmentBandwidthLimit,
+	}
 	if rule.Burst > 0 {
 		rule.Refill = oneDay / time.Duration(rule.Burst)
 	}
@@ -505,7 +526,11 @@ func (v *visitor) bandwidthRule() limit.Rule {
 }
 
 func (v *visitor) topicCreationRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindTopics, Burst: int64(v.config.VisitorTopicCreationLimitBurst), Refill: v.config.VisitorTopicCreationLimitReplenish}
+	return limit.Rule{
+		Kind:   limit.KindTopics,
+		Burst:  int64(v.config.VisitorTopicCreationLimitBurst),
+		Refill: v.config.VisitorTopicCreationLimitReplenish,
+	}
 }
 
 func (v *visitor) topicCreationLimited() bool {
@@ -513,11 +538,19 @@ func (v *visitor) topicCreationLimited() bool {
 }
 
 func (v *visitor) accountRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindAccount, Burst: int64(v.config.VisitorAccountCreationLimitBurst), Refill: v.config.VisitorAccountCreationLimitReplenish}
+	return limit.Rule{
+		Kind:   limit.KindAccount,
+		Burst:  int64(v.config.VisitorAccountCreationLimitBurst),
+		Refill: v.config.VisitorAccountCreationLimitReplenish,
+	}
 }
 
 func (v *visitor) authRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindAuth, Burst: int64(v.config.VisitorAuthFailureLimitBurst), Refill: v.config.VisitorAuthFailureLimitReplenish}
+	return limit.Rule{
+		Kind:   limit.KindAuth,
+		Burst:  int64(v.config.VisitorAuthFailureLimitBurst),
+		Refill: v.config.VisitorAuthFailureLimitReplenish,
+	}
 }
 
 // Info returns the visitor's limits and stats for the account page. The daily counts come from

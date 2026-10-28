@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"net/netip"
 	"testing"
 	"time"
@@ -110,8 +111,39 @@ func TestVisitor_TierChangeKeepsBuckets(t *testing.T) {
 		response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
 			"Authorization": util.BasicAuth("phil", "phil"),
 		})
-		require.Equal(t, 429, response.Code) // Still empty: the larger burst refills nothing
+		require.Equal(t, 200, response.Code) // 4 of 500 spent, not a full bucket
+		require.Nil(t, s.userManager.ChangeTier("phil", "small"))
+		response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 429, response.Code) // 4 of 3 spent: in debt
 	})
+}
+
+func TestVisitor_AccountEmailsRemainingFollowsBucket(t *testing.T) {
+	// The account page shows what the user can send now: no more than the email bucket holds,
+	// even when the daily limit has room left (e.g. right after the daily reset)
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 2
+	c.VisitorEmailLimitReplenish = time.Hour // Daily limit 24
+	s := newTestServer(t, c)
+	s.mailer = &testMailer{}
+	for i := 0; i < 2; i++ {
+		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Email": "test@email.com",
+		})
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, response.Code)
+	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
+	require.Equal(t, int64(2), account.Stats.Emails)
+	require.Equal(t, int64(0), account.Stats.EmailsRemaining)
+	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Email": "test@email.com",
+	})
+	require.Equal(t, 429, response.Code)
 }
 
 func TestVisitor_TierFieldChangeAppliesAtOnce(t *testing.T) {

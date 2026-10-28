@@ -74,7 +74,10 @@ var (
 		CREATE INDEX IF NOT EXISTS idx_usage_day_updated_at ON usage (day, updated_at);
 	` + postgresCreateTopicTableQuery)
 	postgresMigrations = schema.Migrations{
-		{From: 1, To: 2}: schema.Query(postgresCreateTopicTableQuery), // The topic table (who a topic bills to, when it was last subscribed to)
+		{
+			From: 1,
+			To:   2,
+		}: schema.Query(postgresCreateTopicTableQuery), // The topic table (who a topic bills to, when it was last subscribed to)
 	}
 )
 

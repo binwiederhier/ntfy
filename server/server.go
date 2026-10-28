@@ -281,7 +281,10 @@ func New(conf *Config) (*Server, error) {
 		CallFormat:    conf.TwilioCallFormat,
 		BuildVersion:  conf.BuildVersion,
 	})
-	limiter := limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime, FlushInterval: conf.UsageFlushInterval}, usageStore)
+	limiter := limit.New(&limit.Config{
+		ResetTime:     conf.VisitorStatsResetTime,
+		FlushInterval: conf.UsageFlushInterval,
+	}, usageStore)
 	var banner *ban.Service
 	if conf.BanFile != "" {
 		banner = ban.NewService(&ban.Config{

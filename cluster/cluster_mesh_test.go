@@ -961,8 +961,16 @@ func TestMesh_UsageBroadcast(t *testing.T) {
 	defer meshA.Close()
 
 	meshA.BroadcastUsage([]limit.Delta{
-		{Key: "ip:1.2.3.4", Kind: limit.KindRequests, N: 60},
-		{Key: "ban:1.2.3.0/24", Kind: limit.KindStrikes, N: 15},
+		{
+			Key:  "ip:1.2.3.4",
+			Kind: limit.KindRequests,
+			N:    60,
+		},
+		{
+			Key:  "ban:1.2.3.0/24",
+			Kind: limit.KindStrikes,
+			N:    15,
+		},
 	})
 	waitFor(t, func() bool {
 		mu.Lock()
@@ -972,8 +980,16 @@ func TestMesh_UsageBroadcast(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, []limit.Delta{
-		{Key: "ip:1.2.3.4", Kind: limit.KindRequests, N: 60},
-		{Key: "ban:1.2.3.0/24", Kind: limit.KindStrikes, N: 15},
+		{
+			Key:  "ip:1.2.3.4",
+			Kind: limit.KindRequests,
+			N:    60,
+		},
+		{
+			Key:  "ban:1.2.3.0/24",
+			Kind: limit.KindStrikes,
+			N:    15,
+		},
 	}, receivedB)
 	require.Equal(t, 0, receivedA)
 }
@@ -990,7 +1006,11 @@ func TestMesh_UsageBroadcast_OldPeerAnswers404(t *testing.T) {
 	require.Nil(t, err)
 	defer mesh.Close()
 	before := testutil.ToFloat64(metrics.ClusterSendErrors)
-	mesh.BroadcastUsage([]limit.Delta{{Key: "ip:1.2.3.4", Kind: limit.KindRequests, N: 60}})
+	mesh.BroadcastUsage([]limit.Delta{{
+		Key:  "ip:1.2.3.4",
+		Kind: limit.KindRequests,
+		N:    60,
+	}})
 	time.Sleep(300 * time.Millisecond)
 	require.Equal(t, before, testutil.ToFloat64(metrics.ClusterSendErrors))
 }

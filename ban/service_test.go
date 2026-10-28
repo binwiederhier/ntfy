@@ -220,7 +220,14 @@ func TestService_Record_BuffersUntilFlush(t *testing.T) {
 func TestService_Close_FlushesPending(t *testing.T) {
 	// Close must flush buffered bans so nothing is lost on shutdown, and must block until it has.
 	banFile := filepath.Join(t.TempDir(), "ban.log")
-	s := NewService(&Config{File: banFile, Window: time.Minute, Threshold: 1, Weights: Weights{"*": 1}, PrefixBitsIPv4: 32, PrefixBitsIPv6: 64}, limit.New(&limit.Config{}, nil))
+	s := NewService(&Config{
+		File:           banFile,
+		Window:         time.Minute,
+		Threshold:      1,
+		Weights:        Weights{"*": 1},
+		PrefixBitsIPv4: 32,
+		PrefixBitsIPv6: 64,
+	}, limit.New(&limit.Config{}, nil))
 	for i := 0; i < 3; i++ {
 		s.Record(testIP, 429, 42901)
 	}

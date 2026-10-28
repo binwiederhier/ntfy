@@ -34,7 +34,10 @@ func (c *testClock) advance(d time.Duration) {
 func newTestServiceWithClock(t *testing.T) (*Service, *testClock) {
 	t.Helper()
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
 	return newService(conf, clock.now, nil), clock
 }
 
@@ -46,7 +49,11 @@ func newTestService(t *testing.T) *Service {
 
 func TestService_Allow_Bucket(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 3, Refill: 100 * time.Millisecond}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  3,
+		Refill: 100 * time.Millisecond,
+	}
 	for i := 0; i < 3; i++ {
 		require.True(t, s.Allow("k", rule, 1).OK)
 	}
@@ -75,7 +82,10 @@ func TestService_Allow_Bucket(t *testing.T) {
 
 func TestService_Allow_Daily(t *testing.T) {
 	s, _ := newTestServiceWithClock(t) // Noon UTC, 12 hours before the reset
-	rule := Rule{Kind: KindMessages, Daily: 2}
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 2,
+	}
 	require.True(t, s.Allow("k", rule, 1).OK)
 	require.True(t, s.Allow("k", rule, 1).OK)
 	d := s.Allow("k", rule, 1)
@@ -95,7 +105,12 @@ func TestService_Allow_Daily(t *testing.T) {
 func TestService_Allow_BucketAndDaily(t *testing.T) {
 	// Emails: a burst of 2 refilling slowly, and a daily cap of 3
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindEmails, Burst: 2, Refill: time.Minute, Daily: 3}
+	rule := Rule{
+		Kind:   KindEmails,
+		Burst:  2,
+		Refill: time.Minute,
+		Daily:  3,
+	}
 	require.True(t, s.Allow("k", rule, 1).OK)
 	require.True(t, s.Allow("k", rule, 1).OK)
 	d := s.Allow("k", rule, 1)
@@ -112,7 +127,11 @@ func TestService_Allow_BucketAndDaily(t *testing.T) {
 
 func TestService_Allow_N(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindBandwidth, Burst: 1000, Refill: time.Millisecond} // 1 kB burst, 1 kB/s
+	rule := Rule{
+		Kind:   KindBandwidth,
+		Burst:  1000,
+		Refill: time.Millisecond,
+	} // 1 kB burst, 1 kB/s
 	require.True(t, s.Allow("k", rule, 600).OK)
 	d := s.Allow("k", rule, 600)
 	require.False(t, d.OK)
@@ -131,16 +150,28 @@ func TestService_Allow_RuleChangeKeepsTokens(t *testing.T) {
 	// A tier change passes a new rule on the next call: a bigger burst does not hand back a full
 	// bucket, a smaller one caps what is there
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 10, Refill: time.Hour}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Hour,
+	}
 	for i := 0; i < 8; i++ {
 		require.True(t, s.Allow("k", rule, 1).OK)
 	}
-	bigger := Rule{Kind: KindRequests, Burst: 100, Refill: time.Hour}
+	bigger := Rule{
+		Kind:   KindRequests,
+		Burst:  100,
+		Refill: time.Hour,
+	}
 	require.Equal(t, int64(2), s.Tokens("k", bigger))
 	require.True(t, s.Allow("k", bigger, 1).OK)
 	require.True(t, s.Allow("k", bigger, 1).OK)
 	require.False(t, s.Allow("k", bigger, 1).OK)
-	smaller := Rule{Kind: KindRequests, Burst: 1, Refill: time.Hour}
+	smaller := Rule{
+		Kind:   KindRequests,
+		Burst:  1,
+		Refill: time.Hour,
+	}
 	require.Equal(t, int64(0), s.Tokens("k", smaller))
 
 	// A fresh key with the smaller rule starts with its burst
@@ -152,10 +183,22 @@ func TestService_Allow_RuleChangeKeepsTokens(t *testing.T) {
 
 func TestService_Allow_DailyChangeAppliesAtOnce(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 5}, 5).OK)
-	require.False(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 5}, 1).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 6}, 1).OK)  // Upgraded
-	require.False(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 3}, 1).OK) // Downgraded below the count
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 5,
+	}, 5).OK)
+	require.False(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 5,
+	}, 1).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 6,
+	}, 1).OK) // Upgraded
+	require.False(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 3,
+	}, 1).OK) // Downgraded below the count
 	require.Equal(t, int64(6), s.Usage("k").Count(KindMessages))
 }
 
@@ -169,7 +212,10 @@ func TestService_Allow_Unlimited(t *testing.T) {
 
 func TestService_Allow_NeverRefills(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindAccount, Burst: 2} // No refill
+	rule := Rule{
+		Kind:  KindAccount,
+		Burst: 2,
+	} // No refill
 	require.True(t, s.Allow("k", rule, 1).OK)
 	require.True(t, s.Allow("k", rule, 1).OK)
 	clock.advance(24 * time.Hour)
@@ -180,7 +226,12 @@ func TestService_Allow_NeverRefills(t *testing.T) {
 
 func TestService_Refund(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindBandwidth, Burst: 3, Refill: time.Hour, Daily: 100}
+	rule := Rule{
+		Kind:   KindBandwidth,
+		Burst:  3,
+		Refill: time.Hour,
+		Daily:  100,
+	}
 	require.True(t, s.Allow("k", rule, 3).OK)
 	require.False(t, s.Allow("k", rule, 1).OK)
 	s.Refund("k", KindBandwidth, 1)
@@ -200,7 +251,11 @@ func TestService_Refund(t *testing.T) {
 
 func TestService_Tokens_DoesNotConsume(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindAuth, Burst: 5, Refill: time.Minute}
+	rule := Rule{
+		Kind:   KindAuth,
+		Burst:  5,
+		Refill: time.Minute,
+	}
 	require.Equal(t, int64(5), s.Tokens("k", rule))
 	require.Equal(t, int64(5), s.Tokens("k", rule))
 	require.True(t, s.Allow("k", rule, 2).OK)
@@ -210,7 +265,11 @@ func TestService_Tokens_DoesNotConsume(t *testing.T) {
 
 func TestService_Prune(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 1, Refill: time.Hour}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  1,
+		Refill: time.Hour,
+	}
 	require.True(t, s.Allow("old", rule, 1).OK)
 	clock.advance(10 * time.Minute)
 	require.True(t, s.Allow("fresh", rule, 1).OK)
@@ -223,7 +282,12 @@ func TestService_Prune(t *testing.T) {
 
 func TestService_Allow_Concurrent(t *testing.T) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
-	rule := Rule{Kind: KindRequests, Burst: 500, Refill: time.Hour, Daily: 400}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  500,
+		Refill: time.Hour,
+		Daily:  400,
+	}
 	var wg sync.WaitGroup
 	var admitted sync.Map
 	for g := 0; g < 16; g++ {
@@ -253,7 +317,12 @@ func TestService_Allow_Concurrent(t *testing.T) {
 
 func BenchmarkAllow_HotKey(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second, Daily: 1 << 40}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+		Daily:  1 << 40,
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -263,7 +332,11 @@ func BenchmarkAllow_HotKey(b *testing.B) {
 
 func BenchmarkAllow_ManyKeys(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	keys := make([]string, 100000)
 	for i := range keys {
 		keys[i] = fmt.Sprintf("ip:10.%d.%d.%d", i>>16, (i>>8)&255, i&255)
@@ -278,7 +351,11 @@ func BenchmarkAllow_ManyKeys(b *testing.B) {
 
 func BenchmarkAllow_Parallel(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
@@ -295,7 +372,10 @@ func BenchmarkAllow_Parallel(b *testing.B) {
 
 func newPersistentTestService(t *testing.T, store *Store, clock *testClock) *Service {
 	t.Helper()
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
 	s := newService(conf, clock.now, store)
 	t.Cleanup(func() { s.Close() })
 	return s
@@ -306,7 +386,10 @@ func TestService_Persist_FlushAndReadBack(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		a := newPersistentTestService(t, newStore(), clock)
 		b := newPersistentTestService(t, newStore(), clock)
-		rule := Rule{Kind: KindMessages, Daily: 100}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 100,
+		}
 		require.True(t, a.Allow("user:u_1", rule, 3).OK)
 		require.Equal(t, int64(3), a.Usage("user:u_1").Count(KindMessages))
 		a.flush()
@@ -321,8 +404,14 @@ func TestService_Persist_FlushAndReadBack(t *testing.T) {
 		// A learns B's usage at its next flush, and enforces the cluster total
 		a.flush()
 		require.Equal(t, int64(5), a.Usage("user:u_1").Count(KindMessages))
-		require.False(t, a.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 5}, 1).OK)
-		require.True(t, a.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 6}, 1).OK)
+		require.False(t, a.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 5,
+		}, 1).OK)
+		require.True(t, a.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 6,
+		}, 1).OK)
 		a.flush()
 		b.flush()
 		require.Equal(t, int64(6), b.Usage("user:u_1").Count(KindMessages))
@@ -334,7 +423,11 @@ func TestService_Persist_Threshold(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
-		rule := Rule{Kind: KindMessages, Daily: 250, Threshold: 3} // 1% of the quota, rounded up
+		rule := Rule{
+			Kind:      KindMessages,
+			Daily:     250,
+			Threshold: 3,
+		} // 1% of the quota, rounded up
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 2).OK)
 		s.flush()
 		rows, err := store.readKeys(context.Background(), s.today(), []string{"ip:1.2.3.4"})
@@ -349,7 +442,11 @@ func TestService_Persist_Threshold(t *testing.T) {
 		require.Equal(t, map[string]int64{"ip:1.2.3.4/messages": 3}, rowsByKeyKind(rows))
 
 		// Bucket kinds are never persisted, whatever the threshold
-		require.True(t, s.Allow("ip:1.2.3.4", Rule{Kind: KindRequests, Burst: 100, Refill: time.Second}, 50).OK)
+		require.True(t, s.Allow("ip:1.2.3.4", Rule{
+			Kind:   KindRequests,
+			Burst:  100,
+			Refill: time.Second,
+		}, 50).OK)
 		s.flush()
 		rows, err = store.readKeys(context.Background(), s.today(), []string{"ip:1.2.3.4"})
 		require.Nil(t, err)
@@ -367,7 +464,10 @@ func TestService_Persist_FlushErrorRetainsDeltas(t *testing.T) {
 		require.Nil(t, closed.Close())
 		broken.db = db.New(&db.Host{DB: closed}, nil) // Every statement fails from here on
 		s := newPersistentTestService(t, broken, clock)
-		rule := Rule{Kind: KindMessages, Daily: 3}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 3,
+		}
 		require.True(t, s.Allow("user:u_1", rule, 3).OK)
 		s.flush() // Fails; fail open: the counts stay, enforced locally
 		require.Equal(t, int64(3), s.Usage("user:u_1").Count(KindMessages))
@@ -398,7 +498,10 @@ func TestService_DayRollover(t *testing.T) {
 	// In memory (no store), the day follows the local clock: at the reset time the counts start
 	// over at the next flush, with no reset job
 	s, clock := newTestServiceWithClock(t) // Noon UTC
-	rule := Rule{Kind: KindMessages, Daily: 3}
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 3,
+	}
 	require.True(t, s.Allow("k", rule, 3).OK)
 	require.False(t, s.Allow("k", rule, 1).OK)
 	clock.advance(11 * time.Hour)
@@ -416,12 +519,18 @@ func TestService_Persist_DayRolloverKeepsYesterdaysRows(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 4).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 4).OK)
 		s.flush()
 		today := s.today()
 		s.rollDayForTest("2099-01-01")
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages))
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 1).OK)
 		s.flush()
 		rows, err := store.readKeys(context.Background(), today, []string{"user:u_1"})
 		require.Nil(t, err)
@@ -436,7 +545,10 @@ func TestService_Persist_EvictedKeyReadBack(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		s := newPersistentTestService(t, newStore(), clock)
-		rule := Rule{Kind: KindMessages, Daily: 10}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}
 		require.True(t, s.Allow("user:u_1", rule, 5).OK)
 		s.flush()
 		clock.advance(promotedRetention + 10*time.Minute) // A key with a row stays longer (see TestService_Prune_KeepsPromotedKeysLonger)
@@ -448,10 +560,17 @@ func TestService_Persist_EvictedKeyReadBack(t *testing.T) {
 		require.Equal(t, int64(1), s.Usage("user:u_1").Count(KindMessages))
 		s.readMisses()
 		require.Equal(t, int64(6), s.Usage("user:u_1").Count(KindMessages))
-		require.False(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 6}, 1).OK)
+		require.False(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 6,
+		}, 1).OK)
 
 		// Below the threshold there is no row, so the count resumes at zero, as designed
-		below := Rule{Kind: KindMessages, Daily: 250, Threshold: 3}
+		below := Rule{
+			Kind:      KindMessages,
+			Daily:     250,
+			Threshold: 3,
+		}
 		require.True(t, s.Allow("ip:1.2.3.4", below, 2).OK)
 		s.flush()
 		clock.advance(10 * time.Minute)
@@ -466,7 +585,10 @@ func TestService_Persist_Prune_KeepsUnflushed(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		s := newPersistentTestService(t, newStore(), clock)
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 5).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 5).OK)
 		clock.advance(promotedRetention + 10*time.Minute)
 		s.Prune(5 * time.Minute)
 		require.Equal(t, 1, s.Size()) // Not flushed yet, so not evicted
@@ -480,7 +602,10 @@ func TestService_Persist_CloseFlushes_CrashLoses(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
-		rule := Rule{Kind: KindMessages, Daily: 10}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}
 		graceful := newPersistentTestService(t, store, clock)
 		require.True(t, graceful.Allow("user:u_1", rule, 5).OK)
 		require.Nil(t, graceful.Close())
@@ -503,9 +628,16 @@ func TestService_Persist_PruneStore(t *testing.T) {
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
 		old := clock.now().Add(-usageRetention - 24*time.Hour).UTC().Format("2006-01-02")
-		_, err := store.flush(context.Background(), old, []usageRow{{key: "user:u_1", kind: KindMessages, count: 1}})
+		_, err := store.flush(context.Background(), old, []usageRow{{
+			key:   "user:u_1",
+			kind:  KindMessages,
+			count: 1,
+		}})
 		require.Nil(t, err)
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 1).OK)
 		s.flush()
 		require.Nil(t, s.PruneStore())
 		rows, err := store.readKeys(context.Background(), old, []string{"user:u_1"})
@@ -520,14 +652,20 @@ func TestService_Persist_PruneStore(t *testing.T) {
 func TestService_Persist_Loops(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		// With the loops on, two services converge on their own
-		conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: 100 * time.Millisecond}
+		conf := &Config{
+			ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+			FlushInterval: 100 * time.Millisecond,
+		}
 		a := New(conf, newStore())
 		b := New(conf, newStore())
 		t.Cleanup(func() {
 			a.Close()
 			b.Close()
 		})
-		rule := Rule{Kind: KindMessages, Daily: 100}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 100,
+		}
 		require.True(t, a.Allow("user:u_1", rule, 3).OK)
 		require.True(t, b.Allow("user:u_1", rule, 4).OK)
 		require.Eventually(t, func() bool {
@@ -543,9 +681,15 @@ func BenchmarkFlush(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer store.Close()
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}, store)
+	s := New(&Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}, store)
 	defer s.Close()
-	rule := Rule{Kind: KindMessages, Daily: 1 << 40}
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 1 << 40,
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -566,9 +710,20 @@ func TestService_Persist_MoneyKindsLoadSynchronously(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		a := newPersistentTestService(t, newStore(), clock)
 		b := newPersistentTestService(t, newStore(), clock)
-		emails := Rule{Kind: KindEmails, Burst: 10, Refill: time.Hour, Daily: 5}
-		calls := Rule{Kind: KindCalls, Daily: 2}
-		messages := Rule{Kind: KindMessages, Daily: 3}
+		emails := Rule{
+			Kind:   KindEmails,
+			Burst:  10,
+			Refill: time.Hour,
+			Daily:  5,
+		}
+		calls := Rule{
+			Kind:  KindCalls,
+			Daily: 2,
+		}
+		messages := Rule{
+			Kind:  KindMessages,
+			Daily: 3,
+		}
 		require.True(t, a.Allow("user:u_1", emails, 5).OK)
 		require.True(t, a.Allow("user:u_1", calls, 2).OK)
 		require.True(t, a.Allow("user:u_1", messages, 3).OK)
@@ -586,8 +741,16 @@ func TestService_Prune_KeepsPromotedKeysLonger(t *testing.T) {
 		// abuser cannot get a fresh local count by idling a few minutes
 		clock := &testClock{t: time.Now()}
 		s := newPersistentTestService(t, newStore(), clock)
-		require.True(t, s.Allow("ip:heavy", Rule{Kind: KindMessages, Daily: 250, Threshold: 3}, 3).OK)
-		require.True(t, s.Allow("ip:light", Rule{Kind: KindMessages, Daily: 250, Threshold: 3}, 1).OK)
+		require.True(t, s.Allow("ip:heavy", Rule{
+			Kind:      KindMessages,
+			Daily:     250,
+			Threshold: 3,
+		}, 3).OK)
+		require.True(t, s.Allow("ip:light", Rule{
+			Kind:      KindMessages,
+			Daily:     250,
+			Threshold: 3,
+		}, 1).OK)
 		s.flush()
 		clock.advance(10 * time.Minute)
 		s.Prune(5 * time.Minute)
@@ -603,7 +766,10 @@ func TestService_Forget(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		s := newPersistentTestService(t, newStore(), clock)
-		rule := Rule{Kind: KindMessages, Daily: 10}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}
 		require.True(t, s.Allow("user:u_1", rule, 5).OK)
 		require.False(t, s.Forget("user:u_1")) // Not written yet: kept
 		require.Equal(t, 1, s.Size())
@@ -622,7 +788,11 @@ func TestService_Forget(t *testing.T) {
 
 func TestService_TakeDeltas_NonTrivialOnly(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	for i := 0; i < 4; i++ {
 		require.True(t, s.Allow("quiet", rule, 1).OK)
 	}
@@ -634,36 +804,80 @@ func TestService_TakeDeltas_NonTrivialOnly(t *testing.T) {
 	}
 	deltas := s.TakeDeltas()
 	require.ElementsMatch(t, []Delta{
-		{Key: "busy", Kind: KindRequests, N: 5},
-		{Key: "low", Kind: KindRequests, N: 31},
+		{
+			Key:  "busy",
+			Kind: KindRequests,
+			N:    5,
+		},
+		{
+			Key:  "low",
+			Kind: KindRequests,
+			N:    31,
+		},
 	}, deltas)
 
 	// Taken deltas are gone; the quiet key's delta keeps accumulating until it is worth sending
 	require.Empty(t, s.TakeDeltas())
 	require.True(t, s.Allow("quiet", rule, 1).OK)
-	require.Equal(t, []Delta{{Key: "quiet", Kind: KindRequests, N: 5}}, s.TakeDeltas())
+	require.Equal(t, []Delta{{
+		Key:  "quiet",
+		Kind: KindRequests,
+		N:    5,
+	}}, s.TakeDeltas())
 
 	// A key whose bucket is below half sends every delta, however small
 	require.True(t, s.Allow("low", rule, 1).OK)
-	require.Equal(t, []Delta{{Key: "low", Kind: KindRequests, N: 1}}, s.TakeDeltas())
+	require.Equal(t, []Delta{{
+		Key:  "low",
+		Kind: KindRequests,
+		N:    1,
+	}}, s.TakeDeltas())
 }
 
 func TestService_TakeDeltas_MeshKindsOnly(t *testing.T) {
 	// Daily quotas go through the store, not the mesh; bytes and strikes do go through the mesh
 	s, _ := newTestServiceWithClock(t)
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 100}, 50).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindEmails, Burst: 10, Refill: time.Hour, Daily: 10}, 5).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindBandwidth, Burst: 1000, Refill: time.Second}, 600).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindStrikes, Burst: 100, Refill: 6 * time.Second}, 10).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 100,
+	}, 50).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindEmails,
+		Burst:  10,
+		Refill: time.Hour,
+		Daily:  10,
+	}, 5).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindBandwidth,
+		Burst:  1000,
+		Refill: time.Second,
+	}, 600).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindStrikes,
+		Burst:  100,
+		Refill: 6 * time.Second,
+	}, 10).OK)
 	require.ElementsMatch(t, []Delta{
-		{Key: "k", Kind: KindBandwidth, N: 600},
-		{Key: "k", Kind: KindStrikes, N: 10},
+		{
+			Key:  "k",
+			Kind: KindBandwidth,
+			N:    600,
+		},
+		{
+			Key:  "k",
+			Kind: KindStrikes,
+			N:    10,
+		},
 	}, s.TakeDeltas())
 }
 
 func TestService_Burn_DebtCappedAtOneBurst(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	for i := 0; i < 60; i++ {
 		require.True(t, s.Allow("k", rule, 1).OK)
 	}
@@ -690,8 +904,15 @@ func TestService_Burn_UnknownKeyOrBucketIgnored(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
 	s.Burn("unknown", KindRequests, 100)
 	require.Equal(t, 0, s.Size())
-	rule := Rule{Kind: KindRequests, Burst: 10, Refill: time.Hour}
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 10,
+	}, 1).OK)
 	s.Burn("k", KindRequests, 100) // Known key, but its request bucket was never used
 	require.Equal(t, int64(10), s.Tokens("k", rule))
 }
@@ -701,9 +922,16 @@ func TestService_Burn_ThreeNodesConverge(t *testing.T) {
 	// 180 go through in the first round; after the exchange every bucket is at one burst of
 	// debt, and from then on the cluster admits the configured rate, not three times it.
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
 	nodes := []*Service{newService(conf, clock.now, nil), newService(conf, clock.now, nil), newService(conf, clock.now, nil)}
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	admitted := 0
 	exchange := func() {
 		deltas := make([][]Delta, len(nodes))
@@ -757,10 +985,16 @@ func TestService_Persist_DayRolloverWritesYesterdaysPending(t *testing.T) {
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
 		yesterday := s.today()
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 4).OK) // Not flushed
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 4).OK) // Not flushed
 		s.rollDayForTest("2099-01-01")
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages)) // The new day starts at zero
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 1).OK)
 		s.flush()
 		rows, err := store.readKeys(context.Background(), yesterday, []string{"user:u_1"})
 		require.Nil(t, err)
@@ -787,7 +1021,10 @@ func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
 		broken.db = db.New(&db.Host{DB: closed}, nil)
 		s := newPersistentTestService(t, broken, clock)
 		yesterday := s.today()
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 3).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 3).OK)
 		s.flush() // Fails: retained
 		s.rollDayForTest("2099-01-01")
 		s.flush() // Still failing: still retained
@@ -806,10 +1043,16 @@ func newReadWriteRaceSetup(t *testing.T, newStore func() *Store) *Service {
 	t.Helper()
 	clock := &testClock{t: time.Now()}
 	other := newPersistentTestService(t, newStore(), clock)
-	require.True(t, other.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 100}, 10).OK)
+	require.True(t, other.Allow("user:u_1", Rule{
+		Kind:  KindMessages,
+		Daily: 100,
+	}, 10).OK)
 	require.Nil(t, other.Close())
 	s := newPersistentTestService(t, newStore(), clock)
-	require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 100}, 3).OK) // Queued for a read-back
+	require.True(t, s.Allow("user:u_1", Rule{
+		Kind:  KindMessages,
+		Daily: 100,
+	}, 3).OK) // Queued for a read-back
 	return s
 }
 
@@ -861,7 +1104,11 @@ func TestService_Refund_CancelsUnsentDelta(t *testing.T) {
 	// Codex review #7: a refund left the mesh delta, so peers were charged for refunded bytes
 	// (the LimitReader/LimitWriter rollback path)
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindBandwidth, Burst: 1000, Refill: time.Second}
+	rule := Rule{
+		Kind:   KindBandwidth,
+		Burst:  1000,
+		Refill: time.Second,
+	}
 	require.True(t, s.Allow("k", rule, 900).OK)
 	s.Refund("k", KindBandwidth, 900)
 	require.Empty(t, s.TakeDeltas())
@@ -869,9 +1116,17 @@ func TestService_Refund_CancelsUnsentDelta(t *testing.T) {
 	// Refunded after the delta went out: the next round carries the correction, and a peer applies
 	// it as a refund, never past the burst
 	require.True(t, s.Allow("k", rule, 900).OK)
-	require.Equal(t, []Delta{{Key: "k", Kind: KindBandwidth, N: 900}}, s.TakeDeltas())
+	require.Equal(t, []Delta{{
+		Key:  "k",
+		Kind: KindBandwidth,
+		N:    900,
+	}}, s.TakeDeltas())
 	s.Refund("k", KindBandwidth, 900)
-	require.Equal(t, []Delta{{Key: "k", Kind: KindBandwidth, N: -900}}, s.TakeDeltas())
+	require.Equal(t, []Delta{{
+		Key:  "k",
+		Kind: KindBandwidth,
+		N:    -900,
+	}}, s.TakeDeltas())
 	peer, _ := newTestServiceWithClock(t)
 	require.True(t, peer.Allow("k", rule, 100).OK)
 	peer.Burn("k", KindBandwidth, 900)
@@ -886,7 +1141,11 @@ func TestService_Burn_RefillsToReceiptTime(t *testing.T) {
 	// Codex review #6: Burn charged stale tokens and left the refill clock behind, so the next local
 	// use got the whole idle interval's refill, including what the peers had already used
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	require.True(t, s.Allow("k", rule, 60).OK)
 	for i := 0; i < 120; i++ { // Ten minutes: a peer uses each token as it refills
 		clock.advance(5 * time.Second)
@@ -900,9 +1159,16 @@ func TestService_Burn_AlternatingNodes(t *testing.T) {
 	// load balancer's choice): A was idle meanwhile, but B used every token as it refilled, so A must
 	// not hand out a fresh burst when the traffic arrives
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
 	a, b := newService(conf, clock.now, nil), newService(conf, clock.now, nil)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	exchange := func() {
 		da, db := a.TakeDeltas(), b.TakeDeltas()
 		for _, d := range da {

@@ -96,7 +96,11 @@ func (s *Service) Record(ip netip.Addr, httpCode, errorCode int) {
 
 // rule is the strike bucket: Threshold weighted strikes, refilling over the Window
 func (s *Service) rule() limit.Rule {
-	return limit.Rule{Kind: limit.KindStrikes, Burst: int64(s.conf.Threshold), Refill: s.conf.Window / time.Duration(s.conf.Threshold)}
+	return limit.Rule{
+		Kind:   limit.KindStrikes,
+		Burst:  int64(s.conf.Threshold),
+		Refill: s.conf.Window / time.Duration(s.conf.Threshold),
+	}
 }
 
 // prefix masks ip to the ban unit (PrefixBitsIPv4/IPv6) -- what fail2ban bans, e.g. a whole /64.

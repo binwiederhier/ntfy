@@ -604,11 +604,23 @@ func TestServer_Cluster_UsageGossipRoundTrip(t *testing.T) {
 		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
 	}
 	s.cluster.BroadcastUsage(s.limiter.TakeDeltas())
-	require.Equal(t, []limit.Delta{{Key: "ip:9.9.9.9", Kind: limit.KindRequests, N: 5}}, b.Usage())
+	require.Equal(t, []limit.Delta{{
+		Key:  "ip:9.9.9.9",
+		Kind: limit.KindRequests,
+		N:    5,
+	}}, b.Usage())
 
 	// Two peers admitted 5 each for the same key: this node's bucket goes to zero, capped at one
 	// burst of debt, so the next request is denied here too
-	s.handlePeerUsage([]limit.Delta{{Key: "ip:9.9.9.9", Kind: limit.KindRequests, N: 5}, {Key: "ip:9.9.9.9", Kind: limit.KindRequests, N: 5}})
+	s.handlePeerUsage([]limit.Delta{{
+		Key:  "ip:9.9.9.9",
+		Kind: limit.KindRequests,
+		N:    5,
+	}, {
+		Key:  "ip:9.9.9.9",
+		Kind: limit.KindRequests,
+		N:    5,
+	}})
 	rr := request(t, s, "PUT", "/mytopic", "hi", nil)
 	require.Equal(t, 429, rr.Code)
 	require.Equal(t, 42901, toHTTPError(t, rr.Body.String()).Code)

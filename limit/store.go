@@ -204,7 +204,11 @@ func scanUsageRows(rows *sql.Rows) ([]usageRow, error) {
 			log.Tag(tag).Debug("Skipping usage row of unknown kind %s", kindName)
 			continue
 		}
-		result = append(result, usageRow{key: key, kind: kind, count: count})
+		result = append(result, usageRow{
+			key:   key,
+			kind:  kind,
+			count: count,
+		})
 	}
 	return result, rows.Err()
 }

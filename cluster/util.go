@@ -33,7 +33,11 @@ func assembleMessageBody(lines [][]byte) []byte {
 func marshalUsage(deltas []limit.Delta) ([]byte, error) {
 	usage := &apiUsage{Deltas: make([]*apiUsageDelta, len(deltas))}
 	for i, d := range deltas {
-		usage.Deltas[i] = &apiUsageDelta{Key: d.Key, Kind: d.Kind.String(), N: d.N}
+		usage.Deltas[i] = &apiUsageDelta{
+			Key:  d.Key,
+			Kind: d.Kind.String(),
+			N:    d.N,
+		}
 	}
 	return json.Marshal(usage)
 }
@@ -54,7 +58,11 @@ func unmarshalUsage(body []byte) ([]limit.Delta, error) {
 		if !ok {
 			continue
 		}
-		deltas = append(deltas, limit.Delta{Key: d.Key, Kind: kind, N: d.N})
+		deltas = append(deltas, limit.Delta{
+			Key:  d.Key,
+			Kind: kind,
+			N:    d.N,
+		})
 	}
 	return deltas, nil
 }

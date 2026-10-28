@@ -328,7 +328,11 @@ func (s *Service) TakeDeltas() []Delta {
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
 				if e.meshDelta[kind] != 0 && e.deltaWorthSending(kind) {
-					deltas = append(deltas, Delta{Key: key, Kind: kind, N: e.meshDelta[kind]})
+					deltas = append(deltas, Delta{
+						Key:  key,
+						Kind: kind,
+						N:    e.meshDelta[kind],
+					})
 					e.meshDelta[kind] = 0
 				}
 			}

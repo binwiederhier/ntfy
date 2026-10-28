@@ -788,7 +788,11 @@ func TestService_Forget(t *testing.T) {
 
 func TestService_TakeDeltas_NonTrivialOnly(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	for i := 0; i < 4; i++ {
 		require.True(t, s.Allow("quiet", rule, 1).OK)
 	}
@@ -800,36 +804,80 @@ func TestService_TakeDeltas_NonTrivialOnly(t *testing.T) {
 	}
 	deltas := s.TakeDeltas()
 	require.ElementsMatch(t, []Delta{
-		{Key: "busy", Kind: KindRequests, N: 5},
-		{Key: "low", Kind: KindRequests, N: 31},
+		{
+			Key:  "busy",
+			Kind: KindRequests,
+			N:    5,
+		},
+		{
+			Key:  "low",
+			Kind: KindRequests,
+			N:    31,
+		},
 	}, deltas)
 
 	// Taken deltas are gone; the quiet key's delta keeps accumulating until it is worth sending
 	require.Empty(t, s.TakeDeltas())
 	require.True(t, s.Allow("quiet", rule, 1).OK)
-	require.Equal(t, []Delta{{Key: "quiet", Kind: KindRequests, N: 5}}, s.TakeDeltas())
+	require.Equal(t, []Delta{{
+		Key:  "quiet",
+		Kind: KindRequests,
+		N:    5,
+	}}, s.TakeDeltas())
 
 	// A key whose bucket is below half sends every delta, however small
 	require.True(t, s.Allow("low", rule, 1).OK)
-	require.Equal(t, []Delta{{Key: "low", Kind: KindRequests, N: 1}}, s.TakeDeltas())
+	require.Equal(t, []Delta{{
+		Key:  "low",
+		Kind: KindRequests,
+		N:    1,
+	}}, s.TakeDeltas())
 }
 
 func TestService_TakeDeltas_MeshKindsOnly(t *testing.T) {
 	// Daily quotas go through the store, not the mesh; bytes and strikes do go through the mesh
 	s, _ := newTestServiceWithClock(t)
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 100}, 50).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindEmails, Burst: 10, Refill: time.Hour, Daily: 10}, 5).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindBandwidth, Burst: 1000, Refill: time.Second}, 600).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindStrikes, Burst: 100, Refill: 6 * time.Second}, 10).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 100,
+	}, 50).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindEmails,
+		Burst:  10,
+		Refill: time.Hour,
+		Daily:  10,
+	}, 5).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindBandwidth,
+		Burst:  1000,
+		Refill: time.Second,
+	}, 600).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindStrikes,
+		Burst:  100,
+		Refill: 6 * time.Second,
+	}, 10).OK)
 	require.ElementsMatch(t, []Delta{
-		{Key: "k", Kind: KindBandwidth, N: 600},
-		{Key: "k", Kind: KindStrikes, N: 10},
+		{
+			Key:  "k",
+			Kind: KindBandwidth,
+			N:    600,
+		},
+		{
+			Key:  "k",
+			Kind: KindStrikes,
+			N:    10,
+		},
 	}, s.TakeDeltas())
 }
 
 func TestService_Burn_DebtCappedAtOneBurst(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	for i := 0; i < 60; i++ {
 		require.True(t, s.Allow("k", rule, 1).OK)
 	}
@@ -856,8 +904,15 @@ func TestService_Burn_UnknownKeyOrBucketIgnored(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
 	s.Burn("unknown", KindRequests, 100)
 	require.Equal(t, 0, s.Size())
-	rule := Rule{Kind: KindRequests, Burst: 10, Refill: time.Hour}
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 10,
+	}, 1).OK)
 	s.Burn("k", KindRequests, 100) // Known key, but its request bucket was never used
 	require.Equal(t, int64(10), s.Tokens("k", rule))
 }
@@ -867,9 +922,16 @@ func TestService_Burn_ThreeNodesConverge(t *testing.T) {
 	// 180 go through in the first round; after the exchange every bucket is at one burst of
 	// debt, and from then on the cluster admits the configured rate, not three times it.
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
 	nodes := []*Service{newService(conf, clock.now, nil), newService(conf, clock.now, nil), newService(conf, clock.now, nil)}
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	admitted := 0
 	exchange := func() {
 		deltas := make([][]Delta, len(nodes))
@@ -1042,7 +1104,11 @@ func TestService_Refund_CancelsUnsentDelta(t *testing.T) {
 	// Codex review #7: a refund left the mesh delta, so peers were charged for refunded bytes
 	// (the LimitReader/LimitWriter rollback path)
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindBandwidth, Burst: 1000, Refill: time.Second}
+	rule := Rule{
+		Kind:   KindBandwidth,
+		Burst:  1000,
+		Refill: time.Second,
+	}
 	require.True(t, s.Allow("k", rule, 900).OK)
 	s.Refund("k", KindBandwidth, 900)
 	require.Empty(t, s.TakeDeltas())
@@ -1050,9 +1116,17 @@ func TestService_Refund_CancelsUnsentDelta(t *testing.T) {
 	// Refunded after the delta went out: the next round carries the correction, and a peer applies
 	// it as a refund, never past the burst
 	require.True(t, s.Allow("k", rule, 900).OK)
-	require.Equal(t, []Delta{{Key: "k", Kind: KindBandwidth, N: 900}}, s.TakeDeltas())
+	require.Equal(t, []Delta{{
+		Key:  "k",
+		Kind: KindBandwidth,
+		N:    900,
+	}}, s.TakeDeltas())
 	s.Refund("k", KindBandwidth, 900)
-	require.Equal(t, []Delta{{Key: "k", Kind: KindBandwidth, N: -900}}, s.TakeDeltas())
+	require.Equal(t, []Delta{{
+		Key:  "k",
+		Kind: KindBandwidth,
+		N:    -900,
+	}}, s.TakeDeltas())
 	peer, _ := newTestServiceWithClock(t)
 	require.True(t, peer.Allow("k", rule, 100).OK)
 	peer.Burn("k", KindBandwidth, 900)
@@ -1067,7 +1141,11 @@ func TestService_Burn_RefillsToReceiptTime(t *testing.T) {
 	// Codex review #6: Burn charged stale tokens and left the refill clock behind, so the next local
 	// use got the whole idle interval's refill, including what the peers had already used
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	require.True(t, s.Allow("k", rule, 60).OK)
 	for i := 0; i < 120; i++ { // Ten minutes: a peer uses each token as it refills
 		clock.advance(5 * time.Second)
@@ -1081,9 +1159,16 @@ func TestService_Burn_AlternatingNodes(t *testing.T) {
 	// load balancer's choice): A was idle meanwhile, but B used every token as it refilled, so A must
 	// not hand out a fresh burst when the traffic arrives
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
 	a, b := newService(conf, clock.now, nil), newService(conf, clock.now, nil)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	exchange := func() {
 		da, db := a.TakeDeltas(), b.TakeDeltas()
 		for _, d := range da {

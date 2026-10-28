@@ -306,9 +306,12 @@ func New(conf *Config) (*Server, error) {
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
 		visitors:        make(map[string]*visitor),
-		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime, FlushInterval: conf.UsageFlushInterval}, usageStore),
-		stripe:          stripe,
-		streams:         newStreamRegistry(),
+		limiter: limit.New(&limit.Config{
+			ResetTime:     conf.VisitorStatsResetTime,
+			FlushInterval: conf.UsageFlushInterval,
+		}, usageStore),
+		stripe:  stripe,
+		streams: newStreamRegistry(),
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager

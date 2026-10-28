@@ -478,15 +478,29 @@ func (v *visitor) requestRule() limit.Rule {
 }
 
 func (v *visitor) messageRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindMessages, Daily: v.limits.MessageLimit, Threshold: v.thresholdNoLock(v.limits.MessageLimit)}
+	return limit.Rule{
+		Kind:      limit.KindMessages,
+		Daily:     v.limits.MessageLimit,
+		Threshold: v.thresholdNoLock(v.limits.MessageLimit),
+	}
 }
 
 func (v *visitor) emailRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindEmails, Burst: int64(v.limits.EmailLimitBurst), Refill: v.limits.EmailLimitReplenish, Daily: v.limits.EmailLimit, Threshold: v.thresholdNoLock(v.limits.EmailLimit)}
+	return limit.Rule{
+		Kind:      limit.KindEmails,
+		Burst:     int64(v.limits.EmailLimitBurst),
+		Refill:    v.limits.EmailLimitReplenish,
+		Daily:     v.limits.EmailLimit,
+		Threshold: v.thresholdNoLock(v.limits.EmailLimit),
+	}
 }
 
 func (v *visitor) callRule() limit.Rule {
-	return limit.Rule{Kind: limit.KindCalls, Daily: v.limits.CallLimit, Threshold: v.thresholdNoLock(v.limits.CallLimit)}
+	return limit.Rule{
+		Kind:      limit.KindCalls,
+		Daily:     v.limits.CallLimit,
+		Threshold: v.thresholdNoLock(v.limits.CallLimit),
+	}
 }
 
 // thresholdNoLock returns the daily count from which the visitor's usage is persisted: from the

@@ -512,7 +512,11 @@ func (s *Service) snapshot() []usageRow {
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
 				if e.promoted[kind] && e.unflushed[kind] != 0 {
-					rows = append(rows, usageRow{key: key, kind: kind, count: e.unflushed[kind]})
+					rows = append(rows, usageRow{
+						key:   key,
+						kind:  kind,
+						count: e.unflushed[kind],
+					})
 				}
 			}
 		}
@@ -602,13 +606,20 @@ func (s *Service) writeCarried(ctx context.Context, store *Store) {
 		pending := s.carried[day]
 		rows := make([]usageRow, 0, len(pending))
 		for k, count := range pending {
-			rows = append(rows, usageRow{key: k.key, kind: k.kind, count: count})
+			rows = append(rows, usageRow{
+				key:   k.key,
+				kind:  k.kind,
+				count: count,
+			})
 		}
 		s.mu.Unlock()
 		written, err := store.flush(ctx, day, rows)
 		s.mu.Lock()
 		for _, r := range rows[:written] {
-			delete(pending, carriedKey{key: r.key, kind: r.kind})
+			delete(pending, carriedKey{
+				key:  r.key,
+				kind: r.kind,
+			})
 		}
 		if len(pending) == 0 {
 			delete(s.carried, day)
@@ -645,7 +656,10 @@ func (s *Service) maybeRollDay() {
 		for key, e := range sh.entries {
 			for kind := Kind(0); kind < numKinds; kind++ {
 				if e.promoted[kind] && e.unflushed[kind] != 0 {
-					carry[carriedKey{key: key, kind: kind}] += e.unflushed[kind]
+					carry[carriedKey{
+						key:  key,
+						kind: kind,
+					}] += e.unflushed[kind]
 				}
 			}
 			e.baseline = [numKinds]int64{}
@@ -777,7 +791,10 @@ func (s *Service) reset(key string, kind Kind) {
 func (sh *shard) entryNoLock(key string, now time.Time, loaded bool) *entry {
 	e, ok := sh.entries[key]
 	if !ok {
-		e = &entry{seen: now.UnixNano(), loaded: loaded}
+		e = &entry{
+			seen:   now.UnixNano(),
+			loaded: loaded,
+		}
 		sh.entries[key] = e
 	}
 	return e

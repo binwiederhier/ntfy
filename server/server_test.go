@@ -5283,7 +5283,10 @@ func newOtherNodeLimiter(t *testing.T, s *Server) *limit.Service {
 		store, err = limit.NewSQLiteStore(s.config.UsageFile)
 	}
 	require.Nil(t, err)
-	return limit.New(&limit.Config{ResetTime: s.config.VisitorStatsResetTime, FlushInterval: time.Hour}, store)
+	return limit.New(&limit.Config{
+		ResetTime:     s.config.VisitorStatsResetTime,
+		FlushInterval: time.Hour,
+	}, store)
 }
 
 func newTestServer(t *testing.T, config *Config) *Server {

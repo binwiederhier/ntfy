@@ -282,7 +282,12 @@ func TestVisitor_AccountUsageFromNodeThatNeverSawTheKey(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "test", MessageLimit: 100, EmailLimit: 10, CallLimit: 3}))
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "test",
+			MessageLimit: 100,
+			EmailLimit:   10,
+			CallLimit:    3,
+		}))
 		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 		u, err := s.userManager.User("phil")

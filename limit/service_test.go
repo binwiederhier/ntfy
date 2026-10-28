@@ -34,7 +34,10 @@ func (c *testClock) advance(d time.Duration) {
 func newTestServiceWithClock(t *testing.T) (*Service, *testClock) {
 	t.Helper()
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
 	return newService(conf, clock.now, nil), clock
 }
 
@@ -279,7 +282,12 @@ func TestService_Prune(t *testing.T) {
 
 func TestService_Allow_Concurrent(t *testing.T) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
-	rule := Rule{Kind: KindRequests, Burst: 500, Refill: time.Hour, Daily: 400}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  500,
+		Refill: time.Hour,
+		Daily:  400,
+	}
 	var wg sync.WaitGroup
 	var admitted sync.Map
 	for g := 0; g < 16; g++ {
@@ -309,7 +317,12 @@ func TestService_Allow_Concurrent(t *testing.T) {
 
 func BenchmarkAllow_HotKey(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second, Daily: 1 << 40}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+		Daily:  1 << 40,
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -319,7 +332,11 @@ func BenchmarkAllow_HotKey(b *testing.B) {
 
 func BenchmarkAllow_ManyKeys(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	keys := make([]string, 100000)
 	for i := range keys {
 		keys[i] = fmt.Sprintf("ip:10.%d.%d.%d", i>>16, (i>>8)&255, i&255)
@@ -334,7 +351,11 @@ func BenchmarkAllow_ManyKeys(b *testing.B) {
 
 func BenchmarkAllow_Parallel(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0
@@ -351,7 +372,10 @@ func BenchmarkAllow_Parallel(b *testing.B) {
 
 func newPersistentTestService(t *testing.T, store *Store, clock *testClock) *Service {
 	t.Helper()
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
 	s := newService(conf, clock.now, store)
 	t.Cleanup(func() { s.Close() })
 	return s
@@ -362,7 +386,10 @@ func TestService_Persist_FlushAndReadBack(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		a := newPersistentTestService(t, newStore(), clock)
 		b := newPersistentTestService(t, newStore(), clock)
-		rule := Rule{Kind: KindMessages, Daily: 100}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 100,
+		}
 		require.True(t, a.Allow("user:u_1", rule, 3).OK)
 		require.Equal(t, int64(3), a.Usage("user:u_1").Count(KindMessages))
 		a.flush()
@@ -377,8 +404,14 @@ func TestService_Persist_FlushAndReadBack(t *testing.T) {
 		// A learns B's usage at its next flush, and enforces the cluster total
 		a.flush()
 		require.Equal(t, int64(5), a.Usage("user:u_1").Count(KindMessages))
-		require.False(t, a.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 5}, 1).OK)
-		require.True(t, a.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 6}, 1).OK)
+		require.False(t, a.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 5,
+		}, 1).OK)
+		require.True(t, a.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 6,
+		}, 1).OK)
 		a.flush()
 		b.flush()
 		require.Equal(t, int64(6), b.Usage("user:u_1").Count(KindMessages))
@@ -390,7 +423,11 @@ func TestService_Persist_Threshold(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
-		rule := Rule{Kind: KindMessages, Daily: 250, Threshold: 3} // 1% of the quota, rounded up
+		rule := Rule{
+			Kind:      KindMessages,
+			Daily:     250,
+			Threshold: 3,
+		} // 1% of the quota, rounded up
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 2).OK)
 		s.flush()
 		rows, err := store.readKeys(context.Background(), s.today(), []string{"ip:1.2.3.4"})
@@ -405,7 +442,11 @@ func TestService_Persist_Threshold(t *testing.T) {
 		require.Equal(t, map[string]int64{"ip:1.2.3.4/messages": 3}, rowsByKeyKind(rows))
 
 		// Bucket kinds are never persisted, whatever the threshold
-		require.True(t, s.Allow("ip:1.2.3.4", Rule{Kind: KindRequests, Burst: 100, Refill: time.Second}, 50).OK)
+		require.True(t, s.Allow("ip:1.2.3.4", Rule{
+			Kind:   KindRequests,
+			Burst:  100,
+			Refill: time.Second,
+		}, 50).OK)
 		s.flush()
 		rows, err = store.readKeys(context.Background(), s.today(), []string{"ip:1.2.3.4"})
 		require.Nil(t, err)
@@ -423,7 +464,10 @@ func TestService_Persist_FlushErrorRetainsDeltas(t *testing.T) {
 		require.Nil(t, closed.Close())
 		broken.db = db.New(&db.Host{DB: closed}, nil) // Every statement fails from here on
 		s := newPersistentTestService(t, broken, clock)
-		rule := Rule{Kind: KindMessages, Daily: 3}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 3,
+		}
 		require.True(t, s.Allow("user:u_1", rule, 3).OK)
 		s.flush() // Fails; fail open: the counts stay, enforced locally
 		require.Equal(t, int64(3), s.Usage("user:u_1").Count(KindMessages))
@@ -454,7 +498,10 @@ func TestService_DayRollover(t *testing.T) {
 	// In memory (no store), the day follows the local clock: at the reset time the counts start
 	// over at the next flush, with no reset job
 	s, clock := newTestServiceWithClock(t) // Noon UTC
-	rule := Rule{Kind: KindMessages, Daily: 3}
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 3,
+	}
 	require.True(t, s.Allow("k", rule, 3).OK)
 	require.False(t, s.Allow("k", rule, 1).OK)
 	clock.advance(11 * time.Hour)
@@ -472,12 +519,18 @@ func TestService_Persist_DayRolloverKeepsYesterdaysRows(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 4).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 4).OK)
 		s.flush()
 		today := s.today()
 		s.rollDayForTest("2099-01-01")
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages))
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 1).OK)
 		s.flush()
 		rows, err := store.readKeys(context.Background(), today, []string{"user:u_1"})
 		require.Nil(t, err)
@@ -492,7 +545,10 @@ func TestService_Persist_EvictedKeyReadBack(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		s := newPersistentTestService(t, newStore(), clock)
-		rule := Rule{Kind: KindMessages, Daily: 10}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}
 		require.True(t, s.Allow("user:u_1", rule, 5).OK)
 		s.flush()
 		clock.advance(promotedRetention + 10*time.Minute) // A key with a row stays longer (see TestService_Prune_KeepsPromotedKeysLonger)
@@ -504,10 +560,17 @@ func TestService_Persist_EvictedKeyReadBack(t *testing.T) {
 		require.Equal(t, int64(1), s.Usage("user:u_1").Count(KindMessages))
 		s.readMisses()
 		require.Equal(t, int64(6), s.Usage("user:u_1").Count(KindMessages))
-		require.False(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 6}, 1).OK)
+		require.False(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 6,
+		}, 1).OK)
 
 		// Below the threshold there is no row, so the count resumes at zero, as designed
-		below := Rule{Kind: KindMessages, Daily: 250, Threshold: 3}
+		below := Rule{
+			Kind:      KindMessages,
+			Daily:     250,
+			Threshold: 3,
+		}
 		require.True(t, s.Allow("ip:1.2.3.4", below, 2).OK)
 		s.flush()
 		clock.advance(10 * time.Minute)
@@ -522,7 +585,10 @@ func TestService_Persist_Prune_KeepsUnflushed(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		s := newPersistentTestService(t, newStore(), clock)
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 5).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 5).OK)
 		clock.advance(promotedRetention + 10*time.Minute)
 		s.Prune(5 * time.Minute)
 		require.Equal(t, 1, s.Size()) // Not flushed yet, so not evicted
@@ -536,7 +602,10 @@ func TestService_Persist_CloseFlushes_CrashLoses(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
-		rule := Rule{Kind: KindMessages, Daily: 10}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}
 		graceful := newPersistentTestService(t, store, clock)
 		require.True(t, graceful.Allow("user:u_1", rule, 5).OK)
 		require.Nil(t, graceful.Close())
@@ -559,9 +628,16 @@ func TestService_Persist_PruneStore(t *testing.T) {
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
 		old := clock.now().Add(-usageRetention - 24*time.Hour).UTC().Format("2006-01-02")
-		_, err := store.flush(context.Background(), old, []usageRow{{key: "user:u_1", kind: KindMessages, count: 1}})
+		_, err := store.flush(context.Background(), old, []usageRow{{
+			key:   "user:u_1",
+			kind:  KindMessages,
+			count: 1,
+		}})
 		require.Nil(t, err)
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 1).OK)
 		s.flush()
 		require.Nil(t, s.PruneStore())
 		rows, err := store.readKeys(context.Background(), old, []string{"user:u_1"})
@@ -576,14 +652,20 @@ func TestService_Persist_PruneStore(t *testing.T) {
 func TestService_Persist_Loops(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		// With the loops on, two services converge on their own
-		conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: 100 * time.Millisecond}
+		conf := &Config{
+			ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+			FlushInterval: 100 * time.Millisecond,
+		}
 		a := New(conf, newStore())
 		b := New(conf, newStore())
 		t.Cleanup(func() {
 			a.Close()
 			b.Close()
 		})
-		rule := Rule{Kind: KindMessages, Daily: 100}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 100,
+		}
 		require.True(t, a.Allow("user:u_1", rule, 3).OK)
 		require.True(t, b.Allow("user:u_1", rule, 4).OK)
 		require.Eventually(t, func() bool {
@@ -599,9 +681,15 @@ func BenchmarkFlush(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer store.Close()
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), FlushInterval: time.Hour}, store)
+	s := New(&Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}, store)
 	defer s.Close()
-	rule := Rule{Kind: KindMessages, Daily: 1 << 40}
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 1 << 40,
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -622,9 +710,20 @@ func TestService_Persist_MoneyKindsLoadSynchronously(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		a := newPersistentTestService(t, newStore(), clock)
 		b := newPersistentTestService(t, newStore(), clock)
-		emails := Rule{Kind: KindEmails, Burst: 10, Refill: time.Hour, Daily: 5}
-		calls := Rule{Kind: KindCalls, Daily: 2}
-		messages := Rule{Kind: KindMessages, Daily: 3}
+		emails := Rule{
+			Kind:   KindEmails,
+			Burst:  10,
+			Refill: time.Hour,
+			Daily:  5,
+		}
+		calls := Rule{
+			Kind:  KindCalls,
+			Daily: 2,
+		}
+		messages := Rule{
+			Kind:  KindMessages,
+			Daily: 3,
+		}
 		require.True(t, a.Allow("user:u_1", emails, 5).OK)
 		require.True(t, a.Allow("user:u_1", calls, 2).OK)
 		require.True(t, a.Allow("user:u_1", messages, 3).OK)
@@ -642,8 +741,16 @@ func TestService_Prune_KeepsPromotedKeysLonger(t *testing.T) {
 		// abuser cannot get a fresh local count by idling a few minutes
 		clock := &testClock{t: time.Now()}
 		s := newPersistentTestService(t, newStore(), clock)
-		require.True(t, s.Allow("ip:heavy", Rule{Kind: KindMessages, Daily: 250, Threshold: 3}, 3).OK)
-		require.True(t, s.Allow("ip:light", Rule{Kind: KindMessages, Daily: 250, Threshold: 3}, 1).OK)
+		require.True(t, s.Allow("ip:heavy", Rule{
+			Kind:      KindMessages,
+			Daily:     250,
+			Threshold: 3,
+		}, 3).OK)
+		require.True(t, s.Allow("ip:light", Rule{
+			Kind:      KindMessages,
+			Daily:     250,
+			Threshold: 3,
+		}, 1).OK)
 		s.flush()
 		clock.advance(10 * time.Minute)
 		s.Prune(5 * time.Minute)
@@ -659,7 +766,10 @@ func TestService_Forget(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		s := newPersistentTestService(t, newStore(), clock)
-		rule := Rule{Kind: KindMessages, Daily: 10}
+		rule := Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}
 		require.True(t, s.Allow("user:u_1", rule, 5).OK)
 		require.False(t, s.Forget("user:u_1")) // Not written yet: kept
 		require.Equal(t, 1, s.Size())
@@ -681,10 +791,16 @@ func TestService_Persist_DayRolloverWritesYesterdaysPending(t *testing.T) {
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
 		yesterday := s.today()
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 4).OK) // Not flushed
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 4).OK) // Not flushed
 		s.rollDayForTest("2099-01-01")
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages)) // The new day starts at zero
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 1).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 1).OK)
 		s.flush()
 		rows, err := store.readKeys(context.Background(), yesterday, []string{"user:u_1"})
 		require.Nil(t, err)
@@ -711,7 +827,10 @@ func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
 		broken.db = db.New(&db.Host{DB: closed}, nil)
 		s := newPersistentTestService(t, broken, clock)
 		yesterday := s.today()
-		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 10}, 3).OK)
+		require.True(t, s.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 3).OK)
 		s.flush() // Fails: retained
 		s.rollDayForTest("2099-01-01")
 		s.flush() // Still failing: still retained
@@ -730,10 +849,16 @@ func newReadWriteRaceSetup(t *testing.T, newStore func() *Store) *Service {
 	t.Helper()
 	clock := &testClock{t: time.Now()}
 	other := newPersistentTestService(t, newStore(), clock)
-	require.True(t, other.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 100}, 10).OK)
+	require.True(t, other.Allow("user:u_1", Rule{
+		Kind:  KindMessages,
+		Daily: 100,
+	}, 10).OK)
 	require.Nil(t, other.Close())
 	s := newPersistentTestService(t, newStore(), clock)
-	require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages, Daily: 100}, 3).OK) // Queued for a read-back
+	require.True(t, s.Allow("user:u_1", Rule{
+		Kind:  KindMessages,
+		Daily: 100,
+	}, 3).OK) // Queued for a read-back
 	return s
 }
 

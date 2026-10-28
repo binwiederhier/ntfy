@@ -42,7 +42,11 @@ func newTestService(t *testing.T) *Service {
 
 func TestService_Allow_Bucket(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 3, Refill: 100 * time.Millisecond}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  3,
+		Refill: 100 * time.Millisecond,
+	}
 	for i := 0; i < 3; i++ {
 		require.True(t, s.Allow("k", rule, 1).OK)
 	}
@@ -71,7 +75,10 @@ func TestService_Allow_Bucket(t *testing.T) {
 
 func TestService_Allow_Daily(t *testing.T) {
 	s, _ := newTestServiceWithClock(t) // Noon UTC, 12 hours before the reset
-	rule := Rule{Kind: KindMessages, Daily: 2}
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 2,
+	}
 	require.True(t, s.Allow("k", rule, 1).OK)
 	require.True(t, s.Allow("k", rule, 1).OK)
 	d := s.Allow("k", rule, 1)
@@ -91,7 +98,12 @@ func TestService_Allow_Daily(t *testing.T) {
 func TestService_Allow_BucketAndDaily(t *testing.T) {
 	// Emails: a burst of 2 refilling slowly, and a daily cap of 3
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindEmails, Burst: 2, Refill: time.Minute, Daily: 3}
+	rule := Rule{
+		Kind:   KindEmails,
+		Burst:  2,
+		Refill: time.Minute,
+		Daily:  3,
+	}
 	require.True(t, s.Allow("k", rule, 1).OK)
 	require.True(t, s.Allow("k", rule, 1).OK)
 	d := s.Allow("k", rule, 1)
@@ -108,7 +120,11 @@ func TestService_Allow_BucketAndDaily(t *testing.T) {
 
 func TestService_Allow_N(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindBandwidth, Burst: 1000, Refill: time.Millisecond} // 1 kB burst, 1 kB/s
+	rule := Rule{
+		Kind:   KindBandwidth,
+		Burst:  1000,
+		Refill: time.Millisecond,
+	} // 1 kB burst, 1 kB/s
 	require.True(t, s.Allow("k", rule, 600).OK)
 	d := s.Allow("k", rule, 600)
 	require.False(t, d.OK)
@@ -127,16 +143,28 @@ func TestService_Allow_RuleChangeKeepsTokens(t *testing.T) {
 	// A tier change passes a new rule on the next call: a bigger burst does not hand back a full
 	// bucket, a smaller one caps what is there
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 10, Refill: time.Hour}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Hour,
+	}
 	for i := 0; i < 8; i++ {
 		require.True(t, s.Allow("k", rule, 1).OK)
 	}
-	bigger := Rule{Kind: KindRequests, Burst: 100, Refill: time.Hour}
+	bigger := Rule{
+		Kind:   KindRequests,
+		Burst:  100,
+		Refill: time.Hour,
+	}
 	require.Equal(t, int64(2), s.Tokens("k", bigger))
 	require.True(t, s.Allow("k", bigger, 1).OK)
 	require.True(t, s.Allow("k", bigger, 1).OK)
 	require.False(t, s.Allow("k", bigger, 1).OK)
-	smaller := Rule{Kind: KindRequests, Burst: 1, Refill: time.Hour}
+	smaller := Rule{
+		Kind:   KindRequests,
+		Burst:  1,
+		Refill: time.Hour,
+	}
 	require.Equal(t, int64(0), s.Tokens("k", smaller))
 
 	// A fresh key with the smaller rule starts with its burst
@@ -148,10 +176,22 @@ func TestService_Allow_RuleChangeKeepsTokens(t *testing.T) {
 
 func TestService_Allow_DailyChangeAppliesAtOnce(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 5}, 5).OK)
-	require.False(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 5}, 1).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 6}, 1).OK)  // Upgraded
-	require.False(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 3}, 1).OK) // Downgraded below the count
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 5,
+	}, 5).OK)
+	require.False(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 5,
+	}, 1).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 6,
+	}, 1).OK) // Upgraded
+	require.False(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 3,
+	}, 1).OK) // Downgraded below the count
 	require.Equal(t, int64(6), s.Usage("k").Count(KindMessages))
 }
 
@@ -165,7 +205,10 @@ func TestService_Allow_Unlimited(t *testing.T) {
 
 func TestService_Allow_NeverRefills(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindAccount, Burst: 2} // No refill
+	rule := Rule{
+		Kind:  KindAccount,
+		Burst: 2,
+	} // No refill
 	require.True(t, s.Allow("k", rule, 1).OK)
 	require.True(t, s.Allow("k", rule, 1).OK)
 	clock.advance(24 * time.Hour)
@@ -176,7 +219,12 @@ func TestService_Allow_NeverRefills(t *testing.T) {
 
 func TestService_Refund(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindBandwidth, Burst: 3, Refill: time.Hour, Daily: 100}
+	rule := Rule{
+		Kind:   KindBandwidth,
+		Burst:  3,
+		Refill: time.Hour,
+		Daily:  100,
+	}
 	require.True(t, s.Allow("k", rule, 3).OK)
 	require.False(t, s.Allow("k", rule, 1).OK)
 	s.Refund("k", KindBandwidth, 1)
@@ -196,7 +244,11 @@ func TestService_Refund(t *testing.T) {
 
 func TestService_Tokens_DoesNotConsume(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindAuth, Burst: 5, Refill: time.Minute}
+	rule := Rule{
+		Kind:   KindAuth,
+		Burst:  5,
+		Refill: time.Minute,
+	}
 	require.Equal(t, int64(5), s.Tokens("k", rule))
 	require.Equal(t, int64(5), s.Tokens("k", rule))
 	require.True(t, s.Allow("k", rule, 2).OK)
@@ -215,13 +267,23 @@ func TestService_Seed(t *testing.T) {
 	usage.Set(KindMessages, 999)
 	s.Seed("k", usage) // Known key: ignored
 	require.Equal(t, int64(120), s.Usage("k").Count(KindMessages))
-	require.False(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 120}, 1).OK)
-	require.True(t, s.Allow("k", Rule{Kind: KindMessages, Daily: 121}, 1).OK)
+	require.False(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 120,
+	}, 1).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:  KindMessages,
+		Daily: 121,
+	}, 1).OK)
 }
 
 func TestService_Prune(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	rule := Rule{Kind: KindRequests, Burst: 1, Refill: time.Hour}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  1,
+		Refill: time.Hour,
+	}
 	require.True(t, s.Allow("old", rule, 1).OK)
 	clock.advance(10 * time.Minute)
 	require.True(t, s.Allow("fresh", rule, 1).OK)
@@ -234,7 +296,12 @@ func TestService_Prune(t *testing.T) {
 
 func TestService_Allow_Concurrent(t *testing.T) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
-	rule := Rule{Kind: KindRequests, Burst: 500, Refill: time.Hour, Daily: 400}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  500,
+		Refill: time.Hour,
+		Daily:  400,
+	}
 	var wg sync.WaitGroup
 	var admitted sync.Map
 	for g := 0; g < 16; g++ {
@@ -264,7 +331,12 @@ func TestService_Allow_Concurrent(t *testing.T) {
 
 func BenchmarkAllow_HotKey(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second, Daily: 1 << 40}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+		Daily:  1 << 40,
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -274,7 +346,11 @@ func BenchmarkAllow_HotKey(b *testing.B) {
 
 func BenchmarkAllow_ManyKeys(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	keys := make([]string, 100000)
 	for i := range keys {
 		keys[i] = fmt.Sprintf("ip:10.%d.%d.%d", i>>16, (i>>8)&255, i&255)
@@ -289,7 +365,11 @@ func BenchmarkAllow_ManyKeys(b *testing.B) {
 
 func BenchmarkAllow_Parallel(b *testing.B) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
-	rule := Rule{Kind: KindRequests, Burst: 60, Refill: 5 * time.Second}
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0

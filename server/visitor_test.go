@@ -86,8 +86,14 @@ func TestVisitor_TierChangeKeepsBuckets(t *testing.T) {
 		c.VisitorRequestLimitBurst = 3
 		c.VisitorRequestLimitReplenish = time.Hour
 		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "small", MessageLimit: 10}))
-		require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "large", MessageLimit: 10000})) // Burst 500
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "small",
+			MessageLimit: 10,
+		}))
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "large",
+			MessageLimit: 10000,
+		})) // Burst 500
 		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 		require.Nil(t, s.userManager.ChangeTier("phil", "small"))
 		for i := 0; i < 3; i++ {
@@ -114,7 +120,10 @@ func TestVisitor_TierFieldChangeAppliesAtOnce(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "test", MessageLimit: 2}))
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "test",
+			MessageLimit: 2,
+		}))
 		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 		for i := 0; i < 2; i++ {
@@ -171,7 +180,12 @@ func TestVisitor_ZeroLimitsAdmitNothing(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "zero", MessageLimit: 0, CallLimit: 0, AttachmentBandwidthLimit: 0}))
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:                     "zero",
+			MessageLimit:             0,
+			CallLimit:                0,
+			AttachmentBandwidthLimit: 0,
+		}))
 		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 		require.Nil(t, s.userManager.ChangeTier("phil", "zero"))
 		u, err := s.userManager.User("phil")

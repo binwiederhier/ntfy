@@ -184,7 +184,11 @@ func (s *Service) Prune(idle time.Duration) {
 // Limiter returns a util.Limiter view of the key's bucket for the rule, for the readers and
 // writers in util that meter bytes. A negative AllowN refunds.
 func (s *Service) Limiter(key string, rule Rule) util.Limiter {
-	return &limiter{s: s, key: key, rule: rule}
+	return &limiter{
+		s:    s,
+		key:  key,
+		rule: rule,
+	}
 }
 
 // Size returns the number of keys the service holds

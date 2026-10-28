@@ -564,7 +564,7 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	info := infoFromUsage(limits, usage)
+	info := v.infoFromUsage(key, limits, usage)
 
 	// Attachment stats from database
 	var attachmentsBytesUsed int64
@@ -595,10 +595,10 @@ func (v *visitor) Info() (*visitorInfo, error) {
 }
 
 func (v *visitor) infoLightNoLock() *visitorInfo {
-	return infoFromUsage(v.limits, v.limiter.Usage(v.key))
+	return v.infoFromUsage(v.key, v.limits, v.limiter.Usage(v.key))
 }
 
-func infoFromUsage(limits *vis.Limits, usage limit.Usage) *visitorInfo {
+func (v *visitor) infoFromUsage(key string, limits *vis.Limits, usage limit.Usage) *visitorInfo {
 	stats := statsFromUsage(usage)
 	return &visitorInfo{
 		Limits: limits,
@@ -606,19 +606,24 @@ func infoFromUsage(limits *vis.Limits, usage limit.Usage) *visitorInfo {
 			Messages:          stats.Messages,
 			MessagesRemaining: zeroIfNegative(limits.MessageLimit - stats.Messages),
 			Emails:            stats.Emails,
-			EmailsRemaining:   v.emailsRemainingNoLock(stats.Emails),
+			EmailsRemaining:   v.emailsRemaining(key, limits, stats.Emails),
 			Calls:             stats.Calls,
 			CallsRemaining:    zeroIfNegative(limits.CallLimit - stats.Calls),
 		},
 	}
 }
 
-// emailsRemainingNoLock returns what the visitor can send now: the day's remaining emails, but no
-// more than the email bucket holds (it may be empty while the day has room, e.g. after the reset)
-func (v *visitor) emailsRemainingNoLock(emails int64) int64 {
-	remaining := zeroIfNegative(v.limits.EmailLimit - emails)
-	if rule := v.emailRule(); rule.Burst > 0 {
-		remaining = min(remaining, v.limiter.Tokens(v.key, rule))
+// emailsRemaining returns what the visitor can send now: the day's remaining emails, but no more
+// than the email bucket holds (it may be empty while the day has room, e.g. after the reset)
+func (v *visitor) emailsRemaining(key string, limits *vis.Limits, emails int64) int64 {
+	remaining := zeroIfNegative(limits.EmailLimit - emails)
+	if limits.EmailLimitBurst > 0 {
+		bucket := limit.Rule{
+			Kind:   limit.KindEmails,
+			Burst:  int64(limits.EmailLimitBurst),
+			Refill: limits.EmailLimitReplenish,
+		}
+		remaining = min(remaining, v.limiter.Tokens(key, bucket))
 	}
 	return remaining
 }

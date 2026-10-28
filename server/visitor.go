@@ -606,11 +606,21 @@ func infoFromUsage(limits *vis.Limits, usage limit.Usage) *visitorInfo {
 			Messages:          stats.Messages,
 			MessagesRemaining: zeroIfNegative(limits.MessageLimit - stats.Messages),
 			Emails:            stats.Emails,
-			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - stats.Emails),
+			EmailsRemaining:   v.emailsRemainingNoLock(stats.Emails),
 			Calls:             stats.Calls,
 			CallsRemaining:    zeroIfNegative(limits.CallLimit - stats.Calls),
 		},
 	}
+}
+
+// emailsRemainingNoLock returns what the visitor can send now: the day's remaining emails, but no
+// more than the email bucket holds (it may be empty while the day has room, e.g. after the reset)
+func (v *visitor) emailsRemainingNoLock(emails int64) int64 {
+	remaining := zeroIfNegative(v.limits.EmailLimit - emails)
+	if rule := v.emailRule(); rule.Burst > 0 {
+		remaining = min(remaining, v.limiter.Tokens(v.key, rule))
+	}
+	return remaining
 }
 
 func zeroIfNegative(value int64) int64 {

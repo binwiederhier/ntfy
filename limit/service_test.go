@@ -146,9 +146,9 @@ func TestService_Allow_N(t *testing.T) {
 	require.Equal(t, time.Duration(0), d.RetryAfter)
 }
 
-func TestService_Allow_RuleChangeKeepsTokens(t *testing.T) {
-	// A tier change passes a new rule on the next call: a bigger burst does not hand back a full
-	// bucket, a smaller one caps what is there
+func TestService_Allow_RuleChangeKeepsSpent(t *testing.T) {
+	// A tier change passes a new rule on the next call: what was spent stays spent, so a bigger
+	// burst adds its difference and a smaller one takes it away (down to a debt of one burst)
 	s, _ := newTestServiceWithClock(t)
 	rule := Rule{
 		Kind:   KindRequests,
@@ -163,22 +163,24 @@ func TestService_Allow_RuleChangeKeepsTokens(t *testing.T) {
 		Burst:  100,
 		Refill: time.Hour,
 	}
-	require.Equal(t, int64(2), s.Tokens("k", bigger))
-	require.True(t, s.Allow("k", bigger, 1).OK)
-	require.True(t, s.Allow("k", bigger, 1).OK)
-	require.False(t, s.Allow("k", bigger, 1).OK)
+	require.Equal(t, int64(92), s.Tokens("k", bigger)) // 8 spent
+	require.True(t, s.Allow("k", bigger, 2).OK)        // 10 spent
 	smaller := Rule{
 		Kind:   KindRequests,
-		Burst:  1,
+		Burst:  5,
 		Refill: time.Hour,
 	}
-	require.Equal(t, int64(0), s.Tokens("k", smaller))
+	require.Equal(t, int64(0), s.Tokens("k", smaller)) // 10 spent of 5: in debt
+	require.False(t, s.Allow("k", smaller, 1).OK)
+	require.Equal(t, int64(90), s.Tokens("k", bigger)) // Back up: still 10 spent
 
 	// A fresh key with the smaller rule starts with its burst
-	require.Equal(t, int64(1), s.Tokens("fresh", smaller))
-	require.True(t, s.Allow("fresh", smaller, 1).OK)
+	require.Equal(t, int64(5), s.Tokens("fresh", smaller))
+	for i := 0; i < 5; i++ {
+		require.True(t, s.Allow("fresh", smaller, 1).OK)
+	}
 	require.False(t, s.Allow("fresh", smaller, 1).OK)
-	require.False(t, s.Allow("fresh", bigger, 1).OK) // Still empty, the bigger rule refills nothing
+	require.Equal(t, int64(95), s.Tokens("fresh", bigger)) // 5 spent
 }
 
 func TestService_Allow_DailyChangeAppliesAtOnce(t *testing.T) {

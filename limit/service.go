@@ -835,8 +835,15 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 	nowNanos := now.UnixNano()
 	if b.last == 0 {
 		b.tokens = float64(rule.Burst)
-	} else if rule.Refill > 0 {
-		b.tokens += float64(nowNanos-b.last) / float64(rule.Refill)
+	} else {
+		if rule.Burst != b.burst {
+			// A changed burst (tier change) keeps what was spent: shift the tokens by the
+			// difference, down to a debt of one burst
+			b.tokens = math.Max(b.tokens+float64(rule.Burst-b.burst), -float64(rule.Burst))
+		}
+		if rule.Refill > 0 {
+			b.tokens += float64(nowNanos-b.last) / float64(rule.Refill)
+		}
 	}
 	if b.tokens > float64(rule.Burst) {
 		b.tokens = float64(rule.Burst)

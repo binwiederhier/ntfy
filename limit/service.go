@@ -23,7 +23,7 @@ const (
 type Service struct {
 	conf   *Config
 	now    func() time.Time // Injectable clock, for tests
-	shards [shardCount]shard
+	shards [shardCount]*shard
 }
 
 // shard is one independently locked part of the key space
@@ -58,7 +58,9 @@ func newService(conf *Config, now func() time.Time) *Service {
 		now:  now,
 	}
 	for i := range s.shards {
-		s.shards[i].entries = make(map[string]*entry)
+		s.shards[i] = &shard{
+			entries: make(map[string]*entry),
+		}
 	}
 	return s
 }
@@ -67,7 +69,7 @@ func newService(conf *Config, now func() time.Time) *Service {
 // Both the bucket (if the rule has one) and the daily cap (if it has one) must have room.
 func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 	now := s.now()
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e := sh.entryNoLock(key, now)
@@ -98,7 +100,7 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 		return 0
 	}
 	now := s.now()
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]
@@ -113,7 +115,7 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 // Refund hands n units of the kind back to the key, e.g. for bytes that were reserved but not
 // sent. The bucket cannot exceed its burst, and the daily count cannot go below zero.
 func (s *Service) Refund(key string, kind Kind, n int64) {
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]
@@ -129,7 +131,7 @@ func (s *Service) Refund(key string, kind Kind, n int64) {
 
 // Usage returns the key's usage today, of every kind
 func (s *Service) Usage(key string) Usage {
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]
@@ -143,7 +145,7 @@ func (s *Service) Usage(key string) Usage {
 // counts persisted elsewhere (the user's stats) into a fresh key.
 func (s *Service) Seed(key string, usage Usage) {
 	now := s.now()
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	if _, ok := sh.entries[key]; ok {
@@ -155,8 +157,7 @@ func (s *Service) Seed(key string, usage Usage) {
 
 // ResetUsage zeroes the daily counts of every key (the daily reset)
 func (s *Service) ResetUsage() {
-	for i := range s.shards {
-		sh := &s.shards[i]
+	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for _, e := range sh.entries {
 			e.counts = [numKinds]int64{}
@@ -169,8 +170,7 @@ func (s *Service) ResetUsage() {
 // with full buckets and zero counts.
 func (s *Service) Prune(idle time.Duration) {
 	cutoff := s.now().Add(-idle).UnixNano()
-	for i := range s.shards {
-		sh := &s.shards[i]
+	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
 			if e.seen < cutoff {
@@ -190,8 +190,7 @@ func (s *Service) Limiter(key string, rule Rule) util.Limiter {
 // Size returns the number of keys the service holds
 func (s *Service) Size() int {
 	size := 0
-	for i := range s.shards {
-		sh := &s.shards[i]
+	for _, sh := range s.shards {
 		sh.mu.Lock()
 		size += len(sh.entries)
 		sh.mu.Unlock()
@@ -201,7 +200,7 @@ func (s *Service) Size() int {
 
 // reset fills the key's bucket of the kind and zeroes its count (see limiter.Reset)
 func (s *Service) reset(key string, kind Kind) {
-	sh := &s.shards[shardIndex(key)]
+	sh := s.shards[shardIndex(key)]
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	e, ok := sh.entries[key]

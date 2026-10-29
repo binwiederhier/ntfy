@@ -25,8 +25,7 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*http.Request, *visitor, er
 	// Read the "Authorization" header value and exit out early if it's not set
 	ip := extractIPAddress(r, s.config.BehindProxy, s.config.ProxyForwardedHeader, s.config.ProxyTrustedPrefixes)
 	// Stash the extracted client IP in the request context so downstream code (the abuse ban-feed in
-	// handleError) can reuse it without re-parsing headers, and so an account-keyed (tier'd) visitor --
-	// whose shared visitor object has a stale v.ip -- is still attributed to the actual request IP.
+	// handleError) can reuse it without re-parsing headers.
 	r = withContext(r, map[contextKey]any{contextVisitorIP: ip})
 	vip := s.visitor(ip, nil)
 	if s.userManager == nil {
@@ -38,17 +37,17 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*http.Request, *visitor, er
 	} else if !supportedAuthHeader(header) {
 		return r, vip, nil
 	}
-	// If we're trying to auth, check the rate limiter first
-	if !vip.AuthAllowed() {
+	// If we're trying to auth, take a token from the rate limiter first
+	if !vip.AuthAttempt() {
 		return r, vip, errHTTPTooManyRequestsLimitAuthFailure // Always return visitor, even when error occurs!
 	}
 	u, err := s.authenticate(r, header)
 	if err != nil {
-		vip.AuthFailed()
 		logr(r).Err(err).Debug("Authentication failed")
 		return r, vip, errHTTPUnauthorized // Always return visitor, even when error occurs!
 	}
 	// Authentication with user was successful
+	vip.AuthSucceeded()
 	return r, s.visitor(ip, u), nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -97,7 +98,7 @@ func TestService_Allow_Daily(t *testing.T) {
 	require.Equal(t, int64(2), s.Usage("k").Count(KindMessages))
 
 	// The next day starts over (see TestService_DayRollover)
-	s.rollDayForTest("2099-01-01")
+	s.RollDayForTest("2099-01-01")
 	require.Equal(t, int64(0), s.Usage("k").Count(KindMessages))
 	require.True(t, s.Allow("k", rule, 1).OK)
 }
@@ -527,7 +528,7 @@ func TestService_Persist_DayRolloverKeepsYesterdaysRows(t *testing.T) {
 		}, 4).OK)
 		s.flush()
 		today := s.today()
-		s.rollDayForTest("2099-01-01")
+		s.RollDayForTest("2099-01-01")
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages))
 		require.True(t, s.Allow("user:u_1", Rule{
 			Kind:  KindMessages,
@@ -797,7 +798,7 @@ func TestService_Persist_DayRolloverWritesYesterdaysPending(t *testing.T) {
 			Kind:  KindMessages,
 			Daily: 10,
 		}, 4).OK) // Not flushed
-		s.rollDayForTest("2099-01-01")
+		s.RollDayForTest("2099-01-01")
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages)) // The new day starts at zero
 		require.True(t, s.Allow("user:u_1", Rule{
 			Kind:  KindMessages,
@@ -834,7 +835,7 @@ func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
 			Daily: 10,
 		}, 3).OK)
 		s.flush() // Fails: retained
-		s.rollDayForTest("2099-01-01")
+		s.RollDayForTest("2099-01-01")
 		s.flush() // Still failing: still retained
 		s.setStore(good)
 		s.flush()
@@ -906,4 +907,204 @@ func TestService_Persist_ReadBeforeCommitAppliedAfterRetire(t *testing.T) {
 		<-written
 		require.Equal(t, int64(13), s.Usage("user:u_1").Count(KindMessages)) // Not 10
 	})
+}
+
+func TestService_TouchAndSeen(t *testing.T) {
+	s, clock := newTestServiceWithClock(t)
+	require.True(t, s.Seen("k").IsZero())
+	s.Touch("k")
+	require.Equal(t, clock.now(), s.Seen("k"))
+	clock.advance(10 * time.Minute)
+	s.Touch("k")
+	s.Prune(5 * time.Minute)
+	require.Equal(t, 1, s.Size()) // Touched, so not idle
+	require.Equal(t, clock.now(), s.Seen("k"))
+	clock.advance(10 * time.Minute)
+	s.Prune(5 * time.Minute)
+	require.True(t, s.Seen("k").IsZero())
+}
+
+func TestService_FirebaseKind(t *testing.T) {
+	kind, ok := ParseKind("firebase")
+	require.True(t, ok)
+	require.Equal(t, KindFirebase, kind)
+}
+
+func TestService_DayRollover_KeepsBuckets(t *testing.T) {
+	// The day rollover starts the counts over, but the buckets keep their tokens: an email bucket
+	// emptied right before the rollover is not refilled by it (the daily reset used to)
+	s, _ := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindEmails,
+		Burst:  2,
+		Refill: time.Hour,
+		Daily:  3,
+	}
+	require.True(t, s.Allow("k", rule, 2).OK)
+	s.RollDayForTest("2099-01-01")
+	require.Equal(t, int64(0), s.Usage("k").Count(KindEmails))
+	require.Equal(t, int64(0), s.Tokens("k", rule))
+	d := s.Allow("k", rule, 1)
+	require.False(t, d.OK)
+	require.Equal(t, time.Hour, d.RetryAfter) // The bucket is what denies, not the day
+}
+
+// Fails if Allow stops debiting bucket tokens; weighted concurrent calls must share one burst.
+func TestService_Allow_ConcurrentBucketOnly(t *testing.T) {
+	s := newTestService(t)
+	rule := Rule{
+		Kind:  KindBandwidth,
+		Burst: 97,
+	}
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var admitted atomic.Int64
+	for g := 0; g < 32; g++ {
+		wg.Add(1)
+		go func(g int) {
+			defer wg.Done()
+			<-start
+			for i := 0; i < 64; i++ {
+				n := int64(1 + g%7)
+				if s.Allow("hot", rule, n).OK {
+					admitted.Add(n)
+				}
+			}
+		}(g)
+	}
+	close(start)
+	wg.Wait()
+	require.Equal(t, rule.Burst, admitted.Load())
+	require.Equal(t, admitted.Load(), s.Usage("hot").Count(rule.Kind))
+	require.Zero(t, s.Tokens("hot", rule))
+}
+
+// Fails if the day rollover also clears buckets; a rollover racing with publishes grants only one new daily allowance.
+func TestService_DayRollover_ConcurrentAllow(t *testing.T) {
+	for round := 0; round < 20; round++ {
+		s := newTestService(t)
+		rule := Rule{
+			Kind:  KindMessages,
+			Burst: 81,
+			Daily: 40,
+		}
+		require.True(t, s.Allow("hot", rule, 40).OK)
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var admitted atomic.Int64
+		for g := 0; g < 16; g++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				for i := 0; i < 40; i++ {
+					if s.Allow("hot", rule, 1).OK {
+						admitted.Add(1)
+					}
+				}
+			}()
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			s.RollDayForTest("2099-01-01")
+		}()
+		close(start)
+		wg.Wait()
+		for i := 0; i < 40; i++ {
+			if s.Allow("hot", rule, 1).OK {
+				admitted.Add(1)
+			}
+		}
+		require.Equal(t, int64(40), admitted.Load())
+		require.Equal(t, admitted.Load(), s.Usage("hot").Count(rule.Kind))
+		require.Equal(t, int64(1), s.Tokens("hot", rule))
+	}
+}
+
+// Fails if Allow no longer refreshes seen; pruning must retain an active exhausted key while deleting idle keys.
+func TestService_Prune_ConcurrentAllow(t *testing.T) {
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:  KindRequests,
+		Burst: 1,
+	}
+	require.True(t, s.Allow("hot", rule, 1).OK)
+	for i := 0; i < 128; i++ {
+		require.True(t, s.Allow(fmt.Sprintf("idle-%d", i), rule, 1).OK)
+	}
+	clock.advance(2 * time.Hour)
+	require.False(t, s.Allow("hot", rule, 1).OK)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var admitted atomic.Int64
+	for g := 0; g < 8; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			for i := 0; i < 100; i++ {
+				if s.Allow("hot", rule, 1).OK {
+					admitted.Add(1)
+				}
+			}
+		}()
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-start
+		for i := 0; i < 100; i++ {
+			s.Prune(time.Hour)
+		}
+	}()
+	close(start)
+	wg.Wait()
+	require.Zero(t, admitted.Load())
+	require.Equal(t, int64(1), s.Usage("hot").Count(rule.Kind))
+	require.Equal(t, 1, s.Size())
+}
+
+// Fails if refill is disabled; nanosecond and century intervals must earn exactly one token per interval.
+func TestService_Allow_ExtremeRefill(t *testing.T) {
+	for _, interval := range []time.Duration{time.Nanosecond, 100 * 365 * 24 * time.Hour} {
+		t.Run(interval.String(), func(t *testing.T) {
+			s, clock := newTestServiceWithClock(t)
+			rule := Rule{
+				Kind:   KindRequests,
+				Burst:  2,
+				Refill: interval,
+			}
+			require.True(t, s.Allow("hot", rule, 2).OK)
+			d := s.Allow("hot", rule, 1)
+			require.False(t, d.OK)
+			require.Equal(t, interval, d.RetryAfter)
+			clock.advance(interval)
+			require.True(t, s.Allow("hot", rule, 1).OK)
+			require.False(t, s.Allow("hot", rule, 1).OK)
+		})
+	}
+}
+
+func TestService_Allow_ClockGoingBackDoesNotCharge(t *testing.T) {
+	// A call that carries an older timestamp than the bucket's last refill (a goroutine paused
+	// between reading the clock and taking the shard lock, or a wall clock set back) must not
+	// take tokens away, and must not move the refill point back either (that would credit the
+	// same time twice)
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  3,
+		Refill: time.Second,
+	}
+	require.True(t, s.Allow("k", rule, 1).OK)
+	require.True(t, s.Allow("k", rule, 1).OK)
+	clock.advance(-time.Second)
+	require.True(t, s.Allow("k", rule, 1).OK) // The third token is still there
+	require.False(t, s.Allow("k", rule, 1).OK)
+	clock.advance(time.Second) // Back to where the bucket was last refilled: no time has passed
+	require.False(t, s.Allow("k", rule, 1).OK)
+	clock.advance(time.Second)
+	require.True(t, s.Allow("k", rule, 1).OK)
 }

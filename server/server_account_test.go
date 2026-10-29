@@ -2,12 +2,6 @@ package server
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
-	dbtest "heckel.io/ntfy/v2/db/test"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/model"
-	"heckel.io/ntfy/v2/user"
-	"heckel.io/ntfy/v2/util"
 	"io"
 	"net"
 	"net/http"
@@ -16,8 +10,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 )
 
 func TestAccount_Signup_Success(t *testing.T) {
@@ -223,7 +226,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 		require.Equal(t, int64(0), account.Stats.Messages)
 		require.Equal(t, int64(1004), account.Stats.MessagesRemaining)
 		require.Equal(t, int64(0), account.Stats.Emails)
-		require.Equal(t, int64(16), account.Stats.EmailsRemaining) // What the bucket holds now (burst 16), below the day's 24
+		require.Equal(t, int64(24), account.Stats.EmailsRemaining)
 		require.Equal(t, int64(0), account.Stats.Calls)
 		require.Equal(t, int64(0), account.Stats.CallsRemaining)
 
@@ -240,7 +243,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 		require.Equal(t, int64(2), account.Stats.Messages)
 		require.Equal(t, int64(1002), account.Stats.MessagesRemaining)
 		require.Equal(t, int64(1), account.Stats.Emails)
-		require.Equal(t, int64(15), account.Stats.EmailsRemaining) // 16 - 1 in the bucket
+		require.Equal(t, int64(23), account.Stats.EmailsRemaining)
 	})
 }
 
@@ -928,25 +931,25 @@ func TestAccount_Reservation_Delete_Messages_And_Attachments(t *testing.T) {
 	require.Equal(t, int64(2), account.Stats.Messages) // Is not reset!
 }*/
 
-func TestAccount_TokenUpdate_NilUserRace_NoPanic(t *testing.T) {
+func TestAccount_TokenUpdate_NilUser_NoPanic(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		// Regression for the recurring production panic in handleAccountTokenUpdate: the
-		// handler re-reads v.User() after ensureUser already checked it, and a concurrent
-		// anonymous request on the same IP-keyed visitor can SetUser(nil) in between. The
-		// handler must return 401, not dereference a nil user.
+		// Regression for a recurring production panic in handleAccountTokenUpdate: the handler
+		// re-reads v.User() after ensureUser checked it, and must return 401 for a nil user, not
+		// dereference it. Visitors were shared between requests then (#1051).
 		conf := newTestConfigWithAuthFile(t, databaseURL)
 		conf.EnableLogin = true
 		s := newTestServer(t, conf)
+		ip := netip.MustParseAddr("9.9.9.9")
 		require.Nil(t, s.userManager.AddUser("phil", "phil12345", user.RoleUser, false))
 		u, err := s.userManager.User("phil")
 		require.Nil(t, err)
-
-		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		v.SetUser(nil) // The concurrent anonymous request, made deterministic
+		authed := s.visitor(ip, u)
+		anon := s.visitor(ip, nil) // A concurrent anonymous request from the same IP
+		require.NotNil(t, authed.User())
 
 		r, _ := http.NewRequest("PATCH", "/v1/account/token", strings.NewReader("{}"))
 		rr := httptest.NewRecorder()
-		err = s.handleAccountTokenUpdate(rr, r, v)
+		err = s.handleAccountTokenUpdate(rr, r, anon)
 		require.Error(t, err)
 		httpErr, ok := err.(*errHTTP)
 		require.True(t, ok)
@@ -1112,4 +1115,42 @@ func TestAccount_PhoneNumberAdd_WrongCode(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, []string{"+12223334444"}, phoneNumbers)
 	})
+}
+
+func TestAccount_Signup_LimitHoldsForConcurrentSignups(t *testing.T) {
+	// Concurrent signups from one IP must not all get past the account limit before any of them is
+	// charged: no more accounts are created than the bucket holds
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.EnableSignup = true
+	conf.VisitorAccountCreationLimitBurst = 2
+	s := newTestServer(t, conf)
+	var wg sync.WaitGroup
+	var created atomic.Int64
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rr := request(t, s, "POST", "/v1/account", fmt.Sprintf(`{"username":"user%d", "password":"mypass"}`, i), nil)
+			if rr.Code == 200 {
+				created.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	require.Equal(t, int64(2), created.Load())
+}
+
+func TestAccount_Signup_FailedSignupIsFree(t *testing.T) {
+	// A signup that fails (the name is taken) does not use up the account limit
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.EnableSignup = true
+	conf.VisitorAccountCreationLimitBurst = 1
+	s := newTestServer(t, conf)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
+	require.Equal(t, 409, rr.Code)
+	rr = request(t, s, "POST", "/v1/account", `{"username":"ben", "password":"mypass"}`, nil)
+	require.Equal(t, 200, rr.Code)
+	rr = request(t, s, "POST", "/v1/account", `{"username":"emma", "password":"mypass"}`, nil)
+	require.Equal(t, 429, rr.Code)
 }

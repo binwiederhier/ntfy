@@ -64,9 +64,9 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	visitors          map[string]*visitor // ip:<ip> or user:<user>
-	limiter           *limit.Service      // Decides on and counts the visitors' usage, keyed by visitor key
-	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
+	visitors          *visitorEnv    // Shared by all visitors, which are built per request
+	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
@@ -305,7 +305,6 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		visitors:        make(map[string]*visitor),
 		limiter: limit.New(&limit.Config{
 			ResetTime:     conf.VisitorStatsResetTime,
 			FlushInterval: conf.UsageFlushInterval,
@@ -356,6 +355,7 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
+	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
@@ -1045,7 +1045,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if _, ok := t.RateSubscriber(); unifiedpush && s.config.VisitorSubscriberRateLimiting && !ok {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
@@ -1136,10 +1136,6 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
 		}
-	}
-	u := v.User()
-	if s.userManager != nil && u != nil && u.Tier != nil {
-		go v.EnqueueUserStatsDelta()
 	}
 	s.mu.Lock()
 	s.messages++
@@ -1698,6 +1694,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
+	var refreshing atomic.Bool // A re-read of the user is in flight (see keepaliveSubscriber)
 	for {
 		select {
 		case <-ctx.Done():
@@ -1711,10 +1708,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			} else {
 				ev.Trace("Sending keepalive message to %d topics", len(topics))
 			}
-			v.Keepalive()
-			for _, t := range topics {
-				t.Keepalive()
-			}
+			s.keepaliveSubscriber(v, topics, &refreshing)
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
@@ -1785,6 +1779,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 	})
 	g.Go(func() error {
+		var refreshing atomic.Bool // A re-read of the user is in flight (see keepaliveSubscriber)
 		ping := func() error {
 			wlock.Lock()
 			defer wlock.Unlock()
@@ -1803,10 +1798,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				conn.Close()
 				return &websocket.CloseError{Code: websocket.CloseNormalClosure, Text: "subscription was canceled"}
 			case <-time.After(s.config.KeepaliveInterval):
-				v.Keepalive()
-				for _, t := range topics {
-					t.Keepalive()
-				}
+				s.keepaliveSubscriber(v, topics, &refreshing)
 				if err := ping(); err != nil {
 					return err
 				}
@@ -1936,13 +1928,44 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	return s.setRateVisitors(r, v, writableRateTopics)
 }
 
+// keepaliveSubscriber marks a subscriber's topics as in use, and keeps it alive as the rate subscriber
+// of those it is that for. For a user, it also re-reads the user so that a tier change applies to the
+// publishes; that runs in the background (at most one at a time, see refreshing), so a slow database
+// cannot hold up the keepalive or the end of the stream.
+func (s *Server) keepaliveSubscriber(v *visitor, topics []*topic, refreshing *atomic.Bool) {
+	v.Keepalive()
+	rateTopics := make([]*topic, 0)
+	for _, t := range topics {
+		t.Keepalive()
+		if t.KeepaliveRateSubscriber(v) {
+			rateTopics = append(rateTopics, t)
+		}
+	}
+	if len(rateTopics) == 0 || v.user == nil || s.userManager == nil || !refreshing.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		defer refreshing.Store(false)
+		u, err := s.userManager.UserByID(v.user.ID)
+		if errors.Is(err, user.ErrUserNotFound) {
+			u = nil // Deleted: publishes are billed to the IP from now on
+		} else if err != nil {
+			log.Tag(tagSubscribe).Err(err).Warn("Cannot re-read rate subscriber %s, keeping its tier", v.user.ID)
+			return
+		}
+		for _, t := range rateTopics {
+			t.SetRateSubscriberUser(v, u)
+		}
+	}()
+}
+
 func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v)
+		t.SetRateSubscriber(v)
 	}
 	return nil
 }
@@ -2184,9 +2207,6 @@ func (s *Server) resetStats() {
 	log.Info("Resetting all visitor stats (daily task)")
 	s.mu.Lock()
 	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
-	for _, v := range s.visitors {
-		v.ResetStats()
-	}
 	if s.userManager != nil {
 		if err := s.userManager.ResetStats(); err != nil {
 			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
@@ -2198,7 +2218,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
+	v := newVisitor(s.visitors, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -2377,18 +2397,10 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	}
 }
 
+// visitor returns the visitor for this request. It is built per request, so concurrent requests from
+// the same IP (which share a limiter key) cannot see each other's user (#1051).
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	id := visitorID(ip, user, s.config)
-	v, exists := s.visitors[id]
-	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.limiter, s.messageCache, s.userManager, ip, user)
-		return s.visitors[id]
-	}
-	v.Keepalive()
-	v.SetUser(user) // Always update with the latest user, may be nil!
-	return v
+	return newVisitor(s.visitors, ip, user)
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {

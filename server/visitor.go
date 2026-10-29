@@ -376,7 +376,7 @@ func (v *visitor) bandwidthRule() limit.Rule {
 		Burst: v.limits.AttachmentBandwidthLimit,
 	}
 	if rule.Burst > 0 {
-		rule.Refill = oneDay / time.Duration(rule.Burst)
+		rule.Refill = max(oneDay/time.Duration(rule.Burst), time.Nanosecond) // Above ~86T a byte would refill in 0 ns, i.e. never
 	}
 	return rule
 }

@@ -731,3 +731,13 @@ func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	_, ok = topics[0].RateSubscriber()
 	require.False(t, ok)
 }
+
+func TestVisitor_BandwidthRuleRefillsHugeLimits(t *testing.T) {
+	// A daily bandwidth limit of more bytes than a day has nanoseconds must still refill; the
+	// refill per byte rounds down to zero otherwise, and a bucket that never refills is a hard cap
+	c := newTestConfig(t, "")
+	c.VisitorAttachmentDailyBandwidthLimit = 100 * 1024 * 1024 * 1024 * 1024 // 100T
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.Equal(t, time.Nanosecond, v.bandwidthRule().Refill)
+}

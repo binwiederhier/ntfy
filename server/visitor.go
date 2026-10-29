@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/netip"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -48,13 +47,6 @@ type visitorEnv struct {
 	subscriptions *subscriptionGauge
 	messageCache  *message.Cache
 	userManager   *user.Manager // May be nil
-}
-
-// subscriptionGauge counts the open subscriptions per visitor key on this node. It is never shared
-// with other nodes: it protects this node's connections.
-type subscriptionGauge struct {
-	counts map[string]int64
-	mu     sync.Mutex // Protects counts
 }
 
 type visitorInfo struct {
@@ -113,33 +105,6 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is (after Seed, which only fills unknown keys)
 	v.seen.Store(time.Now().UnixNano())
 	return v
-}
-
-func newSubscriptionGauge() *subscriptionGauge {
-	return &subscriptionGauge{
-		counts: make(map[string]int64),
-	}
-}
-
-// Acquire counts one more subscription for the key, unless the key already has limit of them
-func (g *subscriptionGauge) Acquire(key string, limit int64) bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.counts[key] >= limit {
-		return false
-	}
-	g.counts[key]++
-	return true
-}
-
-// Release counts one subscription less for the key, and forgets the key when it has none
-func (g *subscriptionGauge) Release(key string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.counts[key]--
-	if g.counts[key] <= 0 {
-		delete(g.counts, key)
-	}
 }
 
 func (v *visitor) Context() log.Context {
@@ -272,10 +237,6 @@ func (v *visitor) enqueueUserStats(delta *user.Stats) {
 	v.userManager.EnqueueUserStats(v.user.ID, delta)
 }
 
-func (v *visitor) SubscriptionAllowed() bool {
-	return v.subscriptions.Acquire(v.key, int64(v.config.VisitorSubscriptionLimit))
-}
-
 // TopicCreationAllowed returns true if the visitor is allowed to cause a new topic to be
 // inserted into the server's in-memory topic map. Returns true if no limiter is configured.
 func (v *visitor) TopicCreationAllowed() bool {
@@ -314,11 +275,6 @@ func (v *visitor) BandwidthAllowed(bytes int64) bool {
 	return v.limiter.Allow(v.key, v.bandwidthRule(), bytes).OK
 }
 
-func (v *visitor) RemoveSubscription() {
-	v.subscriptions.Release(v.key)
-}
-
-// Keepalive marks the visitor's key as used, so a long-lived subscription keeps its limiter state
 // Keepalive marks the visitor and its key as seen. The subscribe handlers call it on the visitor a
 // topic keeps as its rate visitor; nothing else does, so Stale is the subscriber's liveness.
 func (v *visitor) Keepalive() {
@@ -335,7 +291,6 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 	return v.limiter.Limiter(v.key, v.bandwidthRule())
 }
 
-// Stale returns true if the visitor's key has not been used for visitorExpungeAfter
 // Stale is true when the visitor has not been kept alive for visitorExpungeAfter. It reads the
 // visitor's own keepalive, not the limiter key's last use: publishers charging a topic's rate
 // visitor must not keep a vanished subscriber's limits on the topic.

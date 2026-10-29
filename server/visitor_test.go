@@ -276,6 +276,16 @@ func TestVisitor_FirebasePenaltyIsSharedPerKey(t *testing.T) {
 	require.True(t, s.visitor(netip.MustParseAddr("1.2.3.4"), nil).FirebaseAllowed())
 }
 
+func TestVisitor_FirebasePenaltyExpires(t *testing.T) {
+	c := newTestConfig(t, "")
+	c.FirebaseQuotaExceededPenaltyDuration = 300 * time.Millisecond
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	v.FirebaseTemporarilyDeny()
+	require.False(t, v.FirebaseAllowed())
+	require.Eventually(t, v.FirebaseAllowed, 3*time.Second, 50*time.Millisecond) // Sends resume once the penalty has passed
+}
+
 func TestVisitor_AuthLimiter_NotBypassedByConcurrentLogin(t *testing.T) {
 	// A user without a tier shares the IP limiter key with anonymous requests from the same IP.
 	// Their login must not switch off the auth failure limiter for a concurrent guesser (#1051).

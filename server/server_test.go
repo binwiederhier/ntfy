@@ -3671,13 +3671,14 @@ func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateSubscriber(t *testin
 		})
 	}()
 	waitFor(t, func() bool {
-		return s.topics["upAAAAAAAAAAAA"] != nil && s.topics["upAAAAAAAAAAAA"].SubscribersCount() == 1
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
 	})
 	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
 
 	// A day later, the stream is still there: its keepalives must keep the topic's rate subscriber
-	ageRateSubscriber(s.topics["upAAAAAAAAAAAA"], 25*time.Hour)
+	ageRateSubscriber(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
 	time.Sleep(3 * c.KeepaliveInterval)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
@@ -3712,7 +3713,8 @@ func TestServer_SubscriberRateLimiting_TierChangeAppliesToStream(t *testing.T) {
 		})
 	}()
 	waitFor(t, func() bool {
-		return s.topics["upAAAAAAAAAAAA"] != nil && s.topics["upAAAAAAAAAAAA"].SubscribersCount() == 1
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
 	})
 
 	// Downgrade while the stream is open: after a keepalive, publishes get the small tier
@@ -3722,6 +3724,13 @@ func TestServer_SubscriberRateLimiting_TierChangeAppliesToStream(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 	response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 429, response.Code)
+}
+
+// lockedTopic returns the topic with the given ID, or nil, reading the topics map under the server's lock
+func lockedTopic(s *Server, id string) *topic {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.topics[id]
 }
 
 // ageRateSubscriber makes the topic's rate subscriber look as if it was last seen d ago

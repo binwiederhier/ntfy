@@ -111,12 +111,14 @@ func (s *Server) execManager() {
 }
 
 func (s *Server) pruneVisitors() {
+	pruned := 0
 	log.
 		Tag(tagManager).
 		Timing(func() {
-			s.limiter.Prune(visitorExpungeAfter) // Visitors are per request; only their keys' buckets and counts stay
+			pruned = s.limiter.Prune(visitorExpungeAfter) // Visitors are per request; only their keys' buckets and counts stay
 		}).
-		Debug("Finished deleting stale visitors")
+		Field("pruned_keys", pruned).
+		Debug("Finished deleting stale visitor keys")
 }
 
 func (s *Server) pruneTokens() {

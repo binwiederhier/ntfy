@@ -260,7 +260,7 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 	})
 }
 
-func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *testing.T) {
+func TestPayments_Checkout_Success_And_Increase_Rate_Limits(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		// This test is too overloaded, but it's also a great end-to-end a test.
 		//

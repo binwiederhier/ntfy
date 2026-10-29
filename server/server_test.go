@@ -3636,7 +3636,8 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		require.Equal(t, int64(0), publisher.Stats().Messages)
 		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
 
-		// Expire visitor: its key is pruned from the limiter after a day without use
+		// Expire visitor: its subscriber has been gone for a day, and its key is pruned after a day without use
+		s.topics["upAAAAAAAAAAAA"].rateVisitor.seen.Store(time.Now().Add(-25 * time.Hour).UnixNano())
 		s.limiter.Prune(-time.Hour) // Everything is idle for longer than -1h
 		require.True(t, s.topics["upAAAAAAAAAAAA"].rateVisitor.Stale())
 

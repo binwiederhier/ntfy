@@ -166,19 +166,22 @@ func (s *Service) ResetUsage() {
 	}
 }
 
-// Prune forgets keys that have not been used for longer than idle. A key that comes back starts
-// with full buckets and zero counts.
-func (s *Service) Prune(idle time.Duration) {
+// Prune forgets keys that have not been used for longer than idle, and returns how many. A key
+// that comes back starts with full buckets and zero counts.
+func (s *Service) Prune(idle time.Duration) int {
 	cutoff := s.now().Add(-idle).UnixNano()
+	pruned := 0
 	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
 			if e.seen < cutoff {
 				delete(sh.entries, key)
+				pruned++
 			}
 		}
 		sh.mu.Unlock()
 	}
+	return pruned
 }
 
 // Touch marks the key as used now, so Prune keeps it, e.g. for a long-lived subscription

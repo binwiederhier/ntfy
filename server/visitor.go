@@ -3,6 +3,7 @@ package server
 import (
 	"net/netip"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"heckel.io/ntfy/v2/limit"
@@ -17,9 +18,10 @@ const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter defines how long a visitor is active before it is removed from memory. This number
-	// has to be very high to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since
-	// they are replenished faster (typically).
+	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
+	// forgotten (see Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber
+	// is gone. This number has to be very high to prevent e-mail abuse, but it doesn't really affect
+	// the other limits anyway, since they are replenished faster (typically).
 	visitorExpungeAfter = oneDay
 )
 
@@ -29,10 +31,11 @@ const (
 // key, so two visitors with the same key share one set of buckets and counts.
 type visitor struct {
 	*visitorEnv
-	key    string      // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
-	ip     netip.Addr  // Visitor IP address
-	user   *user.User  // Only set if authenticated user, otherwise nil
-	limits *vis.Limits // Resolved from the config or the user's tier
+	key    string       // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
+	ip     netip.Addr   // Visitor IP address
+	user   *user.User   // Only set if authenticated user, otherwise nil
+	limits *vis.Limits  // Resolved from the config or the user's tier
+	seen   atomic.Int64 // Unix nanos of the last keepalive: the liveness of a subscriber kept as a topic's rate visitor (see Stale)
 }
 
 // visitorEnv is what every visitor of a server shares; it is built once, so building a visitor per
@@ -108,6 +111,7 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 		env.limiter.Seed(v.key, usage)
 	}
 	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is (after Seed, which only fills unknown keys)
+	v.seen.Store(time.Now().UnixNano())
 	return v
 }
 
@@ -143,7 +147,7 @@ func (v *visitor) Context() log.Context {
 	fields := log.Context{
 		"visitor_id":                 v.key,
 		"visitor_ip":                 v.ip.String(),
-		"visitor_seen":               util.FormatTime(v.limiter.Seen(v.key)),
+		"visitor_seen":               util.FormatTime(time.Unix(0, v.seen.Load())),
 		"visitor_messages":           info.Stats.Messages,
 		"visitor_messages_limit":     info.Limits.MessageLimit,
 		"visitor_messages_remaining": info.Stats.MessagesRemaining,
@@ -315,7 +319,10 @@ func (v *visitor) RemoveSubscription() {
 }
 
 // Keepalive marks the visitor's key as used, so a long-lived subscription keeps its limiter state
+// Keepalive marks the visitor and its key as seen. The subscribe handlers call it on the visitor a
+// topic keeps as its rate visitor; nothing else does, so Stale is the subscriber's liveness.
 func (v *visitor) Keepalive() {
+	v.seen.Store(time.Now().UnixNano())
 	v.limiter.Touch(v.key)
 }
 
@@ -329,8 +336,11 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 }
 
 // Stale returns true if the visitor's key has not been used for visitorExpungeAfter
+// Stale is true when the visitor has not been kept alive for visitorExpungeAfter. It reads the
+// visitor's own keepalive, not the limiter key's last use: publishers charging a topic's rate
+// visitor must not keep a vanished subscriber's limits on the topic.
 func (v *visitor) Stale() bool {
-	return time.Since(v.limiter.Seen(v.key)) > visitorExpungeAfter
+	return time.Since(time.Unix(0, v.seen.Load())) > visitorExpungeAfter
 }
 
 func (v *visitor) Stats() *user.Stats {
@@ -516,11 +526,6 @@ func zeroIfNegative(value int64) int64 {
 		return 0
 	}
 	return value
-}
-
-// visitorID returns a unique identifier for a visitor based on user or IP, using configurable prefix bits for IPv4/IPv6
-func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
-	return vis.Key(ip, u, visitorConfigFrom(conf))
 }
 
 // visitorConfigFrom assembles the keying and limit-resolution config from the server config

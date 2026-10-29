@@ -5,7 +5,7 @@ on:
   pull_request:
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -20,6 +20,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './web/package-lock.json'
       - name: Install dependencies
+        timeout-minutes: 10 # A stalled apt mirror must fail the run, not hang it
         run: make build-deps-ubuntu
       - name: Build all the things
         run: make build
@@ -27,7 +28,7 @@ jobs:
         run: make cli-build-results
   docker-build:
     # Dockerfile-build is not used in releases, so build it here to catch it going stale (see #1962)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -6,11 +6,64 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.32.0 | Oct 18, 2026  |
+| ntfy server      | v2.34.0 | Oct 24, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.34.0
+Released October 24, 2026
+
+This release prepares the experimental cluster to run behind load balancers: nodes drain on shutdown instead of
+dropping all of their clients at once, ntfy can listen on several addresses, and access changes reach every node. It
+also fixes a revoked or deleted user keeping some of their subscriptions, on every server.
+
+**Features:**
+
+* Allow several comma-separated addresses in `listen-http`, so a load balancer can hold more than ~63k connections to one ntfy node
+* Cluster nodes drain on shutdown: an active node withdraws (stops being ready), then turns read-only and closes its subscriber connections gradually (`experimental-cluster-drain-delay`, `experimental-cluster-drain-duration`), so its clients move to the other nodes without a reconnect storm (experimental, see [draining on shutdown](config.md#draining-on-shutdown))
+
+**Security:**
+
+* End all of a user's subscriptions when their access to a topic is reset or the user is deleted: only the first one was ended, so the others kept receiving the topic's messages ([#1845](https://github.com/binwiederhier/ntfy/pull/1845), thanks to [@gigioneggiando](https://github.com/gigioneggiando) for reporting)
+* In an experimental cluster, tell the other nodes when access changes (e.g. a reservation or a revoked permission), so they reload their access cache and disconnect subscribers who lost access; the access cache reload also catches changes made elsewhere, e.g. by the `ntfy access` CLI, and now runs every 67 seconds instead of 87
+
+**Bug fixes + maintenance:**
+
+* Fix a deadlock when ending subscriptions (reserving a topic with live subscribers, revoking access, deleting a user) while debug logging or `log-level-overrides` is on: the subscriptions' topic stayed locked for good
+* Fix a data race when `log-level-overrides` changes (e.g. on a config reload with SIGHUP) while the server logs
+
+## ntfy server v2.33.1
+Released October 23, 2026
+
+This is a hotfix release for the amd64 binaries of v2.33.0, which crashed with "Illegal instruction" on older CPUs.
+
+**Bug fixes + maintenance:**
+
+* Fix "Illegal instruction" crash of the amd64 binaries on CPUs without x86-64-v3 (AVX2/BMI2), by building releases on Ubuntu 24.04 again ([#2092](https://github.com/binwiederhier/ntfy/issues/2092), thanks to [@frank-bg](https://github.com/frank-bg) for reporting)
+
+## ntfy server v2.33.0
+Released October 23, 2026
+
+This release builds ntfy with Go 1.27.3 (security fixes, including rejecting the compromised eMudhra intermediate
+CAs), and adds monitoring for the experimental cluster: each node's view of its peers, per-peer and database
+connection pool metrics.
+
+**Features:**
+
+* Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
+* Export PostgreSQL connection pool metrics (`ntfy_db_pool_*`: connections in use, and queries that waited for a free connection, per pool), to size `pool_max_conns` (see [PostgreSQL](config.md#postgresql))
+
+**Security:**
+
+* Build with Go 1.27.3, which includes the security fixes of Go 1.27.2 (`crypto/tls`, `net/http`, `html/template` and others) and 1.27.3 (`crypto/x509`: certificate chains through the compromised eMudhra intermediate CAs are rejected)
+* Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
+* Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
+
+**Bug fixes + maintenance:**
+
+* Count published messages from every cluster node: each node adds its own publishes to the stored total instead of the leader overwriting it with its own count (experimental clustering)
 
 ## ntfy server v2.32.0
 Released October 18, 2026
@@ -2211,24 +2264,19 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-### ntfy server v2.33.0 (UNRELEASED)
+### ntfy server v2.34.1 (UNRELEASED)
 
 **Features:**
 
-* Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
-* Export PostgreSQL connection pool metrics (`ntfy_db_pool_*`: connections in use, and queries that waited for a free connection, per pool), to size `pool_max_conns` (see [PostgreSQL](config.md#postgresql))
 * Admin API: manage tokens of other users (`/v1/users/tokens`), tiers (`/v1/tiers`; the price list for the upgrade dialog moved to `/v1/account/billing/tiers`) and password reset links (`/v1/users/password/reset`); `GET /v1/users` also returns tier names, provisioned users and grants and the default access, `PUT /v1/users` can remove a tier (`"tier": "-"`), and `DELETE /v1/users/access` can reset all of a user's entries or the whole ACL
 
 **Security:**
 
-* Build with Go 1.27.3, which includes the security fixes of Go 1.27.2 (`crypto/tls`, `net/http`, `html/template` and others) and 1.27.3 (`crypto/x509`: certificate chains through the compromised eMudhra intermediate CAs are rejected)
-* Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
-* Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
+* Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied)
 
 **Bug fixes + maintenance:**
 
 * Admin API: invalid password hashes, too many reservations for a new tier, and other user manager errors return 400/409 errors instead of a 500, and deleting a user also removes their web push subscriptions
-* Count published messages from every cluster node: each node adds its own publishes to the stored total instead of the leader overwriting it with its own count (experimental clustering)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

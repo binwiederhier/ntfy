@@ -131,6 +131,11 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 	if err != nil {
 		return nil, err
 	}
+	// The pushkey bypasses the router's topic path check, so check it here: publishing sanitizes the
+	// topic after authorization (e.g. strips a NUL), so an invalid topic could land on a protected one
+	if !topicPathRegex.MatchString(newRequest.URL.Path) {
+		return nil, errHTTPBadRequestTopicInvalid
+	}
 	newRequest.RemoteAddr = r.RemoteAddr // Not strictly necessary, since visitor was already extracted
 	if r.Header.Get("X-Forwarded-For") != "" {
 		newRequest.Header.Set("X-Forwarded-For", r.Header.Get("X-Forwarded-For"))

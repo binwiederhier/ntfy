@@ -37,7 +37,7 @@ var (
 // contextAdminSocket so handlers can allow what the network API refuses.
 func (s *Server) handleAdminSocket(w http.ResponseWriter, r *http.Request) {
 	r = withContext(r, map[contextKey]any{contextAdminSocket: true})
-	v := newVisitor(s.config, s.messageCache, s.userManager, netip.AddrFrom4([4]byte{127, 0, 0, 1}), adminSocketUser)
+	v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.AddrFrom4([4]byte{127, 0, 0, 1}), adminSocketUser)
 	if !slices.Contains(adminSocketPaths, r.URL.Path) {
 		s.handleError(w, r, v, errHTTPNotFound) // Publishing, subscribing, the web app, etc. are not served here
 		return

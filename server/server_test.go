@@ -1337,9 +1337,7 @@ func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
 		require.Equal(t, int64(1), account.Stats.Emails)
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		require.Equal(t, int64(4), v.Stats().Messages)
-		require.Equal(t, int64(4), v.messagesLimiter.Value())
 		require.Equal(t, int64(1), v.Stats().Emails)
-		require.Equal(t, int64(1), v.emailsLimiter.Value())
 
 		// Reset stats and check again
 		s.resetStats()
@@ -1351,9 +1349,7 @@ func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
 		require.Equal(t, int64(0), account.Stats.Emails)
 		v = s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		require.Equal(t, int64(0), v.Stats().Messages)
-		require.Equal(t, int64(0), v.messagesLimiter.Value())
 		require.Equal(t, int64(0), v.Stats().Emails)
-		require.Equal(t, int64(0), v.emailsLimiter.Value())
 	})
 }
 
@@ -1394,9 +1390,7 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 		require.Equal(t, int64(999), account.Stats.Emails)
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
 		require.Equal(t, int64(123456), v.Stats().Messages)
-		require.Equal(t, int64(123456), v.messagesLimiter.Value())
 		require.Equal(t, int64(999), v.Stats().Emails)
-		require.Equal(t, int64(999), v.emailsLimiter.Value())
 	})
 }
 
@@ -1964,7 +1958,7 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 		require.NotNil(t, s.topics["mytopic"])
 
 		// Fudge with last access, but subscribe, and see that it won't get pruned (because of subscriber)
-		subID := s.topics["mytopic"].Subscribe(subFn, "", func() {})
+		subID := s.topics["mytopic"].Subscribe(subFn, nil, func() {})
 		s.topics["mytopic"].mu.Lock()
 		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
 		s.topics["mytopic"].mu.Unlock()
@@ -2120,6 +2114,32 @@ func TestServer_MatrixGateway_Push_Success(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 		m := toMessage(t, response.Body.String())
 		require.Equal(t, notification, m.Message)
+	})
+}
+
+func TestServer_MatrixGateway_Push_InvalidTopicCannotBypassACL(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// The topic "secret" denies anonymous writes. A NUL in the pushkey topic made authorization
+		// check "sec\x00ret" (unmatched, so the default read-write applied), and the message was then
+		// stored as "secret" once the NUL was stripped.
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.AuthDefault = user.PermissionReadWrite
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddUser("alice", "alice12345", user.RoleUser, false))
+		require.Nil(t, s.userManager.AllowAccess("alice", "secret", user.PermissionReadWrite))
+		require.Nil(t, s.userManager.AllowAccess(user.Everyone, "secret", user.PermissionDenyAll))
+		require.Equal(t, 403, request(t, s, "POST", "/secret", "direct", nil).Code)
+
+		notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/sec%00ret?up=1"}]}}`
+		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40009, toHTTPError(t, response.Body.String()).Code)
+
+		response = request(t, s, "GET", "/secret/json?poll=1", "", map[string]string{
+			"Authorization": util.BasicAuth("alice", "alice12345"),
+		})
+		require.Equal(t, 200, response.Code)
+		require.Empty(t, response.Body.String())
 	})
 }
 
@@ -3612,8 +3632,8 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		// Publish message, observe rate visitor tokens being decreased
 		response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
-		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.messagesLimiter.Value())
+		require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].Stats().Messages)
+		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
 		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
 
 		// Expire visitor
@@ -3623,7 +3643,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		// Publish message again, observe that rateVisitor is not used anymore and is reset
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].messagesLimiter.Value())
+		require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].Stats().Messages)
 		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
 		require.Nil(t, s.visitors["ip:1.2.3.4"])
 	})
@@ -5555,7 +5575,7 @@ func TestServer_SubscribeHTTP_NoWriteAfterHandlerReturn(t *testing.T) {
 		// that copied the subscriber list before Unsubscribe ran. In production, this is exactly
 		// how the panic occurs: the goroutine spawned by topic.Publish calls sub() after the
 		// handler has already returned and Go has cleaned up the response writer.
-		v := newVisitor(s.config, s.messageCache, s.userManager, netip.MustParseAddr("9.9.9.9"), nil)
+		v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.MustParseAddr("9.9.9.9"), nil)
 		msg := model.NewDefaultMessage("mytopic", "straggler message")
 		_ = copiedSub(v, msg)
 
@@ -5575,7 +5595,7 @@ func TestServer_HandleError_SkipsWriteHeaderOnHijackedConnection(t *testing.T) {
 		r, _ := http.NewRequest("GET", "/mytopic/ws", nil)
 		r.Header.Set("Upgrade", "websocket")
 		r.Header.Set("Connection", "Upgrade")
-		v := newVisitor(s.config, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
+		v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
 
 		// Test post-upgrade errors wrapped with errWebSocketPostUpgrade (should NOT call WriteHeader)
 		postUpgradeErr := &errWebSocketPostUpgrade{errors.New("websocket: close 1000 (normal)")}
@@ -5772,7 +5792,7 @@ func TestServer_RunDoesNotStartListenersAfterStop(t *testing.T) {
 	addr := ln.Addr().String()
 	require.Nil(t, ln.Close())
 	conf := newTestConfig(t, "")
-	conf.ListenHTTP = addr
+	conf.ListenHTTP = []string{addr}
 	s := newTestServer(t, conf)
 	s.Stop()
 
@@ -5785,6 +5805,48 @@ func TestServer_RunDoesNotStartListenersAfterStop(t *testing.T) {
 	}
 	_, err = net.DialTimeout("tcp", addr, time.Second)
 	require.Error(t, err, "listener was started after Stop")
+}
+
+func TestServer_RunListensOnSeveralAddresses(t *testing.T) {
+	// A load balancer reaches each upstream address from one source IP, so every extra address
+	// gives it another ~63k ports to this node
+	addrs := []string{freeTestAddr(t), freeTestAddr(t)}
+	conf := newTestConfig(t, "")
+	conf.ListenHTTP = addrs
+	s := newTestServer(t, conf)
+	done := make(chan error, 1)
+	go func() { done <- s.Run() }()
+	for _, addr := range addrs {
+		require.Eventually(t, func() bool {
+			resp, err := http.Get("http://" + addr + "/v1/health")
+			if err != nil {
+				return false
+			}
+			resp.Body.Close()
+			return resp.StatusCode == http.StatusOK
+		}, 10*time.Second, 50*time.Millisecond, "no answer on %s", addr)
+	}
+
+	// Stop closes every listener
+	s.Stop()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return after Stop")
+	}
+	for _, addr := range addrs {
+		_, err := net.DialTimeout("tcp", addr, time.Second)
+		require.Error(t, err, "listener %s still open after Stop", addr)
+	}
+}
+
+// freeTestAddr returns a local address that was free a moment ago
+func freeTestAddr(t *testing.T) string {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	addr := ln.Addr().String()
+	require.Nil(t, ln.Close())
+	return addr
 }
 
 func TestServer_StopIsBoundedWhenAStoreBlocks(t *testing.T) {
@@ -5892,4 +5954,31 @@ func TestServer_PublishTimezoneWithoutDelay(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 		require.InDelta(t, time.Now().Unix(), toMessage(t, response.Body.String()).Time, 2)
 	})
+}
+
+// testStream is a live JSON stream subscription; ended is closed when the server ends it
+type testStream struct {
+	ended chan struct{}
+	rr    *httptest.ResponseRecorder
+}
+
+func (s *testStream) body() string {
+	<-s.ended
+	return s.rr.Body.String()
+}
+
+// subscribeStream opens a JSON stream to topic (headers may be nil) and waits until it is live
+func subscribeStream(t *testing.T, s *Server, topic string, headers map[string]string) *testStream {
+	topics, err := s.topicsFromIDs(nil, topic)
+	require.Nil(t, err)
+	before := topics[0].SubscribersCount()
+	stream := &testStream{ended: make(chan struct{})}
+	go func() {
+		stream.rr = request(t, s, "GET", "/"+topic+"/json", "", headers)
+		close(stream.ended)
+	}()
+	waitFor(t, func() bool {
+		return topics[0].SubscribersCount() > before
+	})
+	return stream
 }

@@ -63,7 +63,7 @@ func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _
 	if err != nil {
 		return err
 	}
-	freeTier := s.visitorEnv.ipLimits
+	freeTier := s.visitors.ipLimits
 	response := []*apiAccountBillingTier{
 		{
 			// This is a bit of a hack: This is the "Free" tier. It has no tier code, name or price.

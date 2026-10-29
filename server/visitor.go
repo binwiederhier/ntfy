@@ -91,6 +91,7 @@ func newVisitor(conf *Config, limiter *limit.Service, subscriptions *subscriptio
 		usage.Set(limit.KindCalls, u.Stats.Calls)
 		limiter.Seed(v.key, usage)
 	}
+	limiter.Touch(v.key) // The key is seen now, as the visitor's request is (after Seed, which only fills unknown keys)
 	return v
 }
 
@@ -266,34 +267,24 @@ func (v *visitor) TopicCreationAllowed() bool {
 
 // AuthAllowed returns true if an auth request can be attempted (a token is available)
 func (v *visitor) AuthAllowed() bool {
-	if v.user != nil {
-		return true // Users are already logged in, no need to limit requests
-	}
 	return v.limiter.Tokens(v.key, v.authRule()) >= 1
 }
 
 // AuthFailed records an auth failure
 func (v *visitor) AuthFailed() {
-	if v.user == nil {
-		v.limiter.Allow(v.key, v.authRule(), 1)
-	}
+	v.limiter.Allow(v.key, v.authRule(), 1)
 }
 
 // AccountActionAllowed returns true if a rate-limited account action (signup or password-reset
 // request) is currently allowed for this visitor
 func (v *visitor) AccountActionAllowed() bool {
-	if v.user != nil {
-		return false // Users cannot create accounts when logged in
-	}
 	return v.limiter.Tokens(v.key, v.accountRule()) >= 1
 }
 
 // AccountActionPerformed decreases the account limiter. This is to be called after a rate-limited
 // account action (signup or password-reset request).
 func (v *visitor) AccountActionPerformed() {
-	if v.user == nil {
-		v.limiter.Allow(v.key, v.accountRule(), 1)
-	}
+	v.limiter.Allow(v.key, v.accountRule(), 1)
 }
 
 func (v *visitor) BandwidthAllowed(bytes int64) bool {

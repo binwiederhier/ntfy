@@ -2,6 +2,7 @@ package server
 
 import (
 	"io"
+	"net/http/httptest"
 	"net/netip"
 	"testing"
 	"time"
@@ -306,4 +307,44 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 
 	s.visitor(ip, u)
 	require.True(t, vip.AccountActionAllowed())
+}
+
+func TestVisitor_NewVisitorIsNotStale(t *testing.T) {
+	// A visitor is seen when it is built for a request, like it was when visitors were shared
+	s := newTestServer(t, newTestConfig(t, ""))
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.False(t, v.Stale())
+}
+
+func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
+	// A subscriber from a request-limit-exempt prefix never hits the limiter before it becomes a
+	// topic's rate visitor; the topic must still keep it. Fails if a visitor whose key the limiter
+	// has not seen yet counts as stale.
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.0/24")}
+	s := newTestServer(t, c)
+	_, err := s.topicsFromIDs(s.visitor(netip.MustParseAddr("1.2.3.4"), nil), "mytopic") // The topic exists already
+	require.Nil(t, err)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	topics, err := s.topicsFromIDs(v, "mytopic")
+	require.Nil(t, err)
+	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
+	require.NotNil(t, topics[0].RateVisitor())
+}
+
+func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
+	// The auth and account limits are per key and do not look at the user (as on main since #2119):
+	// a logged-in user may request a password reset, and is charged like everyone on the key
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorAuthFailureLimitBurst = 1
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+	require.True(t, v.AccountActionAllowed())
+	require.True(t, v.AuthAllowed())
+	v.AuthFailed()
+	require.False(t, v.AuthAllowed())
 }

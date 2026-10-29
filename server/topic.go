@@ -124,7 +124,7 @@ func (t *topic) LastAccess() time.Time {
 func (t *topic) SetRateVisitor(v *visitor, poll bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if poll && t.rateVisitor != nil && t.rateVisitor.key == v.key && !t.rateVisitor.Stale() {
+	if poll && t.rateVisitor != nil && t.rateVisitor.key == v.key {
 		t.rateVisitor.Keepalive() // Replacing it would leave an open stream keeping alive a visitor the topic no longer has
 	} else {
 		t.rateVisitor = v

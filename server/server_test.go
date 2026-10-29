@@ -3782,6 +3782,58 @@ func TestServer_SubscriberRateLimiting_StreamReclaimsTopicFromGonePoller(t *test
 	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("2001:db8::1"), nil).Stats().Messages)
 }
 
+func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoked(t *testing.T) {
+	// A stream whose write access was revoked while it is open must not take a stale topic back:
+	// publishes would be charged to (and rejected by) the quota of a subscriber who may no longer write
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.VisitorMessageDailyLimit = 1
+	c.KeepaliveInterval = 20 * time.Millisecond
+	c.AuthDefault = user.PermissionDenyAll
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
+	require.Nil(t, s.userManager.AddUser("bob", "bob", user.RoleUser, false))
+	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionReadWrite))
+	require.Nil(t, s.userManager.AllowAccess("bob", "upAAAAAAAAAAAA", user.PermissionReadWrite))
+	aliceHeaders := map[string]string{
+		"Authorization": util.BasicAuth("alice", "alice"),
+	}
+	bobHeaders := map[string]string{
+		"Authorization": util.BasicAuth("bob", "bob"),
+	}
+
+	// Alice streams and uses up her quota, then may only read
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", aliceHeaders, func(r *http.Request) {
+			r.RemoteAddr = "1.1.1.1:1234"
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	to := lockedTopic(s, "upAAAAAAAAAAAA")
+	require.True(t, to.RateVisitor().MessageAllowed())
+	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionRead))
+
+	// Bob takes the topic with a poll, and is gone a day later
+	response := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", bobHeaders, func(r *http.Request) {
+		r.RemoteAddr = "2.2.2.2:1234"
+	})
+	require.Equal(t, 200, response.Code)
+	ageRateVisitor(to, 25*time.Hour)
+	time.Sleep(5 * c.KeepaliveInterval)
+
+	// Alice's stream did not take the topic back
+	response = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", bobHeaders, func(r *http.Request) {
+		r.RemoteAddr = "2.2.2.2:1234"
+	})
+	require.Equal(t, 200, response.Code)
+}
+
 // ageRateVisitor makes the topic's rate visitor look as if it was last seen d ago
 func ageRateVisitor(t *topic, d time.Duration) {
 	t.mu.Lock()

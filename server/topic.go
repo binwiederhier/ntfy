@@ -132,14 +132,24 @@ func (t *topic) SetRateVisitor(v *visitor) {
 }
 
 // KeepRateVisitor is called on the keepalives of a stream whose visitor may be the topic's rate visitor.
-// A stream with the rate visitor's key keeps it alive, whichever of its subscribers set it. A stream
-// with another key takes the topic back once the rate visitor is stale.
-func (t *topic) KeepRateVisitor(v *visitor) {
+// A stream with the rate visitor's key keeps it alive, whichever of its subscribers set it. It returns
+// true if the rate visitor has another key and is stale, so the stream may take the topic back (see
+// TakeRateVisitor), once it is checked that it still may.
+func (t *topic) KeepRateVisitor(v *visitor) (stale bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.rateVisitor != nil && t.rateVisitor.key == v.key {
 		t.rateSeen = time.Now()
-	} else if t.rateVisitorStaleNoLock() {
+		return false
+	}
+	return t.rateVisitorStaleNoLock()
+}
+
+// TakeRateVisitor makes v the topic's rate visitor if the current one is still stale
+func (t *topic) TakeRateVisitor(v *visitor) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.rateVisitorStaleNoLock() {
 		t.rateVisitor = v
 		t.rateSeen = time.Now()
 	}

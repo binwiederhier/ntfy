@@ -1691,9 +1691,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			for _, t := range topics {
 				t.Keepalive()
 			}
-			for _, t := range rateTopics {
-				t.KeepRateVisitor(v)
-			}
+			s.keepRateVisitors(r, v, rateTopics)
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
@@ -1790,9 +1788,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				for _, t := range topics {
 					t.Keepalive()
 				}
-				for _, t := range rateTopics {
-					t.KeepRateVisitor(v)
-				}
+				s.keepRateVisitors(r, v, rateTopics)
 				if err := ping(); err != nil {
 					return err
 				}
@@ -1898,28 +1894,56 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 		return eligibleRateTopics, nil
 	}
 
-	// If access controls are enabled, only set rate visitor if
-	// - topic is reserved, and v.user is the owner
-	// - topic is not reserved, and v.user has write access
+	// If access controls are enabled, only set rate visitor if v may write to the topic (see mayBeRateVisitor)
 	writableRateTopics := make([]*topic, 0)
-	for _, t := range topics {
-		if !util.Contains(eligibleRateTopics, t) {
-			continue
-		}
-		ownerUserID, err := s.userManager.ReservationOwner(t.ID)
+	for _, t := range eligibleRateTopics {
+		ok, err := s.mayBeRateVisitor(v, t)
 		if err != nil {
 			return nil, err
-		}
-		if ownerUserID == "" {
-			if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite); err == nil {
-				writableRateTopics = append(writableRateTopics, t)
-			}
-		} else if ownerUserID == v.MaybeUserID() {
+		} else if ok {
 			writableRateTopics = append(writableRateTopics, t)
 		}
 	}
 	s.setRateVisitors(r, v, writableRateTopics)
 	return writableRateTopics, nil
+}
+
+// mayBeRateVisitor returns true if v may be the topic's rate visitor:
+// - access controls are off
+// - or the topic is reserved, and v.user is the owner
+// - or the topic is not reserved, and v.user has write access
+func (s *Server) mayBeRateVisitor(v *visitor, t *topic) (bool, error) {
+	if s.userManager == nil {
+		return true, nil
+	}
+	ownerUserID, err := s.userManager.ReservationOwner(t.ID)
+	if err != nil {
+		return false, err
+	}
+	if ownerUserID == "" {
+		return s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite) == nil, nil
+	}
+	return ownerUserID == v.MaybeUserID(), nil
+}
+
+// keepRateVisitors keeps a stream's visitor alive as the rate visitor of its topics (see topic.KeepRateVisitor),
+// and takes back a stale topic only if the stream may still be its rate visitor; write access may have been
+// revoked since it subscribed
+func (s *Server) keepRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) {
+	for _, t := range rateTopics {
+		if !t.KeepRateVisitor(v) {
+			continue
+		}
+		ok, err := s.mayBeRateVisitor(v, t)
+		if err != nil {
+			logvr(v, r).Tag(tagSubscribe).With(t).Err(err).Warn("Cannot check if visitor may be rate visitor for topic %s", t.ID)
+			continue
+		} else if !ok {
+			continue
+		}
+		logvr(v, r).Tag(tagSubscribe).With(t).Debug("Taking back topic %s as rate visitor", t.ID)
+		t.TakeRateVisitor(v)
+	}
 }
 
 func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) {

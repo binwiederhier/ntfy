@@ -234,8 +234,8 @@ func (v *visitor) MessageAllowed() bool {
 }
 
 func (v *visitor) EmailAllowed() bool {
-	if v.limits.EmailLimitBurst <= 0 {
-		return false // No email bucket means no emails, as before
+	if v.limits.EmailLimitBurst <= 0 || v.limits.EmailLimit <= 0 {
+		return false // No email bucket, or no emails on the tier: the limit service reads a daily limit of zero as "no cap"
 	}
 	allowed := v.limiter.Allow(v.key, v.emailRule(), 1).OK
 	if allowed {

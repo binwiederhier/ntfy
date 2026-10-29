@@ -3,6 +3,7 @@ package limit
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -401,4 +402,209 @@ func TestService_FirebaseKind(t *testing.T) {
 	kind, ok := ParseKind("firebase")
 	require.True(t, ok)
 	require.Equal(t, KindFirebase, kind)
+}
+
+func TestService_ResetUsage_KeepsBuckets(t *testing.T) {
+	// The daily reset starts the counts over, but the buckets keep their tokens: an email bucket
+	// emptied right before the reset is not refilled by it (it used to be)
+	s, _ := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindEmails,
+		Burst:  2,
+		Refill: time.Hour,
+		Daily:  3,
+	}
+	require.True(t, s.Allow("k", rule, 2).OK)
+	s.ResetUsage()
+	require.Equal(t, int64(0), s.Usage("k").Count(KindEmails))
+	require.Equal(t, int64(0), s.Tokens("k", rule))
+	d := s.Allow("k", rule, 1)
+	require.False(t, d.OK)
+	require.Equal(t, time.Hour, d.RetryAfter) // The bucket is what denies, not the day
+}
+
+// Fails if Allow stops debiting bucket tokens; weighted concurrent calls must share one burst.
+func TestService_Allow_ConcurrentBucketOnly(t *testing.T) {
+	s := newTestService(t)
+	rule := Rule{
+		Kind:  KindBandwidth,
+		Burst: 97,
+	}
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var admitted atomic.Int64
+	for g := 0; g < 32; g++ {
+		wg.Add(1)
+		go func(g int) {
+			defer wg.Done()
+			<-start
+			for i := 0; i < 64; i++ {
+				n := int64(1 + g%7)
+				if s.Allow("hot", rule, n).OK {
+					admitted.Add(n)
+				}
+			}
+		}(g)
+	}
+	close(start)
+	wg.Wait()
+	require.Equal(t, rule.Burst, admitted.Load())
+	require.Equal(t, admitted.Load(), s.Usage("hot").Count(rule.Kind))
+	require.Zero(t, s.Tokens("hot", rule))
+}
+
+// Fails if ResetUsage also clears buckets; a reset racing with publishes grants only one new daily allowance.
+func TestService_ResetUsage_ConcurrentAllow(t *testing.T) {
+	for round := 0; round < 20; round++ {
+		s := newTestService(t)
+		rule := Rule{
+			Kind:  KindMessages,
+			Burst: 81,
+			Daily: 40,
+		}
+		require.True(t, s.Allow("hot", rule, 40).OK)
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var admitted atomic.Int64
+		for g := 0; g < 16; g++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				for i := 0; i < 40; i++ {
+					if s.Allow("hot", rule, 1).OK {
+						admitted.Add(1)
+					}
+				}
+			}()
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			s.ResetUsage()
+		}()
+		close(start)
+		wg.Wait()
+		for i := 0; i < 40; i++ {
+			if s.Allow("hot", rule, 1).OK {
+				admitted.Add(1)
+			}
+		}
+		require.Equal(t, int64(40), admitted.Load())
+		require.Equal(t, admitted.Load(), s.Usage("hot").Count(rule.Kind))
+		require.Equal(t, int64(1), s.Tokens("hot", rule))
+	}
+}
+
+// Fails if Allow no longer refreshes seen; pruning must retain an active exhausted key while deleting idle keys.
+func TestService_Prune_ConcurrentAllow(t *testing.T) {
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:  KindRequests,
+		Burst: 1,
+	}
+	require.True(t, s.Allow("hot", rule, 1).OK)
+	for i := 0; i < 128; i++ {
+		require.True(t, s.Allow(fmt.Sprintf("idle-%d", i), rule, 1).OK)
+	}
+	clock.advance(2 * time.Hour)
+	require.False(t, s.Allow("hot", rule, 1).OK)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	var admitted atomic.Int64
+	for g := 0; g < 8; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			for i := 0; i < 100; i++ {
+				if s.Allow("hot", rule, 1).OK {
+					admitted.Add(1)
+				}
+			}
+		}()
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-start
+		for i := 0; i < 100; i++ {
+			s.Prune(time.Hour)
+		}
+	}()
+	close(start)
+	wg.Wait()
+	require.Zero(t, admitted.Load())
+	require.Equal(t, int64(1), s.Usage("hot").Count(rule.Kind))
+	require.Equal(t, 1, s.Size())
+}
+
+// Fails if Seed overwrites existing entries, including a key known only through another kind or a daily reset.
+func TestService_Seed_ConcurrentKnownKey(t *testing.T) {
+	s := newTestService(t)
+	require.True(t, s.Allow("hot", Rule{Kind: KindRequests}, 1).OK)
+	s.ResetUsage()
+	var usage Usage
+	usage.Set(KindMessages, 9999)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for g := 0; g < 16; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			for i := 0; i < 100; i++ {
+				s.Seed("hot", usage)
+				s.Allow("hot", Rule{Kind: KindMessages}, 1)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	require.Equal(t, int64(1600), s.Usage("hot").Count(KindMessages))
+	require.Zero(t, s.Usage("hot").Count(KindRequests))
+}
+
+// Fails if refill is disabled; nanosecond and century intervals must earn exactly one token per interval.
+func TestService_Allow_ExtremeRefill(t *testing.T) {
+	for _, interval := range []time.Duration{time.Nanosecond, 100 * 365 * 24 * time.Hour} {
+		t.Run(interval.String(), func(t *testing.T) {
+			s, clock := newTestServiceWithClock(t)
+			rule := Rule{
+				Kind:   KindRequests,
+				Burst:  2,
+				Refill: interval,
+			}
+			require.True(t, s.Allow("hot", rule, 2).OK)
+			d := s.Allow("hot", rule, 1)
+			require.False(t, d.OK)
+			require.Equal(t, interval, d.RetryAfter)
+			clock.advance(interval)
+			require.True(t, s.Allow("hot", rule, 1).OK)
+			require.False(t, s.Allow("hot", rule, 1).OK)
+		})
+	}
+}
+
+func TestService_Allow_ClockGoingBackDoesNotCharge(t *testing.T) {
+	// A call that carries an older timestamp than the bucket's last refill (a goroutine paused
+	// between reading the clock and taking the shard lock, or a wall clock set back) must not
+	// take tokens away, and must not move the refill point back either (that would credit the
+	// same time twice)
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  3,
+		Refill: time.Second,
+	}
+	require.True(t, s.Allow("k", rule, 1).OK)
+	require.True(t, s.Allow("k", rule, 1).OK)
+	clock.advance(-time.Second)
+	require.True(t, s.Allow("k", rule, 1).OK) // The third token is still there
+	require.False(t, s.Allow("k", rule, 1).OK)
+	clock.advance(time.Second) // Back to where the bucket was last refilled: no time has passed
+	require.False(t, s.Allow("k", rule, 1).OK)
+	clock.advance(time.Second)
+	require.True(t, s.Allow("k", rule, 1).OK)
 }

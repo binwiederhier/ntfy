@@ -258,14 +258,18 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 			// difference, down to a debt of one burst
 			b.tokens = math.Max(b.tokens+float64(rule.Burst-b.burst), -float64(rule.Burst))
 		}
-		if rule.Refill > 0 {
+		// A timestamp older than the last refill (a call that read the clock before another one
+		// took the lock, or a wall clock set back) neither charges nor moves the refill point back
+		if rule.Refill > 0 && nowNanos > b.last {
 			b.tokens += float64(nowNanos-b.last) / float64(rule.Refill)
 		}
 	}
 	if b.tokens > float64(rule.Burst) {
 		b.tokens = float64(rule.Burst)
 	}
-	b.last = nowNanos
+	if nowNanos > b.last {
+		b.last = nowNanos
+	}
 	b.burst = rule.Burst
 }
 

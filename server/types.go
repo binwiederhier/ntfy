@@ -19,6 +19,8 @@ type publishMessage struct {
 	Tags       []string       `json:"tags"`
 	Click      string         `json:"click"`
 	Icon       string         `json:"icon"`
+	SmallIcon  string         `json:"small_icon"`
+	Color      string         `json:"color"`
 	Actions    []model.Action `json:"actions"`
 	Attach     string         `json:"attach"`
 	Markdown   bool           `json:"markdown"`

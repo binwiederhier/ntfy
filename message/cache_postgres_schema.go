@@ -21,6 +21,8 @@ const (
 			tags TEXT NOT NULL,
 			click TEXT NOT NULL,
 			icon TEXT NOT NULL,
+			small_icon TEXT NOT NULL DEFAULT '',
+			color TEXT NOT NULL DEFAULT '',
 			actions TEXT NOT NULL,
 			attachment_name TEXT NOT NULL,
 			attachment_type TEXT NOT NULL,
@@ -67,6 +69,10 @@ const (
 	postgresMigrate16To17CreateIndexQuery = `
 		CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id);
 	`
+	postgresMigrate17To18AppearanceQuery = `
+		ALTER TABLE message ADD COLUMN small_icon TEXT NOT NULL DEFAULT '';
+		ALTER TABLE message ADD COLUMN color TEXT NOT NULL DEFAULT '';
+	`
 )
 
 var (
@@ -78,5 +84,6 @@ var (
 		{From: 14, To: 15}: schema.Query(postgresMigrate14To15CreateIndexQuery),
 		{From: 15, To: 16}: schema.Query(postgresMigrate15To16AddClaimedAtQuery),
 		{From: 16, To: 17}: schema.Query(postgresMigrate16To17CreateIndexQuery),
+		{From: 17, To: 18}: schema.Query(postgresMigrate17To18AppearanceQuery),
 	}
 )

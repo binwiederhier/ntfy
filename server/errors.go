@@ -154,6 +154,8 @@ var (
 	errHTTPBadRequestTimezoneInvalid                 = &errHTTP{40059, http.StatusBadRequest, "invalid request: invalid timezone", "https://ntfy.sh/docs/publish/#scheduled-delivery", nil}
 	errHTTPBadRequestPhoneVerificationCodeInvalid    = &errHTTP{40060, http.StatusBadRequest, "invalid request: phone number verification code invalid", "", nil}
 	errHTTPBadRequestTooManyTopics                   = &errHTTP{40061, http.StatusBadRequest, "invalid request: too many topics", "https://ntfy.sh/docs/subscribe/api/#subscribe-to-multiple-topics", nil}
+	errHTTPBadRequestSmallIconInvalid                = &errHTTP{40062, http.StatusBadRequest, "invalid request: invalid small icon, expected an icon name like mdi:bell", "https://ntfy.sh/docs/publish/#small-icon-and-color", nil}
+	errHTTPBadRequestColorInvalid                    = &errHTTP{40063, http.StatusBadRequest, "invalid request: invalid color, expected #RRGGBB", "https://ntfy.sh/docs/publish/#small-icon-and-color", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}

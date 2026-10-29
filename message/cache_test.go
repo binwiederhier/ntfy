@@ -772,6 +772,8 @@ func TestStore_AddMessages_AllFields(t *testing.T) {
 			m.Tags = []string{fmt.Sprintf("tag%d", i), "common"}
 			m.Click = fmt.Sprintf("https://example.com/%d", i)
 			m.Icon = fmt.Sprintf("https://example.com/%d.png", i)
+			m.SmallIcon = fmt.Sprintf("mdi:icon-%d", i)
+			m.Color = fmt.Sprintf("#00000%d", i)
 			m.Actions = []*model.Action{{ID: fmt.Sprintf("a%d", i), Action: "view", Label: fmt.Sprintf("label %d", i), URL: "https://example.com"}}
 			m.Attachment = &model.Attachment{Name: fmt.Sprintf("file%d.txt", i), Type: "text/plain", Size: int64(10 + i), Expires: int64(2000 + i), URL: fmt.Sprintf("https://example.com/file%d.txt", i)}
 			m.Sender = netip.MustParseAddr(fmt.Sprintf("1.2.3.%d", i+1))
@@ -795,6 +797,8 @@ func TestStore_AddMessages_AllFields(t *testing.T) {
 			require.Equal(t, []string{fmt.Sprintf("tag%d", i), "common"}, m.Tags)
 			require.Equal(t, fmt.Sprintf("https://example.com/%d", i), m.Click)
 			require.Equal(t, fmt.Sprintf("https://example.com/%d.png", i), m.Icon)
+			require.Equal(t, fmt.Sprintf("mdi:icon-%d", i), m.SmallIcon)
+			require.Equal(t, fmt.Sprintf("#00000%d", i), m.Color)
 			require.Equal(t, 1, len(m.Actions))
 			require.Equal(t, fmt.Sprintf("label %d", i), m.Actions[0].Label)
 			require.Equal(t, fmt.Sprintf("file%d.txt", i), m.Attachment.Name)
@@ -908,6 +912,8 @@ func TestStore_MessageFieldRoundTrip(t *testing.T) {
 		m.Tags = []string{"warning", "srv01"}
 		m.Click = "https://example.com/click"
 		m.Icon = "https://example.com/icon.png"
+		m.SmallIcon = "mdi:bell"
+		m.Color = "#FF9800"
 		m.Actions = []*model.Action{
 			{
 				ID:     "action1",
@@ -948,6 +954,8 @@ func TestStore_MessageFieldRoundTrip(t *testing.T) {
 		require.Equal(t, []string{"warning", "srv01"}, retrieved.Tags)
 		require.Equal(t, "https://example.com/click", retrieved.Click)
 		require.Equal(t, "https://example.com/icon.png", retrieved.Icon)
+		require.Equal(t, "mdi:bell", retrieved.SmallIcon)
+		require.Equal(t, "#FF9800", retrieved.Color)
 		require.Equal(t, "text/markdown", retrieved.ContentType)
 		require.Equal(t, "base64", retrieved.Encoding)
 		require.Equal(t, netip.MustParseAddr("9.8.7.6"), retrieved.Sender)

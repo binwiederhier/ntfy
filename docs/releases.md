@@ -2264,7 +2264,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-### ntfy server v2.34.1 (UNRELEASED)
+### ntfy server v2.35.0 (UNRELEASED)
+
+**Features:**
+
+* Rate limits are tracked per visitor key (`ip:<prefix>` or `user:<id>`) in one sharded limit service instead of in each in-memory visitor. A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the next request and keeps what was already spent instead of handing out full buckets; the daily email limit shown on the account page is a hard cap; and a failed attachment upload hands its bandwidth back ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
+
+**Bug fixes + maintenance:**
+
+* A user without a tier shares its rate limits with anonymous requests from the same IP, and a login from that IP could switch off the auth failure and account action limits for a concurrent request ([#2119](https://github.com/binwiederhier/ntfy/pull/2119))
+* A tier with a daily email limit of zero sends no emails, a tier edited in place no longer loses pending user stats, and a clock that goes back no longer takes tokens away
 
 **Security:**
 

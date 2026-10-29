@@ -29,7 +29,7 @@ const (
 // same IP cannot see each other's user (#1051). The counting happens in the limit service, keyed by
 // key, so two visitors with the same key share one set of buckets and counts.
 type visitor struct {
-	*visitorEnv
+	env    *visitorEnv
 	key    string       // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
 	ip     netip.Addr   // Visitor IP address
 	user   *user.User   // Only set if authenticated user, otherwise nil
@@ -88,11 +88,11 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 		limits = vis.LimitsFor(env.limitsConfig, tier) // Resolved per request: the tier's fields may change at any time
 	}
 	v := &visitor{
-		visitorEnv: env,
-		key:        vis.Key(ip, u, env.limitsConfig),
-		ip:         ip,
-		user:       u,
-		limits:     limits,
+		env:    env,
+		key:    vis.Key(ip, u, env.limitsConfig),
+		ip:     ip,
+		user:   u,
+		limits: limits,
 	}
 	if tier != nil {
 		// Carry the persisted stats into the key's daily counts, if the key is new to the limiter
@@ -116,23 +116,23 @@ func (v *visitor) Context() log.Context {
 		"visitor_messages":           info.Stats.Messages,
 		"visitor_messages_limit":     info.Limits.MessageLimit,
 		"visitor_messages_remaining": info.Stats.MessagesRemaining,
-		"visitor_requests_remaining": v.limiter.Tokens(v.key, v.requestRule()),
+		"visitor_requests_remaining": v.env.limiter.Tokens(v.key, v.requestRule()),
 	}
-	if v.config.SMTPSenderFrom != "" {
+	if v.env.config.SMTPSenderFrom != "" {
 		fields["visitor_emails"] = info.Stats.Emails
 		fields["visitor_emails_limit"] = info.Limits.EmailLimit
 		fields["visitor_emails_remaining"] = info.Stats.EmailsRemaining
 	}
-	if v.config.TwilioAccount != "" {
+	if v.env.config.TwilioAccount != "" {
 		fields["visitor_calls"] = info.Stats.Calls
 		fields["visitor_calls_limit"] = info.Limits.CallLimit
 		fields["visitor_calls_remaining"] = info.Stats.CallsRemaining
 	}
 	if v.user == nil {
-		fields["visitor_auth_attempts_remaining"] = v.limiter.Tokens(v.key, v.authRule())
+		fields["visitor_auth_attempts_remaining"] = v.env.limiter.Tokens(v.key, v.authRule())
 	}
 	if v.topicCreationLimited() {
-		fields["visitor_topic_creations_remaining"] = v.limiter.Tokens(v.key, v.topicCreationRule())
+		fields["visitor_topic_creations_remaining"] = v.env.limiter.Tokens(v.key, v.topicCreationRule())
 	}
 	if v.user != nil {
 		fields["user_id"] = v.user.ID
@@ -168,7 +168,7 @@ func (v *visitor) RequestAllowed() bool {
 	if v.limits.RequestLimitBurst <= 0 {
 		return false // A bucket of nothing admits nothing, as before
 	}
-	return v.limiter.Allow(v.key, v.requestRule(), 1).OK
+	return v.env.limiter.Allow(v.key, v.requestRule(), 1).OK
 }
 
 // FirebaseAllowed returns false while Firebase sends are paused for the key (see FirebaseTemporarilyDeny)
@@ -177,7 +177,7 @@ func (v *visitor) FirebaseAllowed() bool {
 	if rule.Refill <= 0 {
 		return true
 	}
-	return v.limiter.Tokens(v.key, rule) >= 1
+	return v.env.limiter.Tokens(v.key, rule) >= 1
 }
 
 // FirebaseTemporarilyDeny pauses Firebase sends for the key for the configured penalty duration
@@ -186,14 +186,14 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 	if rule.Refill <= 0 {
 		return
 	}
-	v.limiter.Allow(v.key, rule, 1)
+	v.env.limiter.Allow(v.key, rule, 1)
 }
 
 func (v *visitor) MessageAllowed() bool {
 	if v.limits.MessageLimit <= 0 {
 		return false // A daily limit of zero admits nothing; the limit service reads it as "no cap"
 	}
-	allowed := v.limiter.Allow(v.key, v.messageRule(), 1).OK
+	allowed := v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
 	if allowed {
 		v.enqueueUserStats(&user.Stats{
 			Messages: 1,
@@ -206,7 +206,7 @@ func (v *visitor) EmailAllowed() bool {
 	if v.limits.EmailLimitBurst <= 0 || v.limits.EmailLimit <= 0 {
 		return false // No email bucket, or no emails on the tier: the limit service reads a daily limit of zero as "no cap"
 	}
-	allowed := v.limiter.Allow(v.key, v.emailRule(), 1).OK
+	allowed := v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
 	if allowed {
 		v.enqueueUserStats(&user.Stats{
 			Emails: 1,
@@ -219,7 +219,7 @@ func (v *visitor) CallAllowed() bool {
 	if v.limits.CallLimit <= 0 {
 		return false // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
 	}
-	allowed := v.limiter.Allow(v.key, v.callRule(), 1).OK
+	allowed := v.env.limiter.Allow(v.key, v.callRule(), 1).OK
 	if allowed {
 		v.enqueueUserStats(&user.Stats{
 			Calls: 1,
@@ -231,16 +231,16 @@ func (v *visitor) CallAllowed() bool {
 // enqueueUserStats hands what a tier user's request admitted to the user manager's write queue, which
 // adds it to the persisted stats (deltas add up across requests and cluster nodes)
 func (v *visitor) enqueueUserStats(delta *user.Stats) {
-	if v.userManager == nil || v.user == nil || v.user.Tier == nil {
+	if v.env.userManager == nil || v.user == nil || v.user.Tier == nil {
 		return
 	}
-	v.userManager.EnqueueUserStats(v.user.ID, delta)
+	v.env.userManager.EnqueueUserStats(v.user.ID, delta)
 }
 
 // SubscriptionAllowed takes one of the visitor key's subscription slots on this node, if one is free.
 // Every successful call must be paired with RemoveSubscription.
 func (v *visitor) SubscriptionAllowed() bool {
-	return v.subscriptions.Acquire(v.key, int64(v.config.VisitorSubscriptionLimit))
+	return v.env.subscriptions.Acquire(v.key, int64(v.env.config.VisitorSubscriptionLimit))
 }
 
 // TopicCreationAllowed returns true if the visitor is allowed to cause a new topic to be
@@ -249,48 +249,48 @@ func (v *visitor) TopicCreationAllowed() bool {
 	if !v.topicCreationLimited() {
 		return true
 	}
-	return v.limiter.Allow(v.key, v.topicCreationRule(), 1).OK
+	return v.env.limiter.Allow(v.key, v.topicCreationRule(), 1).OK
 }
 
 // AuthAllowed returns true if an auth request can be attempted (a token is available)
 func (v *visitor) AuthAllowed() bool {
-	return v.limiter.Tokens(v.key, v.authRule()) >= 1
+	return v.env.limiter.Tokens(v.key, v.authRule()) >= 1
 }
 
 // AuthFailed records an auth failure
 func (v *visitor) AuthFailed() {
-	v.limiter.Allow(v.key, v.authRule(), 1)
+	v.env.limiter.Allow(v.key, v.authRule(), 1)
 }
 
 // AccountActionAllowed returns true if a rate-limited account action (signup or password-reset
 // request) is currently allowed for this visitor
 func (v *visitor) AccountActionAllowed() bool {
-	return v.limiter.Tokens(v.key, v.accountRule()) >= 1
+	return v.env.limiter.Tokens(v.key, v.accountRule()) >= 1
 }
 
 // AccountActionPerformed decreases the account limiter. This is to be called after a rate-limited
 // account action (signup or password-reset request).
 func (v *visitor) AccountActionPerformed() {
-	v.limiter.Allow(v.key, v.accountRule(), 1)
+	v.env.limiter.Allow(v.key, v.accountRule(), 1)
 }
 
 func (v *visitor) BandwidthAllowed(bytes int64) bool {
 	if v.limits.AttachmentBandwidthLimit <= 0 {
 		return false // A bandwidth limit of zero admits nothing, as before
 	}
-	return v.limiter.Allow(v.key, v.bandwidthRule(), bytes).OK
+	return v.env.limiter.Allow(v.key, v.bandwidthRule(), bytes).OK
 }
 
 // RemoveSubscription gives back a slot taken by SubscriptionAllowed
 func (v *visitor) RemoveSubscription() {
-	v.subscriptions.Release(v.key)
+	v.env.subscriptions.Release(v.key)
 }
 
 // Keepalive marks the visitor and its key as seen. The subscribe handlers call it on the visitor a
 // topic keeps as its rate visitor; nothing else does, so Stale is the subscriber's liveness.
 func (v *visitor) Keepalive() {
 	v.seen.Store(time.Now().UnixNano())
-	v.limiter.Touch(v.key)
+	v.env.limiter.Touch(v.key)
 }
 
 // BandwidthLimiter returns the visitor's bandwidth bucket as a util.Limiter, for the readers and
@@ -299,7 +299,7 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 	if v.limits.AttachmentBandwidthLimit <= 0 {
 		return util.NewFixedLimiter(0) // A bandwidth limit of zero admits nothing, as BandwidthAllowed
 	}
-	return v.limiter.Limiter(v.key, v.bandwidthRule())
+	return v.env.limiter.Limiter(v.key, v.bandwidthRule())
 }
 
 // Stale is true when the visitor has not been kept alive for visitorExpungeAfter. It reads the
@@ -310,7 +310,7 @@ func (v *visitor) Stale() bool {
 }
 
 func (v *visitor) Stats() *user.Stats {
-	usage := v.limiter.Usage(v.key)
+	usage := v.env.limiter.Usage(v.key)
 	return &user.Stats{
 		Messages: usage.Count(limit.KindMessages),
 		Emails:   usage.Count(limit.KindEmails),
@@ -395,28 +395,28 @@ func (v *visitor) bandwidthRule() limit.Rule {
 func (v *visitor) topicCreationRule() limit.Rule {
 	return limit.Rule{
 		Kind:   limit.KindTopics,
-		Burst:  int64(v.config.VisitorTopicCreationLimitBurst),
-		Refill: v.config.VisitorTopicCreationLimitReplenish,
+		Burst:  int64(v.env.config.VisitorTopicCreationLimitBurst),
+		Refill: v.env.config.VisitorTopicCreationLimitReplenish,
 	}
 }
 
 func (v *visitor) topicCreationLimited() bool {
-	return v.config.VisitorTopicCreationLimitBurst > 0 && v.config.VisitorTopicCreationLimitReplenish > 0
+	return v.env.config.VisitorTopicCreationLimitBurst > 0 && v.env.config.VisitorTopicCreationLimitReplenish > 0
 }
 
 func (v *visitor) accountRule() limit.Rule {
 	return limit.Rule{
 		Kind:   limit.KindAccount,
-		Burst:  int64(v.config.VisitorAccountCreationLimitBurst),
-		Refill: v.config.VisitorAccountCreationLimitReplenish,
+		Burst:  int64(v.env.config.VisitorAccountCreationLimitBurst),
+		Refill: v.env.config.VisitorAccountCreationLimitReplenish,
 	}
 }
 
 func (v *visitor) authRule() limit.Rule {
 	return limit.Rule{
 		Kind:   limit.KindAuth,
-		Burst:  int64(v.config.VisitorAuthFailureLimitBurst),
-		Refill: v.config.VisitorAuthFailureLimitReplenish,
+		Burst:  int64(v.env.config.VisitorAuthFailureLimitBurst),
+		Refill: v.env.config.VisitorAuthFailureLimitReplenish,
 	}
 }
 
@@ -425,7 +425,7 @@ func (v *visitor) firebaseRule() limit.Rule {
 	return limit.Rule{
 		Kind:   limit.KindFirebase,
 		Burst:  1,
-		Refill: v.config.FirebaseQuotaExceededPenaltyDuration,
+		Refill: v.env.config.FirebaseQuotaExceededPenaltyDuration,
 	}
 }
 
@@ -437,9 +437,9 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	var err error
 	u := v.User()
 	if u != nil {
-		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(u.ID)
+		attachmentsBytesUsed, err = v.env.messageCache.AttachmentBytesUsedByUser(u.ID)
 	} else {
-		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedBySender(v.IP().String())
+		attachmentsBytesUsed, err = v.env.messageCache.AttachmentBytesUsedBySender(v.IP().String())
 	}
 	if err != nil {
 		return nil, err
@@ -449,8 +449,8 @@ func (v *visitor) Info() (*visitorInfo, error) {
 
 	// Reservation stats from database
 	var reservations int64
-	if v.userManager != nil && u != nil {
-		reservations, err = v.userManager.ReservationsCount(u.Name)
+	if v.env.userManager != nil && u != nil {
+		reservations, err = v.env.userManager.ReservationsCount(u.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -482,7 +482,7 @@ func (v *visitor) infoLight() *visitorInfo {
 func (v *visitor) emailsRemaining(emails int64) int64 {
 	remaining := zeroIfNegative(v.limits.EmailLimit - emails)
 	if rule := v.emailRule(); rule.Burst > 0 {
-		remaining = min(remaining, v.limiter.Tokens(v.key, rule))
+		remaining = min(remaining, v.env.limiter.Tokens(v.key, rule))
 	}
 	return remaining
 }

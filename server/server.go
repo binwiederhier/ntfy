@@ -1635,7 +1635,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
-	if err := s.maybeSetRateVisitors(r, v, topics, poll); err != nil {
+	rateTopics, err := s.maybeSetRateVisitors(r, v, topics)
+	if err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1690,6 +1691,9 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			for _, t := range topics {
 				t.Keepalive()
 			}
+			for _, t := range rateTopics {
+				t.KeepRateVisitor(v)
+			}
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
@@ -1729,6 +1733,10 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	defer conn.Close()
+	rateTopics, err := s.maybeSetRateVisitors(r, v, topics) // Before the keepalive loop below reads them
+	if err != nil {
+		return err
+	}
 
 	// Subscription connections can be canceled externally, see topic.CancelSubscribersExceptUser
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -1782,6 +1790,9 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				for _, t := range topics {
 					t.Keepalive()
 				}
+				for _, t := range rateTopics {
+					t.KeepRateVisitor(v)
+				}
 				if err := ping(); err != nil {
 					return err
 				}
@@ -1798,9 +1809,6 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			return err
 		}
 		return conn.WriteJSON(msg)
-	}
-	if err := s.maybeSetRateVisitors(r, v, topics, poll); err != nil {
-		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if poll {
@@ -1865,11 +1873,12 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 // - or the topic is reserved, and v.user is the owner
 // - or the topic is not reserved, and v.user has write access
 //
-// This only applies to UnifiedPush topics ("up...").
-func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic, poll bool) error {
+// This only applies to UnifiedPush topics ("up..."). It returns the topics it set the rate visitor on, for
+// the stream's keepalives (see topic.KeepRateVisitor).
+func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic) ([]*topic, error) {
 	// Bail out if not enabled
 	if !s.config.VisitorSubscriberRateLimiting {
-		return nil
+		return nil, nil
 	}
 
 	// Make a list of topics that we'll actually set the RateVisitor on
@@ -1880,12 +1889,13 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 		}
 	}
 	if len(eligibleRateTopics) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// If access controls are turned off, v has access to everything, and we can set the rate visitor
 	if s.userManager == nil {
-		return s.setRateVisitors(r, v, eligibleRateTopics, poll)
+		s.setRateVisitors(r, v, eligibleRateTopics)
+		return eligibleRateTopics, nil
 	}
 
 	// If access controls are enabled, only set rate visitor if
@@ -1898,7 +1908,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 		}
 		ownerUserID, err := s.userManager.ReservationOwner(t.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if ownerUserID == "" {
 			if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite); err == nil {
@@ -1908,18 +1918,18 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 			writableRateTopics = append(writableRateTopics, t)
 		}
 	}
-	return s.setRateVisitors(r, v, writableRateTopics, poll)
+	s.setRateVisitors(r, v, writableRateTopics)
+	return writableRateTopics, nil
 }
 
-func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic, poll bool) error {
+func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) {
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v, poll)
+		t.SetRateVisitor(v)
 	}
-	return nil
 }
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the

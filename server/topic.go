@@ -30,6 +30,7 @@ type topic struct {
 	ID          string
 	subscribers map[int]*topicSubscriber
 	rateVisitor *visitor
+	rateSeen    time.Time // When a subscriber with the rate visitor's key was last seen (see KeepRateVisitor)
 	lastAccess  time.Time
 	delivered   map[string]time.Time // When recent messages went out to the subscribers, by message ID
 	mu          sync.RWMutex
@@ -109,7 +110,7 @@ func (t *topic) ExpireDelivered() {
 func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
+	if !t.rateVisitorStaleNoLock() {
 		return false
 	}
 	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpungeAfter
@@ -121,24 +122,43 @@ func (t *topic) LastAccess() time.Time {
 	return t.lastAccess
 }
 
-func (t *topic) SetRateVisitor(v *visitor, poll bool) {
+// SetRateVisitor makes the subscriber's visitor the topic's rate visitor; the latest subscriber wins
+func (t *topic) SetRateVisitor(v *visitor) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if poll && t.rateVisitor != nil && t.rateVisitor.key == v.key {
-		t.rateVisitor.Keepalive() // Replacing it would leave an open stream keeping alive a visitor the topic no longer has
-	} else {
-		t.rateVisitor = v
-	}
+	t.rateVisitor = v
+	t.rateSeen = time.Now()
 	t.lastAccess = time.Now()
 }
 
+// KeepRateVisitor is called on the keepalives of a stream whose visitor may be the topic's rate visitor.
+// A stream with the rate visitor's key keeps it alive, whichever of its subscribers set it. A stream
+// with another key takes the topic back once the rate visitor is stale.
+func (t *topic) KeepRateVisitor(v *visitor) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.rateVisitor != nil && t.rateVisitor.key == v.key {
+		t.rateSeen = time.Now()
+	} else if t.rateVisitorStaleNoLock() {
+		t.rateVisitor = v
+		t.rateSeen = time.Now()
+	}
+}
+
+// RateVisitor returns the topic's rate visitor, or nil if there is none or it is stale
 func (t *topic) RateVisitor() *visitor {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && t.rateVisitor.Stale() {
+	if t.rateVisitorStaleNoLock() {
 		t.rateVisitor = nil
 	}
 	return t.rateVisitor
+}
+
+// rateVisitorStaleNoLock is true if there is no rate visitor, or no subscriber with its key has been
+// seen for visitorExpungeAfter
+func (t *topic) rateVisitorStaleNoLock() bool {
+	return t.rateVisitor == nil || time.Since(t.rateSeen) > visitorExpungeAfter
 }
 
 // Unsubscribe removes the subscription from the list of subscribers

@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/netip"
-	"sync/atomic"
 	"time"
 
 	"heckel.io/ntfy/v2/limit"
@@ -30,11 +29,10 @@ const (
 // key, so two visitors with the same key share one set of buckets and counts.
 type visitor struct {
 	env    *visitorEnv
-	key    string       // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
-	ip     netip.Addr   // Visitor IP address
-	user   *user.User   // Only set if authenticated user, otherwise nil
-	limits *vis.Limits  // Resolved from the config or the user's tier
-	seen   atomic.Int64 // Unix nanos of the last keepalive: the liveness of a subscriber kept as a topic's rate visitor (see Stale)
+	key    string      // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
+	ip     netip.Addr  // Visitor IP address
+	user   *user.User  // Only set if authenticated user, otherwise nil
+	limits *vis.Limits // Resolved from the config or the user's tier
 }
 
 // visitorEnv is what every visitor of a server shares; it is built once, so building a visitor per
@@ -103,7 +101,6 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 		env.limiter.Seed(v.key, usage)
 	}
 	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is (after Seed, which only fills unknown keys)
-	v.seen.Store(time.Now().UnixNano())
 	return v
 }
 
@@ -112,7 +109,6 @@ func (v *visitor) Context() log.Context {
 	fields := log.Context{
 		"visitor_id":                 v.key,
 		"visitor_ip":                 v.ip.String(),
-		"visitor_seen":               util.FormatTime(time.Unix(0, v.seen.Load())),
 		"visitor_messages":           info.Stats.Messages,
 		"visitor_messages_limit":     info.Limits.MessageLimit,
 		"visitor_messages_remaining": info.Stats.MessagesRemaining,
@@ -288,10 +284,8 @@ func (v *visitor) RemoveSubscription() {
 	v.env.subscriptions.Release(v.key)
 }
 
-// Keepalive marks the visitor and its key as seen. The subscribe handlers call it on the visitor a
-// topic keeps as its rate visitor; nothing else does, so Stale is the subscriber's liveness.
+// Keepalive marks the visitor's key as seen, so the limiter keeps the key of a long-lived subscription
 func (v *visitor) Keepalive() {
-	v.seen.Store(time.Now().UnixNano())
 	v.env.limiter.Touch(v.key)
 }
 
@@ -302,13 +296,6 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 		return util.NewFixedLimiter(0) // A bandwidth limit of zero admits nothing, as BandwidthAllowed
 	}
 	return v.env.limiter.Limiter(v.key, v.bandwidthRule())
-}
-
-// Stale is true when the visitor has not been kept alive for visitorExpungeAfter. It reads the
-// visitor's own keepalive, not the limiter key's last use: publishers charging a topic's rate
-// visitor must not keep a vanished subscriber's limits on the topic.
-func (v *visitor) Stale() bool {
-	return time.Since(time.Unix(0, v.seen.Load())) > visitorExpungeAfter
 }
 
 func (v *visitor) Stats() *user.Stats {

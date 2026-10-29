@@ -62,6 +62,16 @@ func WithIcon(icon string) PublishOption {
 	return WithHeader("X-Icon", icon)
 }
 
+// WithSmallIcon makes the notification use the given Material Design Icons name (e.g. mdi:bell) as its small icon
+func WithSmallIcon(smallIcon string) PublishOption {
+	return WithHeader("X-Small-Icon", smallIcon)
+}
+
+// WithColor sets the notification accent color, as #RRGGBB
+func WithColor(color string) PublishOption {
+	return WithHeader("X-Color", color)
+}
+
 // WithActions adds custom user actions to the notification. The value can be either a JSON array or the
 // simple format definition. See https://ntfy.sh/docs/publish/#action-buttons for details.
 func WithActions(value string) PublishOption {

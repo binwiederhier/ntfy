@@ -29,6 +29,8 @@ var flagsPublish = append(
 	&cli.StringFlag{Name: "delay", Aliases: []string{"at", "in", "D"}, EnvVars: []string{"NTFY_DELAY"}, Usage: "delay/schedule message"},
 	&cli.StringFlag{Name: "click", Aliases: []string{"U"}, EnvVars: []string{"NTFY_CLICK"}, Usage: "URL to open when notification is clicked"},
 	&cli.StringFlag{Name: "icon", Aliases: []string{"i"}, EnvVars: []string{"NTFY_ICON"}, Usage: "URL to use as notification icon"},
+	&cli.StringFlag{Name: "small-icon", Aliases: []string{"small_icon"}, EnvVars: []string{"NTFY_SMALL_ICON"}, Usage: "icon name to use as small notification icon, e.g. mdi:bell"},
+	&cli.StringFlag{Name: "color", EnvVars: []string{"NTFY_COLOR"}, Usage: "notification accent color as #RRGGBB"},
 	&cli.StringFlag{Name: "actions", Aliases: []string{"A"}, EnvVars: []string{"NTFY_ACTIONS"}, Usage: "actions JSON array or simple definition"},
 	&cli.StringFlag{Name: "attach", Aliases: []string{"a"}, EnvVars: []string{"NTFY_ATTACH"}, Usage: "URL to send as an external attachment"},
 	&cli.BoolFlag{Name: "markdown", Aliases: []string{"md"}, EnvVars: []string{"NTFY_MARKDOWN"}, Usage: "Message is formatted as Markdown"},
@@ -98,6 +100,8 @@ func execPublish(c *cli.Context) error {
 	delay := c.String("delay")
 	click := c.String("click")
 	icon := c.String("icon")
+	smallIcon := c.String("small-icon")
+	color := c.String("color")
 	actions := c.String("actions")
 	attach := c.String("attach")
 	markdown := c.Bool("markdown")
@@ -141,6 +145,12 @@ func execPublish(c *cli.Context) error {
 	}
 	if icon != "" {
 		options = append(options, client.WithIcon(icon))
+	}
+	if smallIcon != "" {
+		options = append(options, client.WithSmallIcon(smallIcon))
+	}
+	if color != "" {
+		options = append(options, client.WithColor(color))
 	}
 	if actions != "" {
 		options = append(options, client.WithActions(strings.ReplaceAll(actions, "\n", " ")))

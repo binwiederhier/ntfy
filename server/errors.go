@@ -184,6 +184,8 @@ var (
 	errHTTPBadRequestUserNoPrimaryEmail              = &errHTTP{40067, http.StatusBadRequest, "invalid request: user has no primary email, cannot send reset link", "", nil, nil}
 	errHTTPBadRequestBaseURLNotConfigured            = &errHTTP{40068, http.StatusBadRequest, "invalid request: base-url must be configured on the server to generate links", "https://ntfy.sh/docs/config/", nil, nil}
 	errHTTPBadRequestPasswordHashInvalid             = &errHTTP{40069, http.StatusBadRequest, "invalid request: password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate", "", nil, nil}
+	errHTTPBadRequestSmallIconInvalid                = &errHTTP{40070, http.StatusBadRequest, "invalid request: invalid small icon, expected an icon name like mdi:bell", "https://ntfy.sh/docs/publish/#small-icon-and-color", nil, nil}
+	errHTTPBadRequestColorInvalid                    = &errHTTP{40071, http.StatusBadRequest, "invalid request: invalid color, expected #RRGGBB", "https://ntfy.sh/docs/publish/#small-icon-and-color", nil, nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil, nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil, nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil, nil}

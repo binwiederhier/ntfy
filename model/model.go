@@ -42,6 +42,8 @@ type Message struct {
 	Tags        []string    `json:"tags,omitempty"`
 	Click       string      `json:"click,omitempty"`
 	Icon        string      `json:"icon,omitempty"`
+	SmallIcon   string      `json:"small_icon,omitempty"`
+	Color       string      `json:"color,omitempty"`
 	Actions     []*Action   `json:"actions,omitempty"`
 	Attachment  *Attachment `json:"attachment,omitempty"`
 	PollID      string      `json:"poll_id,omitempty"`
@@ -79,6 +81,8 @@ func (m *Message) SanitizeUTF8() {
 	m.Title = util.SanitizeUTF8(m.Title)
 	m.Click = util.SanitizeUTF8(m.Click)
 	m.Icon = util.SanitizeUTF8(m.Icon)
+	m.SmallIcon = util.SanitizeUTF8(m.SmallIcon)
+	m.Color = util.SanitizeUTF8(m.Color)
 	m.ContentType = util.SanitizeUTF8(m.ContentType)
 	for i, tag := range m.Tags {
 		m.Tags[i] = util.SanitizeUTF8(tag)
@@ -106,7 +110,7 @@ func (m *Message) ForJSON() *Message {
 // can grow rather than trying to match the exact wire size.
 func (m *Message) Size() int {
 	size := len(m.ID) + len(m.SequenceID) + len(m.Event) + len(m.Topic) + len(m.Title) +
-		len(m.Message) + len(m.Click) + len(m.Icon) + len(m.ContentType) + len(m.Encoding) + len(m.PollID)
+		len(m.Message) + len(m.Click) + len(m.Icon) + len(m.SmallIcon) + len(m.Color) + len(m.ContentType) + len(m.Encoding) + len(m.PollID)
 	for _, tag := range m.Tags {
 		size += len(tag)
 	}

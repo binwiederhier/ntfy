@@ -383,6 +383,27 @@ func BenchmarkAllow_Parallel(b *testing.B) {
 	})
 }
 
+func TestService_TouchAndSeen(t *testing.T) {
+	s, clock := newTestServiceWithClock(t)
+	require.True(t, s.Seen("k").IsZero())
+	s.Touch("k")
+	require.Equal(t, clock.now(), s.Seen("k"))
+	clock.advance(10 * time.Minute)
+	s.Touch("k")
+	s.Prune(5 * time.Minute)
+	require.Equal(t, 1, s.Size()) // Touched, so not idle
+	require.Equal(t, clock.now(), s.Seen("k"))
+	clock.advance(10 * time.Minute)
+	s.Prune(5 * time.Minute)
+	require.True(t, s.Seen("k").IsZero())
+}
+
+func TestService_FirebaseKind(t *testing.T) {
+	kind, ok := ParseKind("firebase")
+	require.True(t, ok)
+	require.Equal(t, KindFirebase, kind)
+}
+
 func TestService_ResetUsage_KeepsBuckets(t *testing.T) {
 	// The daily reset starts the counts over, but the buckets keep their tokens: an email bucket
 	// emptied right before the reset is not refilled by it (it used to be)

@@ -2274,6 +2274,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * A user without a tier shares its rate limits with anonymous requests from the same IP, and a login from that IP could switch off the auth failure and account action limits for a concurrent request ([#2119](https://github.com/binwiederhier/ntfy/pull/2119))
 * A tier with a daily email limit of zero sends no emails, a tier edited in place no longer loses pending user stats, and a clock that goes back no longer takes tokens away
+* Every request gets its own visitor instead of sharing one per IP, so a login or logout from the same IP can no longer change the user under a concurrent request, which could panic the account handlers or treat an anonymous request as the logged-in user ([#1051](https://github.com/binwiederhier/ntfy/issues/1051), [#2118](https://github.com/binwiederhier/ntfy/pull/2118))
 
 **Security:**
 

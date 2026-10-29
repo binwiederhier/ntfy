@@ -2269,11 +2269,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Security:**
 
 * Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied; thanks to [Efe Çam](https://github.com/the-arma-of-owl) for reporting)
-* Concurrent requests from one IP could all get past the auth failure limit and the signup limit before any of them was charged; attempts are now charged up front, and a successful login or a signup that fails gets its token back
 
 **Features:**
 
-* Rate limits are tracked per visitor key (`ip:<prefix>` or `user:<id>`) in one sharded limit service instead of in each in-memory visitor. A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the next request and keeps what was already spent instead of handing out full buckets; the daily email limit shown on the account page is a hard cap; and an attachment upload rejected at the size limit is no longer charged for the read that went over it ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
+* Rate limits are tracked per visitor key (`ip:<prefix>` or `user:<id>`) in one sharded limit service instead of in each in-memory visitor. A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the next request and keeps what was already spent instead of handing out full buckets; the daily email limit shown on the account page is a hard cap; and a failed attachment upload hands its bandwidth back ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
 
 **Bug fixes + maintenance:**
 

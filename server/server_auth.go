@@ -37,17 +37,17 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*http.Request, *visitor, er
 	} else if !supportedAuthHeader(header) {
 		return r, vip, nil
 	}
-	// If we're trying to auth, take a token from the rate limiter first
-	if !vip.AuthAttempt() {
+	// If we're trying to auth, check the rate limiter first
+	if !vip.AuthAllowed() {
 		return r, vip, errHTTPTooManyRequestsLimitAuthFailure // Always return visitor, even when error occurs!
 	}
 	u, err := s.authenticate(r, header)
 	if err != nil {
+		vip.AuthFailed()
 		logr(r).Err(err).Debug("Authentication failed")
 		return r, vip, errHTTPUnauthorized // Always return visitor, even when error occurs!
 	}
 	// Authentication with user was successful
-	vip.AuthSucceeded()
 	return r, s.visitor(ip, u), nil
 }
 

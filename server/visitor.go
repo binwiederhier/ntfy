@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/netip"
+	"sync/atomic"
 	"time"
 
 	"heckel.io/ntfy/v2/limit"
@@ -40,10 +41,11 @@ const (
 // key, so two visitors with the same key share one set of buckets and counts.
 type visitor struct {
 	env    *visitorEnv
-	key    string      // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
-	ip     netip.Addr  // Visitor IP address
-	user   *user.User  // Only set if authenticated user, otherwise nil
-	limits *vis.Limits // Resolved from the config or the user's tier
+	key    string       // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
+	ip     netip.Addr   // Visitor IP address
+	user   *user.User   // Only set if authenticated user, otherwise nil
+	limits *vis.Limits  // Resolved from the config or the user's tier
+	seen   atomic.Int64 // Unix nanos of the last keepalive: the liveness of a subscriber kept as a topic's rate visitor (see Stale)
 }
 
 // visitorEnv is what every visitor of a server shares; it is built once, so building a visitor per
@@ -102,6 +104,7 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 		limits: limits,
 	}
 	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is; its daily counts are the limiter's (read from the usage table as needed), so nothing is seeded
+	v.seen.Store(time.Now().UnixNano())
 	return v
 }
 
@@ -110,7 +113,7 @@ func (v *visitor) Context() log.Context {
 	fields := log.Context{
 		"visitor_id":                 v.key,
 		"visitor_ip":                 v.ip.String(),
-		"visitor_seen":               util.FormatTime(v.env.limiter.Seen(v.key)),
+		"visitor_seen":               util.FormatTime(time.Unix(0, v.seen.Load())),
 		"visitor_messages":           info.Stats.Messages,
 		"visitor_messages_limit":     info.Limits.MessageLimit,
 		"visitor_messages_remaining": info.Stats.MessagesRemaining,
@@ -250,33 +253,26 @@ func (v *visitor) TopicCreationAllowed() bool {
 	return v.env.limiter.Allow(v.key, v.topicCreationRule(), 1).OK
 }
 
-// AuthAttempt takes a token for an auth attempt, if one is free. Taking it before the credentials
-// are checked keeps concurrent attempts from all getting through; AuthSucceeded gives it back.
-func (v *visitor) AuthAttempt() bool {
-	if v.env.config.VisitorAuthFailureLimitBurst <= 0 {
-		return false // No attempts at all; the limit service reads a zero burst as "no bucket"
-	}
-	return v.env.limiter.Allow(v.key, v.authRule(), 1).OK
+// AuthAllowed returns true if an auth request can be attempted (a token is available)
+func (v *visitor) AuthAllowed() bool {
+	return v.env.limiter.Tokens(v.key, v.authRule()) >= 1
 }
 
-// AuthSucceeded gives back the token taken by AuthAttempt: only failed attempts are charged
-func (v *visitor) AuthSucceeded() {
-	v.env.limiter.Refund(v.key, limit.KindAuth, 1)
+// AuthFailed records an auth failure
+func (v *visitor) AuthFailed() {
+	v.env.limiter.Allow(v.key, v.authRule(), 1)
 }
 
-// AccountActionAttempt takes a token for a rate-limited account action (signup or password-reset
-// request), if one is free. It is taken up front, so concurrent actions cannot all get through.
-func (v *visitor) AccountActionAttempt() bool {
-	if v.env.config.VisitorAccountCreationLimitBurst <= 0 {
-		return false // No actions at all; the limit service reads a zero burst as "no bucket"
-	}
-	return v.env.limiter.Allow(v.key, v.accountRule(), 1).OK
+// AccountActionAllowed returns true if a rate-limited account action (signup or password-reset
+// request) is currently allowed for this visitor
+func (v *visitor) AccountActionAllowed() bool {
+	return v.env.limiter.Tokens(v.key, v.accountRule()) >= 1
 }
 
-// AccountActionFailed gives back the token taken by AccountActionAttempt, for an action that did
-// not happen (e.g. a signup for a taken username)
-func (v *visitor) AccountActionFailed() {
-	v.env.limiter.Refund(v.key, limit.KindAccount, 1)
+// AccountActionPerformed decreases the account limiter. This is to be called after a rate-limited
+// account action (signup or password-reset request).
+func (v *visitor) AccountActionPerformed() {
+	v.env.limiter.Allow(v.key, v.accountRule(), 1)
 }
 
 func (v *visitor) BandwidthAllowed(bytes int64) bool {
@@ -291,8 +287,10 @@ func (v *visitor) RemoveSubscription() {
 	v.env.subscriptions.Release(v.key)
 }
 
-// Keepalive marks the visitor's key as seen, so the limiter keeps it while its subscriber is connected
+// Keepalive marks the visitor and its key as seen. The subscribe handlers call it on the visitor a
+// topic keeps as its rate visitor; nothing else does, so Stale is the subscriber's liveness.
 func (v *visitor) Keepalive() {
+	v.seen.Store(time.Now().UnixNano())
 	v.env.limiter.Touch(v.key)
 }
 
@@ -303,6 +301,13 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 		return util.NewFixedLimiter(0) // A bandwidth limit of zero admits nothing, as BandwidthAllowed
 	}
 	return v.env.limiter.Limiter(v.key, v.bandwidthRule())
+}
+
+// Stale is true when the visitor has not been kept alive for visitorExpungeAfter. It reads the
+// visitor's own keepalive, not the limiter key's last use: publishers charging a topic's rate
+// visitor must not keep a vanished subscriber's limits on the topic.
+func (v *visitor) Stale() bool {
+	return time.Since(time.Unix(0, v.seen.Load())) > visitorExpungeAfter
 }
 
 func (v *visitor) Stats() *user.Stats {
@@ -399,7 +404,7 @@ func (v *visitor) bandwidthRule() limit.Rule {
 		Burst: v.limits.AttachmentBandwidthLimit,
 	}
 	if rule.Burst > 0 {
-		rule.Refill = max(oneDay/time.Duration(rule.Burst), time.Nanosecond) // Above ~86T a byte would refill in 0 ns, i.e. never
+		rule.Refill = oneDay / time.Duration(rule.Burst)
 	}
 	return rule
 }

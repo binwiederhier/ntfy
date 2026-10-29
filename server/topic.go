@@ -2,7 +2,6 @@ package server
 
 import (
 	"math/rand"
-	"net/netip"
 	"sync"
 	"time"
 
@@ -28,21 +27,12 @@ const (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID             string
-	subscribers    map[int]*topicSubscriber
-	rateSubscriber *rateSubscriber // Who publishes are billed to (UnifiedPush), nil if nobody
-	lastAccess     time.Time
-	delivered      map[string]time.Time // When recent messages went out to the subscribers, by message ID
-	mu             sync.RWMutex
-}
-
-// rateSubscriber is the subscriber that publishes to a topic are billed to. The topic keeps its
-// IP and user rather than a visitor, so every publish is checked against the user's current tier.
-type rateSubscriber struct {
-	id   string // Who subscribed (see rateSubscriberID); unlike user, it does not change on keepalives
-	ip   netip.Addr
-	user *user.User // May be nil; re-read on the subscriber's keepalives, so a tier change applies
-	seen time.Time  // Last subscribe or keepalive: the subscriber's liveness
+	ID          string
+	subscribers map[int]*topicSubscriber
+	rateVisitor *visitor
+	lastAccess  time.Time
+	delivered   map[string]time.Time // When recent messages went out to the subscribers, by message ID
+	mu          sync.RWMutex
 }
 
 type topicSubscriber struct {
@@ -119,7 +109,7 @@ func (t *topic) ExpireDelivered() {
 func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateSubscriber != nil && !t.rateSubscriber.stale() {
+	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
 		return false
 	}
 	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpungeAfter
@@ -131,52 +121,20 @@ func (t *topic) LastAccess() time.Time {
 	return t.lastAccess
 }
 
-// SetRateSubscriber bills publishes to the topic to the visitor's key from now on
-func (t *topic) SetRateSubscriber(v *visitor) {
+func (t *topic) SetRateVisitor(v *visitor) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.rateSubscriber = &rateSubscriber{
-		id:   rateSubscriberID(v),
-		ip:   v.ip,
-		user: v.user,
-		seen: time.Now(),
-	}
+	t.rateVisitor = v
 	t.lastAccess = time.Now()
 }
 
-// RateSubscriber returns the subscriber that publishes are billed to, if there is a live one
-func (t *topic) RateSubscriber() (rateSubscriber, bool) {
+func (t *topic) RateVisitor() *visitor {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateSubscriber != nil && t.rateSubscriber.stale() {
-		t.rateSubscriber = nil
+	if t.rateVisitor != nil && t.rateVisitor.Stale() {
+		t.rateVisitor = nil
 	}
-	if t.rateSubscriber == nil {
-		return rateSubscriber{}, false
-	}
-	return *t.rateSubscriber, true
-}
-
-// KeepaliveRateSubscriber keeps the visitor alive as the topic's rate subscriber, and returns true,
-// if publishes are still billed to the visitor
-func (t *topic) KeepaliveRateSubscriber(v *visitor) bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.rateSubscriber == nil || !t.rateSubscriber.is(v) {
-		return false
-	}
-	t.rateSubscriber.seen = time.Now()
-	return true
-}
-
-// SetRateSubscriberUser sets the user of the topic's rate subscriber as re-read for a keepalive (nil
-// if it is gone), if publishes are still billed to the visitor
-func (t *topic) SetRateSubscriberUser(v *visitor, u *user.User) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.rateSubscriber != nil && t.rateSubscriber.is(v) {
-		t.rateSubscriber.user = u
-	}
+	return t.rateVisitor
 }
 
 // Unsubscribe removes the subscription from the list of subscribers
@@ -353,11 +311,9 @@ func (t *topic) Context() log.Context {
 		"topic_subscribers": len(t.subscribers),
 		"topic_last_access": util.FormatTime(t.lastAccess),
 	}
-	if t.rateSubscriber != nil {
-		fields["topic_rate_visitor_ip"] = t.rateSubscriber.ip.String()
-		fields["topic_rate_visitor_seen"] = util.FormatTime(t.rateSubscriber.seen)
-		if t.rateSubscriber.user != nil {
-			fields["topic_rate_visitor_user_id"] = t.rateSubscriber.user.ID
+	if t.rateVisitor != nil {
+		for k, v := range t.rateVisitor.Context() {
+			fields["topic_rate_"+k] = v
 		}
 	}
 	return fields
@@ -376,22 +332,4 @@ func (t *topic) subscribersCopy() map[int]*topicSubscriber {
 		}
 	}
 	return subscribers
-}
-
-// is returns true if the visitor is this subscriber: the same user, or the same IP if anonymous
-func (s *rateSubscriber) is(v *visitor) bool {
-	return s.id == rateSubscriberID(v)
-}
-
-// rateSubscriberID identifies a subscriber by its user, or by its IP if it is anonymous
-func rateSubscriberID(v *visitor) string {
-	if v.user != nil {
-		return "user:" + v.user.ID
-	}
-	return "ip:" + v.ip.String()
-}
-
-// stale is true when the subscriber has not been seen for visitorExpungeAfter
-func (s *rateSubscriber) stale() bool {
-	return time.Since(s.seen) > visitorExpungeAfter
 }

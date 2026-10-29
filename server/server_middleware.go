@@ -35,8 +35,8 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 			return err
 		}
 		vrate := v
-		if rs, ok := t.RateSubscriber(); ok {
-			vrate = s.visitor(rs.ip, rs.user)
+		if rateVisitor := t.RateVisitor(); rateVisitor != nil {
+			vrate = rateVisitor
 		}
 		r = withContext(r, map[contextKey]any{
 			contextRateVisitor: vrate,

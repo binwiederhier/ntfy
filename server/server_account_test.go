@@ -2,6 +2,12 @@ package server
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
+	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/user"
+	"heckel.io/ntfy/v2/util"
 	"io"
 	"net"
 	"net/http"
@@ -10,17 +16,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
-	dbtest "heckel.io/ntfy/v2/db/test"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/model"
-	"heckel.io/ntfy/v2/user"
-	"heckel.io/ntfy/v2/util"
 )
 
 func TestAccount_Signup_Success(t *testing.T) {
@@ -1115,42 +1112,4 @@ func TestAccount_PhoneNumberAdd_WrongCode(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, []string{"+12223334444"}, phoneNumbers)
 	})
-}
-
-func TestAccount_Signup_LimitHoldsForConcurrentSignups(t *testing.T) {
-	// Concurrent signups from one IP must not all get past the account limit before any of them is
-	// charged: no more accounts are created than the bucket holds
-	conf := newTestConfigWithAuthFile(t, "")
-	conf.EnableSignup = true
-	conf.VisitorAccountCreationLimitBurst = 2
-	s := newTestServer(t, conf)
-	var wg sync.WaitGroup
-	var created atomic.Int64
-	for i := 0; i < 20; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			rr := request(t, s, "POST", "/v1/account", fmt.Sprintf(`{"username":"user%d", "password":"mypass"}`, i), nil)
-			if rr.Code == 200 {
-				created.Add(1)
-			}
-		}()
-	}
-	wg.Wait()
-	require.Equal(t, int64(2), created.Load())
-}
-
-func TestAccount_Signup_FailedSignupIsFree(t *testing.T) {
-	// A signup that fails (the name is taken) does not use up the account limit
-	conf := newTestConfigWithAuthFile(t, "")
-	conf.EnableSignup = true
-	conf.VisitorAccountCreationLimitBurst = 1
-	s := newTestServer(t, conf)
-	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-	rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
-	require.Equal(t, 409, rr.Code)
-	rr = request(t, s, "POST", "/v1/account", `{"username":"ben", "password":"mypass"}`, nil)
-	require.Equal(t, 200, rr.Code)
-	rr = request(t, s, "POST", "/v1/account", `{"username":"emma", "password":"mypass"}`, nil)
-	require.Equal(t, 429, rr.Code)
 }

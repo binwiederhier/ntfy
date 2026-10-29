@@ -512,10 +512,11 @@ func TestVisitor_AuthLimiter_NotBypassedByConcurrentLogin(t *testing.T) {
 	// The user logs in between the guesser's lookup and each failed guess
 	for i := 0; i < 3; i++ {
 		s.visitor(ip, u)
-		require.True(t, vip.AuthAttempt()) // Fails, so the token stays taken
+		require.True(t, vip.AuthAllowed())
+		vip.AuthFailed()
 	}
 	s.visitor(ip, u)
-	require.False(t, vip.AuthAttempt())
+	require.False(t, vip.AuthAllowed())
 }
 
 func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
@@ -529,7 +530,14 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 	vip := s.visitor(ip, nil)
 
 	s.visitor(ip, u)
-	require.True(t, vip.AccountActionAttempt())
+	require.True(t, vip.AccountActionAllowed())
+}
+
+func TestVisitor_NewVisitorIsNotStale(t *testing.T) {
+	// A visitor is seen when it is built for a request, like it was when visitors were shared
+	s := newTestServer(t, newTestConfig(t, ""))
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.False(t, v.Stale())
 }
 
 func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
@@ -545,8 +553,7 @@ func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
 	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
-	_, ok := topics[0].RateSubscriber()
-	require.True(t, ok)
+	require.NotNil(t, topics[0].RateVisitor())
 }
 
 func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
@@ -559,9 +566,10 @@ func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-	require.True(t, v.AccountActionAttempt())
-	require.True(t, v.AuthAttempt()) // Fails, so the token stays taken
-	require.False(t, v.AuthAttempt())
+	require.True(t, v.AccountActionAllowed())
+	require.True(t, v.AuthAllowed())
+	v.AuthFailed()
+	require.False(t, v.AuthAllowed())
 }
 
 func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
@@ -849,7 +857,7 @@ func TestVisitor_ConcurrentSharedKey(t *testing.T) {
 				v.Context()
 				vip := s.visitor(ip, nil)
 				vip.RequestAllowed()
-				vip.AuthAttempt()
+				vip.AuthAllowed()
 				vip.Context()
 				vn := s.visitor(ip, noTier)
 				vn.MessageAllowed()
@@ -920,20 +928,8 @@ func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	require.Nil(t, err)
 	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
 	s.limiter.Prune(0) // The key is gone, the subscriber is not
-	_, ok := topics[0].RateSubscriber()
-	require.True(t, ok)
-	ageRateSubscriber(topics[0], 2*visitorExpungeAfter)            // The subscriber is gone
-	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK) // A publisher charges the key
-	_, ok = topics[0].RateSubscriber()
-	require.False(t, ok)
-}
-
-func TestVisitor_BandwidthRuleRefillsHugeLimits(t *testing.T) {
-	// A daily bandwidth limit of more bytes than a day has nanoseconds must still refill; the
-	// refill per byte rounds down to zero otherwise, and a bucket that never refills is a hard cap
-	c := newTestConfig(t, "")
-	c.VisitorAttachmentDailyBandwidthLimit = 100 * 1024 * 1024 * 1024 * 1024 // 100T
-	s := newTestServer(t, c)
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	require.Equal(t, time.Nanosecond, v.bandwidthRule().Refill)
+	require.NotNil(t, topics[0].RateVisitor())
+	v.seen.Store(time.Now().Add(-2 * visitorExpungeAfter).UnixNano()) // The subscriber is gone
+	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK)    // A publisher charges the key
+	require.Nil(t, topics[0].RateVisitor())
 }

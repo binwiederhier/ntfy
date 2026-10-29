@@ -399,7 +399,6 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits(t *testing.T) {
 		// per request from the visitor config the server built at startup
 		s.visitors.limitsConfig.RequestLimitBurst = 1000000
 		s.visitors.limitsConfig.RequestLimitReplenish = time.Nanosecond
-		s.config.VisitorAuthFailureLimitBurst = 1000 // Every login takes an auth token until it succeeds, and these all run at once
 
 		var wg sync.WaitGroup
 		for i := 0; i < 209; i++ {

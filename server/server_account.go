@@ -23,21 +23,16 @@ const (
 )
 
 func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	u, created := v.User(), false
+	u := v.User()
 	if !u.IsAdmin() { // u may be nil, but that's fine
 		if !s.config.EnableSignup {
 			return errHTTPBadRequestSignupNotEnabled
 		} else if u != nil {
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
-		if !v.AccountActionAttempt() {
+		if !v.AccountActionAllowed() {
 			return errHTTPTooManyRequestsLimitAccountActions
 		}
-		defer func() {
-			if !created {
-				v.AccountActionFailed() // Only signups that created an account are charged
-			}
-		}()
 	}
 	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit, false)
 	if err != nil {
@@ -56,7 +51,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 		}
 		return err
 	}
-	created = true
+	v.AccountActionPerformed()
 	// If an email was provided and email sending is configured, start verification (best-effort).
 	// The address becomes the primary email on verify (the new account has no primary yet); a
 	// failure to send must not fail signup, so we only log it.
@@ -842,9 +837,10 @@ func (s *Server) handleAccountPasswordResetRequest(w http.ResponseWriter, r *htt
 		return err
 	}
 	// Rate limit via the shared per-visitor account-creation bucket (no new limiter/config)
-	if !v.AccountActionAttempt() { // Consume a token on every request (including no-match), to throttle probing
+	if !v.AccountActionAllowed() {
 		return errHTTPTooManyRequestsLimitAccountActions
 	}
+	v.AccountActionPerformed() // Consume a token on every request (including no-match), to throttle probing
 	identifier := strings.TrimSpace(req.Identifier)
 	if identifier != "" && s.config.BaseURL != "" {
 		if userID, email, ok := s.resolveResetPasswordTarget(identifier); ok {

@@ -1045,7 +1045,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if _, ok := t.RateSubscriber(); unifiedpush && s.config.VisitorSubscriberRateLimiting && !ok {
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
@@ -1694,7 +1694,6 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	if err := s.sendOldMessages(w, topics, since, scheduled, v, sub); err != nil {
 		return err
 	}
-	var refreshing atomic.Bool // A re-read of the user is in flight (see keepaliveSubscriber)
 	for {
 		select {
 		case <-ctx.Done():
@@ -1708,7 +1707,10 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			} else {
 				ev.Trace("Sending keepalive message to %d topics", len(topics))
 			}
-			s.keepaliveSubscriber(v, topics, &refreshing)
+			v.Keepalive()
+			for _, t := range topics {
+				t.Keepalive()
+			}
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
@@ -1779,7 +1781,6 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 	})
 	g.Go(func() error {
-		var refreshing atomic.Bool // A re-read of the user is in flight (see keepaliveSubscriber)
 		ping := func() error {
 			wlock.Lock()
 			defer wlock.Unlock()
@@ -1798,7 +1799,10 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				conn.Close()
 				return &websocket.CloseError{Code: websocket.CloseNormalClosure, Text: "subscription was canceled"}
 			case <-time.After(s.config.KeepaliveInterval):
-				s.keepaliveSubscriber(v, topics, &refreshing)
+				v.Keepalive()
+				for _, t := range topics {
+					t.Keepalive()
+				}
 				if err := ping(); err != nil {
 					return err
 				}
@@ -1928,44 +1932,13 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	return s.setRateVisitors(r, v, writableRateTopics)
 }
 
-// keepaliveSubscriber marks a subscriber's topics as in use, and keeps it alive as the rate subscriber
-// of those it is that for. For a user, it also re-reads the user so that a tier change applies to the
-// publishes; that runs in the background (at most one at a time, see refreshing), so a slow database
-// cannot hold up the keepalive or the end of the stream.
-func (s *Server) keepaliveSubscriber(v *visitor, topics []*topic, refreshing *atomic.Bool) {
-	v.Keepalive()
-	rateTopics := make([]*topic, 0)
-	for _, t := range topics {
-		t.Keepalive()
-		if t.KeepaliveRateSubscriber(v) {
-			rateTopics = append(rateTopics, t)
-		}
-	}
-	if len(rateTopics) == 0 || v.user == nil || s.userManager == nil || !refreshing.CompareAndSwap(false, true) {
-		return
-	}
-	go func() {
-		defer refreshing.Store(false)
-		u, err := s.userManager.UserByID(v.user.ID)
-		if errors.Is(err, user.ErrUserNotFound) {
-			u = nil // Deleted: publishes are billed to the IP from now on
-		} else if err != nil {
-			log.Tag(tagSubscribe).Err(err).Warn("Cannot re-read rate subscriber %s, keeping its tier", v.user.ID)
-			return
-		}
-		for _, t := range rateTopics {
-			t.SetRateSubscriberUser(v, u)
-		}
-	}()
-}
-
 func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateSubscriber(v)
+		t.SetRateVisitor(v)
 	}
 	return nil
 }

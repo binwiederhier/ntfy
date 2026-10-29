@@ -395,9 +395,10 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 		require.Equal(t, 429, rr.Code)
 
 		// Now let's test the message limiter by faking a ridiculously generous request limit; the
-		// tier's request burst never goes below the configured one, and visitors are built per request
-		s.config.VisitorRequestLimitBurst = 1000000
-		s.config.VisitorRequestLimitReplenish = time.Nanosecond
+		// tier's request burst never goes below the configured one, and tier limits are resolved
+		// per request from the visitor config the server built at startup
+		s.visitorEnv.limitsConfig.RequestLimitBurst = 1000000
+		s.visitorEnv.limitsConfig.RequestLimitReplenish = time.Nanosecond
 
 		var wg sync.WaitGroup
 		for i := 0; i < 209; i++ {

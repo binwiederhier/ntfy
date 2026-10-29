@@ -28,16 +28,23 @@ const (
 // same IP cannot see each other's user (#1051). The counting happens in the limit service, keyed by
 // key, so two visitors with the same key share one set of buckets and counts.
 type visitor struct {
+	*visitorEnv
+	key    string      // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
+	ip     netip.Addr  // Visitor IP address
+	user   *user.User  // Only set if authenticated user, otherwise nil
+	limits *vis.Limits // Resolved from the config or the user's tier
+}
+
+// visitorEnv is what every visitor of a server shares; it is built once, so building a visitor per
+// request costs little
+type visitorEnv struct {
 	config        *Config
 	limitsConfig  *vis.Config    // The parts of config that keying and limit resolution need (see visitorConfigFrom)
+	ipLimits      *vis.Limits    // The config-based limits of visitors without a tier; never modified
 	limiter       *limit.Service // Decides on and counts usage, keyed by key
 	subscriptions *subscriptionGauge
 	messageCache  *message.Cache
 	userManager   *user.Manager // May be nil
-	key           string        // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
-	ip            netip.Addr    // Visitor IP address
-	user          *user.User    // Only set if authenticated user, otherwise nil
-	limits        *vis.Limits   // Resolved from the config or the user's tier
 }
 
 // subscriptionGauge counts the open subscriptions per visitor key on this node. It is never shared
@@ -65,23 +72,32 @@ type visitorStats struct {
 	AttachmentTotalSizeRemaining int64
 }
 
-func newVisitor(conf *Config, limiter *limit.Service, subscriptions *subscriptionGauge, messageCache *message.Cache, userManager *user.Manager, ip netip.Addr, u *user.User) *visitor {
+func newVisitorEnv(conf *Config, limiter *limit.Service, messageCache *message.Cache, userManager *user.Manager) *visitorEnv {
 	limitsConfig := visitorConfigFrom(conf)
-	var tier *user.Tier
-	if u != nil {
-		tier = u.Tier // May be nil, which resolves the config-based limits
-	}
-	v := &visitor{
+	return &visitorEnv{
 		config:        conf,
 		limitsConfig:  limitsConfig,
+		ipLimits:      vis.LimitsFor(limitsConfig, nil),
 		limiter:       limiter,
-		subscriptions: subscriptions,
+		subscriptions: newSubscriptionGauge(),
 		messageCache:  messageCache,
 		userManager:   userManager, // May be nil
-		key:           vis.Key(ip, u, limitsConfig),
-		ip:            ip,
-		user:          u,
-		limits:        vis.LimitsFor(limitsConfig, tier),
+	}
+}
+
+func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
+	limits := env.ipLimits
+	var tier *user.Tier
+	if u != nil && u.Tier != nil {
+		tier = u.Tier
+		limits = vis.LimitsFor(env.limitsConfig, tier) // Resolved per request: the tier's fields may change at any time
+	}
+	v := &visitor{
+		visitorEnv: env,
+		key:        vis.Key(ip, u, env.limitsConfig),
+		ip:         ip,
+		user:       u,
+		limits:     limits,
 	}
 	if tier != nil {
 		// Carry the persisted stats into the key's daily counts, if the key is new to the limiter
@@ -89,9 +105,9 @@ func newVisitor(conf *Config, limiter *limit.Service, subscriptions *subscriptio
 		usage.Set(limit.KindMessages, u.Stats.Messages)
 		usage.Set(limit.KindEmails, u.Stats.Emails)
 		usage.Set(limit.KindCalls, u.Stats.Calls)
-		limiter.Seed(v.key, usage)
+		env.limiter.Seed(v.key, usage)
 	}
-	limiter.Touch(v.key) // The key is seen now, as the visitor's request is (after Seed, which only fills unknown keys)
+	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is (after Seed, which only fills unknown keys)
 	return v
 }
 

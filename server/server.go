@@ -64,9 +64,9 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	limiter           *limit.Service     // Decides on and counts the visitors' usage, keyed by visitor key
-	subscriptions     *subscriptionGauge // Open subscriptions per visitor key on this node
-	ban               *ban.Service       // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
+	visitorEnv        *visitorEnv    // Shared by all visitors, which are built per request
+	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
@@ -301,7 +301,6 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		subscriptions:   newSubscriptionGauge(),
 		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime}),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
@@ -349,6 +348,7 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
+	s.visitorEnv = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
@@ -2171,7 +2171,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.limiter, s.subscriptions, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
+	v := newVisitor(s.visitorEnv, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -2353,7 +2353,7 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 // visitor returns the visitor for this request. It is built per request, so concurrent requests from
 // the same IP (which share a limiter key) cannot see each other's user (#1051).
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
-	return newVisitor(s.config, s.limiter, s.subscriptions, s.messageCache, s.userManager, ip, user)
+	return newVisitor(s.visitorEnv, ip, user)
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {

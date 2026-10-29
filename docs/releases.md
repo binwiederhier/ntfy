@@ -2272,13 +2272,13 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Rate limits are tracked per visitor key (`ip:<prefix>` or `user:<id>`) in one sharded limit service instead of in each in-memory visitor. A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the next request and keeps what was already spent instead of handing out full buckets; the daily email limit shown on the account page is a hard cap; and a failed attachment upload hands its bandwidth back ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
+* Rate limits are tracked per visitor key (`ip:<prefix>` or `user:<id>`) in one shared limit service. A change from one tier to another (or a tier edited in place) applies on the user's next request and keeps what was already spent, and a tier's daily email limit is a hard cap ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
 
 **Bug fixes + maintenance:**
 
-* A user without a tier shares its rate limits with anonymous requests from the same IP, and a login from that IP could switch off the auth failure and account action limits for a concurrent request ([#2119](https://github.com/binwiederhier/ntfy/pull/2119))
-* A tier with a daily email limit of zero sends no emails, a tier edited in place no longer loses pending user stats, and a clock that goes back no longer takes tokens away
-* Every request gets its own visitor instead of sharing one per IP, so a login or logout from the same IP can no longer change the user under a concurrent request, which could panic the account handlers or treat an anonymous request as the logged-in user ([#1051](https://github.com/binwiederhier/ntfy/issues/1051), [#2118](https://github.com/binwiederhier/ntfy/pull/2118))
+* A login could switch off the auth failure and account limits for a concurrent request from the same IP ([#2119](https://github.com/binwiederhier/ntfy/pull/2119))
+* A tier with a daily email limit of zero sends no emails, a tier edited in place no longer loses pending user stats, an attachment upload rejected at the size limit is no longer charged for the read that went over it, and a clock that goes back no longer takes tokens away
+* Every request gets its own visitor, so a login or logout from the same IP can no longer change the user under a concurrent request, which could panic the account handlers or treat an anonymous request as the logged-in user ([#1051](https://github.com/binwiederhier/ntfy/issues/1051), [#2118](https://github.com/binwiederhier/ntfy/pull/2118))
 * Accept terabyte units (e.g. `1T`) in size settings such as attachment and tier limits, matching how sizes are displayed ([#2078](https://github.com/binwiederhier/ntfy/pull/2078), thanks to [@cangen185-sudo](https://github.com/cangen185-sudo) for the contribution)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)

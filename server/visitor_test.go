@@ -229,3 +229,39 @@ func TestVisitor_ZeroLimitsAdmitNothing(t *testing.T) {
 		require.False(t, v.BandwidthLimiter().AllowN(1))
 	})
 }
+
+func TestVisitor_AuthLimiter_NotBypassedByConcurrentLogin(t *testing.T) {
+	// A user without a tier shares the IP-keyed visitor with anonymous requests from the same IP.
+	// Their login must not switch off the auth failure limiter for a concurrent guesser (#1051).
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorAuthFailureLimitBurst = 3
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+	vip := s.visitor(ip, nil) // The guesser's anonymous visitor (see maybeAuthenticate)
+
+	// The user logs in between the guesser's lookup and each failed guess
+	for i := 0; i < 3; i++ {
+		s.visitor(ip, u)
+		require.True(t, vip.AuthAllowed())
+		vip.AuthFailed()
+	}
+	s.visitor(ip, u)
+	require.False(t, vip.AuthAllowed())
+}
+
+func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
+	// The other direction: a concurrent login on the same IP must not deny an anonymous signup
+	c := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+	vip := s.visitor(ip, nil)
+
+	s.visitor(ip, u)
+	require.True(t, vip.AccountActionAllowed())
+}

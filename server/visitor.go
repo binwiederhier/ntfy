@@ -470,21 +470,11 @@ func (v *visitor) infoLight() *visitorInfo {
 			Messages:          stats.Messages,
 			MessagesRemaining: zeroIfNegative(limits.MessageLimit - stats.Messages),
 			Emails:            stats.Emails,
-			EmailsRemaining:   v.emailsRemaining(stats.Emails),
+			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - stats.Emails),
 			Calls:             stats.Calls,
 			CallsRemaining:    zeroIfNegative(limits.CallLimit - stats.Calls),
 		},
 	}
-}
-
-// emailsRemaining returns what the visitor can send now: the day's remaining emails, but no
-// more than the email bucket holds (it may be empty while the day has room, e.g. after the reset)
-func (v *visitor) emailsRemaining(emails int64) int64 {
-	remaining := zeroIfNegative(v.limits.EmailLimit - emails)
-	if rule := v.emailRule(); rule.Burst > 0 {
-		remaining = min(remaining, v.env.limiter.Tokens(v.key, rule))
-	}
-	return remaining
 }
 
 func zeroIfNegative(value int64) int64 {

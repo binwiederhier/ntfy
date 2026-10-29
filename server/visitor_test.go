@@ -124,9 +124,9 @@ func TestVisitor_TierChangeKeepsBuckets(t *testing.T) {
 	})
 }
 
-func TestVisitor_AccountEmailsRemainingFollowsBucket(t *testing.T) {
-	// The account page shows what the user can send now: no more than the email bucket holds,
-	// even when the daily limit has room left (e.g. right after the daily reset)
+func TestVisitor_AccountEmailsRemainingCountsTheDay(t *testing.T) {
+	// The account shows the day's remaining emails, like it does for messages. The email bucket
+	// may still refuse a send while the day has room left.
 	c := newTestConfig(t, "")
 	c.VisitorEmailLimitBurst = 2
 	c.VisitorEmailLimitReplenish = time.Hour // Daily limit 24
@@ -143,7 +143,7 @@ func TestVisitor_AccountEmailsRemainingFollowsBucket(t *testing.T) {
 	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
 	require.Nil(t, err)
 	require.Equal(t, int64(2), account.Stats.Emails)
-	require.Equal(t, int64(0), account.Stats.EmailsRemaining)
+	require.Equal(t, int64(22), account.Stats.EmailsRemaining)
 	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
 		"Email": "test@email.com",
 	})
@@ -458,7 +458,7 @@ func TestVisitor_DailyResetKeepsEmailBucket(t *testing.T) {
 	require.Equal(t, int64(0), account.Stats.Messages)
 	require.Equal(t, int64(2), account.Stats.MessagesRemaining)
 	require.Equal(t, int64(0), account.Stats.Emails)
-	require.Equal(t, int64(0), account.Stats.EmailsRemaining)
+	require.Equal(t, int64(24), account.Stats.EmailsRemaining)
 	response = request(t, s, "PUT", "/mytopic", "test", nil)
 	require.Equal(t, 200, response.Code)
 	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{

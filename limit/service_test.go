@@ -297,6 +297,83 @@ func TestService_Prune(t *testing.T) {
 	require.False(t, s.Allow("fresh", rule, 1).OK) // Kept
 }
 
+func TestService_Prune_SettledKeyIsForgottenEarly(t *testing.T) {
+	// A key whose buckets are full again and whose counts are zero looks exactly like a new one,
+	// so it is forgotten long before the idle time, once it has been unused for a short while
+	s, clock := newTestServiceWithClock(t)
+	fast := Rule{
+		Kind:   KindRequests,
+		Burst:  2,
+		Refill: time.Second,
+	}
+	slow := Rule{
+		Kind:   KindRequests,
+		Burst:  2,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("fast", fast, 2).OK)
+	require.True(t, s.Allow("slow", slow, 2).OK)
+	clock.advance(30 * time.Second)
+	require.Equal(t, 0, s.Prune(oneDay))
+	require.Equal(t, 2, s.Size()) // "fast" is full again, but was used too recently
+	clock.advance(time.Minute)
+	require.Equal(t, 1, s.Prune(oneDay))
+	require.Equal(t, 1, s.Size())
+	require.False(t, s.Allow("slow", slow, 1).OK) // Not full yet, so it is kept
+}
+
+func TestService_Prune_KeyWithDailyCountIsKept(t *testing.T) {
+	// Daily counts live only here, so a key that used some today is kept until the daily reset
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 10,
+	}
+	require.True(t, s.Allow("k", rule, 1).OK)
+	clock.advance(2 * time.Minute)
+	require.Equal(t, 0, s.Prune(oneDay))
+	require.Equal(t, int64(1), s.Usage("k").Count(KindMessages))
+	s.ResetUsage()
+	require.Equal(t, 1, s.Prune(oneDay))
+	require.Equal(t, 0, s.Size())
+}
+
+func TestService_Prune_BucketWithoutRefillWaitsForIdle(t *testing.T) {
+	// A bucket that never refills is never full again; only the idle time forgets it
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:  KindRequests,
+		Burst: 2,
+	}
+	require.True(t, s.Allow("k", rule, 1).OK)
+	clock.advance(2 * time.Minute)
+	require.Equal(t, 0, s.Prune(time.Hour))
+	clock.advance(2 * time.Hour)
+	require.Equal(t, 1, s.Prune(time.Hour))
+}
+
+func TestService_Prune_SlowerRuleDelaysSettling(t *testing.T) {
+	// The time a key is full again follows the rule it was last read with: a tier change to a
+	// slower refill must not let an emptied bucket be forgotten (and handed back full) early
+	s, clock := newTestServiceWithClock(t)
+	fast := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Second,
+	}
+	slow := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("k", fast, 10).OK)
+	clock.advance(time.Second)
+	require.Equal(t, int64(0), s.Tokens("k", slow)) // Read with the slow rule: full again in about 10 hours
+	clock.advance(2 * time.Minute)
+	require.Equal(t, 0, s.Prune(oneDay))
+	require.Equal(t, 1, s.Size())
+}
+
 func TestService_Allow_Concurrent(t *testing.T) {
 	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
 	rule := Rule{

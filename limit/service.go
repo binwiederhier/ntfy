@@ -17,6 +17,10 @@ import (
 
 const (
 	shardCount = 64 // Keys are spread over this many independently locked maps
+
+	// settledIdle is how long a settled key (see Prune) must go unused before it is forgotten, so
+	// a key in steady use is not dropped and recreated over and over
+	settledIdle = time.Minute
 )
 
 // Service keeps the per-key state and decides on usage. See the package comment.
@@ -37,6 +41,8 @@ type entry struct {
 	buckets [numKinds]bucket
 	counts  [numKinds]int64 // Units used today, per kind
 	seen    int64           // Unix nanoseconds of the last use, for pruning
+	full    int64           // Unix nanoseconds from which every bucket is full again, for pruning
+	capped  uint32          // Kinds (bits) used under a daily cap or seeded, whose counts forgetting would lose
 }
 
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
@@ -88,6 +94,10 @@ func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 	}
 	if rule.Burst > 0 {
 		b.tokens -= float64(n)
+		e.noteFull(b, &rule)
+	}
+	if rule.Daily > 0 {
+		e.capped |= 1 << rule.Kind
 	}
 	e.counts[rule.Kind] += n
 	return Decision{OK: true}
@@ -109,6 +119,7 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 	}
 	b := &e.buckets[rule.Kind]
 	b.refill(now, &rule)
+	e.noteFull(b, &rule) // The rule may refill slower than the one the bucket was charged with
 	return int64(math.Max(0, math.Floor(b.tokens)))
 }
 
@@ -153,6 +164,11 @@ func (s *Service) Seed(key string, usage Usage) {
 	}
 	e := sh.entryNoLock(key, now)
 	e.counts = usage.counts
+	for kind, count := range usage.counts {
+		if count > 0 {
+			e.capped |= 1 << kind
+		}
+	}
 }
 
 // ResetUsage zeroes the daily counts of every key (the daily reset)
@@ -166,15 +182,19 @@ func (s *Service) ResetUsage() {
 	}
 }
 
-// Prune forgets keys that have not been used for longer than idle, and returns how many. A key
-// that comes back starts with full buckets and zero counts.
+// Prune forgets keys that have not been used for longer than idle, and settled keys that have
+// not been used for settledIdle, and returns how many. A key that comes back starts with full
+// buckets and zero counts, so forgetting a settled key (every bucket full again, no counts today)
+// changes nothing; idle is only the backstop for keys that never settle (e.g. no refill).
 func (s *Service) Prune(idle time.Duration) int {
-	cutoff := s.now().Add(-idle).UnixNano()
+	now := s.now().UnixNano()
+	cutoff := now - int64(idle)
+	settledCutoff := now - int64(settledIdle)
 	pruned := 0
 	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
-			if e.seen < cutoff {
+			if e.seen < cutoff || (e.seen < settledCutoff && e.settled(now)) {
 				delete(sh.entries, key)
 				pruned++
 			}
@@ -247,6 +267,37 @@ func (sh *shard) entryNoLock(key string, now time.Time) *entry {
 		sh.entries[key] = e
 	}
 	return e
+}
+
+// noteFull moves the time from which every bucket is full again to when this bucket is full,
+// if that is later. It only ever moves forward, so it may be late but is never early. The
+// bucket must have been refilled with the rule.
+func (e *entry) noteFull(b *bucket, rule *Rule) {
+	missing := float64(b.burst) - b.tokens
+	if missing <= 0 {
+		return
+	}
+	full := int64(math.MaxInt64) // A bucket without refill is never full again
+	if rule.Refill > 0 {
+		full = b.last + int64(math.Ceil(missing*float64(rule.Refill)))
+	}
+	if full > e.full {
+		e.full = full
+	}
+}
+
+// settled returns true if forgetting the entry changes nothing: every bucket is full again, and
+// no kind under a daily cap has counts today. Counts of uncapped kinds are only a tally.
+func (e *entry) settled(now int64) bool {
+	if now < e.full {
+		return false
+	}
+	for kind, count := range e.counts {
+		if count > 0 && e.capped&(1<<kind) != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // refill adds the tokens earned since the last refill, capped at the rule's burst, and remembers

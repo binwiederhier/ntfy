@@ -17,10 +17,9 @@ const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
-	// forgotten (see Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber
-	// is gone. This number has to be very high to prevent e-mail abuse, but it doesn't really affect
-	// the other limits anyway, since they are replenished faster (typically).
+	// visitorExpungeAfter is how long a topic keeps a rate visitor whose subscriber is gone, and the
+	// backstop for limiter keys that never settle (see limit.Service.Prune): a settled key, whose
+	// buckets are full again and whose capped counts are zero, is forgotten after a minute unused.
 	visitorExpungeAfter = oneDay
 )
 

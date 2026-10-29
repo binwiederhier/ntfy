@@ -265,6 +265,21 @@ func TestVisitor_UserIsPerRequest(t *testing.T) {
 	require.True(t, anon.SubscriptionAllowed())
 }
 
+func TestVisitor_SubscriptionLimitSharedPerKey(t *testing.T) {
+	c := newTestConfig(t, "")
+	c.VisitorSubscriptionLimit = 2
+	s := newTestServer(t, c)
+	ip := netip.MustParseAddr("9.9.9.9")
+	v1 := s.visitor(ip, nil)
+	v2 := s.visitor(ip, nil) // A second request from the same IP shares the slots
+	require.True(t, v1.SubscriptionAllowed())
+	require.True(t, v2.SubscriptionAllowed())
+	require.False(t, v1.SubscriptionAllowed())
+	require.True(t, s.visitor(netip.MustParseAddr("1.2.3.4"), nil).SubscriptionAllowed())
+	v1.RemoveSubscription()
+	require.True(t, v2.SubscriptionAllowed())
+}
+
 func TestVisitor_FirebasePenaltyIsSharedPerKey(t *testing.T) {
 	s := newTestServer(t, newTestConfig(t, ""))
 	ip := netip.MustParseAddr("9.9.9.9")

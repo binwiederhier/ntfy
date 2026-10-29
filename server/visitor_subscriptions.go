@@ -37,14 +37,3 @@ func (g *subscriptionGauge) Release(key string) {
 		delete(g.counts, key)
 	}
 }
-
-// SubscriptionAllowed takes one of the visitor key's subscription slots on this node, if one is free.
-// Every successful call must be paired with RemoveSubscription.
-func (v *visitor) SubscriptionAllowed() bool {
-	return v.subscriptions.Acquire(v.key, int64(v.config.VisitorSubscriptionLimit))
-}
-
-// RemoveSubscription gives back a slot taken by SubscriptionAllowed
-func (v *visitor) RemoveSubscription() {
-	v.subscriptions.Release(v.key)
-}

@@ -6026,3 +6026,34 @@ func TestServer_Account_RemainingMatchesAdmissions(t *testing.T) {
 		s.resetStats()
 	}
 }
+
+func TestServer_SubscriptionLimit_ReleasedWhenStreamCloses(t *testing.T) {
+	c := newTestConfig(t, "")
+	c.VisitorSubscriptionLimit = 1
+	s := newTestServer(t, c)
+
+	// The open stream takes the only slot
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		request(t, s, "GET", "/mytopic/json", "", nil, func(r *http.Request) {
+			*r = *r.WithContext(ctx)
+		})
+		close(done)
+	}()
+	waitFor(t, func() bool {
+		s.visitors.subscriptions.mu.Lock()
+		defer s.visitors.subscriptions.mu.Unlock()
+		return len(s.visitors.subscriptions.counts) == 1
+	})
+	rr := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 429, rr.Code)
+	require.Equal(t, 42903, toHTTPError(t, rr.Body.String()).Code)
+
+	// Closing the stream gives it back
+	cancel()
+	<-done
+	rr = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+	require.Equal(t, 200, rr.Code)
+	require.Empty(t, s.visitors.subscriptions.counts)
+}

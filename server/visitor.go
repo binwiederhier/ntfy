@@ -237,6 +237,12 @@ func (v *visitor) enqueueUserStats(delta *user.Stats) {
 	v.userManager.EnqueueUserStats(v.user.ID, delta)
 }
 
+// SubscriptionAllowed takes one of the visitor key's subscription slots on this node, if one is free.
+// Every successful call must be paired with RemoveSubscription.
+func (v *visitor) SubscriptionAllowed() bool {
+	return v.subscriptions.Acquire(v.key, int64(v.config.VisitorSubscriptionLimit))
+}
+
 // TopicCreationAllowed returns true if the visitor is allowed to cause a new topic to be
 // inserted into the server's in-memory topic map. Returns true if no limiter is configured.
 func (v *visitor) TopicCreationAllowed() bool {
@@ -273,6 +279,11 @@ func (v *visitor) BandwidthAllowed(bytes int64) bool {
 		return false // A bandwidth limit of zero admits nothing, as before
 	}
 	return v.limiter.Allow(v.key, v.bandwidthRule(), bytes).OK
+}
+
+// RemoveSubscription gives back a slot taken by SubscriptionAllowed
+func (v *visitor) RemoveSubscription() {
+	v.subscriptions.Release(v.key)
 }
 
 // Keepalive marks the visitor and its key as seen. The subscribe handlers call it on the visitor a

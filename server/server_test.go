@@ -3726,6 +3726,39 @@ func TestServer_SubscriberRateLimiting_TierChangeAppliesToStream(t *testing.T) {
 	require.Equal(t, 429, response.Code)
 }
 
+func TestServer_SubscriberRateLimiting_DeletedUserStreamKeepsTopic(t *testing.T) {
+	// When the user of a rate subscriber's stream is deleted, publishes are billed to the stream's
+	// IP from then on, and the stream's keepalives must still keep the topic's rate subscriber
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.KeepaliveInterval = 100 * time.Millisecond
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+
+	// Stream as phil, then delete phil
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		}, func(r *http.Request) {
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	require.Nil(t, s.userManager.RemoveUser("phil"))
+	time.Sleep(3 * c.KeepaliveInterval)
+
+	// A day later, the stream is still there: its keepalives must keep the topic's rate subscriber
+	ageRateSubscriber(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	time.Sleep(3 * c.KeepaliveInterval)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+}
+
 // lockedTopic returns the topic with the given ID, or nil, reading the topics map under the server's lock
 func lockedTopic(s *Server, id string) *topic {
 	s.mu.RLock()

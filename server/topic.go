@@ -39,6 +39,7 @@ type topic struct {
 // rateSubscriber is the subscriber that publishes to a topic are billed to. The topic keeps its
 // IP and user rather than a visitor, so every publish is checked against the user's current tier.
 type rateSubscriber struct {
+	id   string // Who subscribed (see rateSubscriberID); unlike user, it does not change on keepalives
 	ip   netip.Addr
 	user *user.User // May be nil; re-read on the subscriber's keepalives, so a tier change applies
 	seen time.Time  // Last subscribe or keepalive: the subscriber's liveness
@@ -135,6 +136,7 @@ func (t *topic) SetRateSubscriber(v *visitor) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.rateSubscriber = &rateSubscriber{
+		id:   rateSubscriberID(v),
 		ip:   v.ip,
 		user: v.user,
 		seen: time.Now(),
@@ -375,10 +377,15 @@ func (t *topic) subscribersCopy() map[int]*topicSubscriber {
 
 // is returns true if the visitor is this subscriber: the same user, or the same IP if anonymous
 func (s *rateSubscriber) is(v *visitor) bool {
-	if s.user != nil || v.user != nil {
-		return s.user != nil && v.user != nil && s.user.ID == v.user.ID
+	return s.id == rateSubscriberID(v)
+}
+
+// rateSubscriberID identifies a subscriber by its user, or by its IP if it is anonymous
+func rateSubscriberID(v *visitor) string {
+	if v.user != nil {
+		return "user:" + v.user.ID
 	}
-	return s.ip == v.ip
+	return "ip:" + v.ip.String()
 }
 
 // stale is true when the subscriber has not been seen for visitorExpungeAfter

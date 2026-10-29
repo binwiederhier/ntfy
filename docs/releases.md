@@ -2270,6 +2270,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied)
 
+**Bug fixes + maintenance:**
+
+* Accept terabyte units (e.g. `1T`) in size settings such as attachment and tier limits, matching how sizes are displayed ([#2078](https://github.com/binwiederhier/ntfy/pull/2078), thanks to [@cangen185-sudo](https://github.com/cangen185-sudo) for the contribution)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

@@ -3650,6 +3650,76 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 	})
 }
 
+func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T) {
+	// A poll from the subscriber of an open stream must not take the stream's place as the topic's
+	// rate visitor: only the stream's keepalives keep it alive, so UnifiedPush publishes would fail
+	// a day after the poll while the stream is still open
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.KeepaliveInterval = 100 * time.Millisecond
+	s := newTestServer(t, c)
+	subscriberFn := func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	}
+
+	// Stream, then poll from the same subscriber
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, subscriberFn, func(r *http.Request) {
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+
+	// A day later, the stream is still there: its keepalives must keep the topic's rate visitor
+	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	time.Sleep(3 * c.KeepaliveInterval)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testing.T) {
+	// A subscriber that only polls stays the topic's rate visitor for as long as it keeps polling
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	subscriberFn := func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	}
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+
+	// Polled 23 hours ago; polling again keeps it the rate visitor for another day
+	to := lockedTopic(s, "upAAAAAAAAAAAA")
+	ageRateVisitor(to, 23*time.Hour)
+	rr = request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+	to.mu.Lock()
+	seen := time.Unix(0, to.rateVisitor.seen.Load())
+	to.mu.Unlock()
+	require.WithinDuration(t, time.Now(), seen, time.Minute)
+}
+
+// ageRateVisitor makes the topic's rate visitor look as if it was last seen d ago
+func ageRateVisitor(t *topic, d time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rateVisitor.seen.Store(time.Now().Add(-d).UnixNano())
+}
+
+// lockedTopic returns the topic with the given ID, or nil, reading the topics map under the server's lock
+func lockedTopic(s *Server, id string) *topic {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.topics[id]
+}
+
 func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)

@@ -356,7 +356,7 @@ func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
-	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
+	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics, false))
 	require.NotNil(t, topics[0].RateVisitor())
 }
 
@@ -730,7 +730,7 @@ func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
-	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
+	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics, false))
 	s.limiter.Prune(0) // The key is gone, the subscriber is not
 	require.NotNil(t, topics[0].RateVisitor())
 	v.seen.Store(time.Now().Add(-2 * visitorExpungeAfter).UnixNano()) // The subscriber is gone

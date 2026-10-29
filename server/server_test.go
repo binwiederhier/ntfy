@@ -2166,7 +2166,7 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 507, response.Code)
 		require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
-		require.Nil(t, s.topics["mytopic"].rateVisitor)
+		require.Nil(t, s.topics["mytopic"].rateSubscriber)
 
 		// Fake: This topic has been around for 13 hours without a rate visitor
 		s.topics["mytopic"].lastAccess = time.Now().Add(-13 * time.Hour)
@@ -3460,7 +3460,7 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriber1Fn)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
+		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateSubscriber.ip.String())
 
 		// "Register" visitor 8.7.7.1 to topic "up012345678912" as a rate limit visitor (implicitly via topic name)
 		subscriber2Fn := func(r *http.Request) {
@@ -3469,7 +3469,7 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 		rr = request(t, s, "GET", "/up012345678912/json?poll=1", "", nil, subscriber2Fn)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Equal(t, "8.7.7.1", s.topics["up012345678912"].rateVisitor.ip.String())
+		require.Equal(t, "8.7.7.1", s.topics["up012345678912"].rateSubscriber.ip.String())
 
 		// Publish 2 messages to "subscriber1topic" as visitor 9.9.9.9. It'd be 3 normally, but the
 		// GET request before is also counted towards the request limiter.
@@ -3514,9 +3514,9 @@ func TestServer_SubscriberRateLimiting_NotWrongTopic(t *testing.T) {
 		rr := request(t, s, "GET", "/alerts,upAAAAAAAAAAAA,upBBBBBBBBBBBB/json?poll=1", "", nil, subscriberFn)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Nil(t, s.topics["alerts"].rateVisitor)
-		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
-		require.Equal(t, "1.2.3.4", s.topics["upBBBBBBBBBBBB"].rateVisitor.ip.String())
+		require.Nil(t, s.topics["alerts"].rateSubscriber)
+		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateSubscriber.ip.String())
+		require.Equal(t, "1.2.3.4", s.topics["upBBBBBBBBBBBB"].rateSubscriber.ip.String())
 	})
 }
 
@@ -3535,7 +3535,7 @@ func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 		})
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
+		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateSubscriber)
 
 		// Registering visitor 8.7.7.1 to topic has no effect
 		rr = request(t, s, "GET", "/up012345678912/json?poll=1", "", nil, func(r *http.Request) {
@@ -3543,7 +3543,7 @@ func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 		})
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Nil(t, s.topics["up012345678912"].rateVisitor)
+		require.Nil(t, s.topics["up012345678912"].rateSubscriber)
 
 		// Publish 3 messages to "upAAAAAAAAAAAA" as visitor 9.9.9.9
 		for i := 0; i < 3; i++ {
@@ -3626,28 +3626,109 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		}
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 		require.Equal(t, 200, rr.Code)
-		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
-		require.Equal(t, "ip:1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.key)
+		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateSubscriber.ip.String())
+		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateSubscriber.user)
 
 		// Publish message, observe rate visitor tokens being decreased
 		publisher := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
 		require.Equal(t, int64(0), publisher.Stats().Messages)
-		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
+		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 
 		// Expire visitor: its subscriber has been gone for a day, and its key is pruned after a day without use
-		s.topics["upAAAAAAAAAAAA"].rateVisitor.seen.Store(time.Now().Add(-25 * time.Hour).UnixNano())
+		ageRateSubscriber(s.topics["upAAAAAAAAAAAA"], 25*time.Hour)
 		s.limiter.Prune(-time.Hour) // Everything is idle for longer than -1h
-		require.True(t, s.topics["upAAAAAAAAAAAA"].rateVisitor.Stale())
+		require.True(t, s.topics["upAAAAAAAAAAAA"].rateSubscriber.stale())
 
-		// Publish message again, observe that rateVisitor is not used anymore and is reset
+		// Publish message again, observe that the rate subscriber is not used anymore and is reset
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
 		require.Equal(t, int64(1), publisher.Stats().Messages)
-		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
+		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateSubscriber)
 		require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 	})
+}
+
+func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateSubscriber(t *testing.T) {
+	// A poll from the subscriber of an open stream must not take the stream's place as the topic's
+	// rate subscriber: the stream's keepalives keep the topic billed to the key, so UnifiedPush
+	// publishes keep working long after the poll
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.KeepaliveInterval = 100 * time.Millisecond
+	s := newTestServer(t, c)
+	subscriberFn := func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	}
+
+	// Stream, then poll from the same subscriber
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, subscriberFn, func(r *http.Request) {
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		return s.topics["upAAAAAAAAAAAA"] != nil && s.topics["upAAAAAAAAAAAA"].SubscribersCount() == 1
+	})
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+
+	// A day later, the stream is still there: its keepalives must keep the topic's rate subscriber
+	ageRateSubscriber(s.topics["upAAAAAAAAAAAA"], 25*time.Hour)
+	time.Sleep(3 * c.KeepaliveInterval)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_SubscriberRateLimiting_TierChangeAppliesToStream(t *testing.T) {
+	// Publishes billed to a subscriber's key use the subscriber's current tier, not the one it had
+	// when the stream opened
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.KeepaliveInterval = 100 * time.Millisecond
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "big",
+		MessageLimit: 100,
+	}))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "small",
+		MessageLimit: 1,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "big"))
+
+	// Stream as phil on the big tier
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		}, func(r *http.Request) {
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		return s.topics["upAAAAAAAAAAAA"] != nil && s.topics["upAAAAAAAAAAAA"].SubscribersCount() == 1
+	})
+
+	// Downgrade while the stream is open: after a keepalive, publishes get the small tier
+	require.Nil(t, s.userManager.ChangeTier("phil", "small"))
+	time.Sleep(3 * c.KeepaliveInterval)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+	response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 429, response.Code)
+}
+
+// ageRateSubscriber makes the topic's rate subscriber look as if it was last seen d ago
+func ageRateSubscriber(t *topic, d time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rateSubscriber.seen = time.Now().Add(-d)
 }
 
 func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *testing.T) {
@@ -3667,8 +3748,8 @@ func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *t
 			r.RemoteAddr = "1.2.3.4:1234"
 		})
 		require.Equal(t, 200, rr.Code)
-		require.Equal(t, "1.2.3.4", s.topics["up123456789012"].rateVisitor.ip.String())
-		require.Nil(t, s.topics["announcements"].rateVisitor)
+		require.Equal(t, "1.2.3.4", s.topics["up123456789012"].rateSubscriber.ip.String())
+		require.Nil(t, s.topics["announcements"].rateSubscriber)
 	})
 }
 

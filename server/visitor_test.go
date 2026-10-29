@@ -337,13 +337,6 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 	require.True(t, vip.AccountActionAllowed())
 }
 
-func TestVisitor_NewVisitorIsNotStale(t *testing.T) {
-	// A visitor is seen when it is built for a request, like it was when visitors were shared
-	s := newTestServer(t, newTestConfig(t, ""))
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	require.False(t, v.Stale())
-}
-
 func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
 	// A subscriber from a request-limit-exempt prefix spends nothing before it becomes a topic's
 	// rate visitor; the topic must still keep it. Fails if a new visitor counts as stale.
@@ -357,7 +350,8 @@ func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
 	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
-	require.NotNil(t, topics[0].RateVisitor())
+	_, ok := topics[0].RateSubscriber()
+	require.True(t, ok)
 }
 
 func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
@@ -732,8 +726,10 @@ func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	require.Nil(t, err)
 	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
 	s.limiter.Prune(0) // The key is gone, the subscriber is not
-	require.NotNil(t, topics[0].RateVisitor())
-	v.seen.Store(time.Now().Add(-2 * visitorExpungeAfter).UnixNano()) // The subscriber is gone
-	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK)    // A publisher charges the key
-	require.Nil(t, topics[0].RateVisitor())
+	_, ok := topics[0].RateSubscriber()
+	require.True(t, ok)
+	ageRateSubscriber(topics[0], 2*visitorExpungeAfter)            // The subscriber is gone
+	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK) // A publisher charges the key
+	_, ok = topics[0].RateSubscriber()
+	require.False(t, ok)
 }

@@ -1024,7 +1024,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if _, ok := t.RateSubscriber(); unifiedpush && s.config.VisitorSubscriberRateLimiting && !ok {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
@@ -1686,10 +1686,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			} else {
 				ev.Trace("Sending keepalive message to %d topics", len(topics))
 			}
-			v.Keepalive()
-			for _, t := range topics {
-				t.Keepalive()
-			}
+			s.keepaliveSubscriber(v, topics)
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
@@ -1778,10 +1775,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				conn.Close()
 				return &websocket.CloseError{Code: websocket.CloseNormalClosure, Text: "subscription was canceled"}
 			case <-time.After(s.config.KeepaliveInterval):
-				v.Keepalive()
-				for _, t := range topics {
-					t.Keepalive()
-				}
+				s.keepaliveSubscriber(v, topics)
 				if err := ping(); err != nil {
 					return err
 				}
@@ -1911,13 +1905,37 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	return s.setRateVisitors(r, v, writableRateTopics)
 }
 
+// keepaliveSubscriber marks a subscriber's topics as in use, and keeps it alive as the rate subscriber
+// of those it is that for, with its user re-read so that a tier change applies to the publishes
+func (s *Server) keepaliveSubscriber(v *visitor, topics []*topic) {
+	v.Keepalive()
+	u, reloaded := v.user, false
+	for _, t := range topics {
+		t.Keepalive()
+		if !t.IsRateSubscriber(v) {
+			continue
+		}
+		if !reloaded && u != nil && s.userManager != nil {
+			reloaded = true
+			if fresh, err := s.userManager.UserByID(u.ID); err == nil {
+				u = fresh
+			} else if errors.Is(err, user.ErrUserNotFound) {
+				u = nil // Deleted: publishes are billed to the IP from now on
+			} else {
+				log.Tag(tagSubscribe).Err(err).Warn("Cannot re-read rate subscriber %s, keeping its tier", u.ID)
+			}
+		}
+		t.KeepaliveRateSubscriber(v, u)
+	}
+}
+
 func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v)
+		t.SetRateSubscriber(v)
 	}
 	return nil
 }

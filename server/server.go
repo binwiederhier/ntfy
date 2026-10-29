@@ -1635,7 +1635,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
-	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
+	if err := s.maybeSetRateVisitors(r, v, topics, poll); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1799,7 +1799,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return conn.WriteJSON(msg)
 	}
-	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
+	if err := s.maybeSetRateVisitors(r, v, topics, poll); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1866,7 +1866,7 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 // - or the topic is not reserved, and v.user has write access
 //
 // This only applies to UnifiedPush topics ("up...").
-func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic) error {
+func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic, poll bool) error {
 	// Bail out if not enabled
 	if !s.config.VisitorSubscriberRateLimiting {
 		return nil
@@ -1885,7 +1885,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 
 	// If access controls are turned off, v has access to everything, and we can set the rate visitor
 	if s.userManager == nil {
-		return s.setRateVisitors(r, v, eligibleRateTopics)
+		return s.setRateVisitors(r, v, eligibleRateTopics, poll)
 	}
 
 	// If access controls are enabled, only set rate visitor if
@@ -1908,16 +1908,16 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 			writableRateTopics = append(writableRateTopics, t)
 		}
 	}
-	return s.setRateVisitors(r, v, writableRateTopics)
+	return s.setRateVisitors(r, v, writableRateTopics, poll)
 }
 
-func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
+func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic, poll bool) error {
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v)
+		t.SetRateVisitor(v, poll)
 	}
 	return nil
 }

@@ -40,9 +40,9 @@ func TestVisitor_UserStatsDeltaFlush(t *testing.T) {
 	})
 }
 
-func TestVisitor_SetUser_DoesNotChargeAnonymousUsage(t *testing.T) {
-	// A user who gets a tier takes over their IP-keyed visitor (e.g. the billing callback). What
-	// that visitor counted anonymously must not land on the account.
+func TestVisitor_TierUserDoesNotGetAnonymousUsage(t *testing.T) {
+	// What a user's IP counted anonymously must not land on the account once the user (with a
+	// tier) shows up from that IP.
 	c := newTestConfigWithAuthFile(t, "")
 	c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
@@ -56,7 +56,7 @@ func TestVisitor_SetUser_DoesNotChargeAnonymousUsage(t *testing.T) {
 		require.True(t, v.MessageAllowed())
 	}
 
-	v.SetUser(u)
+	require.True(t, s.visitor(netip.MustParseAddr("9.9.9.9"), u).RequestAllowed())
 	time.Sleep(500 * time.Millisecond)
 	u, err = s.userManager.User("phil")
 	require.Nil(t, err)
@@ -228,4 +228,46 @@ func TestVisitor_ZeroLimitsAdmitNothing(t *testing.T) {
 		require.False(t, v.BandwidthAllowed(1))
 		require.False(t, v.BandwidthLimiter().AllowN(1))
 	})
+}
+
+func TestVisitor_UserIsPerRequest(t *testing.T) {
+	// Untiered users and anonymous requests from one IP share a limiter key, but each request
+	// must keep its own user (#1051)
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	require.Nil(t, s.userManager.AddUser("phil", "phil12345", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+
+	// The concurrent requests, made deterministic
+	authed := s.visitor(ip, u)
+	anon := s.visitor(ip, nil)
+	require.NotNil(t, authed.User())
+	require.Equal(t, u.ID, authed.User().ID)
+	require.Nil(t, anon.User())
+	authedAgain := s.visitor(ip, u)
+	require.Nil(t, anon.User())
+	require.NotNil(t, authedAgain.User())
+	require.Equal(t, u.ID, authedAgain.User().ID)
+
+	// Limits are still shared per IP: requests and the node-local subscription gauge
+	for authed.RequestAllowed() {
+	}
+	require.False(t, anon.RequestAllowed())
+	for authed.SubscriptionAllowed() {
+	}
+	require.False(t, anon.SubscriptionAllowed())
+	authed.RemoveSubscription()
+	require.True(t, anon.SubscriptionAllowed())
+}
+
+func TestVisitor_FirebasePenaltyIsSharedPerKey(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t, ""))
+	ip := netip.MustParseAddr("9.9.9.9")
+	v1 := s.visitor(ip, nil)
+	v2 := s.visitor(ip, nil)
+	require.True(t, v2.FirebaseAllowed())
+	v1.FirebaseTemporarilyDeny()
+	require.False(t, v2.FirebaseAllowed())
+	require.True(t, s.visitor(netip.MustParseAddr("1.2.3.4"), nil).FirebaseAllowed())
 }

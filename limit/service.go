@@ -181,6 +181,27 @@ func (s *Service) Prune(idle time.Duration) {
 	}
 }
 
+// Touch marks the key as used now, so Prune keeps it, e.g. for a long-lived subscription
+func (s *Service) Touch(key string) {
+	now := s.now()
+	sh := s.shards[shardIndex(key)]
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	sh.entryNoLock(key, now).seen = now.UnixNano()
+}
+
+// Seen returns when the key was last used, or the zero time if the service does not know it
+func (s *Service) Seen(key string) time.Time {
+	sh := s.shards[shardIndex(key)]
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	e, ok := sh.entries[key]
+	if !ok {
+		return time.Time{}
+	}
+	return time.Unix(0, e.seen).UTC()
+}
+
 // Limiter returns a util.Limiter view of the key's bucket for the rule, for the readers and
 // writers in util that meter bytes. A negative AllowN refunds.
 func (s *Service) Limiter(key string, rule Rule) util.Limiter {

@@ -211,7 +211,7 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	logvr(v, r).
 		With(tier).
 		Tag(tagStripe).
@@ -435,7 +435,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(r *http.Request,
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	tier, err := s.userManager.TierByStripePrice(priceID)
 	if err != nil {
 		return err
@@ -458,7 +458,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(r *http.Request,
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	logvr(v, r).
 		Tag(tagStripe).
 		Field("stripe_webhook_type", event.Type).

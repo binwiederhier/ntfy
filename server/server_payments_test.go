@@ -12,7 +12,6 @@ import (
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"io"
-	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -395,12 +394,10 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 		})
 		require.Equal(t, 429, rr.Code)
 
-		// Now let's test the message limiter by faking a ridiculously generous rate limiter
-		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		v.mu.Lock()
-		v.limits.RequestLimitBurst = 1000000
-		v.limits.RequestLimitReplenish = time.Nanosecond
-		v.mu.Unlock()
+		// Now let's test the message limiter by faking a ridiculously generous request limit; the
+		// tier's request burst never goes below the configured one, and visitors are built per request
+		s.config.VisitorRequestLimitBurst = 1000000
+		s.config.VisitorRequestLimitReplenish = time.Nanosecond
 
 		var wg sync.WaitGroup
 		for i := 0; i < 209; i++ {

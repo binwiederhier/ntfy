@@ -3627,25 +3627,25 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
-		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
+		require.Equal(t, "ip:1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.key)
 
 		// Publish message, observe rate visitor tokens being decreased
+		publisher := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(0), s.visitors["ip:9.9.9.9"].Stats().Messages)
+		require.Equal(t, int64(0), publisher.Stats().Messages)
 		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
-		require.Equal(t, s.visitors["ip:1.2.3.4"], s.topics["upAAAAAAAAAAAA"].rateVisitor)
 
-		// Expire visitor
-		s.visitors["ip:1.2.3.4"].seen = time.Now().Add(-1 * 25 * time.Hour)
-		s.pruneVisitors()
+		// Expire visitor: its key is pruned from the limiter after a day without use
+		s.limiter.Prune(-time.Hour) // Everything is idle for longer than -1h
+		require.True(t, s.topics["upAAAAAAAAAAAA"].rateVisitor.Stale())
 
 		// Publish message again, observe that rateVisitor is not used anymore and is reset
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(1), s.visitors["ip:9.9.9.9"].Stats().Messages)
+		require.Equal(t, int64(1), publisher.Stats().Messages)
 		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
-		require.Nil(t, s.visitors["ip:1.2.3.4"])
+		require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 	})
 }
 
@@ -5575,7 +5575,7 @@ func TestServer_SubscribeHTTP_NoWriteAfterHandlerReturn(t *testing.T) {
 		// that copied the subscriber list before Unsubscribe ran. In production, this is exactly
 		// how the panic occurs: the goroutine spawned by topic.Publish calls sub() after the
 		// handler has already returned and Go has cleaned up the response writer.
-		v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.MustParseAddr("9.9.9.9"), nil)
+		v := newVisitor(s.config, s.limiter, s.subscriptions, s.messageCache, s.userManager, netip.MustParseAddr("9.9.9.9"), nil)
 		msg := model.NewDefaultMessage("mytopic", "straggler message")
 		_ = copiedSub(v, msg)
 
@@ -5595,7 +5595,7 @@ func TestServer_HandleError_SkipsWriteHeaderOnHijackedConnection(t *testing.T) {
 		r, _ := http.NewRequest("GET", "/mytopic/ws", nil)
 		r.Header.Set("Upgrade", "websocket")
 		r.Header.Set("Connection", "Upgrade")
-		v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
+		v := newVisitor(s.config, s.limiter, s.subscriptions, s.messageCache, s.userManager, netip.MustParseAddr("1.2.3.4"), nil)
 
 		// Test post-upgrade errors wrapped with errWebSocketPostUpgrade (should NOT call WriteHeader)
 		postUpgradeErr := &errWebSocketPostUpgrade{errors.New("websocket: close 1000 (normal)")}

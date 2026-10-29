@@ -75,8 +75,9 @@ func (s *Server) execManager() {
 
 	// Print stats
 	s.mu.RLock()
-	messagesCount, topicsCount, visitorsCount := s.messages, len(s.topics), len(s.visitors)
+	messagesCount, topicsCount := s.messages, len(s.topics)
 	s.mu.RUnlock()
+	visitorsCount := s.limiter.Size()
 
 	// Update stats
 	s.updateAndWriteStats(messagesCount)
@@ -110,23 +111,12 @@ func (s *Server) execManager() {
 }
 
 func (s *Server) pruneVisitors() {
-	staleVisitors := 0
 	log.
 		Tag(tagManager).
 		Timing(func() {
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			for ip, v := range s.visitors {
-				if v.Stale() {
-					log.Tag(tagManager).With(v).Trace("Deleting stale visitor")
-					delete(s.visitors, ip)
-					staleVisitors++
-				}
-			}
+			s.limiter.Prune(visitorExpungeAfter) // Visitors are per request; only their keys' buckets and counts stay
 		}).
-		Field("stale_visitors", staleVisitors).
 		Debug("Finished deleting stale visitors")
-	s.limiter.Prune(visitorExpungeAfter) // The keys' buckets and counts go with the visitors
 }
 
 func (s *Server) pruneTokens() {

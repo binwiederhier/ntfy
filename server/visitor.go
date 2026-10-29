@@ -223,12 +223,10 @@ func (v *visitor) TopicCreationAllowed() bool {
 }
 
 // AuthAllowed returns true if an auth request can be attempted (a token is available)
+// It does not look at v.user: a concurrent request may set it on a shared IP-keyed visitor (#1051)
 func (v *visitor) AuthAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
-	if v.user != nil {
-		return true // Users are already logged in, no need to limit requests
-	}
 	return v.limiter.Tokens(v.key, v.authRule()) >= 1
 }
 
@@ -236,19 +234,14 @@ func (v *visitor) AuthAllowed() bool {
 func (v *visitor) AuthFailed() {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
-	if v.user == nil {
-		v.limiter.Allow(v.key, v.authRule(), 1)
-	}
+	v.limiter.Allow(v.key, v.authRule(), 1)
 }
 
 // AccountActionAllowed returns true if a rate-limited account action (signup or password-reset
-// request) is currently allowed for this visitor
+// request) is currently allowed for this visitor. Like AuthAllowed, it does not look at v.user.
 func (v *visitor) AccountActionAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
-	if v.user != nil {
-		return false // Users cannot create accounts when logged in
-	}
 	return v.limiter.Tokens(v.key, v.accountRule()) >= 1
 }
 
@@ -257,9 +250,7 @@ func (v *visitor) AccountActionAllowed() bool {
 func (v *visitor) AccountActionPerformed() {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
-	if v.user == nil {
-		v.limiter.Allow(v.key, v.accountRule(), 1)
-	}
+	v.limiter.Allow(v.key, v.accountRule(), 1)
 }
 
 func (v *visitor) BandwidthAllowed(bytes int64) bool {

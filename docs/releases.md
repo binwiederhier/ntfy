@@ -2269,6 +2269,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Security:**
 
 * Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied; thanks to [Efe Çam](https://github.com/the-arma-of-owl) for reporting)
+* Concurrent requests from one IP could all get past the auth failure limit and the signup limit before any of them was charged; attempts are now charged up front, and a successful login or a signup that fails gets its token back
 
 **Features:**
 

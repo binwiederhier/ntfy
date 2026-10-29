@@ -2273,7 +2273,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Rate limits are tracked per visitor key (`ip:<prefix>` or `user:<id>`) in one sharded limit service instead of in each in-memory visitor. A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the next request and keeps what was already spent instead of handing out full buckets; the daily email limit shown on the account page is a hard cap; and a failed attachment upload hands its bandwidth back ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
+* Rate limits are tracked per visitor key (`ip:<prefix>` or `user:<id>`) in one sharded limit service instead of in each in-memory visitor. A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the next request and keeps what was already spent instead of handing out full buckets; the daily email limit shown on the account page is a hard cap; and an attachment upload rejected at the size limit is no longer charged for the read that went over it ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
 
 **Bug fixes + maintenance:**
 

@@ -316,11 +316,10 @@ func TestVisitor_AuthLimiter_NotBypassedByConcurrentLogin(t *testing.T) {
 	// The user logs in between the guesser's lookup and each failed guess
 	for i := 0; i < 3; i++ {
 		s.visitor(ip, u)
-		require.True(t, vip.AuthAllowed())
-		vip.AuthFailed()
+		require.True(t, vip.AuthAttempt()) // Fails, so the token stays taken
 	}
 	s.visitor(ip, u)
-	require.False(t, vip.AuthAllowed())
+	require.False(t, vip.AuthAttempt())
 }
 
 func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
@@ -334,7 +333,7 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 	vip := s.visitor(ip, nil)
 
 	s.visitor(ip, u)
-	require.True(t, vip.AccountActionAllowed())
+	require.True(t, vip.AccountActionAttempt())
 }
 
 func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
@@ -364,10 +363,9 @@ func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-	require.True(t, v.AccountActionAllowed())
-	require.True(t, v.AuthAllowed())
-	v.AuthFailed()
-	require.False(t, v.AuthAllowed())
+	require.True(t, v.AccountActionAttempt())
+	require.True(t, v.AuthAttempt()) // Fails, so the token stays taken
+	require.False(t, v.AuthAttempt())
 }
 
 func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
@@ -655,7 +653,7 @@ func TestVisitor_ConcurrentSharedKey(t *testing.T) {
 				v.Context()
 				vip := s.visitor(ip, nil)
 				vip.RequestAllowed()
-				vip.AuthAllowed()
+				vip.AuthAttempt()
 				vip.Context()
 				vn := s.visitor(ip, noTier)
 				vn.MessageAllowed()

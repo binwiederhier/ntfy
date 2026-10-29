@@ -6138,3 +6138,54 @@ func TestServer_SubscriptionLimit_ReleasedWhenStreamCloses(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	require.Empty(t, s.visitors.subscriptions.counts)
 }
+
+func TestServer_AuthFailureLimit_HoldsForConcurrentGuesses(t *testing.T) {
+	// Concurrent wrong passwords from one IP must not all get past the auth failure limit before any
+	// of them is charged: no more guesses reach the password check than the bucket holds
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorAuthFailureLimitBurst = 2
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	var wg sync.WaitGroup
+	var unauthorized, tooMany atomic.Int64
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+				"Authorization": util.BasicAuth("phil", "wrong"),
+			})
+			switch response.Code {
+			case 401:
+				unauthorized.Add(1)
+			case 429:
+				tooMany.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	require.Equal(t, int64(2), unauthorized.Load())
+	require.Equal(t, int64(18), tooMany.Load())
+}
+
+func TestServer_AuthFailureLimit_SuccessfulLoginsAreFree(t *testing.T) {
+	// A login that works gives its token back, so a user can log in for as long as nobody guesses
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorAuthFailureLimitBurst = 1
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	for i := 0; i < 3; i++ {
+		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Authorization": util.BasicAuth("phil", "wrong"),
+	})
+	require.Equal(t, 401, response.Code)
+	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 429, response.Code)
+}

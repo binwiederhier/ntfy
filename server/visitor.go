@@ -249,26 +249,27 @@ func (v *visitor) TopicCreationAllowed() bool {
 	return v.env.limiter.Allow(v.key, v.topicCreationRule(), 1).OK
 }
 
-// AuthAllowed returns true if an auth request can be attempted (a token is available)
-func (v *visitor) AuthAllowed() bool {
-	return v.env.limiter.Tokens(v.key, v.authRule()) >= 1
+// AuthAttempt takes a token for an auth attempt, if one is free. Taking it before the credentials
+// are checked keeps concurrent attempts from all getting through; AuthSucceeded gives it back.
+func (v *visitor) AuthAttempt() bool {
+	return v.env.limiter.Allow(v.key, v.authRule(), 1).OK
 }
 
-// AuthFailed records an auth failure
-func (v *visitor) AuthFailed() {
-	v.env.limiter.Allow(v.key, v.authRule(), 1)
+// AuthSucceeded gives back the token taken by AuthAttempt: only failed attempts are charged
+func (v *visitor) AuthSucceeded() {
+	v.env.limiter.Refund(v.key, limit.KindAuth, 1)
 }
 
-// AccountActionAllowed returns true if a rate-limited account action (signup or password-reset
-// request) is currently allowed for this visitor
-func (v *visitor) AccountActionAllowed() bool {
-	return v.env.limiter.Tokens(v.key, v.accountRule()) >= 1
+// AccountActionAttempt takes a token for a rate-limited account action (signup or password-reset
+// request), if one is free. It is taken up front, so concurrent actions cannot all get through.
+func (v *visitor) AccountActionAttempt() bool {
+	return v.env.limiter.Allow(v.key, v.accountRule(), 1).OK
 }
 
-// AccountActionPerformed decreases the account limiter. This is to be called after a rate-limited
-// account action (signup or password-reset request).
-func (v *visitor) AccountActionPerformed() {
-	v.env.limiter.Allow(v.key, v.accountRule(), 1)
+// AccountActionFailed gives back the token taken by AccountActionAttempt, for an action that did
+// not happen (e.g. a signup for a taken username)
+func (v *visitor) AccountActionFailed() {
+	v.env.limiter.Refund(v.key, limit.KindAccount, 1)
 }
 
 func (v *visitor) BandwidthAllowed(bytes int64) bool {

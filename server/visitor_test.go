@@ -188,22 +188,30 @@ func TestVisitor_TierFieldChangeAppliesAtOnce(t *testing.T) {
 }
 
 func TestVisitor_EmailDailyLimitCapsBelowBurst(t *testing.T) {
-	// The daily email limit (what the account page shows) is enforced, not only the bucket: with
-	// a burst of 16 and a refill every 12 hours, the day's limit is 2, and the third email is
-	// denied even though the bucket has tokens
-	c := newTestConfig(t, "")
+	// A tier's daily email limit (what the account page shows) is enforced, not only the bucket:
+	// with a daily limit of 2 and a burst of 16, the third email is denied even though the bucket
+	// has tokens
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorEmailLimitBurst = 16
-	c.VisitorEmailLimitReplenish = 12 * time.Hour
 	s := newTestServer(t, c)
 	s.mailer = &testMailer{}
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 10,
+		EmailLimit:   2,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 	for i := 0; i < 2; i++ {
 		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-			"Email": "test@email.com",
+			"Authorization": util.BasicAuth("phil", "phil"),
+			"Email":         "test@email.com",
 		})
 		require.Equal(t, 200, response.Code)
 	}
 	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-		"Email": "test@email.com",
+		"Authorization": util.BasicAuth("phil", "phil"),
+		"Email":         "test@email.com",
 	})
 	require.Equal(t, 429, response.Code)
 	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
@@ -736,4 +744,18 @@ func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	v.seen.Store(time.Now().Add(-2 * visitorExpungeAfter).UnixNano()) // The subscriber is gone
 	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK)    // A publisher charges the key
 	require.Nil(t, topics[0].RateVisitor())
+}
+
+func TestVisitor_EmailsWithoutTierHaveNoDailyCap(t *testing.T) {
+	// Without a tier, emails are limited by the email bucket alone, as before: the daily limit derived
+	// from the refill (24 with a refill of an hour) is not a cap, so a full burst of 30 can be sent
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 30
+	c.VisitorEmailLimitReplenish = time.Hour
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	for i := 0; i < 30; i++ {
+		require.True(t, v.EmailAllowed(), "email %d", i)
+	}
+	require.False(t, v.EmailAllowed())
 }

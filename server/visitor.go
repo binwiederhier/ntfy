@@ -364,13 +364,18 @@ func (v *visitor) messageRule() limit.Rule {
 	}
 }
 
+// emailRule is the email bucket, and for a tier also its daily email limit. Without a tier, the
+// daily limit is only derived from the refill, for display, and is not a cap.
 func (v *visitor) emailRule() limit.Rule {
-	return limit.Rule{
+	rule := limit.Rule{
 		Kind:   limit.KindEmails,
 		Burst:  int64(v.limits.EmailLimitBurst),
 		Refill: v.limits.EmailLimitReplenish,
-		Daily:  v.limits.EmailLimit,
 	}
+	if v.limits.Basis == vis.BasisTier {
+		rule.Daily = v.limits.EmailLimit
+	}
+	return rule
 }
 
 func (v *visitor) callRule() limit.Rule {

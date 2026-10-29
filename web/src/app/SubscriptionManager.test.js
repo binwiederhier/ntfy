@@ -233,3 +233,75 @@ describe("SubscriptionManager.addNotifications", () => {
     expect((await db.notifications.toArray()).map((n) => n.message)).toEqual(["Download complete"]);
   });
 });
+
+// The server replays the whole second of a since=<id> marker, so a poll returns messages the
+// client already has, or had and deleted (#2098)
+describe("SubscriptionManager deleted notifications", () => {
+  it("does not add a deleted message again when a poll replays it", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2"), message("m3")]);
+    await manager.deleteNotification("m1");
+    await manager.deleteNotification("m2");
+
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2")]);
+
+    expect((await db.notifications.toArray()).map((n) => n.id)).toEqual(["m3"]);
+  });
+
+  it("does not add a deleted message again when the WebSocket replays it", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotification(subscriptionId, message("m1"));
+    await manager.deleteNotification("m1");
+
+    expect(await manager.addNotification(subscriptionId, message("m1"))).toBe(false);
+
+    expect(await db.notifications.count()).toBe(0);
+  });
+
+  it("does not add older versions of a deleted sequence again, but newer ones", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m2", { sequence_id: "s1", message: "Download complete", time: 1700000001 })]);
+    await manager.deleteNotification("m2");
+
+    await manager.addNotifications(subscriptionId, [message("m1", { sequence_id: "s1", message: "Downloading" })]);
+    expect(await db.notifications.count()).toBe(0);
+
+    await manager.addNotification(subscriptionId, message("m3", { sequence_id: "s1", message: "Download failed", time: 1700000002 }));
+    expect((await db.notifications.toArray()).map((n) => n.id)).toEqual(["m3"]);
+  });
+
+  it("does not add messages again after deleting all of them", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2")]);
+    await manager.deleteNotifications(subscriptionId);
+
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2")]);
+
+    expect(await db.notifications.count()).toBe(0);
+  });
+
+  it("keeps the last message when a poll only replays known or deleted messages", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2"), message("m3")]);
+    await manager.deleteNotification("m1");
+
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2")]);
+
+    expect((await db.subscriptions.get(subscriptionId)).last).toBe("m3");
+  });
+
+  it("forgets deleted messages when the subscription is removed or they are pruned", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("old", { time: 1600000000 }), message("m1")]);
+    await manager.deleteNotifications(subscriptionId);
+
+    await manager.pruneNotifications(1650000000);
+    await manager.addNotifications(subscriptionId, [message("old", { time: 1600000000 })]);
+    expect((await db.notifications.toArray()).map((n) => n.id)).toEqual(["old"]);
+
+    await manager.remove({ id: subscriptionId });
+    await manager.upsert(baseUrl, "mytopic");
+    await manager.addNotifications(subscriptionId, [message("m1")]);
+    expect((await db.notifications.toArray()).map((n) => n.id)).toEqual(["m1"]);
+  });
+});

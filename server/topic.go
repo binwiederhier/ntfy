@@ -157,23 +157,26 @@ func (t *topic) RateSubscriber() (rateSubscriber, bool) {
 	return *t.rateSubscriber, true
 }
 
-// IsRateSubscriber returns true if publishes are billed to the visitor
-func (t *topic) IsRateSubscriber(v *visitor) bool {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	return t.rateSubscriber != nil && t.rateSubscriber.is(v)
-}
-
-// KeepaliveRateSubscriber keeps the visitor alive as the topic's rate subscriber, with the user as
-// re-read for the keepalive (nil if it is gone), if publishes are still billed to the visitor
-func (t *topic) KeepaliveRateSubscriber(v *visitor, u *user.User) {
+// KeepaliveRateSubscriber keeps the visitor alive as the topic's rate subscriber, and returns true,
+// if publishes are still billed to the visitor
+func (t *topic) KeepaliveRateSubscriber(v *visitor) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if t.rateSubscriber == nil || !t.rateSubscriber.is(v) {
-		return
+		return false
 	}
-	t.rateSubscriber.user = u
 	t.rateSubscriber.seen = time.Now()
+	return true
+}
+
+// SetRateSubscriberUser sets the user of the topic's rate subscriber as re-read for a keepalive (nil
+// if it is gone), if publishes are still billed to the visitor
+func (t *topic) SetRateSubscriberUser(v *visitor, u *user.User) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.rateSubscriber != nil && t.rateSubscriber.is(v) {
+		t.rateSubscriber.user = u
+	}
 }
 
 // Unsubscribe removes the subscription from the list of subscribers

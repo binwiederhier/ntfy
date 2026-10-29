@@ -252,6 +252,9 @@ func (v *visitor) TopicCreationAllowed() bool {
 // AuthAttempt takes a token for an auth attempt, if one is free. Taking it before the credentials
 // are checked keeps concurrent attempts from all getting through; AuthSucceeded gives it back.
 func (v *visitor) AuthAttempt() bool {
+	if v.env.config.VisitorAuthFailureLimitBurst <= 0 {
+		return false // No attempts at all; the limit service reads a zero burst as "no bucket"
+	}
 	return v.env.limiter.Allow(v.key, v.authRule(), 1).OK
 }
 
@@ -263,6 +266,9 @@ func (v *visitor) AuthSucceeded() {
 // AccountActionAttempt takes a token for a rate-limited account action (signup or password-reset
 // request), if one is free. It is taken up front, so concurrent actions cannot all get through.
 func (v *visitor) AccountActionAttempt() bool {
+	if v.env.config.VisitorAccountCreationLimitBurst <= 0 {
+		return false // No actions at all; the limit service reads a zero burst as "no bucket"
+	}
 	return v.env.limiter.Allow(v.key, v.accountRule(), 1).OK
 }
 

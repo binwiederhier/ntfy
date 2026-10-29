@@ -3759,6 +3759,68 @@ func TestServer_SubscriberRateLimiting_DeletedUserStreamKeepsTopic(t *testing.T)
 	require.Equal(t, 200, response.Code)
 }
 
+func TestServer_SubscriberRateLimiting_FailedRefreshKeepsLastTier(t *testing.T) {
+	// A keepalive whose user re-read fails keeps the tier the last good re-read found; it must not
+	// go back to the tier the stream had when it opened (and undo a downgrade)
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "big",
+		MessageLimit: 100,
+	}))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "small",
+		MessageLimit: 1,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "big"))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+	topics, err := s.topicsFromIDs(v, "upAAAAAAAAAAAA")
+	require.Nil(t, err)
+	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/upAAAAAAAAAAAA/json", nil), v, topics))
+	tierCode := func() string {
+		rs, ok := topics[0].RateSubscriber()
+		require.True(t, ok)
+		return rs.user.Tier.Code
+	}
+
+	// Downgrade, and a keepalive picks it up
+	require.Nil(t, s.userManager.ChangeTier("phil", "small"))
+	var refreshing atomic.Bool
+	s.keepaliveSubscriber(v, topics, &refreshing)
+	waitFor(t, func() bool {
+		return !refreshing.Load() && tierCode() == "small"
+	})
+
+	// The database goes away: the next keepalive cannot re-read phil, and keeps the small tier
+	require.Nil(t, s.userManager.Close())
+	s.keepaliveSubscriber(v, topics, &refreshing)
+	waitFor(t, func() bool {
+		return !refreshing.Load()
+	})
+	require.Equal(t, "small", tierCode())
+}
+
+func TestServer_AuthFailureLimit_ZeroBurstAdmitsNothing(t *testing.T) {
+	// An auth failure burst of zero allows no attempts at all, as it did when the bucket was checked
+	// before it was charged; the limit service reads a zero burst as "no bucket"
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorAuthFailureLimitBurst = 0
+	c.EnableSignup = true
+	c.VisitorAccountCreationLimitBurst = 0
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Authorization": util.BasicAuth("phil", "wrong"),
+	})
+	require.Equal(t, 429, response.Code)
+	response = request(t, s, "POST", "/v1/account", `{"username":"ben", "password":"mypass"}`, nil)
+	require.Equal(t, 429, response.Code)
+}
+
 // lockedTopic returns the topic with the given ID, or nil, reading the topics map under the server's lock
 func lockedTopic(s *Server, id string) *topic {
 	s.mu.RLock()

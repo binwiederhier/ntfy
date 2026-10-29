@@ -5982,3 +5982,46 @@ func subscribeStream(t *testing.T, s *Server, topic string, headers map[string]s
 	})
 	return stream
 }
+
+// Fails if message/email daily rules are bypassed; account remaining values must match HTTP admissions through reset.
+func TestServer_Account_RemainingMatchesAdmissions(t *testing.T) {
+	c := newTestConfig(t, "")
+	c.VisitorMessageDailyLimit = 4
+	c.VisitorRequestLimitBurst = 100
+	c.VisitorEmailLimitBurst = 10
+	c.VisitorEmailLimitReplenish = 12 * time.Hour
+	s := newTestServer(t, c)
+	s.mailer = &testMailer{}
+	account := func() *apiAccountResponse {
+		response := request(t, s, "GET", "/v1/account", "", nil)
+		require.Equal(t, 200, response.Code)
+		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+		require.NoError(t, err)
+		return account
+	}
+	for day := 0; day < 2; day++ {
+		before := account()
+		require.Equal(t, int64(4), before.Stats.MessagesRemaining)
+		require.Equal(t, int64(2), before.Stats.EmailsRemaining)
+		for i := int64(0); i < before.Stats.EmailsRemaining; i++ {
+			response := request(t, s, "PUT", "/quota", "test", map[string]string{"Email": "test@email.com"})
+			require.Equal(t, 200, response.Code)
+			after := account()
+			require.Equal(t, before.Stats.EmailsRemaining-i-1, after.Stats.EmailsRemaining)
+			require.Equal(t, before.Stats.MessagesRemaining-i-1, after.Stats.MessagesRemaining)
+		}
+		response := request(t, s, "PUT", "/quota", "test", map[string]string{"Email": "test@email.com"})
+		require.Equal(t, 429, response.Code)
+		require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
+		remaining := account().Stats.MessagesRemaining
+		for i := int64(0); i < remaining; i++ {
+			response = request(t, s, "PUT", "/quota", "test", nil)
+			require.Equal(t, 200, response.Code)
+			require.Equal(t, remaining-i-1, account().Stats.MessagesRemaining)
+		}
+		response = request(t, s, "PUT", "/quota", "test", nil)
+		require.Equal(t, 429, response.Code)
+		require.Zero(t, account().Stats.MessagesRemaining)
+		s.resetStats()
+	}
+}

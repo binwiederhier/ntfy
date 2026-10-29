@@ -182,8 +182,8 @@ func (v *visitor) MessageAllowed() bool {
 func (v *visitor) EmailAllowed() bool {
 	v.mu.RLock() // limits could be replaced!
 	defer v.mu.RUnlock()
-	if v.limits.EmailLimitBurst <= 0 {
-		return false // No email bucket means no emails, as before
+	if v.limits.EmailLimitBurst <= 0 || v.limits.EmailLimit <= 0 {
+		return false // No email bucket, or no emails on the tier: the limit service reads a daily limit of zero as "no cap"
 	}
 	allowed := v.limiter.Allow(v.key, v.emailRule(), 1).OK
 	if allowed {
@@ -385,14 +385,14 @@ func (v *visitor) SetUser(u *user.User) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	shouldResetLimits := v.user.TierID() != u.TierID() // TierID works with nil receiver
-	if shouldResetLimits && v.user != nil && v.user.Tier != nil {
-		// Flush increments counted under the old key, under the old account, before the key is
-		// replaced below; the new key is re-seeded from the new user's persisted stats. Usage of
-		// an IP-keyed visitor (no user, or no tier) is never persisted, so it must not land on
-		// the new account.
+	tierChanged := shouldResetLimits || (u != nil && u.Tier != nil && *v.user.Tier != *u.Tier)
+	if tierChanged && v.user != nil && v.user.Tier != nil {
+		// Flush increments counted under the old key, under the old account, before the key and
+		// the local counts are reset below; the new key is re-seeded from the new user's persisted
+		// stats. Usage of an IP-keyed visitor (no user, or no tier) is never persisted, so it must
+		// not land on the new account. A tier edited in place resets the local counts too.
 		v.enqueueUserStatsDeltaNoLock()
 	}
-	tierChanged := shouldResetLimits || (u != nil && u.Tier != nil && *v.user.Tier != *u.Tier)
 	v.user = u // u may be nil!
 	if tierChanged {
 		v.resetLimitsNoLock()

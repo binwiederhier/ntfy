@@ -67,7 +67,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	if err != nil {
 		return err
 	} else if !user.AllowedUsername(req.Username) || (req.Password == "" && req.Hash == "") {
-		return errHTTPBadRequest.Wrap("username invalid, or password/password_hash missing")
+		return errHTTPBadRequest.Wrap("username invalid, or \"password\" or \"hash\" missing")
 	}
 	role := user.RoleUser
 	if req.Role != "" {
@@ -109,7 +109,7 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 	} else if !user.AllowedUsername(req.Username) {
 		return errHTTPBadRequest.Wrap("username invalid")
 	} else if req.Password == "" && req.Hash == "" && req.Tier == "" && req.Role == "" {
-		return errHTTPBadRequest.Wrap("need to provide at least one of \"password\", \"password_hash\", \"tier\" or \"role\"")
+		return errHTTPBadRequest.Wrap("need to provide at least one of \"password\", \"hash\", \"tier\" or \"role\"")
 	}
 	var role user.Role
 	if req.Role != "" {
@@ -601,15 +601,20 @@ func readAdminTierRequest(r *http.Request) (*user.Tier, error) {
 }
 
 func newAPIUserTokenResponse(username string, t *user.Token) *apiUserTokenResponse {
-	return &apiUserTokenResponse{
+	response := &apiUserTokenResponse{
 		Username:    username,
 		Token:       t.Value,
 		Label:       t.Label,
 		Expires:     t.Expires.Unix(),
-		LastAccess:  t.LastAccess.Unix(),
-		LastOrigin:  t.LastOrigin.String(),
 		Provisioned: t.Provisioned,
 	}
+	// Tokens created without a request (admin API, CLI, provisioning) carry their creation time and
+	// origin 0.0.0.0 until first used; report those as never used
+	if t.LastOrigin.IsValid() && !t.LastOrigin.IsUnspecified() {
+		response.LastAccess = t.LastAccess.Unix()
+		response.LastOrigin = t.LastOrigin.String()
+	}
+	return response
 }
 
 // mapUserErrorToHTTP maps user manager errors to HTTP errors

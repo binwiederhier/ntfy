@@ -766,6 +766,18 @@ func TestUser_AddWithInvalidHash(t *testing.T) {
 		})
 		require.Equal(t, 400, rr.Code)
 		require.Equal(t, 40069, toHTTPError(t, rr.Body.String()).Code)
+
+		// The error names the JSON fields as they are spelled
+		rr = request(t, s, "POST", "/v1/users", `{"username": "ben"}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 400, rr.Code)
+		require.Contains(t, toHTTPError(t, rr.Body.String()).Message, `"password" or "hash" missing`)
+		rr = request(t, s, "PUT", "/v1/users", `{"username": "ben"}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 400, rr.Code)
+		require.Contains(t, toHTTPError(t, rr.Body.String()).Message, `"password", "hash", "tier" or "role"`)
 	})
 }
 
@@ -984,6 +996,8 @@ func TestTokens_AddListRemove(t *testing.T) {
 		require.Equal(t, "forever", forever.Label)
 		require.Equal(t, int64(0), forever.Expires)
 		require.True(t, user.ValidToken(forever.Token))
+		require.Equal(t, int64(0), forever.LastAccess) // Never used
+		require.Equal(t, "", forever.LastOrigin)
 
 		expires := time.Now().Add(time.Hour).Unix()
 		rr = request(t, s, "POST", "/v1/users/tokens", fmt.Sprintf(`{"username":"emma","expires":%d}`, expires), auth)

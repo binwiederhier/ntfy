@@ -759,3 +759,16 @@ func TestVisitor_EmailsWithoutTierHaveNoDailyCap(t *testing.T) {
 	}
 	require.False(t, v.EmailAllowed())
 }
+
+func TestVisitor_EmailsWithoutTierAllowedWithSlowRefill(t *testing.T) {
+	// A refill slower than a day derives a daily limit of zero, which must not turn off email
+	// without a tier: the bucket alone limits it
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 2
+	c.VisitorEmailLimitReplenish = 48 * time.Hour
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.True(t, v.EmailAllowed())
+	require.True(t, v.EmailAllowed())
+	require.False(t, v.EmailAllowed())
+}

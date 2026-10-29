@@ -289,9 +289,11 @@ func (s *Server) handleUsersTokensAdd(w http.ResponseWriter, r *http.Request, v 
 	} else if req.Username == user.Everyone {
 		return errHTTPBadRequest.Wrap("cannot create tokens for the everyone user")
 	}
-	u, err := s.readAdminTokenUser(r, req.Username)
+	u, err := s.userManager.User(req.Username)
 	if err != nil {
-		return err
+		return mapUserErrorToHTTP(err)
+	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
+		return errHTTPForbidden // Admin users' tokens can only be managed over the admin socket
 	}
 	expires := time.Unix(0, 0)
 	if req.Expires != 0 {
@@ -313,9 +315,11 @@ func (s *Server) handleUsersTokensDelete(w http.ResponseWriter, r *http.Request,
 	if err != nil {
 		return err
 	}
-	u, err := s.readAdminTokenUser(r, req.Username)
+	u, err := s.userManager.User(req.Username)
 	if err != nil {
-		return err
+		return mapUserErrorToHTTP(err)
+	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
+		return errHTTPForbidden // Admin users' tokens can only be managed over the admin socket
 	}
 	adminLog(v, r).Info("Removing token for user %s", req.Username)
 	if err := s.userManager.RemoveToken(u.ID, req.Token); err != nil {
@@ -556,18 +560,6 @@ func (s *Server) topicsForAccessChange(topicPattern string) []*topic {
 		return nil
 	}
 	return topics
-}
-
-// readAdminTokenUser looks up the owner of tokens to be created or removed. Admin users' tokens
-// can only be managed over the admin socket.
-func (s *Server) readAdminTokenUser(r *http.Request, username string) (*user.User, error) {
-	u, err := s.userManager.User(username)
-	if err != nil {
-		return nil, mapUserErrorToHTTP(err)
-	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
-		return nil, errHTTPForbidden
-	}
-	return u, nil
 }
 
 // checkRoleChange validates a requested role change. Roles can only be set over the admin socket.

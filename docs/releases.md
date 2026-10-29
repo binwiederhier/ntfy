@@ -2268,7 +2268,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Admin API: manage tokens of other users (`/v1/users/tokens`), tiers (`/v1/tiers`; the price list for the upgrade dialog moved to `/v1/account/billing/tiers`) and password reset links (`/v1/users/password/reset`); `GET /v1/users` also returns tier names, provisioned users and grants and the default access, `PUT /v1/users` can remove a tier (`"tier": "-"`), and `DELETE /v1/users/access` can reset all of a user's entries or the whole ACL
+* Admin API: manage tokens of other users (`/v1/users/tokens`), tiers (`/v1/tiers`; the price list for the upgrade dialog moved to `/v1/account/billing/tiers`) and password reset links (`/v1/users/password/reset`); `GET /v1/users` also returns tier names, provisioned users and grants and the default access, `PUT /v1/users` can remove a tier (`"tier": "-"`), and `DELETE /v1/users/access` can reset all of a user's entries (or, over the admin socket, the whole ACL)
 
 **Security:**
 

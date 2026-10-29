@@ -127,7 +127,7 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	} else if u != nil {
 		if u.IsAdmin() && !isAdminSocketRequest(r) {
-			return errHTTPForbidden
+			return errHTTPForbiddenAdminSocketOnly
 		}
 		if req.Hash != "" || req.Password != "" {
 			adminLog(v, r).Info("Changing password of user %s", req.Username)
@@ -227,6 +227,8 @@ func (s *Server) handleAccessReset(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	} else if req.Username == "" && req.Topic != "" {
 		return errHTTPBadRequest.Wrap("topic requires a username")
+	} else if req.Username == "" && !isAdminSocketRequest(r) {
+		return errHTTPForbiddenAdminSocketOnly // Resetting the whole ACL also opens all reserved topics
 	}
 	var u *user.User
 	if req.Username != "" {
@@ -258,8 +260,12 @@ func (s *Server) handleUsersTokensGet(w http.ResponseWriter, r *http.Request, v 
 		u, err := s.userManager.User(username)
 		if err != nil {
 			return mapUserErrorToHTTP(err)
+		} else if u.IsAdmin() && !isAdminSocketRequest(r) {
+			return errHTTPForbiddenAdminSocketOnly // Admin users' tokens can only be managed over the admin socket
 		}
 		users = []*user.User{u}
+	} else if !isAdminSocketRequest(r) {
+		return errHTTPForbiddenAdminSocketOnly // All users' tokens in one call, too much for a leaked admin token
 	} else {
 		var err error
 		if users, err = s.userManager.Users(); err != nil {
@@ -268,9 +274,6 @@ func (s *Server) handleUsersTokensGet(w http.ResponseWriter, r *http.Request, v 
 	}
 	response := make([]*apiUserTokenResponse, 0)
 	for _, u := range users {
-		if u.IsAdmin() && !isAdminSocketRequest(r) {
-			continue // Tokens are secrets; the network API never touches admins
-		}
 		tokens, err := s.userManager.Tokens(u.ID)
 		if err != nil {
 			return err
@@ -293,7 +296,7 @@ func (s *Server) handleUsersTokensAdd(w http.ResponseWriter, r *http.Request, v 
 	if err != nil {
 		return mapUserErrorToHTTP(err)
 	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
-		return errHTTPForbidden // Admin users' tokens can only be managed over the admin socket
+		return errHTTPForbiddenAdminSocketOnly // Admin users' tokens can only be managed over the admin socket
 	}
 	expires := time.Unix(0, 0)
 	if req.Expires != 0 {
@@ -319,7 +322,7 @@ func (s *Server) handleUsersTokensDelete(w http.ResponseWriter, r *http.Request,
 	if err != nil {
 		return mapUserErrorToHTTP(err)
 	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
-		return errHTTPForbidden // Admin users' tokens can only be managed over the admin socket
+		return errHTTPForbiddenAdminSocketOnly // Admin users' tokens can only be managed over the admin socket
 	}
 	adminLog(v, r).Info("Removing token for user %s", req.Username)
 	if err := s.userManager.RemoveToken(u.ID, req.Token); err != nil {
@@ -341,7 +344,7 @@ func (s *Server) handleUsersPasswordReset(w http.ResponseWriter, r *http.Request
 	} else if u.Provisioned {
 		return errHTTPConflictProvisionedUserChange
 	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
-		return errHTTPForbidden
+		return errHTTPForbiddenAdminSocketOnly
 	}
 	var email string
 	if req.SendEmail {

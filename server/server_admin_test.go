@@ -915,10 +915,22 @@ func TestAccess_ResetAll(t *testing.T) {
 		require.Nil(t, s.userManager.AllowAccess("ben", "gold", user.PermissionRead))
 		require.Nil(t, s.userManager.AllowAccess("emma", "silver", user.PermissionRead))
 		require.Nil(t, s.userManager.AllowAccess(user.Everyone, "public", user.PermissionRead))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 
-		rr := requestAdminSocket(t, s, "DELETE", "/v1/users/access", `{}`)
-		require.Equal(t, 200, rr.Code)
+		// Over HTTP, resetting the whole ACL is refused, even for admins
+		rr := request(t, s, "DELETE", "/v1/users/access", `{}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 		grants, err := s.userManager.AllGrants()
+		require.Nil(t, err)
+		require.Len(t, grants, 3)
+
+		// Over the socket, it works
+		rr = requestAdminSocket(t, s, "DELETE", "/v1/users/access", `{}`)
+		require.Equal(t, 200, rr.Code)
+		grants, err = s.userManager.AllGrants()
 		require.Nil(t, err)
 		require.Empty(t, grants)
 	})
@@ -959,7 +971,7 @@ func TestTokens_AddListRemove(t *testing.T) {
 		auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
 
 		// No tokens yet: empty array, not null
-		rr := request(t, s, "GET", "/v1/users/tokens", "", auth)
+		rr := request(t, s, "GET", "/v1/users/tokens?username=ben", "", auth)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "[]", strings.TrimSpace(rr.Body.String()))
 
@@ -984,12 +996,17 @@ func TestTokens_AddListRemove(t *testing.T) {
 		rr = request(t, s, "GET", "/v1/account", "", map[string]string{"Authorization": util.BearerAuth(forever.Token)})
 		require.Equal(t, 200, rr.Code)
 
-		// List all, and one user
+		// Listing all users' tokens is refused over HTTP, but works over the socket
 		rr = request(t, s, "GET", "/v1/users/tokens", "", auth)
+		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
+		rr = requestAdminSocket(t, s, "GET", "/v1/users/tokens", "")
 		require.Equal(t, 200, rr.Code)
 		var tokens []*apiUserTokenResponse
 		require.Nil(t, json.NewDecoder(rr.Body).Decode(&tokens))
 		require.Len(t, tokens, 2)
+
+		// List one user
 		rr = request(t, s, "GET", "/v1/users/tokens?username=ben", "", auth)
 		require.Equal(t, 200, rr.Code)
 		tokens = nil
@@ -1040,7 +1057,7 @@ func TestTokens_Failures(t *testing.T) {
 		require.Equal(t, 40906, toHTTPError(t, rr.Body.String()).Code)
 
 		// Non-admins cannot use the API
-		rr = request(t, s, "GET", "/v1/users/tokens", "", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
+		rr = request(t, s, "GET", "/v1/users/tokens?username=ben", "", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
 		require.Equal(t, 401, rr.Code)
 	})
 }
@@ -1057,8 +1074,11 @@ func TestTokens_AdminTokensOnlyOverSocket(t *testing.T) {
 		require.Nil(t, err)
 		auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
 
-		// Over HTTP, admin tokens are hidden and cannot be created or removed
-		rr := request(t, s, "GET", "/v1/users/tokens", "", auth)
+		// Over HTTP, admin tokens cannot be listed, created or removed
+		rr := request(t, s, "GET", "/v1/users/tokens?username=phil", "", auth)
+		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
+		rr = request(t, s, "GET", "/v1/users/tokens?username=ben", "", auth)
 		require.Equal(t, 200, rr.Code)
 		var tokens []*apiUserTokenResponse
 		require.Nil(t, json.NewDecoder(rr.Body).Decode(&tokens))
@@ -1066,6 +1086,7 @@ func TestTokens_AdminTokensOnlyOverSocket(t *testing.T) {
 		require.Equal(t, "ben", tokens[0].Username)
 		rr = request(t, s, "POST", "/v1/users/tokens", `{"username":"phil"}`, auth)
 		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 
 		// Over the socket, they are visible and can be created
 		rr = requestAdminSocket(t, s, "GET", "/v1/users/tokens", "")

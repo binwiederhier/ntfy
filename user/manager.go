@@ -38,7 +38,7 @@ const (
 
 // Default constants that may be overridden by configs
 const (
-	DefaultUserStatsQueueWriterInterval = 33 * time.Second
+	DefaultUserStatsQueueWriterInterval = 33 * time.Second // How often the token access stats are written; the daily counts are the limit service's (see package limit)
 	DefaultUserPasswordBcryptCost       = 10
 	DefaultAccessCacheEnabled           = false
 	DefaultAccessCacheReloadInterval    = 67 * time.Second
@@ -56,7 +56,6 @@ type Manager struct {
 	config      *Config
 	db          *db.DB
 	queries     queries
-	statsQueue  map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
 	tokenQueue  map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
 	accessCache *accessCache            // In-memory snapshot of user_access; reloaded by accessWritten after every ACL mutation
 	quit        chan struct{}           // Closed by Close() to signal background goroutines to stop
@@ -81,7 +80,6 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 	manager := &Manager{
 		config:     config,
 		db:         d,
-		statsQueue: make(map[string]*Stats),
 		tokenQueue: make(map[string]*TokenUpdate),
 		quit:       make(chan struct{}),
 		queries:    queries,
@@ -422,33 +420,6 @@ func (a *Manager) checkReservationsLimitTx(tx *sql.Tx, username string, reservat
 	return nil
 }
 
-// ResetStats resets all user stats in the user database. This touches all users.
-func (a *Manager) ResetStats() error {
-	a.mu.Lock() // Includes database query to avoid races!
-	defer a.mu.Unlock()
-	if _, err := a.db.Exec(a.queries.updateUserStatsResetAll); err != nil {
-		return err
-	}
-	a.statsQueue = make(map[string]*Stats)
-	return nil
-}
-
-// EnqueueUserStats adds the given stats *delta* to a queue which writes out user stats
-// (messages, emails, ..) in batches at a regular interval. Deltas accumulate in the queue and
-// are flushed as SQL increments, so concurrent flushes from multiple nodes add up instead of
-// overwriting each other.
-func (a *Manager) EnqueueUserStats(userID string, delta *Stats) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if queued, ok := a.statsQueue[userID]; ok {
-		queued.Messages += delta.Messages
-		queued.Emails += delta.Emails
-		queued.Calls += delta.Calls
-	} else {
-		a.statsQueue[userID] = &Stats{Messages: delta.Messages, Emails: delta.Emails, Calls: delta.Calls}
-	}
-}
-
 func (a *Manager) asyncQueueWriteLoop(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -457,45 +428,11 @@ func (a *Manager) asyncQueueWriteLoop(interval time.Duration) {
 		case <-a.quit:
 			return
 		case <-ticker.C:
-			if err := a.writeUserStatsQueue(); err != nil {
-				log.Tag(tag).Err(err).Warn("Writing user stats queue failed")
-			}
 			if err := a.writeTokenUpdateQueue(); err != nil {
 				log.Tag(tag).Err(err).Warn("Writing token update queue failed")
 			}
 		}
 	}
-}
-
-func (a *Manager) writeUserStatsQueue() error {
-	a.mu.Lock()
-	if len(a.statsQueue) == 0 {
-		a.mu.Unlock()
-		log.Tag(tag).Trace("No user stats updates to commit")
-		return nil
-	}
-	statsQueue := a.statsQueue
-	a.statsQueue = make(map[string]*Stats)
-	a.mu.Unlock()
-
-	return db.ExecTx(a.db, func(tx *sql.Tx) error {
-		log.Tag(tag).Debug("Writing user stats queue for %d user(s)", len(statsQueue))
-		for userID, update := range statsQueue {
-			log.
-				Tag(tag).
-				Fields(log.Context{
-					"user_id":        userID,
-					"messages_count": update.Messages,
-					"emails_count":   update.Emails,
-					"calls_count":    update.Calls,
-				}).
-				Trace("Updating stats for user %s", userID)
-			if _, err := tx.Exec(a.queries.updateUserStats, update.Messages, update.Emails, update.Calls, userID); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
 }
 
 // User returns the user with the given username if it exists, or ErrUserNotFound otherwise
@@ -622,9 +559,8 @@ func (a *Manager) scanUser(rows *sql.Rows) (*User, error) {
 	var id, username, hash, role, prefs, syncTopic string
 	var provisioned bool
 	var stripeCustomerID, stripeSubscriptionID, stripeSubscriptionStatus, stripeSubscriptionInterval, stripeMonthlyPriceID, stripeYearlyPriceID, tierID, tierCode, tierName sql.NullString
-	var messages, emails, calls int64
 	var messagesLimit, messagesExpiryDuration, emailsLimit, callsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration, attachmentBandwidthLimit, stripeSubscriptionPaidUntil, stripeSubscriptionCancelAt, deleted sql.NullInt64
-	if err := rows.Scan(&id, &username, &hash, &role, &prefs, &syncTopic, &provisioned, &messages, &emails, &calls, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionInterval, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &deleted, &tierID, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &callsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &attachmentBandwidthLimit, &stripeMonthlyPriceID, &stripeYearlyPriceID); err != nil {
+	if err := rows.Scan(&id, &username, &hash, &role, &prefs, &syncTopic, &provisioned, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionInterval, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &deleted, &tierID, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &callsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &attachmentBandwidthLimit, &stripeMonthlyPriceID, &stripeYearlyPriceID); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -637,11 +573,6 @@ func (a *Manager) scanUser(rows *sql.Rows) (*User, error) {
 		Prefs:       &Prefs{},
 		SyncTopic:   syncTopic,
 		Provisioned: provisioned,
-		Stats: &Stats{
-			Messages: messages,
-			Emails:   emails,
-			Calls:    calls,
-		},
 		Billing: &Billing{
 			StripeCustomerID:            stripeCustomerID.String,                                            // May be empty
 			StripeSubscriptionID:        stripeSubscriptionID.String,                                        // May be empty

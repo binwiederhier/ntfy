@@ -21,6 +21,10 @@ const (
 	// is gone. This number has to be very high to prevent e-mail abuse, but it doesn't really affect
 	// the other limits anyway, since they are replenished faster (typically).
 	visitorExpungeAfter = oneDay
+
+	// promoteRate is the fraction of the daily message cap (1/promoteRate) from which the count of
+	// a visitor without a user is written to the usage table; below it, a restart forgets it
+	promoteRate = 10
 )
 
 // visitor represents one request's API user: its identity (the IP, or the user) and the limits that
@@ -52,6 +56,13 @@ type visitorInfo struct {
 	Stats  *visitorStats
 }
 
+// visitorUsage is a key's daily counts (see visitor.Stats)
+type visitorUsage struct {
+	Messages int64
+	Emails   int64
+	Calls    int64
+}
+
 type visitorStats struct {
 	Messages                     int64
 	MessagesRemaining            int64
@@ -63,6 +74,7 @@ type visitorStats struct {
 	ReservationsRemaining        int64
 	AttachmentTotalSize          int64
 	AttachmentTotalSizeRemaining int64
+	ResetAt                      time.Time // When the daily counts start over
 }
 
 func newVisitorEnv(conf *Config, limiter *limit.Service, messageCache *message.Cache, userManager *user.Manager) *visitorEnv {
@@ -181,13 +193,7 @@ func (v *visitor) MessageAllowed() bool {
 	if v.limits.MessageLimit <= 0 {
 		return false // A daily limit of zero admits nothing; the limit service reads it as "no cap"
 	}
-	allowed := v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Messages: 1,
-		})
-	}
-	return allowed
+	return v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
 }
 
 func (v *visitor) EmailAllowed() bool {
@@ -196,35 +202,14 @@ func (v *visitor) EmailAllowed() bool {
 	} else if v.limits.Basis == vis.BasisTier && v.limits.EmailLimit <= 0 {
 		return false // No emails on the tier: the limit service reads a daily limit of zero as "no cap"
 	}
-	allowed := v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Emails: 1,
-		})
-	}
-	return allowed
+	return v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
 }
 
 func (v *visitor) CallAllowed() bool {
 	if v.limits.CallLimit <= 0 {
 		return false // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
 	}
-	allowed := v.env.limiter.Allow(v.key, v.callRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Calls: 1,
-		})
-	}
-	return allowed
-}
-
-// enqueueUserStats hands what a tier user's request admitted to the user manager's write queue, which
-// adds it to the persisted stats (deltas add up across requests and cluster nodes)
-func (v *visitor) enqueueUserStats(delta *user.Stats) {
-	if v.env.userManager == nil || v.user == nil || v.user.Tier == nil {
-		return
-	}
-	v.env.userManager.EnqueueUserStats(v.user.ID, delta)
+	return v.env.limiter.Allow(v.key, v.callRule(), 1).OK
 }
 
 // SubscriptionAllowed takes one of the visitor key's subscription slots on this node, if one is free.
@@ -290,9 +275,10 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 	return v.env.limiter.Limiter(v.key, v.bandwidthRule())
 }
 
-func (v *visitor) Stats() *user.Stats {
+// Stats returns the key's daily counts in its current period
+func (v *visitor) Stats() *visitorUsage {
 	usage := v.env.limiter.Usage(v.key)
-	return &user.Stats{
+	return &visitorUsage{
 		Messages: usage.Count(limit.KindMessages),
 		Emails:   usage.Count(limit.KindEmails),
 		Calls:    usage.Count(limit.KindCalls),
@@ -338,25 +324,29 @@ func (v *visitor) requestRule() limit.Rule {
 	}
 }
 
+// messageRule is the daily message limit. The count of a visitor without a user is written to the
+// usage table only from a tenth of the cap on (most keys never get there, so their rows are
+// saved); a logged-in user's from the first message, so the account page agrees across nodes.
 func (v *visitor) messageRule() limit.Rule {
-	return limit.Rule{
+	rule := limit.Rule{
 		Kind:  limit.KindMessages,
 		Daily: v.limits.MessageLimit,
 	}
+	if v.user == nil {
+		rule.Threshold = v.limits.MessageLimit / promoteRate
+	}
+	return rule
 }
 
-// emailRule is the email bucket, and for a tier also its daily email limit. Without a tier, the
-// daily limit is only derived from the refill, for display, and is not a cap.
+// emailRule is the email bucket and the daily email limit; without a tier, the daily limit is
+// derived from the refill (24h / visitor-email-limit-replenish)
 func (v *visitor) emailRule() limit.Rule {
-	rule := limit.Rule{
+	return limit.Rule{
 		Kind:   limit.KindEmails,
 		Burst:  int64(v.limits.EmailLimitBurst),
 		Refill: v.limits.EmailLimitReplenish,
+		Daily:  v.limits.EmailLimit,
 	}
-	if v.limits.Basis == vis.BasisTier {
-		rule.Daily = v.limits.EmailLimit
-	}
-	return rule
 }
 
 func (v *visitor) callRule() limit.Rule {
@@ -459,6 +449,7 @@ func (v *visitor) infoLight() *visitorInfo {
 			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - stats.Emails),
 			Calls:             stats.Calls,
 			CallsRemaining:    zeroIfNegative(limits.CallLimit - stats.Calls),
+			ResetAt:           v.env.limiter.ResetAt(v.key),
 		},
 	}
 }

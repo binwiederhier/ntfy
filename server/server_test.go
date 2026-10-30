@@ -6123,3 +6123,70 @@ func TestServer_SubscriptionLimit_ReleasedWhenStreamCloses(t *testing.T) {
 	require.Equal(t, 200, rr.Code)
 	require.Empty(t, s.visitors.subscriptions.counts)
 }
+
+func TestServer_UsageSurvivesRestart(t *testing.T) {
+	// Daily counts are kept in the usage table of the auth-file: a restart continues where the old
+	// server stopped, except for keys without a user below the threshold (10% of the cap)
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorMessageDailyLimit = 100 // Threshold 10
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 50,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	publish := func(s *Server, n int, headers map[string]string, ip string) {
+		for i := 0; i < n; i++ {
+			response := request(t, s, "PUT", "/mytopic", "test", headers, func(r *http.Request) {
+				r.RemoteAddr = ip + ":1234"
+			})
+			require.Equal(t, 200, response.Code)
+		}
+	}
+	auth := map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	}
+	publish(s, 3, auth, "9.9.9.9")
+	publish(s, 12, nil, "1.1.1.1")
+	publish(s, 5, nil, "2.2.2.2")
+	s.Stop()
+
+	s = newTestServer(t, c)
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, int64(3), s.visitor(netip.MustParseAddr("9.9.9.9"), u).Stats().Messages)
+	require.Equal(t, int64(12), s.visitor(netip.MustParseAddr("1.1.1.1"), nil).Stats().Messages)
+	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("2.2.2.2"), nil).Stats().Messages)
+}
+
+func TestServer_AnonymousEmailDailyCapShared(t *testing.T) {
+	// Anonymous emails have a daily cap (24h / visitor-email-limit-replenish) shared by all nodes
+	// on one usage table, not one per node
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.VisitorEmailLimitBurst = 10
+		c.VisitorEmailLimitReplenish = 24 * time.Hour / 5 // Daily cap 5
+		a := newTestServer(t, c)
+		a.mailer = &testMailer{}
+		bConf := *c
+		bConf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
+		b := newTestServer(t, &bConf)
+		b.mailer = &testMailer{}
+		email := map[string]string{
+			"Email": "test@email.com",
+		}
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, a, "PUT", "/mytopic", "test", email).Code)
+		}
+		waitForWithMaxWait(t, 15*time.Second, func() bool {
+			return b.visitor(netip.MustParseAddr("9.9.9.9"), nil).Stats().Emails == 3
+		})
+		for i := 0; i < 2; i++ {
+			require.Equal(t, 200, request(t, b, "PUT", "/mytopic", "test", email).Code)
+		}
+		response := request(t, b, "PUT", "/mytopic", "test", email)
+		require.Equal(t, 429, response.Code)
+		require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
+	})
+}

@@ -309,6 +309,7 @@ type apiAccountStats struct {
 	ReservationsRemaining        int64 `json:"reservations_remaining"`
 	AttachmentTotalSize          int64 `json:"attachment_total_size"`
 	AttachmentTotalSizeRemaining int64 `json:"attachment_total_size_remaining"`
+	ResetAt                      int64 `json:"reset_at"` // Unix seconds: when the daily counts start over (see limit.Service.ResetAt)
 }
 
 type apiAccountReservation struct {

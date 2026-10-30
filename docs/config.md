@@ -1933,7 +1933,9 @@ The daily counts (messages, e-mails and phone calls) are kept in the user databa
 Without either, they are counted in memory only and start over with every restart. With a database, idle visitors are
 also dropped from memory after a few minutes instead of a day (once their rate limits are full again), since their counts
 are in the database (an anonymous visitor only gets a row once it has used 1% of a daily quota, so the many visitors that
-publish once or twice never touch it).
+publish once or twice never touch it). In an [experimental cluster](#clustering-experimental), the counts are shared by all nodes
+through the database, and the request, e-mail and other rate limit buckets converge across the nodes within seconds, so
+a client spread over several nodes gets the configured rate rather than several times it.
 
 ### Attachment limits
 Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 

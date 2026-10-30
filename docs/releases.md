@@ -2297,6 +2297,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Admin API: return 4xx errors instead of a 500 for invalid input, and remove a deleted user's web push subscriptions
+* Check the whole server config again when `base-url` or a `message-size-limit` above 4K is set; most checks after them were skipped, so an invalid config (e.g. `upstream-base-url` equal to `base-url`) now fails to start ([#1969](https://github.com/binwiederhier/ntfy/pull/1969), thanks to [@mikejgray](https://github.com/mikejgray) for the contribution)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

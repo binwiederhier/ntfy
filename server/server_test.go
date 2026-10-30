@@ -3893,6 +3893,31 @@ func TestServer_SubscriberRateLimiting_DeletedSubscriberIsNoPayer(t *testing.T) 
 	})
 }
 
+func TestServer_SubscriberRateLimiting_UserLookupErrorIsRetryable(t *testing.T) {
+	// If the subscriber cannot be looked up, the publish fails with a 5xx the publisher retries: it is
+	// not a topic without subscriber, which would make the Matrix gateway reject the pushkey
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", map[string]string{
+		"Authorization": util.BasicAuth("alice", "alice"),
+	})
+	require.Equal(t, 200, rr.Code)
+	s.payers.userByID = func(id string) (*user.User, error) {
+		return nil, errors.New("database is down")
+	}
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 500, response.Code)
+	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/upAAAAAAAAAAAA?up=1"}]}}`
+	to := lockedTopic(s, "upAAAAAAAAAAAA")
+	to.mu.Lock()
+	to.lastAccess = time.Now().Add(-13 * time.Hour) // Long enough without access to reject the pushkey, if there were no payer
+	to.mu.Unlock()
+	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
+	require.Equal(t, 500, response.Code)
+}
+
 // lockedTopic returns the topic with the given ID, or nil, reading the topics map under the server's lock
 func lockedTopic(s *Server, id string) *topic {
 	s.mu.RLock()

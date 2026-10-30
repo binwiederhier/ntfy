@@ -107,7 +107,11 @@ func (p *topicPayers) Resolve(topicID string) (*visitor, error) {
 		return newVisitor(p.visitors, py.ip, nil), nil
 	}
 	u, err := p.userByID(py.userID)
-	if err != nil || u.Deleted {
+	if errors.Is(err, user.ErrUserNotFound) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	} else if u.Deleted {
 		return nil, nil
 	}
 	return newVisitor(p.visitors, py.ip, u), nil

@@ -30,7 +30,7 @@ type topic struct {
 	ID          string
 	subscribers map[int]*topicSubscriber
 	rateVisitor *visitor
-	rateSeen    time.Time // When a subscriber with the rate visitor's key was last seen (see KeepRateVisitor)
+	rateSeen    time.Time // When the rate visitor subscribed, or a stream on the topic last closed
 	lastAccess  time.Time
 	delivered   map[string]time.Time // When recent messages went out to the subscribers, by message ID
 	mu          sync.RWMutex
@@ -131,30 +131,6 @@ func (t *topic) SetRateVisitor(v *visitor) {
 	t.lastAccess = time.Now()
 }
 
-// KeepRateVisitor is called on the keepalives of a stream whose visitor may be the topic's rate visitor.
-// A stream with the rate visitor's key keeps it alive, whichever of its subscribers set it. It returns
-// true if the rate visitor has another key and is stale, so the stream may take the topic back (see
-// TakeRateVisitor), once it is checked that it still may.
-func (t *topic) KeepRateVisitor(v *visitor) (stale bool) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.rateVisitor != nil && t.rateVisitor.key == v.key {
-		t.rateSeen = time.Now()
-		return false
-	}
-	return t.rateVisitorStaleNoLock()
-}
-
-// TakeRateVisitor makes v the topic's rate visitor if the current one is still stale
-func (t *topic) TakeRateVisitor(v *visitor) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.rateVisitorStaleNoLock() {
-		t.rateVisitor = v
-		t.rateSeen = time.Now()
-	}
-}
-
 // RateVisitor returns the topic's rate visitor, or nil if there is none or it is stale
 func (t *topic) RateVisitor() *visitor {
 	t.mu.Lock()
@@ -165,10 +141,14 @@ func (t *topic) RateVisitor() *visitor {
 	return t.rateVisitor
 }
 
-// rateVisitorStaleNoLock is true if there is no rate visitor, or no subscriber with its key has been
-// seen for visitorExpungeAfter
+// rateVisitorStaleNoLock is true if there is no rate visitor, or the topic has no open stream and
+// none closed or polled within visitorExpungeAfter. Any open stream keeps the rate visitor alive,
+// which is the subscriber's own, or whoever subscribed last.
 func (t *topic) rateVisitorStaleNoLock() bool {
-	return t.rateVisitor == nil || time.Since(t.rateSeen) > visitorExpungeAfter
+	if t.rateVisitor == nil {
+		return true
+	}
+	return len(t.subscribers) == 0 && time.Since(t.rateSeen) > visitorExpungeAfter
 }
 
 // Unsubscribe removes the subscription from the list of subscribers
@@ -176,6 +156,7 @@ func (t *topic) Unsubscribe(id int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.subscribers, id)
+	t.rateSeen = time.Now() // The subscriber was last seen now; the rate visitor stays for another visitorExpungeAfter
 }
 
 // Publish sends a live message to the subscribers that have not had it (see deliver), without

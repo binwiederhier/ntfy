@@ -46,8 +46,8 @@ type TopicInfo struct {
 	LastSubscriberKey string
 	LastPublishedAt   time.Time
 	LastPublisherKey  string
-	RateVisitorKey    string // Empty if no rate visitor was ever assigned
-	RateVisitorUID    string // User ID for user-keyed rate visitors, empty otherwise
+	RateVisitorKey    string    // Empty if no rate visitor was ever assigned
+	RateVisitorUID    string    // The rate visitor's user ID, empty if anonymous
 	RateVisitorSeenAt time.Time // When the rate visitor was assigned
 }
 

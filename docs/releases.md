@@ -6,11 +6,35 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.34.0 | Oct 24, 2026  |
+| ntfy server      | v2.35.0 | Oct 30, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.35.0
+Released October 30, 2026
+
+This release keeps what a user already spent when their tier changes, and makes a tier's daily email limit a hard
+cap. It also fixes intermittent 403s under concurrent requests from the same IP, and the Matrix push gateway storing
+messages under a protected topic on SQLite.
+
+**Security:**
+
+* Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied; thanks to [Efe Çam](https://github.com/the-arma-of-owl) for reporting)
+
+**Features:**
+
+* A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the user's next request and keeps what was already spent; before, it refilled the request, email and attachment bandwidth limits ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
+* A tier's daily email limit is a hard cap; before, the tier's email burst came on top of it, so a user could send more emails a day than the tier allows
+
+**Bug fixes + maintenance:**
+
+* Fix intermittent 403s and panics in the account handlers under concurrent requests from the same IP: a login or logout could change the user under another request, so a request with valid credentials was treated as anonymous, or the other way around. Every request now gets its own visitor ([#1051](https://github.com/binwiederhier/ntfy/issues/1051), [#2113](https://github.com/binwiederhier/ntfy/issues/2113), [#2118](https://github.com/binwiederhier/ntfy/pull/2118), thanks to [@ivanetinajero](https://github.com/ivanetinajero) for reporting)
+* A tier with a daily email limit of zero sends no emails; before, it could still send the server's email burst (`visitor-email-limit-burst`)
+* An attachment upload rejected at a size limit is no longer charged to the attachment bandwidth limit for the part that went over
+* Rate limits live in one shared limit service, keyed by `ip:<prefix>` or `user:<id>`, instead of in each visitor, which uses less memory per visitor and takes a global lock off the request path
+* Accept terabyte units (e.g. `1T`) in size settings such as attachment and tier limits, matching how sizes are displayed ([#2078](https://github.com/binwiederhier/ntfy/pull/2078), thanks to [@cangen185-sudo](https://github.com/cangen185-sudo) for the contribution)
 
 ## ntfy server v2.34.0
 Released October 24, 2026
@@ -2264,21 +2288,18 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-### ntfy server v2.35.0 (UNRELEASED)
+### ntfy server v2.36.0 (UNRELEASED)
 
 **Features:**
 
 * Daily quotas (messages, e-mails, phone calls) are kept in a database (`usage-file` for SQLite, or `database-url`) and survive a restart; a crash loses at most 5 seconds of counting. Before, every restart reset them (see [message limits](config.md#message-limits))
 * In an experimental cluster, the rate limits are shared across the nodes: daily quotas through the database, request and other rate limit buckets through the node mesh, so a client spread over several nodes gets the configured rate instead of several times it, and a brute force attempt spread over the nodes is caught at the same point as on one node
-* Idle visitors are dropped from memory after a few minutes instead of a day when usage is persisted, which cuts the server's memory on busy instances
+* Idle visitors are dropped from memory after a few minutes instead of a day when usage is persisted (once their rate limits are full again), which cuts the server's memory on busy instances
 * Topics without subscribers are dropped from memory after a few minutes instead of 16 hours when usage is persisted: who a UnifiedPush topic bills to and when it was last subscribed to are kept in a `topic` table instead, so any node (and a restarted one) knows them
 * UnifiedPush: a push (`?up=1`) to a topic nobody has subscribed to for 7 days answers `404` instead of `507`, as RFC 8030 prescribes for an expired subscription, so app servers like Mastodon stop sending to it; the Matrix push gateway's `rejected` answer after 12 hours now works across nodes and restarts too ([#664](https://github.com/binwiederhier/ntfy/issues/664), thanks to [@ShadowJonathan](https://github.com/ShadowJonathan) for reporting)
 
 **Behavior changes:**
 
-* The daily e-mail limit (the number shown on the account page) is now enforced as a daily cap on top of the e-mail bucket; before, only the bucket's refill rate approximated it
-* A tier change applies on the next request without handing back full rate limit buckets, and a changed limit on an existing tier applies at once
-* A rejected attachment chunk refunds the bandwidth it was charged (e.g. when the file size limit rejects it)
 * The daily reset job is gone: the usage day starts over at midnight UTC by itself, and the `stats_*` columns of the user table are no longer written or read (the account page reads the usage table)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)

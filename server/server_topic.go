@@ -41,7 +41,7 @@ func (s *Server) recordSubscribers(v *visitor, topics []*topic) {
 	if !s.limiter.Persistent() {
 		return
 	}
-	key := v.Key()
+	key := v.key
 	for _, t := range topics {
 		if t.ShouldRecord(false) {
 			id := t.ID
@@ -55,7 +55,7 @@ func (s *Server) recordSubscribers(v *visitor, topics []*topic) {
 // recordPublish writes a successful publish to the topic table, throttled per topic, in the background
 func (s *Server) recordPublish(v *visitor, t *topic) {
 	if s.limiter.Persistent() && t.ShouldRecord(true) {
-		id, key := t.ID, v.Key()
+		id, key := t.ID, v.key
 		s.enqueueTopicWrite(func() {
 			s.logTopicError(id, s.limiter.RecordTopicPublish(id, key))
 		})
@@ -73,7 +73,7 @@ func (s *Server) recordRateVisitors(v *visitor, topics []*topic, added []string)
 		}
 		return
 	}
-	key, userID := v.Key(), v.MaybeUserID()
+	key, userID := v.key, v.MaybeUserID()
 	ids := make([]string, len(topics))
 	for i, t := range topics {
 		ids[i] = t.ID

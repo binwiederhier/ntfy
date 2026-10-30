@@ -238,7 +238,7 @@ func TestServer_UnifiedPush_ActiveVisitorDoesNotKeepAbandonedTopicAlive(t *testi
 		tp := s.topics["upHHHHHHHHHHHH"]
 		s.mu.Unlock()
 		tp.mu.Lock()
-		tp.rateVisitorSeen = time.Now().Add(-upTopicAbandonedAfter - time.Hour) // Its last activity on this topic
+		tp.rateSeen = time.Now().Add(-upTopicAbandonedAfter - time.Hour) // Its last activity on this topic
 		tp.mu.Unlock()
 		s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Keepalive() // The visitor is busy elsewhere
 		rr = request(t, s, "POST", "/upHHHHHHHHHHHH?up=1", "some message", nil)

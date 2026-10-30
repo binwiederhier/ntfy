@@ -21,7 +21,7 @@ import (
 
 func TestServer_TopicEvictedAfterMinutesWhenPersisted(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		s := newTestServer(t, newTestConfig(t, databaseURL))
+		s := newTestServer(t, newTestConfigWithAuthFile(t, databaseURL))
 		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
 		s.mu.Lock()
 		s.topics["mytopic"].lastAccess = time.Now().Add(-topicExpungeAfterPersisted - time.Minute)
@@ -36,7 +36,7 @@ func TestServer_TopicEvictedAfterMinutesWhenPersisted(t *testing.T) {
 
 func TestServer_UnifiedPush_RateVisitorSurvivesTopicEviction(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, func(r *http.Request) {
@@ -62,7 +62,7 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers404(t *testing.T) {
 	// A UnifiedPush topic nobody subscribed to for upTopicAbandonedAfter tells the publisher to
 	// stop: 404, as RFC 8030 prescribes for an expired subscription; before that, 507 (transient)
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
 		rr := request(t, s, "POST", "/upBBBBBBBBBBBB?up=1", "some message", nil)
@@ -87,7 +87,7 @@ func TestServer_MatrixGateway_RejectsFromTopicTable(t *testing.T) {
 	// The 12 h Matrix rule is answered from the table, so a node that never saw the topic (or
 	// evicted it) rejects the pushkey as well
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
 		notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/upCCCCCCCCCCCC?up=1"}]}}`
@@ -121,7 +121,7 @@ func backdateTopic(t *testing.T, s *Server, id string, age time.Duration) {
 	if s.db != nil {
 		_, err = s.db.Exec(`UPDATE topic SET created_at = $1, last_subscribed_at = LEAST(last_subscribed_at, $1), rate_visitor_seen_at = LEAST(rate_visitor_seen_at, $1) WHERE id = $2`, then, id)
 	} else {
-		d, openErr := sql.Open("sqlite3", s.config.UsageFile)
+		d, openErr := sql.Open("sqlite3", s.config.AuthFile)
 		require.Nil(t, openErr)
 		defer d.Close()
 		_, err = d.Exec(`UPDATE topic SET created_at = ?, last_subscribed_at = MIN(last_subscribed_at, ?), rate_visitor_seen_at = MIN(rate_visitor_seen_at, ?) WHERE id = ?`, then, then, then, id)
@@ -150,14 +150,14 @@ func TestServer_UnifiedPush_PeerAnnouncementClearsCachedMiss(t *testing.T) {
 	// Lab finding (case "up", 2026-10-25): a push before the subscription cached "no row" on this
 	// node for 30 s, so a subscription on another node went unseen and pushes got 507
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
 		rr := request(t, s, "POST", "/upEEEEEEEEEEEE?up=1", "m", nil)
 		require.Equal(t, 507, rr.Code) // Caches the miss
 		other := newOtherNodeLimiter(t, s)
 		require.Nil(t, other.SetTopicRateVisitor("upEEEEEEEEEEEE", "ip:1.2.3.4", ""))
-		require.Nil(t, other.Close())
+		other.Close()
 		rr = request(t, s, "POST", "/upEEEEEEEEEEEE?up=1", "m", nil)
 		require.Equal(t, 507, rr.Code) // Still cached
 		s.handlePeerTopicsAdded([]string{"upEEEEEEEEEEEE"})
@@ -170,7 +170,7 @@ func TestServer_TopicTableWritesDoNotBlockTheCaller(t *testing.T) {
 	// Codex review #5: "go s.logTopicError(..., s.limiter.X(...))" ran the SQL on the caller (Go
 	// evaluates a goroutine's arguments first), so a slow database stalled publishes and keepalives
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
 		v := s.visitor(netip.MustParseAddr("1.2.3.4"), nil)
@@ -190,7 +190,7 @@ func TestServer_RateVisitorCommittedBeforeAnnouncement(t *testing.T) {
 	// A peer that hears about a topic's first subscriber reads the table at once (see
 	// handlePeerTopicsAdded), so the assignment must be committed before the announcement
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
 		var mu sync.Mutex
@@ -226,7 +226,7 @@ func TestServer_UnifiedPush_ActiveVisitorDoesNotKeepAbandonedTopicAlive(t *testi
 	// Codex review #8: the in-memory rate visitor stayed valid while its key was active anywhere, so
 	// unrelated traffic of the subscriber's IP kept an abandoned topic billable and skipped the 404
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
 		rr := request(t, s, "GET", "/upHHHHHHHHHHHH/json?poll=1", "", nil, func(r *http.Request) {

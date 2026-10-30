@@ -12,8 +12,6 @@ import (
 )
 
 const (
-	schemaStore = "usage" // Store name in the shared schema_version table (see db/schema)
-
 	// flushChunkRows caps the rows of one upsert statement, so a flush with many keys is a few
 	// bounded statements rather than one huge one (SQLite also caps the variables per statement)
 	flushChunkRows = 500
@@ -36,7 +34,6 @@ type Store struct {
 	db      *db.DB
 	dialect schema.Dialect
 	queries queries
-	closer  *sql.DB // Closed by Close; nil when the pool is shared and owned by the caller
 }
 
 // queries are the dialect's SQL statements
@@ -131,14 +128,6 @@ func (s *Store) readKeys(ctx context.Context, day string, keys []string) ([]usag
 func (s *Store) prune(ctx context.Context, day string) error {
 	_, err := s.db.ExecContext(ctx, s.queries.prune, day)
 	return err
-}
-
-// Close closes the store's own database, if it has one
-func (s *Store) Close() error {
-	if s.closer != nil {
-		return s.closer.Close()
-	}
-	return nil
 }
 
 func (s *Store) flushPostgres(ctx context.Context, day string, rows []usageRow) error {

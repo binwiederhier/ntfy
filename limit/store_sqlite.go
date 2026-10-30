@@ -1,9 +1,6 @@
 package limit
 
 import (
-	"database/sql"
-
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
 )
@@ -40,56 +37,11 @@ const (
 	sqlitePruneTopicsQuery = `DELETE FROM topic WHERE MAX(created_at, last_subscribed_at, last_published_at, rate_visitor_seen_at) < ?`
 )
 
-// The topic table: who a topic bills to (the UnifiedPush rate visitor), when it was created,
-// last subscribed to and last published on (see topics.go)
-const (
-	sqliteCreateTopicTableQuery = `
-		CREATE TABLE IF NOT EXISTS topic (
-			id TEXT PRIMARY KEY,
-			created_at INT NOT NULL,
-			last_subscribed_at INT NOT NULL DEFAULT 0,
-			last_subscriber_key TEXT NOT NULL DEFAULT '',
-			last_published_at INT NOT NULL DEFAULT 0,
-			last_publisher_key TEXT NOT NULL DEFAULT '',
-			rate_visitor_key TEXT NOT NULL DEFAULT '',
-			rate_visitor_uid TEXT NOT NULL DEFAULT '',
-			rate_visitor_seen_at INT NOT NULL DEFAULT 0
-		);
-	`
-)
-
-// Schema
-var (
-	sqliteCreateTables = schema.AsMigrateFunc(`
-		CREATE TABLE IF NOT EXISTS usage (
-			key TEXT NOT NULL,
-			day TEXT NOT NULL,
-			kind TEXT NOT NULL,
-			count INT NOT NULL DEFAULT 0,
-			updated_at INT NOT NULL,
-			PRIMARY KEY (key, day, kind)
-		);
-		CREATE INDEX IF NOT EXISTS idx_usage_day_updated_at ON usage (day, updated_at);
-	` + sqliteCreateTopicTableQuery)
-	sqliteMigrations = schema.Migrations{
-		{
-			From: 1,
-			To:   2,
-		}: schema.Query(sqliteCreateTopicTableQuery), // The topic table (who a topic bills to, when it was last subscribed to)
-	}
-)
-
-// NewSQLiteStore opens (or creates) the usage database in the given file
-func NewSQLiteStore(filename string) (*Store, error) {
-	d, err := sql.Open("sqlite3", filename)
-	if err != nil {
-		return nil, err
-	}
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations); err != nil {
-		return nil, err
-	}
+// NewSQLiteStore returns the store on the user database (auth-file), which holds the usage table
+// (see package user, which creates and migrates it)
+func NewSQLiteStore(d *db.DB) *Store {
 	return &Store{
-		db:      db.New(&db.Host{DB: d}, nil),
+		db:      d,
 		dialect: schema.SQLite,
 		queries: queries{
 			selectClock:    sqliteSelectClockQuery,
@@ -108,6 +60,5 @@ func NewSQLiteStore(filename string) (*Store, error) {
 				prune:             sqlitePruneTopicsQuery,
 			},
 		},
-		closer: d,
-	}, nil
+	}
 }

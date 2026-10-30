@@ -1848,6 +1848,19 @@ func TestMigrationFrom4(t *testing.T) {
 	checkMigratedSqliteSchema(t, filename)
 }
 
+func TestManager_UsageTable(t *testing.T) {
+	// The daily usage counts (package limit) live in the user database, so a single-node SQLite
+	// server keeps them in its auth-file, and a cluster in the shared Postgres
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		_, err := testDB(a).Exec(`INSERT INTO usage (key, day, kind, count, updated_at) VALUES ('ip:1.2.3.4', '2026-10-30', 'messages', 3, 1)`)
+		require.Nil(t, err)
+		var count int64
+		require.Nil(t, testDB(a).QueryRow(`SELECT count FROM usage WHERE key = 'ip:1.2.3.4'`).Scan(&count))
+		require.Equal(t, int64(3), count)
+	})
+}
+
 // TestMigrationFrom6Postgres tests the Postgres migration chain from its oldest supported
 // version (6, the version PostgreSQL support first shipped with).
 func TestMigrationFrom6Postgres(t *testing.T) {
@@ -1861,7 +1874,7 @@ func TestMigrationFrom6Postgres(t *testing.T) {
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'user'`).Scan(&version))
-	require.Equal(t, 9, version)
+	require.Equal(t, 11, version)
 	// The manager works against the migrated schema
 	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
 	u, err := a.User("phil")
@@ -1903,7 +1916,7 @@ func checkSchemaVersion(t *testing.T, d *db.DB) {
 
 	var schemaVersion int
 	require.Nil(t, rows.Scan(&schemaVersion))
-	require.Equal(t, 9, schemaVersion)
+	require.Equal(t, 11, schemaVersion)
 	require.Nil(t, rows.Close())
 }
 

@@ -1332,7 +1332,7 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 		other := newOtherNodeLimiter(t, s)
 		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindMessages}, 123456).OK)
 		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindEmails}, 999).OK)
-		require.Nil(t, other.Close()) // Writes the counts
+		other.Close() // Writes the counts
 
 		// Get account and verify stats are read from the DB, and that the visitor also has these stats
 		rr := request(t, s, "GET", "/v1/account", "", map[string]string{
@@ -3570,7 +3570,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 
 func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL) // With the topic table, which outlives the topic in memory
 		c.VisitorRequestLimitBurst = 3
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
@@ -5525,7 +5525,6 @@ func newTestConfig(t *testing.T, databaseURL string) *Config {
 	} else {
 		conf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
 		conf.CacheStartupQueries = "pragma journal_mode = WAL; pragma synchronous = normal; pragma temp_store = memory;"
-		conf.UsageFile = filepath.Join(t.TempDir(), "usage.db")
 	}
 	conf.UsageFlushInterval = 300 * time.Millisecond
 	conf.AttachmentCacheDir = t.TempDir()
@@ -5552,14 +5551,8 @@ func newTestConfigWithAuthFile(t *testing.T, databaseURL string) *Config {
 // another cluster node (or an earlier run of this one); Close writes what it counted
 func newOtherNodeLimiter(t *testing.T, s *Server) *limit.Service {
 	t.Helper()
-	var store *limit.Store
-	var err error
-	if s.db != nil {
-		store, err = limit.NewPostgresStore(s.db)
-	} else {
-		store, err = limit.NewSQLiteStore(s.config.UsageFile)
-	}
-	require.Nil(t, err)
+	store := createUsageStore(s.db, s.userManager)
+	require.NotNil(t, store) // Needs a user database (auth-file on SQLite)
 	return limit.New(&limit.Config{
 		ResetTime:     s.config.VisitorStatsResetTime,
 		FlushInterval: time.Hour,

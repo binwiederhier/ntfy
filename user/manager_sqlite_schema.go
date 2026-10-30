@@ -364,20 +364,56 @@ const (
 	`
 )
 
+// The usage table holds the visitors' daily usage counts (see package limit, which reads and writes
+// it). It lives here so a single-node server keeps it in its user database, under the user schema's
+// migrations.
+const (
+	sqliteCreateUsageTableQuery = `
+		CREATE TABLE IF NOT EXISTS usage (
+			key TEXT NOT NULL,
+			day TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			count INT NOT NULL DEFAULT 0,
+			updated_at INT NOT NULL,
+			PRIMARY KEY (key, day, kind)
+		);
+		CREATE INDEX IF NOT EXISTS idx_usage_day_updated_at ON usage (day, updated_at);
+	`
+
+	// The topic table holds what a topic has to remember while it is not in memory: who a
+	// UnifiedPush topic bills to (its rate visitor), and when it was created, last subscribed to and
+	// last published on (see package limit, topics.go)
+	sqliteCreateTopicTableQuery = `
+		CREATE TABLE IF NOT EXISTS topic (
+			id TEXT PRIMARY KEY,
+			created_at INT NOT NULL,
+			last_subscribed_at INT NOT NULL DEFAULT 0,
+			last_subscriber_key TEXT NOT NULL DEFAULT '',
+			last_published_at INT NOT NULL DEFAULT 0,
+			last_publisher_key TEXT NOT NULL DEFAULT '',
+			rate_visitor_key TEXT NOT NULL DEFAULT '',
+			rate_visitor_uid TEXT NOT NULL DEFAULT '',
+			rate_visitor_seen_at INT NOT NULL DEFAULT 0
+		);
+	`
+)
+
 var (
-	sqliteCreateTables = schema.AsMigrateFunc(sqliteCreateTablesQueries)
+	sqliteCreateTables = schema.AsMigrateFunc(sqliteCreateTablesQueries + sqliteCreateUsageTableQuery + sqliteCreateTopicTableQuery)
 
 	// sqliteMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
 	sqliteMigrations = schema.Migrations{
-		{From: 1, To: 2}: schema.Func(sqliteMigrateFrom1),
-		{From: 2, To: 3}: schema.Query(sqliteMigrate2To3UpdateQueries),
-		{From: 3, To: 4}: schema.Query(sqliteMigrate3To4UpdateQueries),
-		{From: 4, To: 5}: schema.Query(sqliteMigrate4To5UpdateQueries),
-		{From: 5, To: 6}: schema.Query(sqliteMigrate5To6UpdateQueries),
-		{From: 6, To: 7}: schema.Query(sqliteMigrate6To7UpdateQueries),
-		{From: 7, To: 8}: schema.Query(sqliteMigrate7To8UpdateQueries),
-		{From: 8, To: 9}: schema.Query(sqliteMigrate8To9UpdateQueries),
+		{From: 1, To: 2}:   schema.Func(sqliteMigrateFrom1),
+		{From: 2, To: 3}:   schema.Query(sqliteMigrate2To3UpdateQueries),
+		{From: 3, To: 4}:   schema.Query(sqliteMigrate3To4UpdateQueries),
+		{From: 4, To: 5}:   schema.Query(sqliteMigrate4To5UpdateQueries),
+		{From: 5, To: 6}:   schema.Query(sqliteMigrate5To6UpdateQueries),
+		{From: 6, To: 7}:   schema.Query(sqliteMigrate6To7UpdateQueries),
+		{From: 7, To: 8}:   schema.Query(sqliteMigrate7To8UpdateQueries),
+		{From: 8, To: 9}:   schema.Query(sqliteMigrate8To9UpdateQueries),
+		{From: 9, To: 10}:  schema.Query(sqliteCreateUsageTableQuery), // The usage table (see package limit)
+		{From: 10, To: 11}: schema.Query(sqliteCreateTopicTableQuery), // The topic table (see package limit)
 	}
 )
 

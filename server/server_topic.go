@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/netip"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/user"
+	vis "heckel.io/ntfy/v2/visitor" // Aliased: the server has its own visitor type
 )
 
 // The topic table (see limit.TopicInfo) remembers what an in-memory topic used to: who a
@@ -19,11 +21,9 @@ import (
 // database), everything stays in memory as before.
 
 const (
-	tagTopic             = "topic"
-	topicWriteQueueSize  = 10000   // Topic table writes waiting for a writer; beyond it, a write is dropped (they are throttled hints)
-	topicWriteWorkers    = 4       // Writers running the queued topic table writes
-	visitorKeyIPPrefix   = "ip:"   // See visitor.Key
-	visitorKeyUserPrefix = "user:" // See visitor.Key
+	tagTopic            = "topic"
+	topicWriteQueueSize = 10000 // Topic table writes waiting for a writer; beyond it, a write is dropped (they are throttled hints)
+	topicWriteWorkers   = 4     // Writers running the queued topic table writes
 )
 
 // topicExpungeAfter returns how long a topic without subscribers stays in memory: minutes when
@@ -170,23 +170,33 @@ func (s *Server) topicTableInfo(t *topic) *limit.TopicInfo {
 	return info
 }
 
-// visitorFromKey returns the visitor with the given limiter key (see visitor.Key)
+// visitorFromKey rebuilds a rate visitor from the topic table: its user if it had one (a user
+// with a tier is keyed by its ID, one without by its IP, like an anonymous visitor), and the IP
+// of an IP key. A user key carries no IP; the visitor's IP only shows in its log context then. A
+// user whose key changed since (a lost tier) is not rebuilt, since the table has no IP for it.
 func (s *Server) visitorFromKey(key, userID string) (*visitor, error) {
-	if strings.HasPrefix(key, visitorKeyUserPrefix) {
-		if s.userManager == nil || userID == "" {
-			return nil, errors.New("user-keyed rate visitor without a user")
+	var u *user.User
+	if userID != "" {
+		if s.userManager == nil {
+			return nil, errors.New("rate visitor with a user, but no user manager")
 		}
-		u, err := s.userManager.UserByID(userID)
-		if err != nil {
+		var err error
+		if u, err = s.userManager.UserByID(userID); err != nil {
 			return nil, err
 		}
-		return s.visitor(netip.IPv4Unspecified(), u), nil
 	}
-	ip, err := netip.ParseAddr(strings.TrimPrefix(key, visitorKeyIPPrefix))
-	if err != nil {
-		return nil, err
+	ip := netip.IPv4Unspecified()
+	if addr, ok := strings.CutPrefix(key, vis.KeyPrefixIP); ok {
+		var err error
+		if ip, err = netip.ParseAddr(addr); err != nil {
+			return nil, err
+		}
 	}
-	return s.visitor(ip, (*user.User)(nil)), nil
+	v := s.visitor(ip, u)
+	if v.key != key {
+		return nil, fmt.Errorf("rate visitor %s is now keyed %s", key, v.key)
+	}
+	return v, nil
 }
 
 // handlePeerTopicsAdded drops the cached table reads of topics a peer announced as having just

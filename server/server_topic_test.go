@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/limit"
+	"heckel.io/ntfy/v2/user"
 )
 
 // The step 6 tests: the topic table answers what the in-memory topic used to (who a UnifiedPush
@@ -118,6 +119,35 @@ func TestServer_UnifiedPush_StreamOnOtherNodeKeepsRateVisitor(t *testing.T) {
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Usage().Count(limit.KindMessages))
 	})
+}
+
+func TestServer_VisitorFromKey(t *testing.T) {
+	// A rate visitor read from the topic table is rebuilt as the visitor it was: with its user
+	// (also for an IP-keyed user without a tier), and only if the user still has that key
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code: "test",
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false)) // No tier: IP-keyed
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	phil, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ben, err := s.userManager.User("ben")
+	require.Nil(t, err)
+
+	v, err := s.visitorFromKey("user:"+phil.ID, phil.ID)
+	require.Nil(t, err)
+	require.Equal(t, "user:"+phil.ID, v.key)
+	v, err = s.visitorFromKey("ip:1.2.3.4", ben.ID)
+	require.Nil(t, err)
+	require.Equal(t, "ip:1.2.3.4", v.key)
+	require.Equal(t, ben.ID, v.MaybeUserID())
+
+	// Phil loses the tier: his rate visitor would now be keyed by an IP the table does not have
+	require.Nil(t, s.userManager.ResetTier("phil"))
+	_, err = s.visitorFromKey("user:"+phil.ID, phil.ID)
+	require.NotNil(t, err)
 }
 
 // evictTopic removes the topic from memory, as the manager does with an idle one

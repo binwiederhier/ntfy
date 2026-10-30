@@ -45,6 +45,9 @@ var (
 		Stats:   &user.Stats{},   // Read by newVisitor
 		Billing: &user.Billing{}, // Read by the visitor's log context
 	}
+
+	// adminSocketIP is the visitor IP of every socket request; they all come from this machine
+	adminSocketIP = netip.AddrFrom4([4]byte{127, 0, 0, 1})
 )
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -547,7 +550,7 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 // contextAdminSocket so handlers can allow what the network API refuses.
 func (s *Server) handleAdminSocket(w http.ResponseWriter, r *http.Request) {
 	r = withContext(r, map[contextKey]any{contextAdminSocket: true})
-	v := newVisitor(s.visitors, netip.AddrFrom4([4]byte{127, 0, 0, 1}), adminSocketUser)
+	v := newVisitor(s.visitors, adminSocketIP, adminSocketUser)
 	adminLog(v, r).Debug("Admin socket request")
 	if !slices.Contains(adminSocketPaths, r.URL.Path) {
 		s.handleError(w, r, v, errHTTPNotFound) // Publishing, subscribing, the web app, etc. are not served here

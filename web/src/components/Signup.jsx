@@ -35,7 +35,7 @@ const Signup = () => {
     } catch (e) {
       console.log(`[Signup] Signup for user ${user.username} failed`, e);
       if (e instanceof UserExistsError) {
-        setError(t("signup_error_username_taken", { username: e.username }));
+        setError(t("signup_error_username_taken", { username: user.username }));
       } else if (e instanceof AccountActionLimitReachedError) {
         setError(t("signup_error_creation_limit_reached"));
       } else {

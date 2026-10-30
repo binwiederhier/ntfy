@@ -1,16 +1,3 @@
-<div align="center" markdown="1">
-<sup>Special thanks to:</sup>
-<br>
-<br>
-<a href="https://go.warp.dev/ntfy">
-  <img alt="Warp sponsorship" width="400" src="https://raw.githubusercontent.com/warpdotdev/brand-assets/refs/heads/main/Github/Sponsor/Warp-Github-LG-02.png">
-</a>
-
-### [Warp, built for coding with multiple AI agents.](https://go.warp.dev/ntfy)
-[Available for MacOS, Linux, & Windows](https://go.warp.dev/ntfy)<br>
-</div>
-<hr>
-
 ![ntfy](web/public/static/images/ntfy.png)
 
 # ntfy.sh | Send push notifications to your phone or desktop via PUT/POST
@@ -80,13 +67,7 @@ If you'd like to support the ntfy maintainers, please consider donating to [GitH
 and [Liberapay](https://liberapay.com/ntfy). We would be humbled if you helped carry the server and developer 
 account costs. Even small donations are very much appreciated. 
 
-Thank you to our commercial sponsors, who help keep the service running and the development going:
-
-<a href="https://m.do.co/c/442b929528db"><img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="201px"></a>
-
-<a href="https://go.warp.dev/ntfy"><img src="https://raw.githubusercontent.com/warpdotdev/brand-assets/refs/heads/main/Logos/Warp-Wordmark-Black.png" width="160px"></a>
-
-And a big fat **Thank You** to the individuals who have sponsored ntfy in the past, or are still sponsoring ntfy:
+A big fat **Thank You** to the individuals who have sponsored ntfy in the past, or are still sponsoring ntfy:
 
 <a href="https://github.com/neutralinsomniac"><img src="https://github.com/neutralinsomniac.png" width="40px" /></a>
 <a href="https://github.com/aspyct"><img src="https://github.com/aspyct.png" width="40px" /></a>
@@ -176,7 +157,6 @@ And a big fat **Thank You** to the individuals who have sponsored ntfy in the pa
 <a href="https://github.com/richardleach"><img src="https://github.com/richardleach.png" width="40px" /></a>
 <a href="https://github.com/bear"><img src="https://github.com/bear.png" width="40px" /></a>
 <a href="https://github.com/cminter"><img src="https://github.com/cminter.png" width="40px" /></a>
-<a href="https://github.com/bahur142"><img src="https://github.com/bahur142.png" width="40px" /></a>
 <a href="https://github.com/pgwiebes"><img src="https://github.com/pgwiebes.png" width="40px" /></a>
 <a href="https://github.com/ralhei"><img src="https://github.com/ralhei.png" width="40px" /></a>
 <a href="https://github.com/TechMDW"><img src="https://github.com/TechMDW.png" width="40px" /></a>
@@ -200,7 +180,6 @@ And a big fat **Thank You** to the individuals who have sponsored ntfy in the pa
 <a href="https://github.com/Integral-Tech"><img src="https://github.com/Integral-Tech.png" width="40px" /></a>
 <a href="https://github.com/TheTomik1"><img src="https://github.com/TheTomik1.png" width="40px" /></a>
 <a href="https://github.com/dav23r"><img src="https://github.com/dav23r.png" width="40px" /></a>
-<a href="https://github.com/stannynuytkens"><img src="https://github.com/stannynuytkens.png" width="40px" /></a>
 <a href="https://github.com/danbartram"><img src="https://github.com/danbartram.png" width="40px" /></a>
 <a href="https://github.com/arthurgleckler"><img src="https://github.com/arthurgleckler.png" width="40px" /></a>
 <a href="https://github.com/tomroth04"><img src="https://github.com/tomroth04.png" width="40px" /></a>
@@ -223,9 +202,122 @@ And a big fat **Thank You** to the individuals who have sponsored ntfy in the pa
 <a href="https://github.com/suhlig"><img src="https://github.com/suhlig.png" width="40px" /></a>
 <a href="https://github.com/Proximus888"><img src="https://github.com/Proximus888.png" width="40px" /></a>
 <a href="https://github.com/wielandp"><img src="https://github.com/wielandp.png" width="40px" /></a>
-<a href="https://github.com/chxseh"><img src="https://github.com/chxseh.png" width="40px" /></a>
 <a href="https://github.com/user8446"><img src="https://github.com/user8446.png" width="40px" /></a>
 <a href="https://github.com/cdf-eagles"><img src="https://github.com/cdf-eagles.png" width="40px" /></a>
+<a href="https://github.com/gabeklavans"><img src="https://github.com/gabeklavans.png" width="40px" /></a>
+<a href="https://github.com/lyellick"><img src="https://github.com/lyellick.png" width="40px" /></a>
+<a href="https://github.com/lukaszange"><img src="https://github.com/lukaszange.png" width="40px" /></a>
+<a href="https://github.com/noon92"><img src="https://github.com/noon92.png" width="40px" /></a>
+<a href="https://github.com/wljohnson05"><img src="https://github.com/wljohnson05.png" width="40px" /></a>
+<a href="https://github.com/reivilibre"><img src="https://github.com/reivilibre.png" width="40px" /></a>
+<a href="https://github.com/Coleslaw3557"><img src="https://github.com/Coleslaw3557.png" width="40px" /></a>
+<a href="https://github.com/alexgaudon"><img src="https://github.com/alexgaudon.png" width="40px" /></a>
+<a href="https://github.com/jarikmarwede"><img src="https://github.com/jarikmarwede.png" width="40px" /></a>
+<a href="https://github.com/the-antz"><img src="https://github.com/the-antz.png" width="40px" /></a>
+<a href="https://github.com/flag0010"><img src="https://github.com/flag0010.png" width="40px" /></a>
+<a href="https://github.com/chsedotsh"><img src="https://github.com/chsedotsh.png" width="40px" /></a>
+<a href="https://github.com/nanoandrew4"><img src="https://github.com/nanoandrew4.png" width="40px" /></a>
+<a href="https://github.com/aashish-joshi"><img src="https://github.com/aashish-joshi.png" width="40px" /></a>
+<a href="https://github.com/acantril"><img src="https://github.com/acantril.png" width="40px" /></a>
+<a href="https://github.com/therobbielee"><img src="https://github.com/therobbielee.png" width="40px" /></a>
+<a href="https://github.com/kdirectorate"><img src="https://github.com/kdirectorate.png" width="40px" /></a>
+<a href="https://github.com/jestramiana"><img src="https://github.com/jestramiana.png" width="40px" /></a>
+<a href="https://github.com/chefarbeiter"><img src="https://github.com/chefarbeiter.png" width="40px" /></a>
+<a href="https://github.com/innateessence"><img src="https://github.com/innateessence.png" width="40px" /></a>
+<a href="https://github.com/protok"><img src="https://github.com/protok.png" width="40px" /></a>
+<a href="https://github.com/Gennadiyev"><img src="https://github.com/Gennadiyev.png" width="40px" /></a>
+<a href="https://github.com/lennart-m"><img src="https://github.com/lennart-m.png" width="40px" /></a>
+<a href="https://github.com/martin3000"><img src="https://github.com/martin3000.png" width="40px" /></a>
+<a href="https://github.com/hockdudu"><img src="https://github.com/hockdudu.png" width="40px" /></a>
+<a href="https://github.com/reedkrantz"><img src="https://github.com/reedkrantz.png" width="40px" /></a>
+<a href="https://github.com/lsanchohub"><img src="https://github.com/lsanchohub.png" width="40px" /></a>
+<a href="https://github.com/weikib"><img src="https://github.com/weikib.png" width="40px" /></a>
+<a href="https://github.com/stoneynutcase"><img src="https://github.com/stoneynutcase.png" width="40px" /></a>
+<a href="https://github.com/baudneo"><img src="https://github.com/baudneo.png" width="40px" /></a>
+<a href="https://github.com/blockblue47"><img src="https://github.com/blockblue47.png" width="40px" /></a>
+<a href="https://github.com/fristyxd"><img src="https://github.com/fristyxd.png" width="40px" /></a>
+<a href="https://github.com/skijk"><img src="https://github.com/skijk.png" width="40px" /></a>
+<a href="https://github.com/FluLights"><img src="https://github.com/FluLights.png" width="40px" /></a>
+<a href="https://github.com/GioMez"><img src="https://github.com/GioMez.png" width="40px" /></a>
+<a href="https://github.com/merpuya"><img src="https://github.com/merpuya.png" width="40px" /></a>
+<a href="https://github.com/paralino"><img src="https://github.com/paralino.png" width="40px" /></a>
+<a href="https://github.com/iamboozer"><img src="https://github.com/iamboozer.png" width="40px" /></a>
+<a href="https://github.com/xaviierw"><img src="https://github.com/xaviierw.png" width="40px" /></a>
+<a href="https://github.com/its-tujo"><img src="https://github.com/its-tujo.png" width="40px" /></a>
+<a href="https://github.com/CR000K"><img src="https://github.com/CR000K.png" width="40px" /></a>
+<a href="https://github.com/joe-mccarthy"><img src="https://github.com/joe-mccarthy.png" width="40px" /></a>
+<a href="https://github.com/bub0-bub0"><img src="https://github.com/bub0-bub0.png" width="40px" /></a>
+<a href="https://github.com/tmat255"><img src="https://github.com/tmat255.png" width="40px" /></a>
+<a href="https://github.com/aqplemine"><img src="https://github.com/aqplemine.png" width="40px" /></a>
+<a href="https://github.com/AlbedoSapiens"><img src="https://github.com/AlbedoSapiens.png" width="40px" /></a>
+<a href="https://github.com/finneon-nvb"><img src="https://github.com/finneon-nvb.png" width="40px" /></a>
+<a href="https://github.com/AsebWebDev"><img src="https://github.com/AsebWebDev.png" width="40px" /></a>
+<a href="https://github.com/simpleetech"><img src="https://github.com/simpleetech.png" width="40px" /></a>
+<a href="https://github.com/Glareascum"><img src="https://github.com/Glareascum.png" width="40px" /></a>
+<a href="https://github.com/obliviance"><img src="https://github.com/obliviance.png" width="40px" /></a>
+<a href="https://github.com/hippothomas"><img src="https://github.com/hippothomas.png" width="40px" /></a>
+<a href="https://github.com/IamLunchbox"><img src="https://github.com/IamLunchbox.png" width="40px" /></a>
+<a href="https://github.com/BenotoNet"><img src="https://github.com/BenotoNet.png" width="40px" /></a>
+<a href="https://github.com/Hennbaer"><img src="https://github.com/Hennbaer.png" width="40px" /></a>
+<a href="https://github.com/tomasodehnal"><img src="https://github.com/tomasodehnal.png" width="40px" /></a>
+<a href="https://github.com/Kasi07"><img src="https://github.com/Kasi07.png" width="40px" /></a>
+<a href="https://github.com/kanna5"><img src="https://github.com/kanna5.png" width="40px" /></a>
+<a href="https://github.com/warpdotdev"><img src="https://github.com/warpdotdev.png" width="40px" /></a>
+<a href="https://github.com/t3hero"><img src="https://github.com/t3hero.png" width="40px" /></a>
+<a href="https://github.com/jorgenbs"><img src="https://github.com/jorgenbs.png" width="40px" /></a>
+<a href="https://github.com/AdmiralNemo"><img src="https://github.com/AdmiralNemo.png" width="40px" /></a>
+<a href="https://github.com/wcypierre"><img src="https://github.com/wcypierre.png" width="40px" /></a>
+<a href="https://github.com/timgluz"><img src="https://github.com/timgluz.png" width="40px" /></a>
+<a href="https://github.com/DavorPadovan"><img src="https://github.com/DavorPadovan.png" width="40px" /></a>
+<a href="https://github.com/fapeg"><img src="https://github.com/fapeg.png" width="40px" /></a>
+<a href="https://github.com/shaunhey"><img src="https://github.com/shaunhey.png" width="40px" /></a>
+<a href="https://github.com/xiongzi"><img src="https://github.com/xiongzi.png" width="40px" /></a>
+<a href="https://github.com/belthesar"><img src="https://github.com/belthesar.png" width="40px" /></a>
+<a href="https://github.com/profbbrown"><img src="https://github.com/profbbrown.png" width="40px" /></a>
+<a href="https://github.com/dodancs"><img src="https://github.com/dodancs.png" width="40px" /></a>
+<a href="https://github.com/Spakman"><img src="https://github.com/Spakman.png" width="40px" /></a>
+<a href="https://github.com/rubiojr"><img src="https://github.com/rubiojr.png" width="40px" /></a>
+<a href="https://github.com/majoragee"><img src="https://github.com/majoragee.png" width="40px" /></a>
+<a href="https://github.com/defewit"><img src="https://github.com/defewit.png" width="40px" /></a>
+<a href="https://github.com/scode"><img src="https://github.com/scode.png" width="40px" /></a>
+<a href="https://github.com/mvgrimes"><img src="https://github.com/mvgrimes.png" width="40px" /></a>
+<a href="https://github.com/brpaz"><img src="https://github.com/brpaz.png" width="40px" /></a>
+<a href="https://github.com/gregwinn"><img src="https://github.com/gregwinn.png" width="40px" /></a>
+<a href="https://github.com/fazalmajid"><img src="https://github.com/fazalmajid.png" width="40px" /></a>
+<a href="https://github.com/upsuper"><img src="https://github.com/upsuper.png" width="40px" /></a>
+<a href="https://github.com/schneidr"><img src="https://github.com/schneidr.png" width="40px" /></a>
+<a href="https://github.com/pm0u"><img src="https://github.com/pm0u.png" width="40px" /></a>
+<a href="https://github.com/AlexKalopsia"><img src="https://github.com/AlexKalopsia.png" width="40px" /></a>
+<a href="https://github.com/rpaterson"><img src="https://github.com/rpaterson.png" width="40px" /></a>
+<a href="https://github.com/nabulator"><img src="https://github.com/nabulator.png" width="40px" /></a>
+<a href="https://github.com/noenik"><img src="https://github.com/noenik.png" width="40px" /></a>
+<a href="https://github.com/dasos"><img src="https://github.com/dasos.png" width="40px" /></a>
+<a href="https://github.com/AntonAttano"><img src="https://github.com/AntonAttano.png" width="40px" /></a>
+<a href="https://github.com/JohnFritz"><img src="https://github.com/JohnFritz.png" width="40px" /></a>
+<a href="https://github.com/muety"><img src="https://github.com/muety.png" width="40px" /></a>
+<a href="https://github.com/mjablon1"><img src="https://github.com/mjablon1.png" width="40px" /></a>
+<a href="https://github.com/57-Wolve"><img src="https://github.com/57-Wolve.png" width="40px" /></a>
+<a href="https://github.com/AceofSpades5757"><img src="https://github.com/AceofSpades5757.png" width="40px" /></a>
+<a href="https://github.com/sdiggly"><img src="https://github.com/sdiggly.png" width="40px" /></a>
+<a href="https://github.com/berkutta"><img src="https://github.com/berkutta.png" width="40px" /></a>
+<a href="https://github.com/stevennevins"><img src="https://github.com/stevennevins.png" width="40px" /></a>
+<a href="https://github.com/rohitshriwas"><img src="https://github.com/rohitshriwas.png" width="40px" /></a>
+<a href="https://github.com/hostinger"><img src="https://github.com/hostinger.png" width="40px" /></a>
+<a href="https://github.com/haguenau"><img src="https://github.com/haguenau.png" width="40px" /></a>
+<a href="https://github.com/manuel-rhdt"><img src="https://github.com/manuel-rhdt.png" width="40px" /></a>
+<a href="https://github.com/tylercasson"><img src="https://github.com/tylercasson.png" width="40px" /></a>
+<a href="https://github.com/tagadvance"><img src="https://github.com/tagadvance.png" width="40px" /></a>
+<a href="https://github.com/Conor0Callaghan"><img src="https://github.com/Conor0Callaghan.png" width="40px" /></a>
+<a href="https://github.com/gorhack"><img src="https://github.com/gorhack.png" width="40px" /></a>
+<a href="https://github.com/Raiper34"><img src="https://github.com/Raiper34.png" width="40px" /></a>
+<a href="https://github.com/shaungarwood"><img src="https://github.com/shaungarwood.png" width="40px" /></a>
+<a href="https://github.com/alex-ip"><img src="https://github.com/alex-ip.png" width="40px" /></a>
+<a href="https://github.com/remcoboerma"><img src="https://github.com/remcoboerma.png" width="40px" /></a>
+<a href="https://github.com/viliev"><img src="https://github.com/viliev.png" width="40px" /></a>
+<a href="https://github.com/choozm"><img src="https://github.com/choozm.png" width="40px" /></a>
+<a href="https://github.com/theProf"><img src="https://github.com/theProf.png" width="40px" /></a>
+<a href="https://github.com/alidtz"><img src="https://github.com/alidtz.png" width="40px" /></a>
+<a href="https://github.com/degill"><img src="https://github.com/degill.png" width="40px" /></a>
 
 ## Contributing
 I welcome any contributions. Just create a PR or an issue. For larger features/ideas, please reach out

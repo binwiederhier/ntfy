@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -32,8 +33,10 @@ import (
 	"heckel.io/ntfy/v2/action"
 	"heckel.io/ntfy/v2/attachment"
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/mail"
 	"heckel.io/ntfy/v2/message"
@@ -49,22 +52,26 @@ import (
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
 	config            *Config
-	db                *db.DB // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
-	httpServer        *http.Server
+	db                *db.DB          // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
+	cluster           cluster.Cluster // Fans messages out to peer cluster nodes (nop when not clustered)
+	httpServers       []*http.Server
 	httpsServer       *http.Server
 	httpMetricsServer *http.Server
 	httpProfileServer *http.Server
+	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	unixListener      net.Listener
 	smtpServer        *smtp.Server
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	visitors          map[string]*visitor // ip:<ip> or user:<user>
-	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
+	visitors          *visitorEnv    // Shared by all visitors, which are built per request
+	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
+	messagesFlushed   int64                               // Value of the messages counter at the last stats flush; the difference is written as a delta
 	userManager       *user.Manager                       // Might be nil!
 	messageCache      *message.Cache                      // Database that stores the messages
 	webPush           *webpush.Store                      // Database that stores web push subscriptions
@@ -73,6 +80,11 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
+	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
+	stopOnce          sync.Once
+	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
+	streams           *streamRegistry // Open subscriber connections, for Drain
+	readOnly          atomic.Bool     // Second phase of a drain: new subscriptions and publishes get 503 (see Drain)
 	mu                sync.RWMutex
 }
 
@@ -106,6 +118,7 @@ var (
 	matrixPushPath                                       = "/_matrix/push/v1/notify"
 	metricsPath                                          = "/metrics"
 	apiHealthPath                                        = "/v1/health"
+	apiReadyPath                                         = "/v1/ready"
 	apiVersionPath                                       = "/v1/version"
 	apiConfigPath                                        = "/v1/config"
 	apiStatsPath                                         = "/v1/stats"
@@ -113,6 +126,8 @@ var (
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
+	apiUsersTokensPath                                   = "/v1/users/tokens"
+	apiUsersPasswordResetPath                            = "/v1/users/password/reset"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountLoginPath                                  = "/v1/account/login"
 	apiAccountTokenPath                                  = "/v1/account/token"
@@ -128,6 +143,7 @@ var (
 	apiAccountEmailResendPath                            = "/v1/account/email/resend"
 	apiAccountPasswordResetRequestPath                   = "/v1/account/password/reset/request"
 	apiAccountPasswordResetPath                          = "/v1/account/password/reset"
+	apiAccountBillingTiersPath                           = "/v1/account/billing/tiers"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -163,6 +179,12 @@ const (
 	unifiedPushTopicPrefix   = "up"                      // Temporarily, we rate limit all "up*" topics based on the subscriber
 	unifiedPushTopicLength   = 14                        // Length of UnifiedPush topics, including the "up" part
 	messagesHistoryMax       = 10                        // Number of message count values to keep in memory
+	subscribeTopicsLimit     = 150                       // Max distinct topics in one subscription; each one runs its own replay query (matches the ntfy.sh nginx edge rule)
+
+	// stopTimeout bounds the entire shutdown. The stores wait for their own background work
+	// (the attachment sync loop queries the database), and none of those waits has a deadline,
+	// so this is the backstop that keeps a wedged database from stalling us until SIGKILL.
+	stopTimeout = 10 * time.Second
 )
 
 // WebSocket constants
@@ -253,6 +275,40 @@ func New(conf *Config) (*Server, error) {
 		CallFormat:    conf.TwilioCallFormat,
 		BuildVersion:  conf.BuildVersion,
 	})
+	var banner *ban.Service
+	if conf.BanFile != "" {
+		banner = ban.NewService(&ban.Config{
+			File:           conf.BanFile,
+			Window:         conf.BanWindow,
+			Threshold:      conf.BanThreshold,
+			Weights:        conf.BanWeights,
+			PrefixBitsIPv4: conf.VisitorPrefixBitsIPv4,
+			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
+		})
+	}
+	// Peers reach this node on the dedicated cluster listener, never on the public ones
+	advertiseURL := conf.ClusterAdvertiseURL
+	if advertiseURL == "" && conf.ClusterListen != "" {
+		advertiseURL = "http://" + conf.ClusterListen
+	}
+	s := &Server{
+		config:          conf,
+		db:              pool,
+		messageCache:    messageCache,
+		webPush:         wp,
+		attachment:      attachmentStore,
+		twilio:          twilioClient,
+		mailer:          sender,
+		ban:             banner,
+		topics:          topics,
+		messages:        messages,
+		messagesHistory: []int64{messages},
+		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
+		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime}),
+		stripe:          stripe,
+		streams:         newStreamRegistry(),
+	}
+	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager
 	if conf.AuthFile != "" || pool != nil {
 		authConfig := &user.Config{
@@ -268,6 +324,8 @@ func New(conf *Config) (*Server, error) {
 			QueueWriterInterval:       conf.AuthStatsQueueWriterInterval,
 			AccessCacheEnabled:        conf.AuthAccessCacheEnabled,
 			AccessCacheReloadInterval: conf.AuthAccessCacheReloadInterval,
+			AccessCacheChangedFunc:    s.reauthorizeSubscribers,
+			AccessWrittenFunc:         s.broadcastAccessChanged,
 		}
 		if pool != nil {
 			userManager, err = user.NewPostgresManager(pool, authConfig)
@@ -292,36 +350,49 @@ func New(conf *Config) (*Server, error) {
 		}
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
-	var banner *ban.Service
-	if conf.BanFile != "" {
-		banner = ban.NewService(&ban.Config{
-			File:           conf.BanFile,
-			Window:         conf.BanWindow,
-			Threshold:      conf.BanThreshold,
-			Weights:        conf.BanWeights,
-			PrefixBitsIPv4: conf.VisitorPrefixBitsIPv4,
-			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
+	s.userManager = userManager
+	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
+	s.firebaseClient = firebaseClient
+	if pool != nil {
+		metrics.SetDBPoolsFunc(s.dbPoolStats)
+	}
+	s.cluster, err = cluster.New(&cluster.Config{
+		Enabled:           conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
+		NodeID:            cluster.NodeID(conf.ClusterNodeID),
+		AdvertiseURL:      advertiseURL,
+		Role:              conf.ClusterRole,
+		Secret:            conf.ClusterSecret,
+		BatchLinger:       conf.ClusterBatchLinger,
+		UsersDeletedFunc:  s.handleUsersDeleted,
+		AccessChangedFunc: s.handlePeerAccessChanged,
+		IsolatedFunc:      s.maybeCloseLocalSubscribers,
+		MaxMessageBytes:   int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
+	}, pool, s.deliverFromBus)
+	if err != nil {
+		return nil, err
+	}
+	if conf.CacheDuration > 0 {
+		tail, err := messageCache.Tail()
+		if err != nil {
+			return nil, err
+		}
+		s.tail = tail
+		go s.runTail()
+	}
+	return s, nil
+}
+
+// dbPoolStats reports the database connection pools for the ntfy_db_pool_* metrics
+func (s *Server) dbPoolStats() []*metrics.DBPool {
+	pools := make([]*metrics.DBPool, 0)
+	for _, p := range s.db.Stats() {
+		pools = append(pools, &metrics.DBPool{
+			Role:  p.Role,
+			Addr:  p.Addr,
+			Stats: p.Stats,
 		})
 	}
-	s := &Server{
-		config:          conf,
-		db:              pool,
-		messageCache:    messageCache,
-		webPush:         wp,
-		attachment:      attachmentStore,
-		firebaseClient:  firebaseClient,
-		twilio:          twilioClient,
-		mailer:          sender,
-		ban:             banner,
-		topics:          topics,
-		userManager:     userManager,
-		messages:        messages,
-		messagesHistory: []int64{messages},
-		visitors:        make(map[string]*visitor),
-		stripe:          stripe,
-	}
-	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
-	return s, nil
+	return pools
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -344,12 +415,17 @@ func createAttachmentStore(conf *Config, messageCache *message.Cache) (*attachme
 	return nil, nil
 }
 
+// testHookBeforeSubscribe, if non-nil, is called by the subscribe handlers after the request was
+// authorized and before its stream subscribes. Tests use it to land an access change in between;
+// it is always nil in production.
+var testHookBeforeSubscribe func()
+
 // Run executes the main server. It listens on HTTP (+ HTTPS, if configured), and starts
 // a manager go routine to print stats and prune messages.
 func (s *Server) Run() error {
 	var listenStr string
-	if s.config.ListenHTTP != "" {
-		listenStr += fmt.Sprintf(" %s[http]", s.config.ListenHTTP)
+	for _, addr := range s.config.ListenHTTP {
+		listenStr += fmt.Sprintf(" %s[http]", addr)
 	}
 	if s.config.ListenHTTPS != "" {
 		listenStr += fmt.Sprintf(" %s[https]", s.config.ListenHTTPS)
@@ -374,12 +450,20 @@ func (s *Server) Run() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handle)
 	errChan := make(chan error)
+	if s.stopped.Load() {
+		return nil // Stopped before we got here; a stuck shutdown must not block us on the lock
+	}
 	s.mu.Lock()
+	if s.stopped.Load() {
+		s.mu.Unlock()
+		return nil // Stopped while we waited for the lock, i.e. the stores are closed by now
+	}
 	s.closeChan = make(chan bool)
-	if s.config.ListenHTTP != "" {
-		s.httpServer = &http.Server{Addr: s.config.ListenHTTP, Handler: mux}
+	for _, addr := range s.config.ListenHTTP {
+		httpServer := &http.Server{Addr: addr, Handler: mux}
+		s.httpServers = append(s.httpServers, httpServer)
 		go func() {
-			errChan <- s.httpServer.ListenAndServe()
+			errChan <- httpServer.ListenAndServe()
 		}()
 	}
 	if s.config.ListenHTTPS != "" {
@@ -392,6 +476,10 @@ func (s *Server) Run() error {
 		go func() {
 			var err error
 			s.mu.Lock()
+			if s.stopped.Load() {
+				s.mu.Unlock()
+				return // Nobody would close this listener anymore
+			}
 			os.Remove(s.config.ListenUnix)
 			s.unixListener, err = net.Listen("unix", s.config.ListenUnix)
 			if err != nil {
@@ -420,6 +508,14 @@ func (s *Server) Run() error {
 	} else if s.config.EnableMetrics {
 		s.metricsHandler = promhttp.Handler()
 	}
+	if s.config.ClusterListen != "" {
+		// The cluster serves the whole private listener: every path on it is the peer API, which
+		// the cluster owns and authenticates itself
+		s.httpClusterServer = &http.Server{Addr: s.config.ClusterListen, Handler: s.cluster}
+		go func() {
+			errChan <- s.httpClusterServer.ListenAndServe()
+		}()
+	}
 	if s.config.ProfileListenHTTP != "" {
 		profileMux := http.NewServeMux()
 		profileMux.HandleFunc("/debug/pprof/", pprof.Index)
@@ -446,12 +542,33 @@ func (s *Server) Run() error {
 	return <-errChan
 }
 
-// Stop stops HTTP (+HTTPS) server and all managers
+// Stop stops the HTTP (+HTTPS) server and all managers. It is idempotent: a signal handler and
+// the serve command both call it, and the second call waits for the first to finish.
 func (s *Server) Stop() {
+	s.stopped.Store(true) // Before the lock: Run must see this even if stop() is stuck
+	s.stopOnce.Do(s.stopBounded)
+}
+
+// stopBounded runs the shutdown and gives up on it after stopTimeout, so that a store which
+// never finishes closing cannot keep the process alive
+func (s *Server) stopBounded() {
+	done := make(chan struct{})
+	go func() {
+		s.stop()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(stopTimeout):
+		log.Tag(tagStartup).Warn("Shutdown did not finish within %v, exiting anyway", stopTimeout)
+	}
+}
+
+func (s *Server) stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.httpServer != nil {
-		s.httpServer.Close()
+	for _, httpServer := range s.httpServers {
+		httpServer.Close()
 	}
 	if s.httpsServer != nil {
 		s.httpsServer.Close()
@@ -465,6 +582,12 @@ func (s *Server) Stop() {
 	if s.attachment != nil {
 		s.attachment.Close()
 	}
+	if s.httpClusterServer != nil {
+		s.httpClusterServer.Close()
+	}
+	if s.tail != nil {
+		s.tail.Close() // Before the databases close under it
+	}
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -475,11 +598,13 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) closeDatabases() {
-	if s.userManager != nil {
-		s.userManager.Close()
-	}
+	// Message cache first: it may still be writing its last batch, and on Postgres all stores
+	// share one pool, so closing any other store first would close the pool under that write
 	if s.messageCache != nil {
 		s.messageCache.Close()
+	}
+	if s.userManager != nil {
+		s.userManager.Close()
 	}
 	if s.webPush != nil {
 		s.webPush.Close()
@@ -520,7 +645,8 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	}
 	metrics.HTTPRequests.WithLabelValues(strconv.Itoa(httpErr.HTTPCode), strconv.Itoa(httpErr.Code), r.Method).Inc()
 	isRateLimiting := util.Contains(rateLimitingErrorCodes, httpErr.HTTPCode)
-	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode)
+	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode) ||
+		httpErr.Code == errHTTPServiceUnavailableDraining.Code // A draining node rejects every new subscription, by design
 	ev := logvr(v, r).Err(err)
 	if websocket.IsWebSocketUpgrade(r) {
 		ev.Tag(tagWebsocket).Fields(websocketErrorContext(err))
@@ -567,6 +693,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleEmpty)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiHealthPath {
 		return s.handleHealth(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiReadyPath {
+		return s.handleReady(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiVersionPath {
 		return s.ensureAdmin(s.handleVersion)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiConfigPath {
@@ -587,6 +715,22 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensGet)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensDelete)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPasswordResetPath {
+		return s.ensureAdmin(s.handleUsersPasswordReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath && v.User().IsAdmin() {
+		return s.ensureAdmin(s.handleAdminTiersGet)(w, r, v) // Non-admins get the billing tiers, see below
+	} else if r.Method == http.MethodPost && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersAdd)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersUpdate)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
@@ -653,8 +797,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountBillingTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
+		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v) // Non-admins: web apps before v2.36.0, remove after 2026-11-22
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
@@ -717,10 +863,27 @@ func (s *Server) handleTopicAuth(w http.ResponseWriter, _ *http.Request, _ *visi
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
-	response := &apiHealthResponse{
-		Healthy: true,
+	// Unhealthy = the registry heartbeat went stale and peers stopped forwarding to this node. For
+	// monitoring; load balancers check /v1/ready, which keeps the only active node in
+	healthy := s.cluster.Healthy()
+	if !healthy {
+		w.WriteHeader(http.StatusServiceUnavailable)
 	}
-	return s.writeJSON(w, response)
+	return s.writeJSON(w, &apiHealthResponse{Healthy: healthy, Role: s.cluster.Role()})
+}
+
+// handleReady answers whether a load balancer should send clients here (see cluster.Cluster's
+// Ready). A passive node is healthy (see handleHealth) but never ready.
+func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request, _ *visitor) error {
+	ready := s.cluster.Ready()
+	if !ready {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	return s.writeJSON(w, &apiReadyResponse{
+		Ready:    ready,
+		Role:     s.cluster.Role(),
+		Draining: s.cluster.Draining(),
+	})
 }
 
 // handleMetrics returns Prometheus metrics. This endpoint is only called if enable-metrics is set,
@@ -824,6 +987,11 @@ func (s *Server) handleMatrixDiscovery(w http.ResponseWriter) error {
 // the single choke point through which every published message must pass; t may be nil when
 // the topic has no local subscribers (delayed sender).
 func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchOpts) error {
+	// Hand the message to the other cluster nodes: fire-and-forget, so a slow or dead peer never
+	// delays the publisher. Nop single-node.
+	if err := s.cluster.ForwardMessage(m); err != nil {
+		logvm(v, m).Err(err).Warn("Unable to forward message to cluster peers")
+	}
 	// Deliver to local subscribers
 	if t != nil {
 		if opts.async {
@@ -856,6 +1024,9 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 }
 
 func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
+	if s.readOnly.Load() {
+		return nil, errHTTPServiceUnavailableDraining // Read-only; the load balancers stopped sending requests in the drain delay
+	}
 	start := time.Now()
 	t, err := fromContext[*topic](r, contextTopic)
 	if err != nil {
@@ -947,25 +1118,24 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		logvrm(v, r, m).Tag(tagPublish).Debug("Message delayed, will process later")
 	}
 	if cache {
-		// Delete any existing scheduled message with the same sequence ID
-		deletedIDs, err := s.messageCache.DeleteScheduledBySequenceID(t.ID, m.SequenceID)
-		if err != nil {
-			return nil, err
-		}
-		// Delete attachment files for deleted scheduled messages
-		if s.attachment != nil && len(deletedIDs) > 0 {
-			if err := s.attachment.Remove(deletedIDs...); err != nil {
-				logvrm(v, r, m).Tag(tagPublish).Err(err).Warn("Error removing attachments for deleted scheduled messages")
+		// Delete any existing scheduled message with the same sequence ID. Without a client-provided
+		// sequence ID, it is the message's own fresh ID and nothing can match, so skip the round trip.
+		if m.SequenceID != m.ID {
+			deletedIDs, err := s.messageCache.DeleteScheduledBySequenceID(t.ID, m.SequenceID)
+			if err != nil {
+				return nil, err
+			}
+			// Delete attachment files for deleted scheduled messages
+			if s.attachment != nil && len(deletedIDs) > 0 {
+				if err := s.attachment.Remove(deletedIDs...); err != nil {
+					logvrm(v, r, m).Tag(tagPublish).Err(err).Warn("Error removing attachments for deleted scheduled messages")
+				}
 			}
 		}
 		logvrm(v, r, m).Tag(tagPublish).Debug("Adding message to cache")
 		if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
 		}
-	}
-	u := v.User()
-	if s.userManager != nil && u != nil && u.Tier != nil {
-		go s.userManager.EnqueueUserStats(u.ID, v.Stats())
 	}
 	s.mu.Lock()
 	s.messages++
@@ -1235,7 +1405,15 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		if call != "" {
 			return false, false, "", "", "", false, "", errHTTPBadRequestDelayNoCall // we cannot store the phone number (yet)
 		}
-		delay, err := util.ParseFutureTime(delayStr, time.Now())
+		now := time.Now()
+		if timezone := readParam(r, "x-timezone", "timezone"); timezone != "" {
+			location, err := time.LoadLocation(timezone)
+			if err != nil {
+				return false, false, "", "", "", false, "", errHTTPBadRequestTimezoneInvalid
+			}
+			now = now.In(location)
+		}
+		delay, err := util.ParseFutureTime(delayStr, now)
 		if err != nil {
 			return false, false, "", "", "", false, "", errHTTPBadRequestDelayCannotParse
 		} else if delay.Unix() < time.Now().Add(s.config.MessageDelayMin).Unix() {
@@ -1253,7 +1431,7 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		}
 	}
 	contentType, markdown := readParam(r, "content-type", "content_type"), readBoolParam(r, false, "x-markdown", "markdown", "md")
-	if markdown || strings.ToLower(contentType) == "text/markdown" {
+	if markdown || isMarkdownContentType(contentType) {
 		m.ContentType = "text/markdown"
 	}
 	unifiedpush = readBoolParam(r, false, "x-unifiedpush", "unifiedpush", "up") // see GET too!
@@ -1432,6 +1610,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
+	} else if !poll && s.readOnly.Load() {
+		return errHTTPServiceUnavailableDraining
 	}
 	var wlock sync.Mutex
 	var closed bool
@@ -1488,17 +1668,26 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		meterPollBandwidth = true
 		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
+	w.Header().Set("Incremental", "?1") // Ask proxies to forward the stream without buffering (RFC 10036)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	if testHookBeforeSubscribe != nil {
+		testHookBeforeSubscribe()
+	}
+	streamID := s.streams.Add(cancel)
+	defer s.streams.Remove(streamID)
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.User(), cancel))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
+	if err := s.authorizeSubscribed(v, topics); err != nil {
+		return err
+	}
 	if err := sub(v, model.NewOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
@@ -1546,6 +1735,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 	poll, since, scheduled, filters, err := parseSubscribeParams(r)
 	if err != nil {
 		return err
+	} else if !poll && s.readOnly.Load() {
+		return errHTTPServiceUnavailableDraining // Before the upgrade, so the load balancer can retry elsewhere
 	}
 	upgrader := &websocket.Upgrader{
 		ReadBufferSize:  wsBufferSize,
@@ -1639,15 +1830,23 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return s.sendOldMessages(w, topics, since, scheduled, v, sub)
 	}
+	if testHookBeforeSubscribe != nil {
+		testHookBeforeSubscribe()
+	}
+	streamID := s.streams.Add(cancel)
+	defer s.streams.Remove(streamID)
 	subscriberIDs := make([]int, 0)
 	for _, t := range topics {
-		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.MaybeUserID(), cancel))
+		subscriberIDs = append(subscriberIDs, t.Subscribe(sub, v.User(), cancel))
 	}
 	defer func() {
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
+	if err := s.authorizeSubscribed(v, topics); err != nil {
+		return err
+	}
 	if err := sub(v, model.NewOpenMessage(topicsStr)); err != nil { // Send out open message
 		return err
 	}
@@ -1750,10 +1949,24 @@ func (s *Server) sendOldMessages(w http.ResponseWriter, topics []*topic, since m
 	if since.IsNone() {
 		return nil
 	}
+	var marker *message.Marker
+	if since.IsID() {
+		var err error
+		if marker, err = s.messageCache.ResolveMarker(since.ID()); err != nil {
+			return err
+		}
+	}
 	messages := make([]*model.Message, 0)
 	truncated := false
 	for _, t := range topics {
-		topicMessages, topicTruncated, err := s.messageCache.MessagesCapped(t.ID, since, scheduled, s.config.MessagePollSizeLimit)
+		var topicMessages []*model.Message
+		var topicTruncated bool
+		var err error
+		if marker != nil {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesAfterMarker(t.ID, marker, scheduled, s.config.MessagePollSizeLimit)
+		} else {
+			topicMessages, topicTruncated, err = s.messageCache.MessagesCapped(t.ID, sinceForTopic(t, since), scheduled, s.config.MessagePollSizeLimit)
+		}
 		if err != nil {
 			return err
 		}
@@ -1834,7 +2047,11 @@ func (s *Server) topicsFromPath(v *visitor, path string) ([]*topic, string, erro
 	if len(parts) < 2 {
 		return nil, "", errHTTPBadRequestTopicInvalid
 	}
-	topicIDs := util.SplitNoEmpty(parts[1], ",")
+	// De-duplicate, or each repetition of a topic replays (and buffers) its cache again
+	topicIDs := util.Dedup(util.SplitNoEmpty(parts[1], ","))
+	if len(topicIDs) > subscribeTopicsLimit {
+		return nil, "", errHTTPBadRequestTooManyTopics
+	}
 	topics, err := s.topicsFromIDs(v, topicIDs...)
 	if err != nil {
 		return nil, "", err
@@ -1888,19 +2105,29 @@ func (s *Server) topicFromID(v *visitor, id string) (*topic, error) {
 
 // topicsFromPattern returns a list of topics matching the given pattern, but it does not create them.
 func (s *Server) topicsFromPattern(pattern string) ([]*topic, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	patternRegexp, err := regexp.Compile("^" + strings.ReplaceAll(pattern, "*", ".*") + "$")
 	if err != nil {
 		return nil, err
 	}
 	topics := make([]*topic, 0)
-	for _, t := range s.topics {
+	for _, t := range s.allTopics() {
 		if patternRegexp.MatchString(t.ID) {
 			topics = append(topics, t)
 		}
 	}
 	return topics, nil
+}
+
+// allTopics returns all topics. Callers that scan them (~313k on ntfy.sh) do so without s.mu held,
+// which every request that creates a visitor or topic needs.
+func (s *Server) allTopics() []*topic {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	topics := make([]*topic, 0, len(s.topics))
+	for _, t := range s.topics {
+		topics = append(topics, t)
+	}
+	return topics
 }
 
 func (s *Server) runSMTPServer() error {
@@ -1953,9 +2180,7 @@ func (s *Server) resetStats() {
 	log.Info("Resetting all visitor stats (daily task)")
 	s.mu.Lock()
 	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
-	for _, v := range s.visitors {
-		v.ResetStats()
-	}
+	s.limiter.ResetUsage()
 	if s.userManager != nil {
 		if err := s.userManager.ResetStats(); err != nil {
 			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
@@ -1967,10 +2192,15 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
+	v := newVisitor(s.visitors, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
+			// Leader only: a keepalive wakes every subscribed phone, so the cluster sends it
+			// once rather than once per node. Per tick, to survive a failover.
+			if !s.cluster.IsLeader() {
+				continue
+			}
 			s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
 		/*
 			FIXME: Disable iOS polling entirely for now due to thundering herd problem (see #677)
@@ -1990,6 +2220,11 @@ func (s *Server) runDelayedSender() {
 	for {
 		select {
 		case <-time.After(s.config.DelayedSenderInterval):
+			// Leader only, to keep delayed sends on one node. A preference, not what makes
+			// delivery safe: MessagesDue claims each row, so a non-leader is harmless.
+			if !s.cluster.IsLeader() {
+				continue
+			}
 			if err := s.sendDelayedMessages(); err != nil {
 				log.Tag(tagPublish).Err(err).Warn("Error sending delayed messages")
 			}
@@ -2000,6 +2235,9 @@ func (s *Server) runDelayedSender() {
 }
 
 func (s *Server) sendDelayedMessages() error {
+	if s.cluster.Draining() {
+		return nil // On its way out: claiming now could leave a claimed message unsent; the next leader sends it
+	}
 	messages, err := s.messageCache.MessagesDue()
 	if err != nil {
 		return err
@@ -2096,6 +2334,9 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		if m.Delay != "" {
 			r.Header.Set("X-Delay", m.Delay)
 		}
+		if m.Timezone != "" {
+			r.Header.Set("X-Timezone", m.Timezone)
+		}
 		if m.Call != "" {
 			r.Header.Set("X-Call", m.Call)
 		}
@@ -2130,18 +2371,10 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	}
 }
 
+// visitor returns the visitor for this request. It is built per request, so concurrent requests from
+// the same IP (which share a limiter key) cannot see each other's user (#1051).
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	id := visitorID(ip, user, s.config)
-	v, exists := s.visitors[id]
-	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.messageCache, s.userManager, ip, user)
-		return s.visitors[id]
-	}
-	v.Keepalive()
-	v.SetUser(user) // Always update with the latest user, may be nil!
-	return v
+	return newVisitor(s.visitors, ip, user)
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {
@@ -2160,8 +2393,23 @@ func (s *Server) updateAndWriteStats(messagesCount int64) {
 	if len(s.messagesHistory) > messagesHistoryMax {
 		s.messagesHistory = s.messagesHistory[1:]
 	}
+	snapshot, delta := s.messages, s.messages-s.messagesFlushed
 	s.mu.Unlock()
-	if err := s.messageCache.UpdateStats(messagesCount); err != nil {
+	// Write this node's delta and fold the cluster-wide total back in, so every node's counter
+	// (and /v1/stats) converges on the shared sum instead of overwriting it
+	if err := s.messageCache.AddStats(delta); err != nil {
 		log.Tag(tagManager).Err(err).Warn("Cannot write messages stats")
+		return // Delta remains unflushed; retried on the next tick
 	}
+	total, err := s.messageCache.Stats()
+	if err != nil {
+		log.Tag(tagManager).Err(err).Warn("Cannot read messages stats")
+		total = snapshot // Keep the local view; only the flush marker moves
+	}
+	s.mu.Lock()
+	// The marker is the folded total (everything the database already has, incl. peer counts),
+	// so the next delta is only this node's new publishes; peer counts must never be re-added
+	s.messagesFlushed = total
+	s.messages = total + (s.messages - snapshot) // Publishes that arrived while flushing stay counted
+	s.mu.Unlock()
 }

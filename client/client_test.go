@@ -5,8 +5,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/server"
 	"heckel.io/ntfy/v2/test"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -99,6 +101,37 @@ func TestClient_Publish_Poll(t *testing.T) {
 	require.Equal(t, 2, len(messages))
 	require.Equal(t, "some message", messages[0].Message)
 	require.Equal(t, "some delayed message", messages[1].Message)
+}
+
+func TestClient_Publish_HeaderWithNewlines(t *testing.T) {
+	conf := server.NewConfig()
+	conf.BaseURL = "http://127.0.0.1" // Attachments require a base URL
+	s, port := test.StartServerWithConfig(t, conf)
+	defer test.StopServer(t, s, port)
+	c := client.New(newTestConfig(port))
+
+	// With an attachment as the body, message and title must travel as headers (see #1808)
+	msg, err := c.PublishReader("mytopic", strings.NewReader("file contents"),
+		client.WithFilename("test.txt"),
+		client.WithMessage("message\n  with\n  newlines"),
+		client.WithTitle("title\nwith newline"))
+	require.Nil(t, err)
+	require.Equal(t, "message\n  with\n  newlines", msg.Message)
+	require.Equal(t, "title\nwith newline", msg.Title)
+	require.Equal(t, "test.txt", msg.Attachment.Name)
+
+	// Unicode, and long values that are split into multiple encoded words
+	longMessage := strings.Repeat("Grüße aus Köln 🎉\r\n", 30)
+	msg, err = c.PublishReader("mytopic", strings.NewReader("file contents"),
+		client.WithFilename("über.txt"),
+		client.WithMessage(longMessage),
+		client.WithTitle("Grüße 🎉"),
+		client.WithTags([]string{"tada", "größe"}))
+	require.Nil(t, err)
+	require.Equal(t, strings.TrimSpace(longMessage), msg.Message)
+	require.Equal(t, "Grüße 🎉", msg.Title)
+	require.Equal(t, []string{"tada", "größe"}, msg.Tags)
+	require.Equal(t, "über.txt", msg.Attachment.Name)
 }
 
 func newTestConfig(port int) *client.Config {

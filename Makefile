@@ -46,6 +46,7 @@ help:
 	@echo "  make web-build                  - Actually build the web app"
 	@echo "  make web-lint                   - Run eslint on the web app"
 	@echo "  make web-test                   - Run vitest unit tests for the web app"
+	@echo "  make web-e2e                    - Run Playwright e2e tests against a fresh local server"
 	@echo "  make web-fmt                    - Run prettier on the web app"
 	@echo "  make web-fmt-check              - Run prettier on the web app, but don't change anything"
 	@echo
@@ -107,17 +108,28 @@ docker-dev:
 
 # Ubuntu-specific
 
+# The Azure apt mirrors on GitHub runners sometimes stall mid-download, and apt then waits forever.
+# A timeout fails the stalled download, and the retries fetch it again.
+APT_GET := sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+#
+# The Azure mirror also trickles for minutes without stalling, which no apt timeout catches, so
+# GitHub runners use the main Ubuntu archive instead (a no-op elsewhere). Their ubuntu.sources points
+# at a mirror list (mirror+file:/etc/apt/apt-mirrors.txt) with the Azure mirror first, so both change.
+APT_SOURCES := /etc/apt/sources.list.d/ubuntu.sources /etc/apt/apt-mirrors.txt
+
 build-deps-ubuntu:
-	sudo apt-get update
-	sudo apt-get install -y \
+	for f in $(APT_SOURCES); do [ ! -f $$f ] || sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' $$f; done
+	$(APT_GET) update
+	$(APT_GET) install -y \
 		curl \
 		gcc-aarch64-linux-gnu \
 		gcc-arm-linux-gnueabi \
 		gcc-mingw-w64-x86-64 \
 		python3 \
 		python3-venv \
+		qemu-user \
 		jq
-	which pip3 || sudo apt-get install -y python3-pip
+	which pip3 || $(APT_GET) install -y python3-pip
 
 
 # Documentation
@@ -170,6 +182,12 @@ web-lint:
 
 web-test:
 	cd web && $(NPM) run test
+
+# The e2e server must embed the real web app, so this builds the web app and a server binary
+# (build/ntfy-e2e) first; see web/e2e/server.mjs for how it is started
+web-e2e: web cli-deps-static-sites
+	CGO_ENABLED=1 go build -tags sqlite_omit_load_extension,osusergo,netgo -o build/ntfy-e2e .
+	cd web && npx playwright install chromium && $(NPM) run test:e2e
 
 # Main server/client build
 
@@ -282,22 +300,22 @@ test: cli-test web-test
 testv: cli-testv web-test
 
 cli-test: FORCE
-	go test $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
+	go test $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 cli-testv: FORCE
-	go test -v $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
+	go test -v $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 race: FORCE
-	go test -v -race $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
+	go test -v -race $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 
 coverage:
 	mkdir -p build/coverage
-	go test -v -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools|web)')
+	go test -v -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools|web)')
 	go tool cover -func build/coverage/coverage.txt
 
 coverage-html:
 	mkdir -p build/coverage
-	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
+	go test -race -coverprofile=build/coverage/coverage.txt -covermode=atomic $(shell go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools)')
 	go tool cover -html build/coverage/coverage.txt
 
 coverage-upload:

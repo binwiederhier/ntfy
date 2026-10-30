@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/client"
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/test"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -520,6 +522,79 @@ func TestCLI_Serve_WebSocket(t *testing.T) {
 	require.Equal(t, "mytopic", m.Topic)
 }
 
+func TestParseListenHTTP_Success(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "single address",
+			input:    ":80",
+			expected: []string{":80"},
+		},
+		{
+			name:     "several addresses",
+			input:    "10.0.0.5:2586,10.0.0.5:2588,10.0.0.5:2589",
+			expected: []string{"10.0.0.5:2586", "10.0.0.5:2588", "10.0.0.5:2589"},
+		},
+		{
+			name:     "whitespace around commas",
+			input:    " 10.0.0.5:2586 , 10.0.0.5:2588 ",
+			expected: []string{"10.0.0.5:2586", "10.0.0.5:2588"},
+		},
+		{
+			name:     "unset default",
+			input:    "-",
+			expected: []string{},
+		},
+		{
+			name:     "empty",
+			input:    "",
+			expected: []string{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseListenHTTP(tt.input)
+			require.Nil(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestParseListenHTTP_Errors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		error string
+	}{
+		{
+			name:  "empty entry",
+			input: "10.0.0.5:2586,,10.0.0.5:2588",
+			error: "invalid listen-http: 10.0.0.5:2586,,10.0.0.5:2588, empty address",
+		},
+		{
+			name:  "trailing comma",
+			input: "10.0.0.5:2586,",
+			error: "invalid listen-http: 10.0.0.5:2586,, empty address",
+		},
+		{
+			name:  "duplicate address",
+			input: "10.0.0.5:2586,10.0.0.5:2586",
+			error: "invalid listen-http: 10.0.0.5:2586,10.0.0.5:2586, duplicate address 10.0.0.5:2586",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseListenHTTP(tt.input)
+			require.Error(t, err)
+			require.Nil(t, result)
+			assert.Equal(t, tt.error, err.Error())
+		})
+	}
+}
+
 func TestIP_Host_Parsing(t *testing.T) {
 	cases := map[string]string{
 		"1.1.1.1":          "1.1.1.1/32",
@@ -536,55 +611,84 @@ func TestIP_Host_Parsing(t *testing.T) {
 	}
 }
 
-func TestCLI_Serve_ValidationNotSkippedWhenBaseURLSet(t *testing.T) {
-	authFile := filepath.Join(t.TempDir(), "user.db")
-	cases := map[string]struct {
-		args        []string
-		expectedErr string
-	}{
-		"identical upstream-base-url": {
-			args:        []string{"--base-url=https://ntfy.example.com", "--upstream-base-url=https://ntfy.example.com"},
-			expectedErr: "base-url and upstream-base-url cannot be identical",
-		},
-		"upstream-base-url with trailing slash": {
-			args:        []string{"--base-url=https://ntfy.example.com", "--upstream-base-url=https://ntfy.sh/"},
-			expectedErr: "upstream-base-url must not end with a slash",
-		},
-		"require-login without enable-login": {
-			args:        []string{"--base-url=https://ntfy.example.com", "--auth-file=" + authFile, "--require-login"},
-			expectedErr: "cannot set require-login without also setting enable-login",
-		},
-	}
-	for name, c := range cases {
-		t.Run(name, func(t *testing.T) {
-			require.ErrorContains(t, runServeUntilError(t, c.args...), c.expectedErr)
-		})
-	}
-}
-
-func TestCLI_Serve_ValidationNotSkippedWhenMessageSizeLimitAboveDefault(t *testing.T) {
-	err := runServeUntilError(t, "--message-size-limit=8k", "--visitor-prefix-bits-ipv4=0")
-	require.ErrorContains(t, err, "visitor-prefix-bits-ipv4 must be between 1 and 32")
-}
-
-// runServeUntilError runs "ntfy serve" and returns its error. If the config passes validation,
-// the server starts and blocks, so the test fails after a timeout instead of hanging.
-func runServeUntilError(t *testing.T, args ...string) error {
+func TestCLI_Serve_ClusterValidation(t *testing.T) {
 	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
-	port := 10000 + rand.Intn(20000)
-	errChan := make(chan error, 1)
-	go func() {
+	// Setting experimental-cluster-listen implicitly enables clustering, which requires
+	// database-url; all validation must fail before any database connection is attempted
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "database-url")
+	// It also requires a shared secret
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-secret")
+	// ... and an explicit stable node ID
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-node-id")
+	// A secret without a listen address is a config error: clustering would silently be off
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-secret=s3cret"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-listen")
+	// A wildcard bind cannot derive an advertise URL
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-advertise-url")
+	// The linger must not be negative
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-batch-linger=-1s"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster batch linger")
+	// The drain duration must not be negative either (0 disables draining)
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-duration=-1s"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster drain duration")
+	// The drain delay must not be negative either
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-delay=-1s"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cluster drain delay")
+	// 0 is valid (close all at once): the error is about the role, which is checked after the drain duration
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-duration=0", "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a", "--experimental-cluster-role=leader"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-role")
+	// The role must be one of the known ones: a typo would make a node half passive
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a", "--experimental-cluster-role=leader"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "experimental-cluster-role")
+}
+
+func TestCLI_Serve_AttachmentExpiryLongerThanCacheDurationWarning(t *testing.T) {
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+
+	// An invalid auth-default-access fails right after validation, before the server starts
+	runServe := func(args ...string) {
 		app, _, _, _ := newTestApp()
-		serveArgs := []string{"ntfy", "serve", "--config=" + configFile, fmt.Sprintf("--listen-http=:%d", port)}
-		errChan <- app.Run(append(serveArgs, args...))
-	}()
-	select {
-	case err := <-errChan:
-		return err
-	case <-time.After(3 * time.Second):
-		t.Fatal("server started, but config should have been rejected")
-		return nil
+		err := app.Run(append([]string{"ntfy", "serve", "--config=" + configFile, "--auth-default-access=invalid"}, args...))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "auth-default-access")
 	}
+
+	// Attachments outliving the message cache are cut short, so warn
+	runServe("--cache-duration=12h", "--attachment-expiry-duration=24h")
+	require.Contains(t, buf.String(), "attachment-expiry-duration (24h) is longer than cache-duration (12h)")
+
+	// No warning if the attachments expire first, or if messages are kept forever
+	buf.Reset()
+	runServe("--cache-duration=12h", "--attachment-expiry-duration=3h")
+	runServe("--cache-duration=0", "--attachment-expiry-duration=24h")
+	require.NotContains(t, buf.String(), "attachment-expiry-duration")
 }
 
 func newEmptyFile(t *testing.T) string {

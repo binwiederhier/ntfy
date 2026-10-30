@@ -19,6 +19,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/payments"
 	"heckel.io/ntfy/v2/server"
@@ -34,7 +35,7 @@ var flagsServe = append(
 	append([]cli.Flag{}, flagsDefault...),
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: server.DefaultConfigFile, Usage: "config file"},
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "base-url", Aliases: []string{"base_url", "B"}, EnvVars: []string{"NTFY_BASE_URL"}, Usage: "externally visible base URL for this host (e.g. https://ntfy.sh)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used as HTTP listen address"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-http", Aliases: []string{"listen_http", "l"}, EnvVars: []string{"NTFY_LISTEN_HTTP"}, Value: server.DefaultListenHTTP, Usage: "ip:port used as HTTP listen address; several comma-separated addresses are allowed"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used as HTTPS listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-unix", Aliases: []string{"listen_unix", "U"}, EnvVars: []string{"NTFY_LISTEN_UNIX"}, Usage: "listen on unix socket path"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "listen-unix-mode", Aliases: []string{"listen_unix_mode"}, EnvVars: []string{"NTFY_LISTEN_UNIX_MODE"}, DefaultText: "system default", Usage: "file permissions of unix socket, e.g. 0700"}),
@@ -43,6 +44,14 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-node-id", Aliases: []string{"experimental_cluster_node_id"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (required in cluster mode)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-listen", Aliases: []string{"experimental_cluster_listen"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_LISTEN"}, Usage: "ip:port for the dedicated cluster fan-out listener; bind it to the private network (e.g. 10.0.0.5:2587)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-advertise-url", Aliases: []string{"experimental_cluster_advertise_url"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out listener (defaults to http://<experimental-cluster-listen>)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-secret", Aliases: []string{"experimental_cluster_secret"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-role", Aliases: []string{"experimental_cluster_role"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_ROLE"}, Value: string(server.DefaultClusterRole), Usage: "role of this cluster node: active (takes client traffic, may lead) or passive (hidden: never leads, never fences)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-batch-linger", Aliases: []string{"experimental_cluster_batch_linger"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER"}, Value: util.FormatDuration(server.DefaultClusterBatchLinger), Usage: "how long fan-out messages wait to form a batch per peer node (0 = send immediately)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-drain-delay", Aliases: []string{"experimental_cluster_drain_delay"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY"}, Value: util.FormatDuration(server.DefaultClusterDrainDelay), Usage: "on shutdown (SIGTERM), how long an active cluster node withdraws (not ready, but still serves everything), so the load balancers stop sending it requests before it turns read-only"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-drain-duration", Aliases: []string{"experimental_cluster_drain_duration"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION"}, Value: util.FormatDuration(server.DefaultClusterDrainDuration), Usage: "on shutdown (SIGTERM), how long an active cluster node takes to close its subscriber connections, so they reconnect to the other nodes gradually (0 = all at once)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
@@ -148,7 +157,7 @@ func execServe(c *cli.Context) error {
 	// Read all the options
 	config := c.String("config")
 	baseURL := strings.TrimSuffix(c.String("base-url"), "/")
-	listenHTTP := c.String("listen-http")
+	listenHTTPRaw := c.String("listen-http")
 	listenHTTPS := c.String("listen-https")
 	listenUnix := c.String("listen-unix")
 	listenUnixMode := c.Int("listen-unix-mode")
@@ -157,6 +166,14 @@ func execServe(c *cli.Context) error {
 	firebaseKeyFile := c.String("firebase-key-file")
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
+	clusterNodeID := c.String("experimental-cluster-node-id")
+	clusterListen := c.String("experimental-cluster-listen")
+	clusterAdvertiseURL := c.String("experimental-cluster-advertise-url")
+	clusterSecret := c.String("experimental-cluster-secret")
+	clusterBatchLingerStr := c.String("experimental-cluster-batch-linger")
+	clusterRoleStr := c.String("experimental-cluster-role")
+	clusterDrainDelayStr := c.String("experimental-cluster-drain-delay")
+	clusterDrainDurationStr := c.String("experimental-cluster-drain-duration")
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
 	webPushFile := c.String("web-push-file")
@@ -252,6 +269,22 @@ func execServe(c *cli.Context) error {
 	if err != nil {
 		return fmt.Errorf("invalid keepalive interval: %s", keepaliveIntervalStr)
 	}
+	clusterBatchLinger, err := util.ParseDuration(clusterBatchLingerStr)
+	if err != nil || clusterBatchLinger < 0 {
+		return fmt.Errorf("invalid cluster batch linger: %s", clusterBatchLingerStr)
+	}
+	clusterDrainDelay, err := util.ParseDuration(clusterDrainDelayStr)
+	if err != nil || clusterDrainDelay < 0 {
+		return fmt.Errorf("invalid cluster drain delay: %s", clusterDrainDelayStr)
+	}
+	clusterDrainDuration, err := util.ParseDuration(clusterDrainDurationStr)
+	if err != nil || clusterDrainDuration < 0 {
+		return fmt.Errorf("invalid cluster drain duration: %s", clusterDrainDurationStr)
+	}
+	clusterRole := cluster.Role(clusterRoleStr)
+	if !clusterRole.Valid() {
+		return fmt.Errorf("invalid experimental-cluster-role: %s (must be %s or %s)", clusterRoleStr, cluster.RoleActive, cluster.RolePassive)
+	}
 	managerInterval, err := util.ParseDuration(managerIntervalStr)
 	if err != nil {
 		return fmt.Errorf("invalid manager interval: %s", managerIntervalStr)
@@ -322,6 +355,16 @@ func execServe(c *cli.Context) error {
 		return errors.New("if database-url is set, auth-file, cache-file, and web-push-file must not be set")
 	} else if len(databaseReplicaURLs) > 0 && databaseURL == "" {
 		return errors.New("database-replica-urls can only be used if database-url is also set")
+	} else if clusterListen != "" && databaseURL == "" {
+		return errors.New("experimental-cluster-listen requires database-url to be set")
+	} else if clusterListen != "" && clusterSecret == "" {
+		return errors.New("experimental-cluster-listen requires experimental-cluster-secret to be set")
+	} else if clusterListen != "" && clusterNodeID == "" {
+		return errors.New("experimental-cluster-listen requires experimental-cluster-node-id to be set")
+	} else if clusterListen == "" && clusterSecret != "" {
+		return errors.New("experimental-cluster-secret can only be used if experimental-cluster-listen is set")
+	} else if clusterListen != "" && clusterAdvertiseURL == "" && wildcardAddr(clusterListen) {
+		return errors.New("experimental-cluster-advertise-url must be set if experimental-cluster-listen binds a wildcard address")
 	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if firebaseKeyFile != "" && !server.FirebaseAvailable {
@@ -348,8 +391,15 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
-	} else if err := validateBaseURL(baseURL); err != nil {
-		return err
+	} else if baseURL != "" {
+		u, err := url.Parse(baseURL)
+		if err != nil {
+			return fmt.Errorf("if set, base-url must be a valid URL, e.g. https://ntfy.mydomain.com: %v", err)
+		} else if u.Scheme != "http" && u.Scheme != "https" {
+			return errors.New("if set, base-url must be a valid URL starting with http:// or https://, e.g. https://ntfy.mydomain.com")
+		} else if u.Path != "" {
+			return fmt.Errorf("if set, base-url must not have a path (%s), as hosting ntfy on a sub-path is not supported, e.g. https://ntfy.mydomain.com", u.Path)
+		}
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
 	} else if upstreamBaseURL != "" && strings.HasSuffix(upstreamBaseURL, "/") {
@@ -370,8 +420,11 @@ func execServe(c *cli.Context) error {
 		return errors.New("if stripe-secret-key is set, stripe-webhook-key and base-url must also be set")
 	} else if twilioAccount != "" && (twilioAuthToken == "" || twilioPhoneNumber == "" || twilioVerifyService == "" || baseURL == "" || (authFile == "" && databaseURL == "")) {
 		return errors.New("if twilio-account is set, twilio-auth-token, twilio-phone-number, twilio-verify-service, base-url, and auth-file (or database-url) must also be set")
-	} else if messageSizeLimit > 5*1024*1024 {
-		return errors.New("message-size-limit cannot be higher than 5M")
+	} else if messageSizeLimit > server.DefaultMessageSizeLimit {
+		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
+		if messageSizeLimit > 5*1024*1024 {
+			return errors.New("message-size-limit cannot be higher than 5M")
+		}
 	} else if !server.WebPushAvailable && (webPushPrivateKey != "" || webPushPublicKey != "" || webPushFile != "") {
 		return errors.New("cannot enable WebPush, support is not available in this build (nowebpush)")
 	} else if webPushExpiryWarningDuration > 0 && webPushExpiryWarningDuration > webPushExpiryDuration {
@@ -393,8 +446,8 @@ func execServe(c *cli.Context) error {
 	} else if runtime.GOOS == "windows" && listenUnix != "" {
 		return errors.New("listen-unix is not supported on Windows")
 	}
-	if messageSizeLimit > server.DefaultMessageSizeLimit {
-		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
+	if cacheDuration > 0 && attachmentExpiryDuration > cacheDuration {
+		log.Warn("attachment-expiry-duration (%s) is longer than cache-duration (%s); attachments never outlive their message, so they will be deleted after %s", attachmentExpiryDurationStr, cacheDurationStr, cacheDurationStr)
 	}
 
 	// Backwards compatibility
@@ -426,9 +479,9 @@ func execServe(c *cli.Context) error {
 		return err
 	}
 
-	// Special case: Unset default
-	if listenHTTP == "-" {
-		listenHTTP = ""
+	listenHTTP, err := parseListenHTTP(listenHTTPRaw)
+	if err != nil {
+		return err
 	}
 
 	// Resolve hosts
@@ -552,6 +605,14 @@ func execServe(c *cli.Context) error {
 	conf.ProfileListenHTTP = profileListenHTTP
 	conf.DatabaseURL = databaseURL
 	conf.DatabaseReplicaURLs = databaseReplicaURLs
+	conf.ClusterNodeID = clusterNodeID
+	conf.ClusterListen = clusterListen
+	conf.ClusterAdvertiseURL = clusterAdvertiseURL
+	conf.ClusterSecret = clusterSecret
+	conf.ClusterBatchLinger = clusterBatchLinger
+	conf.ClusterRole = clusterRole
+	conf.ClusterDrainDelay = clusterDrainDelay
+	conf.ClusterDrainDuration = clusterDrainDuration
 	conf.WebPushPrivateKey = webPushPrivateKey
 	conf.WebPushPublicKey = webPushPublicKey
 	conf.WebPushFile = webPushFile
@@ -578,25 +639,21 @@ func execServe(c *cli.Context) error {
 	s, err := server.New(conf)
 	if err != nil {
 		log.Fatal("%s", err.Error())
-	} else if err := s.Run(); err != nil {
-		log.Fatal("%s", err.Error())
+	}
+	stopping := make(chan struct{})
+	go sigHandlerShutdown(s, stopping)
+	err = s.Run()
+	select {
+	case <-stopping:
+		// Run returns as soon as the listeners close; Stop blocks until the signal-triggered
+		// shutdown (incl. flushing the message cache) has completed
+		s.Stop()
+	default:
+		if err != nil {
+			log.Fatal("%s", err.Error())
+		}
 	}
 	log.Info("Exiting.")
-	return nil
-}
-
-func validateBaseURL(baseURL string) error {
-	if baseURL == "" {
-		return nil
-	}
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		return fmt.Errorf("if set, base-url must be a valid URL, e.g. https://ntfy.mydomain.com: %v", err)
-	} else if u.Scheme != "http" && u.Scheme != "https" {
-		return errors.New("if set, base-url must be a valid URL starting with http:// or https://, e.g. https://ntfy.mydomain.com")
-	} else if u.Path != "" {
-		return fmt.Errorf("if set, base-url must not have a path (%s), as hosting ntfy on a sub-path is not supported, e.g. https://ntfy.mydomain.com", u.Path)
-	}
 	return nil
 }
 
@@ -744,4 +801,35 @@ func maybeFromMetadata(m map[string]any, key string) string {
 		return ""
 	}
 	return s
+}
+
+// wildcardAddr reports whether the given listen address binds all interfaces (e.g. ":2587",
+// "0.0.0.0:2587", "[::]:2587"), in which case peers cannot derive a reachable URL from it.
+func wildcardAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return true // Unparseable -> cannot derive a URL either
+	}
+	return host == "" || host == "0.0.0.0" || host == "::"
+}
+
+// parseListenHTTP parses the comma-separated listen-http addresses ("-" unsets the default)
+func parseListenHTTP(raw string) ([]string, error) {
+	addrs := make([]string, 0)
+	if raw == "" || raw == "-" {
+		return addrs, nil
+	}
+	seen := make(map[string]struct{})
+	for _, addr := range strings.Split(raw, ",") {
+		addr = strings.TrimSpace(addr)
+		if addr == "" {
+			return nil, fmt.Errorf("invalid listen-http: %s, empty address", raw)
+		}
+		if _, ok := seen[addr]; ok {
+			return nil, fmt.Errorf("invalid listen-http: %s, duplicate address %s", raw, addr)
+		}
+		seen[addr] = struct{}{}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
 }

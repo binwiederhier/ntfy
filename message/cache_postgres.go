@@ -1,17 +1,23 @@
 package message
 
 import (
+	"database/sql"
 	"time"
 
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
+	"heckel.io/ntfy/v2/model"
 )
 
 // PostgreSQL runtime query constants
 const (
-	postgresInsertMessageQuery = `
+	// postgresInsertMessagesQuery writes a whole batch in one statement with one array parameter
+	// per column, in the order of insertMessageArgs. The statement text is the same for every batch
+	// size: pgx prepares each distinct text server-side and keeps up to 512 per connection, and a
+	// multi-row INSERT per batch size left hundreds of multi-MB plans in every pooled backend.
+	postgresInsertMessagesQuery = `
 		INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user_id, content_type, encoding, published)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+		SELECT * FROM unnest($1::TEXT[], $2::TEXT[], $3::BIGINT[], $4::TEXT[], $5::BIGINT[], $6::TEXT[], $7::TEXT[], $8::TEXT[], $9::INT[], $10::TEXT[], $11::TEXT[], $12::TEXT[], $13::TEXT[], $14::TEXT[], $15::TEXT[], $16::BIGINT[], $17::BIGINT[], $18::TEXT[], $19::BOOLEAN[], $20::TEXT[], $21::TEXT[], $22::TEXT[], $23::TEXT[], $24::BOOLEAN[])
 	`
 	postgresSelectScheduledMessageIDsBySeqIDQuery = `SELECT mid FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
 	postgresDeleteScheduledBySequenceIDQuery      = `DELETE FROM message WHERE topic = $1 AND sequence_id = $2 AND published = FALSE`
@@ -33,20 +39,46 @@ const (
 		WHERE topic = $1 AND time >= $2
 		ORDER BY time DESC, id DESC
 	`
+	postgresSelectMessageRowIDQuery = `SELECT id, time FROM message WHERE mid = $1 LIMIT 1`
+	// postgresSelectMessagesSinceIDQuery replays after a since=<mid> marker (see Cache.MessagesAfterMarker):
+	// rows published in the marker's second ($3) or later, except the marker ($2), and rows written after
+	// the marker but published before it. Each part starts its index scan at the marker; as one OR, every
+	// row of the topic was read (incident 2026-10-16). "time + 0" keeps the second part off the time index,
+	// whose scan would start at the topic's oldest row.
 	postgresSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
-		FROM message
-		WHERE topic = $1
-		  AND id > COALESCE((SELECT id FROM message WHERE mid = $2), 0)
-		  AND published = TRUE
+		FROM (
+			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id <> $2
+			UNION ALL
+			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND id > $2 AND time + 0 < $3
+		) m
 		ORDER BY time DESC, id DESC
 	`
 	postgresSelectMessagesSinceIDIncludeScheduledQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
-		FROM message
-		WHERE topic = $1
-		  AND (id > COALESCE((SELECT id FROM message WHERE mid = $2), 0) OR published = FALSE)
+		FROM (
+			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id <> $2
+			UNION ALL
+			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND id > $2 AND time + 0 < $3
+			UNION ALL
+			SELECT * FROM message WHERE topic = $1 AND published = FALSE
+		) m
 		ORDER BY time DESC, id DESC
+	`
+	postgresSelectRecentRowIDsQuery = `SELECT id FROM message ORDER BY id DESC LIMIT $1`
+	// postgresSelectMessagesAfterRowIDQuery reads rows in write order: those after the cursor ($1),
+	// plus the skipped row ids ($2, a JSON array) that were not committed yet when the cursor passed.
+	// The parts are separate so that the primary key checks every condition, also in the plan made
+	// without the parameter values; as one OR, that plan read the whole table.
+	postgresSelectMessagesAfterRowIDQuery = `
+		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding, id, published
+		FROM (
+			SELECT * FROM message WHERE id > $1
+			UNION ALL
+			SELECT * FROM message WHERE id = ANY(ARRAY(SELECT jsonb_array_elements_text($2::JSONB)::BIGINT)) AND id <= $1
+		) m
+		ORDER BY id
+		LIMIT $3
 	`
 	postgresSelectMessagesLatestQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
@@ -76,23 +108,42 @@ const (
 	postgresSelectAttachmentsSizeByUserIDQuery = `SELECT COALESCE(SUM(attachment_size), 0) FROM message WHERE user_id = $1 AND attachment_expires >= $2`
 	postgresSelectAttachmentsWithSizesQuery    = `SELECT mid, attachment_size FROM message WHERE attachment_expires > $1 AND attachment_deleted = FALSE`
 
-	postgresSelectStatsQuery       = `SELECT value FROM message_stats WHERE key = 'messages'`
-	postgresUpdateStatsQuery       = `UPDATE message_stats SET value = $1 WHERE key = 'messages'`
+	postgresSelectStatsQuery = `SELECT value FROM message_stats WHERE key = 'messages'`
+	// postgresClaimMessagesDueQuery claims due rows in one statement: the inner SELECT locks what
+	// it picks and skips what another node is claiming, so concurrent senders get disjoint sets.
+	// Unclaimed rows have claimed_at 0, so the cutoff ($2) matches them too.
+	postgresClaimMessagesDueQuery = `
+		WITH due AS (
+			SELECT id FROM message
+			WHERE time <= $1 AND published = FALSE AND claimed_at <= $2
+			ORDER BY time, id
+			LIMIT $3
+			FOR UPDATE SKIP LOCKED
+		)
+		UPDATE message SET claimed_at = $4 WHERE id IN (SELECT id FROM due)
+		RETURNING mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
+	`
+
+	postgresUpdateStatsQuery       = `UPDATE message_stats SET value = value + $1 WHERE key = 'messages'`
 	postgresUpdateMessageTimeQuery = `UPDATE message SET time = $1 WHERE mid = $2`
 )
 
 var postgresQueries = queries{
-	insertMessage:                    postgresInsertMessageQuery,
+	insertMessages:                   postgresInsertMessages,
 	selectScheduledMessageIDsBySeqID: postgresSelectScheduledMessageIDsBySeqIDQuery,
 	deleteScheduledBySequenceID:      postgresDeleteScheduledBySequenceIDQuery,
 	updateMessagesForTopicExpiry:     postgresUpdateMessagesForTopicExpiryQuery,
 	selectMessagesByID:               postgresSelectMessagesByIDQuery,
 	selectMessagesSinceTime:          postgresSelectMessagesSinceTimeQuery,
 	selectMessagesSinceTimeScheduled: postgresSelectMessagesSinceTimeIncludeScheduledQuery,
+	selectMessageRowID:               postgresSelectMessageRowIDQuery,
 	selectMessagesSinceID:            postgresSelectMessagesSinceIDQuery,
 	selectMessagesSinceIDScheduled:   postgresSelectMessagesSinceIDIncludeScheduledQuery,
+	selectRecentRowIDs:               postgresSelectRecentRowIDsQuery,
+	selectMessagesAfterRowID:         postgresSelectMessagesAfterRowIDQuery,
 	selectMessagesLatest:             postgresSelectMessagesLatestQuery,
 	selectMessagesDue:                postgresSelectMessagesDueQuery,
+	claimMessagesDue:                 postgresClaimMessagesDueQuery,
 	deleteExpiredMessages:            postgresDeleteExpiredMessagesQuery,
 	updateMessagePublished:           postgresUpdateMessagePublishedQuery,
 	selectMessagesCount:              postgresSelectMessagesCountQuery,
@@ -108,8 +159,29 @@ var postgresQueries = queries{
 
 // NewPostgresStore creates a new PostgreSQL-backed message cache store using an existing database connection pool.
 func NewPostgresStore(d *db.DB, batchSize int, batchTimeout time.Duration) (*Cache, error) {
-	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, postgresMigrations); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCreateTables, postgresMigrations); err != nil {
 		return nil, err
 	}
 	return newCache(d, postgresQueries, nil, batchSize, batchTimeout, false), nil
+}
+
+// postgresInsertMessages transposes the batch into one array per column and writes it with
+// postgresInsertMessagesQuery in a single round trip
+func postgresInsertMessages(tx *sql.Tx, ms []*model.Message) error {
+	columns := make([][]any, insertMessageColumns)
+	for _, m := range ms {
+		args, err := insertMessageArgs(m)
+		if err != nil {
+			return err
+		}
+		for i, arg := range args {
+			columns[i] = append(columns[i], arg)
+		}
+	}
+	params := make([]any, 0, len(columns))
+	for _, column := range columns {
+		params = append(params, column)
+	}
+	_, err := tx.Exec(postgresInsertMessagesQuery, params...)
+	return err
 }

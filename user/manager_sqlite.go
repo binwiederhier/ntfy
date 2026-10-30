@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 
@@ -77,7 +76,7 @@ const (
 	sqliteUpdateUserRoleQuery           = `UPDATE user SET role = ? WHERE user = ?`
 	sqliteUpdateUserProvisionedQuery    = `UPDATE user SET provisioned = ? WHERE user = ?`
 	sqliteUpdateUserPrefsQuery          = `UPDATE user SET prefs = ? WHERE id = ?`
-	sqliteUpdateUserStatsQuery          = `UPDATE user SET stats_messages = ?, stats_emails = ?, stats_calls = ? WHERE id = ?`
+	sqliteUpdateUserStatsQuery          = `UPDATE user SET stats_messages = stats_messages + ?, stats_emails = stats_emails + ?, stats_calls = stats_calls + ? WHERE id = ?`
 	sqliteUpdateUserStatsResetAllQuery  = `UPDATE user SET stats_messages = 0, stats_emails = 0, stats_calls = 0`
 	sqliteUpdateUserTierQuery           = `UPDATE user SET tier_id = (SELECT id FROM tier WHERE code = ?) WHERE user = ?`
 	sqliteUpdateUserDeletedQuery        = `UPDATE user SET deleted = ? WHERE id = ?`
@@ -216,6 +215,12 @@ const (
 		FROM tier
 		WHERE (stripe_monthly_price_id = ? OR stripe_yearly_price_id = ?)
 	`
+	sqliteSelectTierUsersCountQuery = `
+		SELECT t.code, COUNT(u.id)
+		FROM tier t
+		LEFT JOIN user u ON u.tier_id = t.id
+		GROUP BY t.code
+	`
 	sqliteDeleteTierQuery = `DELETE FROM tier WHERE code = ?`
 
 	// Phone queries
@@ -250,21 +255,6 @@ const (
 	`
 )
 
-// sqliteSelectAccessCacheUsersQuery builds the per-users cache-load query
-// with a "?, ?, ..." IN clause sized for n usernames.
-func sqliteSelectAccessCacheUsersQuery(n int) string {
-	var sb strings.Builder
-	sb.WriteString(`SELECT u.user, a.topic, a.read, a.write FROM user_access a JOIN user u ON u.id = a.user_id WHERE u.user IN (`)
-	for i := 0; i < n; i++ {
-		if i > 0 {
-			sb.WriteString(",")
-		}
-		sb.WriteString("?")
-	}
-	sb.WriteString(")")
-	return sb.String()
-}
-
 var sqliteQueries = queries{
 	selectUserByID:                 sqliteSelectUserByIDQuery,
 	selectUserByName:               sqliteSelectUserByNameQuery,
@@ -290,7 +280,6 @@ var sqliteQueries = queries{
 	deleteUsersProvisioned:         sqliteDeleteUsersProvisionedQuery,
 	selectTopicPerms:               sqliteSelectTopicPermsQuery,
 	selectAccessCacheAll:           sqliteSelectAccessCacheAllQuery,
-	selectAccessCacheUsers:         sqliteSelectAccessCacheUsersQuery,
 	selectUserAllAccess:            sqliteSelectUserAllAccessQuery,
 	selectUserAccess:               sqliteSelectUserAccessQuery,
 	selectUserReservations:         sqliteSelectUserReservationsQuery,
@@ -321,6 +310,7 @@ var sqliteQueries = queries{
 	selectTierByCode:               sqliteSelectTierByCodeQuery,
 	selectTierByPriceID:            sqliteSelectTierByPriceIDQuery,
 	updateTier:                     sqliteUpdateTierQuery,
+	selectTierUsersCount:           sqliteSelectTierUsersCountQuery,
 	deleteTier:                     sqliteDeleteTierQuery,
 	selectPhoneNumbers:             sqliteSelectPhoneNumbersQuery,
 	insertPhoneNumber:              sqliteInsertPhoneNumberQuery,
@@ -362,7 +352,7 @@ func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager
 	// Migrations must run before the startup queries: the 5 -> 6 table rebuilds rely on
 	// foreign keys being OFF, which is only guaranteed on fresh connections (the foreign_keys
 	// pragma is enabled as part of the builtin startup queries below)
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCurrentSchemaVersion, sqliteCreateTables, sqliteMigrations); err != nil {
+	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations); err != nil {
 		return nil, err
 	}
 	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {

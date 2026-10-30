@@ -19,6 +19,11 @@ func sigHandlerConfigReload(config string) {
 	log.Debug("Config hot-reload via SIGHUP is not supported on Windows")
 }
 
+// sigHandlerShutdown is a no-op on Windows; the service control manager stops the server
+// via windowsService.Execute
+func sigHandlerShutdown(s *server.Server, stopping chan<- struct{}) {
+}
+
 // runAsWindowsService runs the ntfy server as a Windows service
 func runAsWindowsService(conf *server.Config) error {
 	return svc.Run(serviceName, &windowsService{conf: conf})

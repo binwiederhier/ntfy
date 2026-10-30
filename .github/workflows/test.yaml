@@ -5,7 +5,7 @@ on:
   pull_request:
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:17
@@ -31,12 +31,13 @@ jobs:
         with:
           go-version-file: '.go-version'
       - name: Install node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: 'npm'
           cache-dependency-path: './web/package-lock.json'
       - name: Install dependencies
+        timeout-minutes: 10 # A stalled apt mirror must fail the run, not hang it
         run: make build-deps-ubuntu
       - name: Build docs (required for tests)
         run: make docs

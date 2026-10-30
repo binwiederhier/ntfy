@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"heckel.io/ntfy/v2/util"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -182,11 +183,12 @@ func WithTagsFilter(tags []string) SubscribeOption {
 	return WithQueryParam("tags", strings.Join(tags, ","))
 }
 
-// WithHeader is a generic option to add headers to a request
+// WithHeader is a generic option to add headers to a request. Values with characters that are not
+// allowed in HTTP headers (e.g. newlines) are RFC 2047 encoded, which the server decodes.
 func WithHeader(header, value string) RequestOption {
 	return func(r *http.Request) error {
 		if value != "" {
-			r.Header.Set(header, value)
+			r.Header.Set(header, mime.BEncoding.Encode("utf-8", value))
 		}
 		return nil
 	}

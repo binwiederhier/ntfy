@@ -9,6 +9,7 @@ import {
   shortUrl,
   expandUrl,
   expandSecureUrl,
+  findSubscriptionForRoute,
   validUrl,
   validTopic,
   disallowedTopic,
@@ -64,6 +65,34 @@ describe("url helpers", () => {
     expect(validUrl("https://ntfy.sh")).toBeTruthy();
     expect(validUrl("http://ntfy.sh")).toBeTruthy();
     expect(validUrl("ftp://ntfy.sh")).toBeFalsy();
+  });
+});
+
+describe("findSubscriptionForRoute", () => {
+  // The same topic on the default server and on another server (#858)
+  const defaultBaseUrl = "https://ntfy.sh";
+  const onDefault = { id: "https://ntfy.sh/test", baseUrl: "https://ntfy.sh", topic: "test" };
+  const onOther = { id: "https://ntfy.example.com/test", baseUrl: "https://ntfy.example.com", topic: "test" };
+
+  it("picks the other server's subscription for /:baseUrl/:topic", () => {
+    const params = { baseUrl: "ntfy.example.com", topic: "test" };
+    expect(findSubscriptionForRoute([onDefault, onOther], params, defaultBaseUrl)).toBe(onOther);
+  });
+
+  it("picks the default server's subscription for /:topic", () => {
+    const params = { topic: "test" };
+    expect(findSubscriptionForRoute([onOther, onDefault], params, defaultBaseUrl)).toBe(onDefault);
+  });
+
+  it("matches an http base URL", () => {
+    const onHttp = { id: "http://10.0.0.1/test", baseUrl: "http://10.0.0.1", topic: "test" };
+    const params = { baseUrl: "10.0.0.1", topic: "test" };
+    expect(findSubscriptionForRoute([onDefault, onHttp], params, defaultBaseUrl)).toBe(onHttp);
+  });
+
+  it("returns undefined when nothing matches", () => {
+    const params = { baseUrl: "ntfy.example.com", topic: "other" };
+    expect(findSubscriptionForRoute([onDefault, onOther], params, defaultBaseUrl)).toBeUndefined();
   });
 });
 

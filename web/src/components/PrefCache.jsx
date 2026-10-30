@@ -35,6 +35,7 @@ export const PrefCacheProvider = ({ children }) => {
     dateFormat: await prefs.dateFormat(),
     timeFormat: await prefs.timeFormat(),
     webPushEnabled: await prefs.webPushEnabled(),
+    notificationAlertDismissed: await prefs.notificationAlertDismissed(),
   }));
 
   // Write through to localStorage on change (prefs change rarely).

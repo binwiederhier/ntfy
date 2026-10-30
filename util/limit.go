@@ -2,10 +2,8 @@ package util
 
 import (
 	"errors"
-	"golang.org/x/time/rate"
 	"io"
 	"sync"
-	"time"
 )
 
 // ErrLimitReached is the error returned by the Limiter and LimitWriter when the predefined limit has been reached
@@ -78,77 +76,6 @@ func (l *FixedLimiter) Value() int64 {
 func (l *FixedLimiter) Reset() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.value = 0
-}
-
-// RateLimiter is a Limiter that wraps a rate.Limiter, allowing a floating time-based limit.
-type RateLimiter struct {
-	r       rate.Limit
-	b       int
-	value   int64
-	limiter *rate.Limiter
-	mu      sync.Mutex
-}
-
-var _ Limiter = (*RateLimiter)(nil)
-
-// NewRateLimiter creates a new RateLimiter
-func NewRateLimiter(r rate.Limit, b int) *RateLimiter {
-	return NewRateLimiterWithValue(r, b, 0)
-}
-
-// NewRateLimiterWithValue creates a new RateLimiter with the given starting value.
-//
-// Note that the starting value only has informational value. It does not impact the underlying
-// value of the rate.Limiter.
-func NewRateLimiterWithValue(r rate.Limit, b int, value int64) *RateLimiter {
-	return &RateLimiter{
-		r:       r,
-		b:       b,
-		value:   value,
-		limiter: rate.NewLimiter(r, b),
-	}
-}
-
-// NewBytesLimiter creates a RateLimiter that is meant to be used for a bytes-per-interval limit,
-// e.g. 250 MB per day. And example of the underlying idea can be found here: https://go.dev/play/p/0ljgzIZQ6dJ
-func NewBytesLimiter(bytes int, interval time.Duration) *RateLimiter {
-	return NewRateLimiter(rate.Limit(bytes)*rate.Every(interval), bytes)
-}
-
-// Allow adds one to the limiters internal value, but only if the limit has not been reached. If the limit was
-// exceeded, false is returned.
-func (l *RateLimiter) Allow() bool {
-	return l.AllowN(1)
-}
-
-// AllowN adds n to the limiters internal value, but only if the limit has not been reached. If the limit was
-// exceeded after adding n, false is returned.
-func (l *RateLimiter) AllowN(n int64) bool {
-	if n <= 0 {
-		return false // No-op. Can't take back bytes you're written!
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if !l.limiter.AllowN(time.Now(), int(n)) {
-		return false
-	}
-	l.value += n
-	return true
-}
-
-// Value returns the current limiter value
-func (l *RateLimiter) Value() int64 {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.value
-}
-
-// Reset sets the limiter's value back to zero, and resets the underlying rate.Limiter
-func (l *RateLimiter) Reset() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.limiter = rate.NewLimiter(l.r, l.b)
 	l.value = 0
 }
 

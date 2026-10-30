@@ -17,5 +17,7 @@ node_modules/
 .DS_Store
 __pycache__
 web/dev-dist/
+web/test-results/
+web/playwright-report/
 venv/
 cmd/key-file.yaml

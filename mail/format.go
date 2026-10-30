@@ -54,6 +54,12 @@ func formatMail(baseURL, senderIP, from, to string, m *model.Message) (string, e
 		}
 		trailer += fmt.Sprintf("Priority: %s", priority)
 	}
+	if m.Attachment != nil && m.Attachment.URL != "" {
+		if trailer != "" {
+			trailer += "\n"
+		}
+		trailer += "Attachment: " + formatAttachment(m.Attachment)
+	}
 	if trailer != "" {
 		message += "\n\n" + trailer
 	}
@@ -79,6 +85,22 @@ This message was sent by {ip} at {time} via {topicURL}`
 	body = strings.ReplaceAll(body, "{time}", time.Unix(m.Time, 0).UTC().Format(time.RFC1123))
 	body = strings.ReplaceAll(body, "{ip}", senderIP)
 	return body, nil
+}
+
+// formatAttachment links the attachment rather than attaching it, since emails never expire
+// but uploaded files do (and would turn ntfy into a file host)
+func formatAttachment(a *model.Attachment) string {
+	details := make([]string, 0)
+	if a.Name != "" {
+		details = append(details, a.Name)
+	}
+	if a.Expires > 0 {
+		details = append(details, "expires "+time.Unix(a.Expires, 0).UTC().Format(time.RFC1123))
+	}
+	if len(details) == 0 {
+		return a.URL
+	}
+	return fmt.Sprintf("%s (%s)", a.URL, strings.Join(details, ", "))
 }
 
 func toEmojis(tags []string) (emojisOut []string, tagsOut []string) {

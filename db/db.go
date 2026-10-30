@@ -57,6 +57,16 @@ func (d *DB) Exec(query string, args ...any) (sql.Result, error) {
 	return d.primary.DB.Exec(query, args...)
 }
 
+// ExecContext delegates to the primary database.
+func (d *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return d.primary.DB.ExecContext(ctx, query, args...)
+}
+
+// QueryContext delegates to the primary database.
+func (d *DB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return d.primary.DB.QueryContext(ctx, query, args...)
+}
+
 // Begin delegates to the primary database.
 func (d *DB) Begin() (*sql.Tx, error) {
 	return d.primary.DB.Begin()
@@ -71,6 +81,25 @@ func (d *DB) Ping() error {
 // one-time schema setup during store initialization, not for regular queries.
 func (d *DB) Primary() *sql.DB {
 	return d.primary.DB
+}
+
+// Stats returns the connection pool statistics of the primary, then of each replica
+func (d *DB) Stats() []*PoolStats {
+	stats := []*PoolStats{
+		{
+			Role:  PoolRolePrimary,
+			Addr:  d.primary.Addr,
+			Stats: d.primary.DB.Stats(),
+		},
+	}
+	for _, r := range d.replicas {
+		stats = append(stats, &PoolStats{
+			Role:  PoolRoleReplica,
+			Addr:  r.Addr,
+			Stats: r.DB.Stats(),
+		})
+	}
+	return stats
 }
 
 // ReadOnly returns a *sql.DB suitable for read-only queries. It round-robins across healthy

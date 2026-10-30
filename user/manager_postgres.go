@@ -1,9 +1,6 @@
 package user
 
 import (
-	"fmt"
-	"strings"
-
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
 )
@@ -73,7 +70,7 @@ const (
 	postgresUpdateUserRoleQuery           = `UPDATE "user" SET role = $1 WHERE user_name = $2`
 	postgresUpdateUserProvisionedQuery    = `UPDATE "user" SET provisioned = $1 WHERE user_name = $2`
 	postgresUpdateUserPrefsQuery          = `UPDATE "user" SET prefs = $1 WHERE id = $2`
-	postgresUpdateUserStatsQuery          = `UPDATE "user" SET stats_messages = $1, stats_emails = $2, stats_calls = $3 WHERE id = $4`
+	postgresUpdateUserStatsQuery          = `UPDATE "user" SET stats_messages = stats_messages + $1, stats_emails = stats_emails + $2, stats_calls = stats_calls + $3 WHERE id = $4`
 	postgresUpdateUserStatsResetAllQuery  = `UPDATE "user" SET stats_messages = 0, stats_emails = 0, stats_calls = 0`
 	postgresUpdateUserTierQuery           = `UPDATE "user" SET tier_id = (SELECT id FROM tier WHERE code = $1) WHERE user_name = $2`
 	postgresUpdateUserDeletedQuery        = `UPDATE "user" SET deleted = $1 WHERE id = $2`
@@ -219,6 +216,12 @@ const (
 		FROM tier
 		WHERE (stripe_monthly_price_id = $1 OR stripe_yearly_price_id = $2)
 	`
+	postgresSelectTierUsersCountQuery = `
+		SELECT t.code, COUNT(u.id)
+		FROM tier t
+		LEFT JOIN "user" u ON u.tier_id = t.id
+		GROUP BY t.code
+	`
 	postgresDeleteTierQuery = `DELETE FROM tier WHERE code = $1`
 
 	// Phone queries
@@ -253,21 +256,6 @@ const (
 	`
 )
 
-// postgresSelectAccessCacheUsersQuery builds the per-users cache-load query
-// with a "$1, $2, ..." IN clause sized for n usernames.
-func postgresSelectAccessCacheUsersQuery(n int) string {
-	var sb strings.Builder
-	sb.WriteString(`SELECT u.user_name, a.topic, a.read, a.write FROM user_access a JOIN "user" u ON u.id = a.user_id WHERE u.user_name IN (`)
-	for i := 0; i < n; i++ {
-		if i > 0 {
-			sb.WriteString(",")
-		}
-		fmt.Fprintf(&sb, "$%d", i+1)
-	}
-	sb.WriteString(")")
-	return sb.String()
-}
-
 // NewPostgresManager creates a new Manager backed by a PostgreSQL database using an existing connection pool.
 var postgresQueries = queries{
 	selectUserByID:                 postgresSelectUserByIDQuery,
@@ -294,7 +282,6 @@ var postgresQueries = queries{
 	deleteUsersProvisioned:         postgresDeleteUsersProvisionedQuery,
 	selectTopicPerms:               postgresSelectTopicPermsQuery,
 	selectAccessCacheAll:           postgresSelectAccessCacheAllQuery,
-	selectAccessCacheUsers:         postgresSelectAccessCacheUsersQuery,
 	selectUserAllAccess:            postgresSelectUserAllAccessQuery,
 	selectUserAccess:               postgresSelectUserAccessQuery,
 	selectUserReservations:         postgresSelectUserReservationsQuery,
@@ -325,6 +312,7 @@ var postgresQueries = queries{
 	selectTierByCode:               postgresSelectTierByCodeQuery,
 	selectTierByPriceID:            postgresSelectTierByPriceIDQuery,
 	updateTier:                     postgresUpdateTierQuery,
+	selectTierUsersCount:           postgresSelectTierUsersCountQuery,
 	deleteTier:                     postgresDeleteTierQuery,
 	selectPhoneNumbers:             postgresSelectPhoneNumbersQuery,
 	insertPhoneNumber:              postgresInsertPhoneNumberQuery,
@@ -349,7 +337,7 @@ var postgresQueries = queries{
 
 // NewPostgresManager creates a new Manager backed by a PostgreSQL database
 func NewPostgresManager(d *db.DB, config *Config) (*Manager, error) {
-	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCurrentSchemaVersion, postgresCreateTables, postgresMigrations); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCreateTables, postgresMigrations); err != nil {
 		return nil, err
 	}
 	return newManager(d, postgresQueries, config)

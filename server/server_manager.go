@@ -10,12 +10,16 @@ func (s *Server) execManager() {
 	// WARNING: Make sure to only selectively lock with the mutex, and be aware that this
 	//          there is no mutex for the entire function.
 
-	// Prune all the things
+	// Prune all the things. In-memory state is pruned on every node; jobs touching the shared
+	// database (and the web push job, which also sends expiry warnings) run on the cluster
+	// leader only. Without clustering, IsLeader is always true.
 	s.pruneVisitors()
-	s.pruneTokens()
-	s.pruneAttachments()
-	s.pruneMessages()
-	s.pruneAndNotifyWebPushSubscriptions()
+	if s.cluster.IsLeader() {
+		s.pruneTokens()
+		s.pruneAttachments()
+		s.pruneMessages()
+		s.pruneAndNotifyWebPushSubscriptions()
+	}
 
 	// Message count
 	messagesCached, err := s.messageCache.MessagesCount()
@@ -43,6 +47,7 @@ func (s *Server) execManager() {
 					if ev.IsTrace() {
 						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, util.FormatTime(lastAccess))
 					}
+					t.ExpireDelivered()
 					subscribers += subs
 				}
 			}
@@ -70,8 +75,9 @@ func (s *Server) execManager() {
 
 	// Print stats
 	s.mu.RLock()
-	messagesCount, topicsCount, visitorsCount := s.messages, len(s.topics), len(s.visitors)
+	messagesCount, topicsCount := s.messages, len(s.topics)
 	s.mu.RUnlock()
+	visitorsCount := s.limiter.Size()
 
 	// Update stats
 	s.updateAndWriteStats(messagesCount)
@@ -105,22 +111,14 @@ func (s *Server) execManager() {
 }
 
 func (s *Server) pruneVisitors() {
-	staleVisitors := 0
+	pruned := 0
 	log.
 		Tag(tagManager).
 		Timing(func() {
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			for ip, v := range s.visitors {
-				if v.Stale() {
-					log.Tag(tagManager).With(v).Trace("Deleting stale visitor")
-					delete(s.visitors, ip)
-					staleVisitors++
-				}
-			}
+			pruned = s.limiter.Prune(visitorExpungeAfter) // Visitors are per request; only their keys' buckets and counts stay
 		}).
-		Field("stale_visitors", staleVisitors).
-		Debug("Finished deleting stale visitors")
+		Field("pruned_keys", pruned).
+		Debug("Finished deleting stale visitor keys")
 }
 
 func (s *Server) pruneTokens() {

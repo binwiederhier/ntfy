@@ -279,6 +279,67 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
 2. Run the server (step 2 above)
 
 3. Open <http://localhost/>
+
+### Run the web app end-to-end tests
+The web app has [Playwright](https://playwright.dev/) end-to-end tests in `web/e2e/`. They drive a real (headless) Chromium
+against a real ntfy server, and cover subscribing, publishing, notifications, signup/login, account settings, access tokens,
+reservations and languages. To build the web app and the server, and run all tests against a fresh local server, type:
+
+``` shell
+$ make web-e2e
+...
+  56 passed
+```
+
+This builds the binary `build/ntfy-e2e` (with the web app embedded), downloads Chromium if needed, and starts the server
+on `127.0.0.1:12586` with a throwaway database in `build/e2e/` (see `web/e2e/server.mjs`). The server is stopped when the
+tests are done.
+
+After `make web-e2e` has run once, you can run the tests directly from `web/`, e.g. a single spec file, or with a visible
+browser. The binary is not rebuilt this way, so **run `make web-e2e` again after changing the web app or the server**:
+
+``` shell
+$ cd web
+$ npx playwright test settings.spec.js      # Only the tests in one file
+$ npx playwright test -g "access token"     # Only tests whose name matches
+$ npx playwright test --headed              # Watch the browser while the tests run
+$ npx playwright test --ui                  # Interactive UI: pick tests, step through them
+```
+
+If a test fails, its trace is kept in `web/test-results/`. Open it with `npx playwright show-trace <path>/trace.zip` to see
+every step with screenshots, the DOM, console logs and network requests. To get traces and an HTML report for **all**
+tests, including the passing ones:
+
+``` shell
+$ npx playwright test --trace on --reporter=list,html
+$ npx playwright show-report
+```
+
+#### Against an existing server
+The tests can also run against an existing server (e.g. staging) instead of a local one. They create (and delete) their own
+users and topics on that server, so **don't run them against production**. You'll need:
+
+- an admin access token (e.g. `ntfy token add <admin-user>`), which is used to create and delete test users
+- an existing tier that allows reservations (e.g. `ntfy tier add --reservation-limit 10 e2e`), which is assigned to the
+  test users that need a paid account
+
+``` shell
+$ cd web
+$ NTFY_E2E_BASE_URL=https://staging.example.com \
+  NTFY_E2E_ADMIN_TOKEN=tk_... \
+  NTFY_E2E_TIER=e2e \
+  npx playwright test --workers 2
+```
+
+Tests for features the server has disabled (e.g. signup or reservations, as reported by `/v1/config`) are skipped. A few
+things to keep in mind:
+
+- Every run signs up one account through the web app, and ntfy only allows a few signups per IP per day, so you can run
+  the full suite about 6 times per day.
+- All tests come from your IP, so request limits may kick in; use fewer workers (e.g. `--workers 2`) if you see `429`s.
+- The reservation tests expect anonymous users to be allowed to publish and subscribe to topics that aren't reserved
+  (`auth-default-access: read-write`).
+
 ### Build the docs
 The sources for the docs live in `docs/`. Similarly to the web app, you can simply run `make docs` to build the 
 documentation. As long as you have `mkdocs` installed (see above), this should work fine:

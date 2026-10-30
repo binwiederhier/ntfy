@@ -183,7 +183,7 @@ func TestSqliteStore_Migration_From9(t *testing.T) {
 	require.True(t, rows.Next())
 	var version int
 	require.Nil(t, rows.Scan(&version))
-	require.Equal(t, 15, version)
+	require.Equal(t, 17, version)
 	require.Nil(t, rows.Close())
 
 	messages, err := s.Messages("mytopic", model.SinceAllMessages, false)
@@ -256,11 +256,27 @@ func checkSqliteSchemaVersion(t *testing.T, filename string) {
 	db, err := sql.Open("sqlite3", filename)
 	require.Nil(t, err)
 	defer db.Close()
-	rows, err := db.Query(`SELECT version FROM schemaVersion`)
+	rows, err := db.Query(`SELECT version FROM schemaVersion WHERE id = 1`)
 	require.Nil(t, err)
 	require.True(t, rows.Next())
 	var schemaVersion int
 	require.Nil(t, rows.Scan(&schemaVersion))
-	require.Equal(t, 15, schemaVersion)
+	require.Equal(t, 17, schemaVersion)
 	require.Nil(t, rows.Close())
+}
+
+func TestSqliteStore_CloseFlushesQueuedMessages(t *testing.T) {
+	// Messages accepted into the write batch must reach the database on a graceful Close;
+	// before, a restart dropped up to one batch timeout's worth of accepted messages
+	filename := newSqliteTestStoreFile(t)
+	s, err := message.NewSQLiteStore(filename, "", time.Hour, 100, time.Hour, false)
+	require.Nil(t, err)
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "queued 1")))
+	require.Nil(t, s.AddMessage(model.NewDefaultMessage("mytopic", "queued 2")))
+	require.Nil(t, s.Close())
+
+	reopened := newSqliteTestStoreFromFile(t, filename, "")
+	messages, err := reopened.Messages("mytopic", model.SinceAllMessages, false)
+	require.Nil(t, err)
+	require.Equal(t, 2, len(messages))
 }

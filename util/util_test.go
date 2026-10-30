@@ -80,6 +80,12 @@ func TestContainsAll(t *testing.T) {
 	require.False(t, ContainsAll([]int{1, 1}, []int{1, 2}))
 }
 
+func TestDedup(t *testing.T) {
+	require.Equal(t, []string{"b", "a", "c"}, Dedup([]string{"b", "a", "b", "c", "a"}))
+	require.Equal(t, []int{1, 2}, Dedup([]int{1, 1, 2}))
+	require.Empty(t, Dedup([]string{}))
+}
+
 func TestContainsIP(t *testing.T) {
 	require.True(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("1.1.1.1")))
 	require.True(t, ContainsIP([]netip.Prefix{netip.MustParsePrefix("fd00::/8"), netip.MustParsePrefix("1.1.0.0/16")}, netip.MustParseAddr("fd12:1234:5678::9876")))
@@ -151,6 +157,33 @@ func TestParseSize_10kLowerCaseSuccess(t *testing.T) {
 	require.Equal(t, int64(10*1024), s)
 }
 
+func TestParseSize_Terabytes(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		size  int64
+	}{
+		{"1T", 1 << 40},
+		{"10t", 10 << 40},
+		{"0T", 0},
+		{"8388607T", 8388607 << 40},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			s, err := ParseSize(tc.input)
+			require.NoError(t, err)
+			require.Equal(t, tc.size, s)
+		})
+	}
+}
+
+func TestParseSize_TerabyteOverflow(t *testing.T) {
+	for _, input := range []string{"8388608T", "16777216t", "9223372036854775807T"} {
+		t.Run(input, func(t *testing.T) {
+			_, err := ParseSize(input)
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestParseSize_FailureInvalid(t *testing.T) {
 	_, err := ParseSize("not a size")
 	require.Error(t, err)
@@ -165,6 +198,7 @@ func TestFormatSize(t *testing.T) {
 		{10 * 1024, "10K"},
 		{10 * 1024 * 1024, "10M"},
 		{10 * 1024 * 1024 * 1024, "10G"},
+		{1024 * 1024 * 1024 * 1024, "1T"},
 	}
 	for _, value := range values {
 		require.Equal(t, value.expected, FormatSize(value.size))
@@ -306,4 +340,12 @@ func TestEncodeJSON(t *testing.T) {
 	var buf bytes.Buffer
 	require.Nil(t, EncodeJSON(&buf, map[string]string{"message": "<b>a&b</b>"}))
 	require.Equal(t, `{"message":"<b>a&b</b>"}`+"\n", buf.String())
+}
+
+func TestMaxTime(t *testing.T) {
+	a := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	b := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	require.Equal(t, b, MaxTime(a, b))
+	require.Equal(t, b, MaxTime(b, a, time.Time{}))
+	require.True(t, MaxTime().IsZero())
 }

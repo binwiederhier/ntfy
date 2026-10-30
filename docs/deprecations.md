@@ -6,7 +6,7 @@ before the behavior is changed depends on the severity of the change, and how pr
 ## Active deprecations
 
 ### ntfy CLI: `ntfy user/access/token/tier` without a running server
-> Active since 2026-10-22 (v2.33.0), behavior will change after 2026-11-22
+> Active since 2026-10-30, behavior will change after 2026-12-30
 
 The `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` commands now talk to the running ntfy server through
 its local [admin socket](config.md#admin-socket), so changes take effect immediately. If no server answers on the

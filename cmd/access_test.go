@@ -82,7 +82,7 @@ user * (role: anonymous, tier: none)
 }
 
 func TestCLI_Access_ShowUsers_OldServer(t *testing.T) {
-	// Servers before v2.33.0 do not send the default access; skip that line instead of failing
+	// Servers before v2.36.0 do not send the default access; skip that line instead of failing
 	app, _, stdout, _ := newTestApp()
 	c := cli.NewContext(app, nil, nil)
 	require.Nil(t, showUsers(c, []*client.AdminUser{{Username: "*", Role: "anonymous"}}))

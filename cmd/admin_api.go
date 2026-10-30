@@ -22,7 +22,7 @@ const (
 %s (%s), writing to the database
 directly. A running server may not see this change right away.
 
-Direct database access will be removed after 2026-11-22. After that, the
+Direct database access will be removed after 2026-12-30. After that, the
 ntfy user/access/token/tier commands need a running server.
 See https://docs.ntfy.sh/deprecations/ for details.`
 	adminWarningColorYellow = "\033[1;33m"
@@ -65,7 +65,7 @@ func newAdminAPI(c *cli.Context) (adminAPI, error) {
 		return client.NewAdmin(server, token), nil
 	}
 	authConfigured := c.String("auth-file") != "" || c.String("database-url") != ""
-	if socket := c.String("listen-admin-unix"); socket != "" && authConfigured {
+	if socket := c.String("listen-admin-unix"); socket != "" && socket != "-" && authConfigured { // "-" disables it, as in the server
 		admin := client.NewAdminSocket(socket)
 		err := admin.Ping()
 		var apiErr *client.AdminError

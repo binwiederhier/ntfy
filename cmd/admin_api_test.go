@@ -55,6 +55,17 @@ func TestCLI_AdminAPI_FallbackWarning(t *testing.T) {
 	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
 }
 
+func TestCLI_AdminAPI_SocketDisabled(t *testing.T) {
+	s, conf, port := newTestServerWithAuth(t, false)
+	defer test.StopServer(t, s, port)
+
+	// "-" disables the socket, like in the server: no socket named "-", straight to the database
+	app, _, stdout, stderr := newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=-", "list"}))
+	require.Contains(t, stdout.String(), "user * (role: anonymous, tier: none)")
+	require.NotContains(t, stderr.String(), "admin socket")
+}
+
 func TestCLI_AdminAPI_FallbackWarningBanner(t *testing.T) {
 	plain := adminFallbackWarning("/run/ntfy/admin.sock", "no such file or directory", false)
 	require.Equal(t, `**********************************************************************
@@ -62,7 +73,7 @@ DEPRECATION WARNING: No ntfy server answered on the admin socket
 /run/ntfy/admin.sock (no such file or directory), writing to the database
 directly. A running server may not see this change right away.
 
-Direct database access will be removed after 2026-11-22. After that, the
+Direct database access will be removed after 2026-12-30. After that, the
 ntfy user/access/token/tier commands need a running server.
 See https://docs.ntfy.sh/deprecations/ for details.
 **********************************************************************

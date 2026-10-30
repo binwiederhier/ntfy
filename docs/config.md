@@ -932,7 +932,7 @@ The socket is only opened if [access control](#access-control) is configured (`a
 
 If no server answers on the socket (the server is not running, or it could not create the socket), the commands fall
 back to editing the database directly, like they did before, and print a warning (in yellow on a terminal, unless
-`NO_COLOR` is set). This fallback is [deprecated](deprecations.md) and will be removed after 2026-11-22:
+`NO_COLOR` is set). This fallback is [deprecated](deprecations.md) and will be removed after 2026-12-30:
 
 ```
 **********************************************************************
@@ -940,7 +940,7 @@ DEPRECATION WARNING: No ntfy server answered on the admin socket
 /run/ntfy/admin.sock (no such file or directory), writing to the database
 directly. A running server may not see this change right away.
 
-Direct database access will be removed after 2026-11-22. After that, the
+Direct database access will be removed after 2026-12-30. After that, the
 ntfy user/access/token/tier commands need a running server.
 See https://docs.ntfy.sh/deprecations/ for details.
 **********************************************************************
@@ -950,7 +950,7 @@ The server logs at startup whether it is listening on the socket, and why not if
 
 ```
 INFO Admin socket listening on /run/ntfy/admin.sock (tag=startup)
-WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly (error=mkdir /run/ntfy: permission denied, tag=startup)
+WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated and stops working after 2026-12-30, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
 ```
 
 To change the path, set `listen-admin-unix` in the `server.yml` file (or `NTFY_LISTEN_ADMIN_UNIX`); the commands read it from

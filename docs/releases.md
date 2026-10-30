@@ -2288,6 +2288,16 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.36.0 (UNRELEASED)
+
+**Features:**
+
+* Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
+
+**Bug fixes + maintenance:**
+
+* Admin API: return 4xx errors instead of a 500 for invalid input, and remove a deleted user's web push subscriptions
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

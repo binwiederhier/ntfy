@@ -126,6 +126,8 @@ var (
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
+	apiUsersTokensPath                                   = "/v1/users/tokens"
+	apiUsersPasswordResetPath                            = "/v1/users/password/reset"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountLoginPath                                  = "/v1/account/login"
 	apiAccountTokenPath                                  = "/v1/account/token"
@@ -141,6 +143,7 @@ var (
 	apiAccountEmailResendPath                            = "/v1/account/email/resend"
 	apiAccountPasswordResetRequestPath                   = "/v1/account/password/reset/request"
 	apiAccountPasswordResetPath                          = "/v1/account/password/reset"
+	apiAccountBillingTiersPath                           = "/v1/account/billing/tiers"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -712,6 +715,22 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensGet)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensDelete)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPasswordResetPath {
+		return s.ensureAdmin(s.handleUsersPasswordReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath && v.User().IsAdmin() {
+		return s.ensureAdmin(s.handleAdminTiersGet)(w, r, v) // Non-admins get the billing tiers, see below
+	} else if r.Method == http.MethodPost && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersAdd)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersUpdate)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
@@ -778,8 +797,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountBillingTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
+		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v) // Non-admins: web apps before v2.36.0, remove after 2026-11-22
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {

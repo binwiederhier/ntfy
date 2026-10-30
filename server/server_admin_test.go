@@ -1283,11 +1283,10 @@ func TestAdminSocket_ListenAndRemove(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s, socket := newTestServerWithAdminSocket(t, newTestConfigWithAuthFile(t, databaseURL))
 
-		// Socket exists with the right mode
+		// Socket exists; who may open it is checked per OS (server_admin_unix_test.go, server_admin_windows_test.go)
 		stat, err := os.Stat(socket)
 		require.Nil(t, err)
 		require.Equal(t, os.ModeSocket, stat.Mode().Type())
-		require.Equal(t, DefaultListenAdminUnixMode, stat.Mode().Perm())
 
 		// Removed on stop
 		s.Stop()
@@ -1367,24 +1366,6 @@ func TestAdminSocket_AnotherServerListening(t *testing.T) {
 	// The other listener is untouched
 	_, err = os.Stat(conf.ListenAdminUnix)
 	require.Nil(t, err)
-}
-
-func TestAdminSocket_UnwritableDirectory(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("root can write anywhere")
-	}
-	dir := shortTempDir(t)
-	require.Nil(t, os.Chmod(dir, 0500))
-	t.Cleanup(func() { os.Chmod(dir, 0700) })
-	conf := newTestConfigWithAuthFile(t, "")
-	conf.ListenAdminUnix = filepath.Join(dir, "sub", "admin.sock")
-	s := newTestServer(t, conf)
-	output := captureLog(t, func() {
-		runTestServer(t, s)
-	})
-	require.Contains(t, output, "Admin socket")
-	require.Contains(t, output, "not available")
-	require.Nil(t, s.adminSocketServer)
 }
 
 func TestAdminSocket_DisabledWithoutPathOrAuth(t *testing.T) {

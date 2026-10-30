@@ -47,3 +47,19 @@ jobs:
         run: make checkv
       - name: Run coverage
         run: make coverage
+  test-windows:
+    # The server ships for Windows; this covers what differs there (admin socket DACL, default paths)
+    runs-on: windows-2025
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: '.go-version'
+      - name: Create placeholder docs and web app (embedded by the server)
+        shell: bash
+        run: mkdir -p server/docs server/site && touch server/docs/index.html server/site/app.html
+      - name: Run Windows-specific tests
+        shell: bash
+        run: go test -count=1 -run 'AdminSocket|DefaultListenAdminUnix' ./server/

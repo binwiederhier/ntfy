@@ -9,6 +9,31 @@ let topic;
 // Browser notifications the app showed, recorded by the init script in beforeEach
 const shown = (page) => page.evaluate(() => window.shownNotifications.map((n) => n.body));
 
+// Publishes messages within one second, right after a second starts. A since=<id> marker replays
+// every message from its second, so the earlier ones come back to a client that has the last one.
+const publishInOneSecond = async (request, topic, messages) => {
+  await new Promise((resolve) => setTimeout(resolve, 1000 - (Date.now() % 1000)));
+  const times = [];
+  for (const message of messages) {
+    times.push((await (await request.post(`/${topic}`, { data: message })).json()).time);
+  }
+  expect(new Set(times).size, `published in one second: ${times}`).toBe(1);
+};
+
+// Messages the topic's WebSocket received from the server, from now on
+const liveMessages = (page, topic) => {
+  const received = [];
+  page.on("websocket", (ws) => {
+    if (new URL(ws.url()).pathname.endsWith(`/${topic}/ws`)) {
+      ws.on("framereceived", (frame) => {
+        const event = JSON.parse(frame.payload);
+        if (event.event === "message") received.push(event.message);
+      });
+    }
+  });
+  return received;
+};
+
 test.beforeEach(async ({ page }) => {
   // Record browser notifications instead of showing them; headless Chrome can't show them anyway
   await page.addInitScript(() => {
@@ -265,6 +290,49 @@ test.describe("sequences", () => {
     await expect(page).toHaveTitle("(1) ntfy");
     await request.put(`/${topic}/download/clear`);
     await expect(page).toHaveTitle("ntfy");
+  });
+});
+
+test.describe("replays", () => {
+  test("deleted messages don't come back when a reconnect replays them", async ({ page, request }) => {
+    await publishInOneSecond(request, topic, ["first", "second", "third"]);
+    const items = page.getByRole("listitem", { name: "Notification" });
+    await expect(items).toHaveCount(3);
+    for (const message of ["first", "second", "third"]) {
+      await items.filter({ hasText: message }).getByRole("button", { name: "Delete" }).click();
+    }
+    await expect(items).toHaveCount(0);
+
+    // Reconnecting and the startup poll ask for since=<last>, and get the rest of its second again
+    const live = liveMessages(page, topic);
+    const polled = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith(`/${topic}/json`));
+    await page.reload();
+    await page.clock.runFor(2000);
+    expect(await (await polled).text()).toContain("first");
+    await expect.poll(() => live).toContain("first");
+    await page.waitForTimeout(1000); // Let the app store what it got
+    await expect(items).toHaveCount(0);
+    await expect(page.getByText("You haven't received any notifications for this topic yet.")).toBeVisible();
+  });
+
+  test("a message replayed on reconnect stays read and doesn't notify again", async ({ page, request }) => {
+    await publishInOneSecond(request, topic, ["first", "second"]);
+    await expect(page.getByRole("listitem", { name: "Notification" })).toHaveCount(2);
+
+    // Read them by opening the topic, then reconnect from another one, so one that comes back unread is counted
+    const other = unique("other");
+    await subscribe(page, other);
+    await expect(page).toHaveTitle("(2) ntfy");
+    await page.getByRole("button", { name: topic, exact: true }).click();
+    await expect(page).toHaveTitle("ntfy");
+    await page.getByRole("button", { name: other, exact: true }).click();
+    const live = liveMessages(page, topic);
+    await page.reload();
+    await page.clock.runFor(2000);
+    await expect.poll(() => live).toContain("first");
+    await page.waitForTimeout(1000); // Let the app store what it got
+    await expect(page).toHaveTitle("ntfy");
+    expect(await shown(page)).toEqual([]);
   });
 });
 

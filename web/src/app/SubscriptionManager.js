@@ -201,7 +201,13 @@ export class SubscriptionManager {
       // Add notification to database; check and add in one transaction, so a poll storing the
       // same message concurrently (see addNotifications) can't slip in between
       const added = await this.db.transaction("rw", this.db.notifications, async () => {
-        if (await this.db.notifications.get(notification.id)) {
+        // A replayed message keeps its local state (e.g. read or deleted), but one that only a poll
+        // stored (no "new" marker, see addNotifications) wasn't delivered live yet, so it's new
+        const existing = await this.db.notifications.get(notification.id);
+        if (existing && existing.new === undefined) {
+          await this.db.notifications.update(notification.id, { new: 1 });
+          return true;
+        } else if (existing) {
           return false;
         }
 

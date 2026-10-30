@@ -179,6 +179,16 @@ describe("SubscriptionManager.addNotification", () => {
     expect((await db.subscriptions.get(subscriptionId)).last).toBe("m2");
   });
 
+  it("marks a message the poll stored as unread when the WebSocket delivers it", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m1")]);
+
+    // The poll stored it before the live delivery arrived; the user hasn't seen it yet
+    expect(await manager.addNotification(subscriptionId, message("m1"))).toBe(true);
+
+    expect((await db.notifications.get("m1")).new).toBe(1);
+  });
+
   it("does not store delete and clear events", async () => {
     const { db, manager } = await setup();
     expect(await manager.addNotification(subscriptionId, message("d1", { event: "message_delete", sequence_id: "s1" }))).toBe(false);

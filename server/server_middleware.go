@@ -14,6 +14,7 @@ const (
 	contextTopic
 	contextMatrixPushKey
 	contextVisitorIP // Client IP extracted in maybeAuthenticate; reused by the abuse ban-feed (see ban.Service.Record)
+	contextHasPayer  // True if contextRateVisitor is the topic's payer, not the requesting visitor
 )
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
@@ -27,19 +28,25 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 	}
 }
 
-// limitRequestsWithTopic limits requests with a topic and stores the rate-limiting-subscriber and topic into request.Context
+// limitRequestsWithTopic limits requests with a topic and stores the rate-limiting-subscriber (the topic's payer, if
+// it has one) and topic into request.Context
 func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		t, err := s.topicFromPath(v, r.URL.Path)
 		if err != nil {
 			return err
 		}
+		payer, err := s.payers.Resolve(t.ID) // Once per request, so the publish handler sees the same payer
+		if err != nil {
+			return err
+		}
 		vrate := v
-		if rateVisitor := t.RateVisitor(); rateVisitor != nil {
-			vrate = rateVisitor
+		if payer != nil {
+			vrate = payer
 		}
 		r = withContext(r, map[contextKey]any{
 			contextRateVisitor: vrate,
+			contextHasPayer:    payer != nil,
 			contextTopic:       t,
 		})
 		if util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {

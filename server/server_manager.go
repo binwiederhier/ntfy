@@ -14,6 +14,7 @@ func (s *Server) execManager() {
 	// database (and the web push job, which also sends expiry warnings) run on the cluster
 	// leader only. Without clustering, IsLeader is always true.
 	s.pruneVisitors()
+	s.payers.Prune()
 	if s.cluster.IsLeader() {
 		s.pruneTokens()
 		s.pruneAttachments()
@@ -37,7 +38,7 @@ func (s *Server) execManager() {
 			for _, t := range s.topics {
 				subs, lastAccess := t.Stats()
 				ev := log.Tag(tagManager).With(t)
-				if t.Stale() {
+				if t.Stale() && !s.payers.Live(t.ID) { // A topic with a payer stays, for the Matrix gateway's rejection (see handlePublishMatrix)
 					if ev.IsTrace() {
 						ev.Trace("- topic %s: Deleting stale topic (%d subscribers, accessed %s)", t.ID, subs, util.FormatTime(lastAccess))
 					}

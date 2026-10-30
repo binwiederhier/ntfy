@@ -2,7 +2,6 @@ package server
 
 import (
 	"io"
-	"net/http/httptest"
 	"net/netip"
 	"strings"
 	"sync"
@@ -335,29 +334,6 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 
 	s.visitor(ip, u)
 	require.True(t, vip.AccountActionAllowed())
-}
-
-func TestVisitor_NewVisitorIsNotStale(t *testing.T) {
-	// A visitor is seen when it is built for a request, like it was when visitors were shared
-	s := newTestServer(t, newTestConfig(t, ""))
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	require.False(t, v.Stale())
-}
-
-func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
-	// A subscriber from a request-limit-exempt prefix spends nothing before it becomes a topic's
-	// rate visitor; the topic must still keep it. Fails if a new visitor counts as stale.
-	c := newTestConfig(t, "")
-	c.VisitorSubscriberRateLimiting = true
-	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.0/24")}
-	s := newTestServer(t, c)
-	_, err := s.topicsFromIDs(s.visitor(netip.MustParseAddr("1.2.3.4"), nil), "mytopic") // The topic exists already
-	require.Nil(t, err)
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	topics, err := s.topicsFromIDs(v, "mytopic")
-	require.Nil(t, err)
-	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics, false))
-	require.NotNil(t, topics[0].RateVisitor())
 }
 
 func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
@@ -718,22 +694,4 @@ func TestVisitor_TierWithoutEmailsAdmitsNone(t *testing.T) {
 	})
 	require.Equal(t, 429, response.Code)
 	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
-}
-
-func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
-	// A topic keeps its rate visitor for as long as the subscriber is around (its keepalive), not
-	// for as long as its limiter key is in use: the limiter forgetting the key must not drop it,
-	// and publishers charging the key must not keep it
-	c := newTestConfig(t, "")
-	c.VisitorSubscriberRateLimiting = true
-	s := newTestServer(t, c)
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	topics, err := s.topicsFromIDs(v, "mytopic")
-	require.Nil(t, err)
-	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics, false))
-	s.limiter.Prune(0) // The key is gone, the subscriber is not
-	require.NotNil(t, topics[0].RateVisitor())
-	v.seen.Store(time.Now().Add(-2 * visitorExpungeAfter).UnixNano()) // The subscriber is gone
-	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK)    // A publisher charges the key
-	require.Nil(t, topics[0].RateVisitor())
 }

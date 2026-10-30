@@ -29,7 +29,6 @@ const (
 type topic struct {
 	ID          string
 	subscribers map[int]*topicSubscriber
-	rateVisitor *visitor
 	lastAccess  time.Time
 	delivered   map[string]time.Time // When recent messages went out to the subscribers, by message ID
 	mu          sync.RWMutex
@@ -109,9 +108,6 @@ func (t *topic) ExpireDelivered() {
 func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
-		return false
-	}
 	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpungeAfter
 }
 
@@ -119,26 +115,6 @@ func (t *topic) LastAccess() time.Time {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.lastAccess
-}
-
-func (t *topic) SetRateVisitor(v *visitor, poll bool) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if poll && t.rateVisitor != nil && t.rateVisitor.key == v.key {
-		t.rateVisitor.Keepalive() // Replacing it would leave an open stream keeping alive a visitor the topic no longer has
-	} else {
-		t.rateVisitor = v
-	}
-	t.lastAccess = time.Now()
-}
-
-func (t *topic) RateVisitor() *visitor {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.rateVisitor != nil && t.rateVisitor.Stale() {
-		t.rateVisitor = nil
-	}
-	return t.rateVisitor
 }
 
 // Unsubscribe removes the subscription from the list of subscribers
@@ -314,11 +290,6 @@ func (t *topic) Context() log.Context {
 		"topic":             t.ID,
 		"topic_subscribers": len(t.subscribers),
 		"topic_last_access": util.FormatTime(t.lastAccess),
-	}
-	if t.rateVisitor != nil {
-		for k, v := range t.rateVisitor.Context() {
-			fields["topic_rate_"+k] = v
-		}
 	}
 	return fields
 }

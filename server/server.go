@@ -66,6 +66,7 @@ type Server struct {
 	topics            map[string]*topic
 	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
 	visitors          *visitorEnv    // Shared by all visitors, which are built per request
+	payers            *topicPayers   // Who pays for the publishes to UnifiedPush topics (visitor-subscriber-rate-limiting)
 	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
@@ -349,6 +350,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	s.userManager = userManager
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
+	s.payers = newTopicPayers(conf, s.visitors, userManager)
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
@@ -1015,6 +1017,10 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if err != nil {
 		return nil, err
 	}
+	hasPayer, err := fromContext[bool](r, contextHasPayer)
+	if err != nil {
+		return nil, err
+	}
 	body, err := util.Peek(r.Body, s.config.MessageSizeLimit)
 	if err != nil {
 		return nil, err
@@ -1024,7 +1030,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && !hasPayer {
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
@@ -1635,7 +1641,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
-	if err := s.maybeSetRateVisitors(r, v, topics, poll); err != nil {
+	payerTopicIDs, err := s.subscribePayers(r, v, topics)
+	if err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1690,6 +1697,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			for _, t := range topics {
 				t.Keepalive()
 			}
+			s.keepPayers(r, v, payerTopicIDs)
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
@@ -1729,6 +1737,10 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	defer conn.Close()
+	payerTopicIDs, err := s.subscribePayers(r, v, topics) // Before the keepalive loop below reads them
+	if err != nil {
+		return err
+	}
 
 	// Subscription connections can be canceled externally, see topic.CancelSubscribersExceptUser
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -1782,6 +1794,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				for _, t := range topics {
 					t.Keepalive()
 				}
+				s.keepPayers(r, v, payerTopicIDs)
 				if err := ping(); err != nil {
 					return err
 				}
@@ -1798,9 +1811,6 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			return err
 		}
 		return conn.WriteJSON(msg)
-	}
-	if err := s.maybeSetRateVisitors(r, v, topics, poll); err != nil {
-		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if poll {
@@ -1857,69 +1867,39 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 	return
 }
 
-// maybeSetRateVisitors sets the rate visitor on a topic (v.SetRateVisitor), indicating that all messages published
-// to that topic will be rate limited against the rate visitor instead of the publishing visitor.
+// subscribePayers makes v the payer of the subscription's UnifiedPush topics, indicating that all messages
+// published to them will be rate limited against v's identity instead of the publishing visitor's.
 //
-// Setting the rate visitor is ony allowed if the `visitor-subscriber-rate-limiting` setting is enabled, AND
+// Paying is only allowed if the `visitor-subscriber-rate-limiting` setting is enabled, AND
 // - auth-file is not set (everything is open by default)
 // - or the topic is reserved, and v.user is the owner
 // - or the topic is not reserved, and v.user has write access
 //
-// This only applies to UnifiedPush topics ("up...").
-func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic, poll bool) error {
-	// Bail out if not enabled
-	if !s.config.VisitorSubscriberRateLimiting {
-		return nil
-	}
-
-	// Make a list of topics that we'll actually set the RateVisitor on
-	eligibleRateTopics := make([]*topic, 0)
+// This only applies to UnifiedPush topics ("up..."). It returns the topics v pays for, for the
+// subscription's keepalives (see keepPayers).
+func (s *Server) subscribePayers(r *http.Request, v *visitor, topics []*topic) ([]string, error) {
+	topicIDs := make([]string, 0, len(topics))
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
-			eligibleRateTopics = append(eligibleRateTopics, t)
-		}
+		topicIDs = append(topicIDs, t.ID)
 	}
-	if len(eligibleRateTopics) == 0 {
-		return nil
+	payerTopicIDs, err := s.payers.Subscribe(v, topicIDs)
+	if err != nil {
+		return nil, err
 	}
-
-	// If access controls are turned off, v has access to everything, and we can set the rate visitor
-	if s.userManager == nil {
-		return s.setRateVisitors(r, v, eligibleRateTopics, poll)
-	}
-
-	// If access controls are enabled, only set rate visitor if
-	// - topic is reserved, and v.user is the owner
-	// - topic is not reserved, and v.user has write access
-	writableRateTopics := make([]*topic, 0)
-	for _, t := range topics {
-		if !util.Contains(eligibleRateTopics, t) {
-			continue
-		}
-		ownerUserID, err := s.userManager.ReservationOwner(t.ID)
-		if err != nil {
-			return err
-		}
-		if ownerUserID == "" {
-			if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite); err == nil {
-				writableRateTopics = append(writableRateTopics, t)
-			}
-		} else if ownerUserID == v.MaybeUserID() {
-			writableRateTopics = append(writableRateTopics, t)
-		}
-	}
-	return s.setRateVisitors(r, v, writableRateTopics, poll)
-}
-
-func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic, poll bool) error {
-	for _, t := range rateTopics {
+	for _, topicID := range payerTopicIDs {
 		logvr(v, r).
 			Tag(tagSubscribe).
-			With(t).
-			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v, poll)
+			Field("topic", topicID).
+			Debug("Setting visitor as payer for topic %s", topicID)
 	}
-	return nil
+	return payerTopicIDs, nil
+}
+
+// keepPayers keeps v the payer of the subscription's topics, or takes a stale one back (see topicPayers.Keep)
+func (s *Server) keepPayers(r *http.Request, v *visitor, payerTopicIDs []string) {
+	if err := s.payers.Keep(v, payerTopicIDs); err != nil {
+		logvr(v, r).Tag(tagSubscribe).Err(err).Warn("Cannot check if visitor may pay for its topics")
+	}
 }
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the

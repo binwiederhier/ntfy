@@ -6,15 +6,16 @@ import (
 	"heckel.io/ntfy/v2/db"
 )
 
-// Timestamps come from the database clock, never from a node's (see Store). The upsert is one
+// Timestamps come from the database clock, never from a node's (see Store), rounded down to the
+// second like SQLite's. The upsert is one
 // fixed statement per chunk (unnest), because SQL built per call bloats pgx's statement cache.
 // Same period: add; a newer one: replace; an older one (a leftover): add to the stored period.
 const (
-	postgresSelectClockQuery = `SELECT EXTRACT(EPOCH FROM now())::BIGINT`
+	postgresSelectClockQuery = `SELECT FLOOR(EXTRACT(EPOCH FROM now()))::BIGINT`
 	postgresSelectSinceQuery = `SELECT key, period_start, messages, emails, calls FROM usage WHERE updated_at >= $1`
 	postgresUpsertQuery      = `
 		INSERT INTO usage AS u (key, period_start, messages, emails, calls, updated_at)
-		SELECT key, ps, m, e, c, EXTRACT(EPOCH FROM now())::BIGINT
+		SELECT key, ps, m, e, c, FLOOR(EXTRACT(EPOCH FROM now()))::BIGINT
 		FROM unnest($1::TEXT[], $2::BIGINT[], $3::BIGINT[], $4::BIGINT[], $5::BIGINT[]) AS d(key, ps, m, e, c)
 		ON CONFLICT (key) DO UPDATE SET
 			messages = CASE WHEN u.period_start >= EXCLUDED.period_start THEN u.messages + EXCLUDED.messages ELSE EXCLUDED.messages END,

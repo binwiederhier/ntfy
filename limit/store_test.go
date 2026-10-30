@@ -212,3 +212,29 @@ func keysOf(rows map[string]usageRow) []string {
 	slices.Sort(keys)
 	return keys
 }
+
+func TestStore_ClockTruncatesToTheSecond(t *testing.T) {
+	// Database time is whole seconds, rounded down on both dialects, for the clock and for
+	// updated_at alike (the test database runs on this host's clock)
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newStore()
+		ctx := context.Background()
+		for i := 0; i < 20; i++ {
+			dbNow, err := s.clock(ctx)
+			require.Nil(t, err)
+			require.LessOrEqual(t, dbNow, time.Now().Unix())
+			_, err = s.write(ctx, []usageRow{
+				{
+					key:         "k",
+					periodStart: 1,
+					counts:      [numDaily]int64{1, 0, 0},
+				},
+			})
+			require.Nil(t, err)
+			var updatedAt int64
+			require.Nil(t, s.db.QueryRow(`SELECT updated_at FROM usage WHERE key = 'k'`).Scan(&updatedAt))
+			require.LessOrEqual(t, updatedAt, time.Now().Unix())
+			time.Sleep(37 * time.Millisecond)
+		}
+	})
+}

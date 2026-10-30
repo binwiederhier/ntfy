@@ -1288,7 +1288,7 @@ func TestAdminSocket_ListenAndRemove(t *testing.T) {
 		stat, err := os.Stat(socket)
 		require.Nil(t, err)
 		require.Equal(t, os.ModeSocket, stat.Mode().Type())
-		require.Equal(t, DefaultAdminSocketMode, stat.Mode().Perm())
+		require.Equal(t, DefaultListenAdminUnixMode, stat.Mode().Perm())
 
 		// Removed on stop
 		s.Stop()
@@ -1342,11 +1342,11 @@ func TestAdminSocket_NonAdminRoutes(t *testing.T) {
 
 func TestAdminSocket_StaleSocketFile(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t, "")
-	conf.AdminSocket = filepath.Join(shortTempDir(t), "admin.sock")
-	require.Nil(t, os.WriteFile(conf.AdminSocket, []byte("stale"), 0600))
+	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
+	require.Nil(t, os.WriteFile(conf.ListenAdminUnix, []byte("stale"), 0600))
 	s := newTestServer(t, conf)
 	s.startAdminSocket()
-	resp, err := adminSocketClient(conf.AdminSocket).Get("http://ntfy/v1/users")
+	resp, err := adminSocketClient(conf.ListenAdminUnix).Get("http://ntfy/v1/users")
 	require.Nil(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 	resp.Body.Close()
@@ -1354,8 +1354,8 @@ func TestAdminSocket_StaleSocketFile(t *testing.T) {
 
 func TestAdminSocket_AnotherServerListening(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t, "")
-	conf.AdminSocket = filepath.Join(shortTempDir(t), "admin.sock")
-	other, err := net.Listen("unix", conf.AdminSocket)
+	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
+	other, err := net.Listen("unix", conf.ListenAdminUnix)
 	require.Nil(t, err)
 	defer other.Close()
 	s := newTestServer(t, conf)
@@ -1366,7 +1366,7 @@ func TestAdminSocket_AnotherServerListening(t *testing.T) {
 	require.Nil(t, s.adminSocketServer)
 
 	// The other listener is untouched
-	_, err = os.Stat(conf.AdminSocket)
+	_, err = os.Stat(conf.ListenAdminUnix)
 	require.Nil(t, err)
 }
 
@@ -1378,7 +1378,7 @@ func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 	require.Nil(t, os.Chmod(dir, 0500))
 	t.Cleanup(func() { os.Chmod(dir, 0700) })
 	conf := newTestConfigWithAuthFile(t, "")
-	conf.AdminSocket = filepath.Join(dir, "sub", "admin.sock")
+	conf.ListenAdminUnix = filepath.Join(dir, "sub", "admin.sock")
 	s := newTestServer(t, conf)
 	output := captureLog(t, func() {
 		s.startAdminSocket()
@@ -1399,11 +1399,11 @@ func TestAdminSocket_DisabledWithoutPathOrAuth(t *testing.T) {
 
 	// No auth configured: nothing to administer, so no listener either
 	conf := newTestConfig(t, "")
-	conf.AdminSocket = filepath.Join(shortTempDir(t), "admin.sock")
+	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
 	s = newTestServer(t, conf)
 	s.startAdminSocket()
 	require.Nil(t, s.adminSocketServer)
-	_, err := os.Stat(conf.AdminSocket)
+	_, err := os.Stat(conf.ListenAdminUnix)
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
@@ -1469,11 +1469,11 @@ func mustUserID(t *testing.T, s *Server, username string) string {
 // newTestServerWithAdminSocket starts a test server with the admin socket listening in a short
 // temp dir (unix socket paths are limited to ~104 bytes, t.TempDir() can be longer on macOS)
 func newTestServerWithAdminSocket(t *testing.T, conf *Config) (*Server, string) {
-	conf.AdminSocket = filepath.Join(shortTempDir(t), "admin.sock")
+	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
 	s := newTestServer(t, conf)
 	s.startAdminSocket()
 	require.NotNil(t, s.adminSocketServer)
-	return s, conf.AdminSocket
+	return s, conf.ListenAdminUnix
 }
 
 // adminSocketClient returns an HTTP client that sends every request to the given unix socket

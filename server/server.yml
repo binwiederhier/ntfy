@@ -36,7 +36,7 @@
 # fall back to writing to the database directly if no server listens on it. Set to "" to disable.
 # The socket is only opened if auth-file or database-url is set. Not available on Windows.
 #
-# admin-socket: "/run/ntfy/admin.sock"
+# listen-admin-unix: "/run/ntfy/admin.sock"
 
 # Path to the private key & cert file for the HTTPS web server. Not used if "listen-https" is not set.
 #

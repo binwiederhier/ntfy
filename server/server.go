@@ -435,8 +435,8 @@ func (s *Server) Run() error {
 	if s.config.ListenUnix != "" {
 		listenStr += fmt.Sprintf(" %s[unix]", s.config.ListenUnix)
 	}
-	if s.config.AdminSocket != "" && s.userManager != nil {
-		listenStr += fmt.Sprintf(" %s[admin]", s.config.AdminSocket)
+	if s.config.ListenAdminUnix != "" && s.userManager != nil {
+		listenStr += fmt.Sprintf(" %s[admin]", s.config.ListenAdminUnix)
 	}
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)

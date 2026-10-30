@@ -504,12 +504,12 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 // startAdminSocket listens on the admin socket, if configured, and serves the admin API on it.
 // Failing to listen is not fatal: the CLI falls back to the database, so it only logs a warning.
 func (s *Server) startAdminSocket() {
-	if s.config.AdminSocket == "" || s.userManager == nil {
+	if s.config.ListenAdminUnix == "" || s.userManager == nil {
 		return // Without auth, there is nothing to administer
 	}
 	listener, err := s.listenAdminSocket()
 	if err != nil {
-		log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly", s.config.AdminSocket)
+		log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly", s.config.ListenAdminUnix)
 		return
 	}
 	s.adminSocketListener = listener
@@ -520,7 +520,7 @@ func (s *Server) startAdminSocket() {
 	go func(server *http.Server) {
 		// Not fed into Run's error channel: losing the socket must not take the server down
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Tag(tagStartup).Err(err).Warn("Admin socket %s stopped", s.config.AdminSocket)
+			log.Tag(tagStartup).Err(err).Warn("Admin socket %s stopped", s.config.ListenAdminUnix)
 		}
 	}(s.adminSocketServer)
 }
@@ -529,7 +529,7 @@ func (s *Server) startAdminSocket() {
 // server behind it) and listens. A socket that answers belongs to another running server; in
 // that case this one does not take it over.
 func (s *Server) listenAdminSocket() (net.Listener, error) {
-	path := s.config.AdminSocket
+	path := s.config.ListenAdminUnix
 	if err := os.MkdirAll(filepath.Dir(path), adminSocketDirMode); err != nil {
 		return nil, err
 	}
@@ -544,7 +544,7 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot listen on %s: %w", path, err)
 	}
-	if err := os.Chmod(path, DefaultAdminSocketMode); err != nil {
+	if err := os.Chmod(path, DefaultListenAdminUnixMode); err != nil {
 		listener.Close()
 		return nil, err
 	}

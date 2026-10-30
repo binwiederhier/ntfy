@@ -67,7 +67,7 @@ Tiers can be used to grant users higher limits, such as daily message limits, at
 make it possible for users to reserve topics.
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.
 
@@ -112,7 +112,7 @@ After updating a tier, you may have to restart the ntfy server to apply them
 to all visitors. 
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.
 
@@ -137,7 +137,7 @@ You cannot remove a tier if there are users associated with a tier. Use "ntfy us
 to remove or switch their tier first.
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.
 
@@ -153,7 +153,7 @@ Example:
 			Description: `Shows a list of all configured tiers.
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.
 `,
@@ -166,7 +166,7 @@ to grant users higher limits, such as daily message limits, attachment size, or 
 possible for users to reserve topics.
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.
 

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -47,23 +46,18 @@ var (
 		Stats:   &user.Stats{},   // Read by newVisitor
 		Billing: &user.Billing{}, // Read by the visitor's log context
 	}
+
+	// adminSocketIP is the visitor IP of every socket request; they all come from this machine
+	adminSocketIP = netip.AddrFrom4([4]byte{127, 0, 0, 1})
 )
 
-// peerCredentials identifies the process on the other end of a unix socket connection, for the
-// audit log. Zero values mean "unknown" (other OS, or the lookup failed).
-type peerCredentials struct {
-	UID int
-	GID int
-	PID int
-}
-
-// DefaultAdminSocket returns the default admin socket path. On Windows there is none: unix socket
+// DefaultListenAdminUnix returns the default admin socket path. On Windows there is none: unix socket
 // file permissions do not protect it there, so the CLI uses the database or --server instead.
-func DefaultAdminSocket() string {
-	return defaultAdminSocketFor(runtime.GOOS)
+func DefaultListenAdminUnix() string {
+	return defaultListenAdminUnixFor(runtime.GOOS)
 }
 
-func defaultAdminSocketFor(goos string) string {
+func defaultListenAdminUnixFor(goos string) string {
 	switch goos {
 	case "windows":
 		return ""
@@ -518,37 +512,12 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 	return s.writeJSON(w, newSuccessResponse())
 }
 
-// startAdminSocket listens on the admin socket, if configured, and serves the admin API on it.
-// Failing to listen is not fatal: the CLI falls back to the database, so it only logs a warning.
-func (s *Server) startAdminSocket() {
-	if s.config.AdminSocket == "" || s.userManager == nil {
-		return // Without auth, there is nothing to administer
-	}
-	listener, err := s.listenAdminSocket()
-	if err != nil {
-		log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly", s.config.AdminSocket)
-		return
-	}
-	log.Tag(tagStartup).Info("Admin socket listening on %s", s.config.AdminSocket)
-	s.adminSocketListener = listener
-	s.adminSocketServer = &http.Server{
-		Handler:     http.HandlerFunc(s.handleAdminSocket),
-		ConnContext: adminSocketConnContext,
-	}
-	go func(server *http.Server) {
-		// Not fed into Run's error channel: losing the socket must not take the server down
-		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Tag(tagStartup).Err(err).Warn("Admin socket %s stopped", s.config.AdminSocket)
-		}
-	}(s.adminSocketServer)
-}
-
 // listenAdminSocket creates the socket's directory, removes a stale socket file (one with no
 // server behind it) and listens. Anything at the path that is not a socket is left alone, in case
-// admin-socket points somewhere it should not (e.g. at the database). A socket that answers belongs to another running server; in
-// that case this one does not take it over.
+// listen-admin-unix points somewhere it should not (e.g. at the database). A socket that answers
+// belongs to another running server; in that case this one does not take it over.
 func (s *Server) listenAdminSocket() (net.Listener, error) {
-	path := s.config.AdminSocket
+	path := s.config.ListenAdminUnix
 	if err := os.MkdirAll(filepath.Dir(path), adminSocketDirMode); err != nil {
 		return nil, err
 	}
@@ -556,7 +525,7 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 		conn.Close()
 		return nil, fmt.Errorf("another server is listening on %s", path)
 	} else if errors.Is(err, fs.ErrPermission) {
-		return nil, fmt.Errorf("%s belongs to a server of another user, set admin-socket to a path of your own", path)
+		return nil, fmt.Errorf("%s belongs to a server of another user, set listen-admin-unix to a path of your own", path)
 	}
 	if stat, err := os.Lstat(path); err == nil {
 		if stat.Mode().Type() != fs.ModeSocket {
@@ -569,7 +538,7 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot listen on %s: %w", path, err)
 	}
-	if err := os.Chmod(path, DefaultAdminSocketMode); err != nil {
+	if err := os.Chmod(path, DefaultListenAdminUnixMode); err != nil {
 		listener.Close()
 		return nil, err
 	}
@@ -582,7 +551,7 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 // contextAdminSocket so handlers can allow what the network API refuses.
 func (s *Server) handleAdminSocket(w http.ResponseWriter, r *http.Request) {
 	r = withContext(r, map[contextKey]any{contextAdminSocket: true})
-	v := newVisitor(s.visitors, netip.AddrFrom4([4]byte{127, 0, 0, 1}), adminSocketUser)
+	v := newVisitor(s.visitors, adminSocketIP, adminSocketUser)
 	adminLog(v, r).Debug("Admin socket request")
 	if !slices.Contains(adminSocketPaths, r.URL.Path) {
 		s.handleError(w, r, v, errHTTPNotFound) // Publishing, subscribing, the web app, etc. are not served here
@@ -591,12 +560,6 @@ func (s *Server) handleAdminSocket(w http.ResponseWriter, r *http.Request) {
 	if err := s.handleInternal(w, r, v); err != nil {
 		s.handleError(w, r, v, err)
 	}
-}
-
-// adminSocketConnContext is the http.Server ConnContext for the admin socket: it reads the
-// peer's credentials once per connection and stores them for the handlers' audit log.
-func adminSocketConnContext(ctx context.Context, conn net.Conn) context.Context {
-	return context.WithValue(ctx, contextAdminSocketPeer, readPeerCredentials(conn))
 }
 
 func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
@@ -787,16 +750,9 @@ func isAdminSocketRequest(r *http.Request) bool {
 
 // adminLog returns the audit log event for a mutating admin request, with how it arrived
 func adminLog(v *visitor, r *http.Request) *log.Event {
-	if !isAdminSocketRequest(r) {
-		return logvr(v, r).Tag(tagAdmin).Field("admin_via", "http")
+	via := "http"
+	if isAdminSocketRequest(r) {
+		via = "socket"
 	}
-	ev := logvr(v, r).Tag(tagAdmin).Field("admin_via", "socket")
-	if peer, err := fromContext[peerCredentials](r, contextAdminSocketPeer); err == nil {
-		ev = ev.Fields(log.Context{
-			"peer_uid": peer.UID,
-			"peer_gid": peer.GID,
-			"peer_pid": peer.PID,
-		})
-	}
-	return ev
+	return logvr(v, r).Tag(tagAdmin).Field("admin_via", via)
 }

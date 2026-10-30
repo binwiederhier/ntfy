@@ -42,7 +42,7 @@ Tokens have full access, and can perform any task a user can do. They are meant 
 avoid spreading the password to various places.
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.
 
@@ -71,7 +71,7 @@ Example:
 			Description: `Shows a list of all tokens.
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.`,
 		},
@@ -92,7 +92,7 @@ Tokens have full access, and can perform any task a user can do. They are meant 
 avoid spreading the password to various places.
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.
 

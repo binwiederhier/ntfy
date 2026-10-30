@@ -222,7 +222,7 @@ func TestCLI_User_AuthFileNotReadable(t *testing.T) {
 	configFile := filepath.Join(t.TempDir(), "server.yml")
 	require.Nil(t, os.WriteFile(configFile, []byte{}, 0600))
 	app, _, _, _ := newTestApp()
-	err := app.Run([]string{"ntfy", "user", "--config=" + configFile, "--auth-file=" + authFile, "--admin-socket=", "list"})
+	err := app.Run([]string{"ntfy", "user", "--config=" + configFile, "--auth-file=" + authFile, "--listen-admin-unix=", "list"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "permission denied")
 	require.NotContains(t, err.Error(), "does not exist")
@@ -303,16 +303,16 @@ func newTestServerWithAuth(t *testing.T, socket bool, options ...func(conf *serv
 	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
 	conf.AuthDefault = user.PermissionDenyAll
 	conf.AuthAccessCacheEnabled = false
-	conf.AdminSocket = "" // Never the real default path, a server on this machine may be listening there
+	conf.ListenAdminUnix = "" // Never the real default path, a server on this machine may be listening there
 	if socket {
-		conf.AdminSocket = filepath.Join(shortTempDir(t), "admin.sock")
+		conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
 	}
 	for _, option := range options {
 		option(conf)
 	}
 	s, port = test.StartServerWithConfig(t, conf)
 	if socket {
-		waitForAdminSocket(t, conf.AdminSocket)
+		waitForAdminSocket(t, conf.ListenAdminUnix)
 	}
 	return
 }
@@ -325,7 +325,7 @@ func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {
 		"--config=" + conf.File, // Dummy config file to avoid lookups of real file
 		"--auth-file=" + conf.AuthFile,
 		"--auth-default-access=" + conf.AuthDefault.String(),
-		"--admin-socket=" + conf.AdminSocket,
+		"--listen-admin-unix=" + conf.ListenAdminUnix,
 	}
 	return app.Run(append(userArgs, args...))
 }

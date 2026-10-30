@@ -86,7 +86,7 @@ func runTierCommand(app *cli.App, conf *server.Config, args ...string) error {
 		"tier",
 		"--config=" + conf.File, // Dummy config file to avoid lookups of real file
 		"--auth-file=" + conf.AuthFile,
-		"--admin-socket=" + conf.AdminSocket,
+		"--listen-admin-unix=" + conf.ListenAdminUnix,
 		"--auth-default-access=" + conf.AuthDefault.String(),
 	}
 	return app.Run(append(userArgs, args...))

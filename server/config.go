@@ -17,7 +17,7 @@ import (
 
 // Defines default config settings (excluding limits, see below)
 const (
-	DefaultAdminSocketMode                      = fs.FileMode(0660) // Owner (the ntfy user) and the ntfy group; root bypasses anyway
+	DefaultListenAdminUnixMode                  = fs.FileMode(0660) // Owner (the ntfy user) and the ntfy group; root bypasses anyway
 	DefaultListenHTTP                           = ":80"
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultCacheBatchTimeout                    = time.Duration(0)
@@ -133,7 +133,7 @@ type Config struct {
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
-	AdminSocket                          string // Path of the local admin socket (CLI access without credentials); empty disables it
+	ListenAdminUnix                      string // Path of the local admin socket (CLI access without credentials); empty disables it
 	KeyFile                              string
 	CertFile                             string
 	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
@@ -259,7 +259,7 @@ func NewConfig() *Config {
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,
-		AdminSocket:                          DefaultAdminSocket(),
+		ListenAdminUnix:                      DefaultListenAdminUnix(),
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",

@@ -65,7 +65,7 @@ func newAdminAPI(c *cli.Context) (adminAPI, error) {
 		return client.NewAdmin(server, token), nil
 	}
 	authConfigured := c.String("auth-file") != "" || c.String("database-url") != ""
-	if socket := c.String("admin-socket"); socket != "" && authConfigured {
+	if socket := c.String("listen-admin-unix"); socket != "" && authConfigured {
 		admin := client.NewAdminSocket(socket)
 		err := admin.Ping()
 		var apiErr *client.AdminError

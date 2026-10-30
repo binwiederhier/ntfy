@@ -70,7 +70,7 @@ func runTokenCommand(app *cli.App, conf *server.Config, args ...string) error {
 		"token",
 		"--config=" + conf.File, // Dummy config file to avoid lookups of real file
 		"--auth-file=" + conf.AuthFile,
-		"--admin-socket=" + conf.AdminSocket,
+		"--listen-admin-unix=" + conf.ListenAdminUnix,
 	}
 	return app.Run(append(userArgs, args...))
 }

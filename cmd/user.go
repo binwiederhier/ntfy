@@ -39,7 +39,7 @@ var flagsUser = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", Aliases: []string{"smtp_sender_user"}, EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-pass", Aliases: []string{"smtp_sender_pass"}, EnvVars: []string{"NTFY_SMTP_SENDER_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-from", Aliases: []string{"smtp_sender_from"}, EnvVars: []string{"NTFY_SMTP_SENDER_FROM"}, Usage: "SMTP sender address (if e-mail sending is enabled)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "admin-socket", Aliases: []string{"admin_socket"}, EnvVars: []string{"NTFY_ADMIN_SOCKET"}, Value: server.DefaultAdminSocket(), DefaultText: "/run/ntfy/admin.sock on Linux, /var/run/ntfy/admin.sock on macOS/BSD", Usage: "admin socket of the local ntfy server; empty forces direct database access"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-admin-unix", Aliases: []string{"listen_admin_unix"}, EnvVars: []string{"NTFY_LISTEN_ADMIN_UNIX"}, Value: server.DefaultListenAdminUnix(), DefaultText: "/run/ntfy/admin.sock on Linux, /var/run/ntfy/admin.sock on macOS/BSD", Usage: "admin socket of the local ntfy server; empty forces direct database access"}),
 	&cli.StringFlag{Name: "server", Aliases: []string{"S"}, EnvVars: []string{"NTFY_ADMIN_SERVER"}, Usage: "manage a remote server over HTTPS instead (base URL, e.g. https://ntfy.example.com); requires --token of an admin user"},
 	&cli.StringFlag{Name: "token", Aliases: []string{"k"}, EnvVars: []string{"NTFY_ADMIN_TOKEN"}, Usage: "admin access token for --server"},
 )
@@ -198,7 +198,7 @@ Example:
 This command is an alias to calling 'ntfy access' (display access control list).
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead.
 `,
@@ -210,7 +210,7 @@ The command allows you to add/remove/change users in the ntfy user database, as 
 passwords or roles.
 
 This is a server-only command. It talks to the running ntfy server over its local admin socket
-(admin-socket in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
 directly. With --server and --token, it manages a remote server over HTTPS instead. Please also refer
 to the related command 'ntfy access'.

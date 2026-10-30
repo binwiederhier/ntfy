@@ -39,7 +39,7 @@ func TestCLI_AdminAPI_FallbackWarning(t *testing.T) {
 	// Missing socket file
 	app, _, stdout, stderr := newTestApp()
 	socket := filepath.Join(shortTempDir(t), "admin.sock")
-	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--admin-socket=" + socket, "list"}))
+	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
 	require.Contains(t, stdout.String(), "user * (role: anonymous, tier: none)")
 	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket)
 	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
@@ -50,7 +50,7 @@ func TestCLI_AdminAPI_FallbackWarning(t *testing.T) {
 	listener.(*net.UnixListener).SetUnlinkOnClose(false)
 	listener.Close()
 	app, _, _, stderr = newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--admin-socket=" + socket, "list"}))
+	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
 	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket)
 	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
 }
@@ -87,7 +87,7 @@ func TestCLI_AdminAPI_SocketErrorNoFallback(t *testing.T) {
 	defer httpServer.Close()
 
 	app, _, stdout, _ := newTestApp()
-	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--admin-socket=" + socket, "list"})
+	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"})
 	require.Error(t, err)
 	require.Empty(t, stdout.String())
 }
@@ -148,7 +148,7 @@ func TestCLI_AdminAPI_SocketPermissionDenied(t *testing.T) {
 	}
 	s, conf, port := newTestServerWithAuth(t, true)
 	defer test.StopServer(t, s, port)
-	require.Nil(t, os.Chmod(conf.AdminSocket, 0))
+	require.Nil(t, os.Chmod(conf.ListenAdminUnix, 0))
 
 	// Database not accessible either: the user is not allowed to manage this server, say how to fix it
 	dir := filepath.Dir(conf.AuthFile)

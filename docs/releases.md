@@ -2292,11 +2292,11 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Admin API: manage tokens of other users (`/v1/users/tokens`), tiers (`/v1/tiers`; the price list for the upgrade dialog moved to `/v1/account/billing/tiers`) and password reset links (`/v1/users/password/reset`); `GET /v1/users` also returns tier names, provisioned users and grants and the default access, `PUT /v1/users` can remove a tier (`"tier": "-"`), and `DELETE /v1/users/access` can reset all of a user's entries (or, over the admin socket, the whole ACL)
+* Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
 
 **Bug fixes + maintenance:**
 
-* Admin API: invalid password hashes, too many reservations for a new tier, and other user manager errors return 400/409 errors instead of a 500, and deleting a user also removes their web push subscriptions
+* Admin API: return 4xx errors instead of a 500 for invalid input, and remove a deleted user's web push subscriptions
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

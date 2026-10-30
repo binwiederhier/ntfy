@@ -200,11 +200,17 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 // sent. The bucket cannot exceed its burst, and the daily count cannot go below zero.
 func (s *Service) Refund(key string, kind Kind, n int64) {
 	s.refundTokens(key, kind, n)
+	start := periodStart(key, s.dbTime(s.now()))
 	i := dailyIndex(kind)
 	if i < 0 {
+		bs := s.buckets[shardIndex(key)]
+		bs.mu.Lock()
+		defer bs.mu.Unlock()
+		if e, ok := bs.entries[key]; ok && e.periodStart >= start {
+			e.counts[kind] = max(0, e.counts[kind]-n)
+		}
 		return
 	}
-	start := periodStart(key, s.dbTime(s.now()))
 	cs := s.counters[shardIndex(key)]
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -213,19 +219,24 @@ func (s *Service) Refund(key string, kind Kind, n int64) {
 	}
 }
 
-// Usage returns the key's daily counts in its current period, from memory
+// Usage returns the key's counts in its current period, from memory: the daily counts (all
+// nodes' as of the last sync, plus this node's since), and this node's units of the other kinds
 func (s *Service) Usage(key string) Usage {
 	start := periodStart(key, s.dbTime(s.now()))
+	var u Usage
+	bs := s.buckets[shardIndex(key)]
+	bs.mu.Lock()
+	if e, ok := bs.entries[key]; ok && e.periodStart >= start {
+		u.counts = e.counts
+	}
+	bs.mu.Unlock()
 	cs := s.counters[shardIndex(key)]
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
-	c, ok := cs.counters[key]
-	if !ok || c.periodStart < start {
-		return Usage{}
-	}
-	var u Usage
-	for i := 0; i < numDaily; i++ {
-		u.counts[i] = c.base[i] + c.unflushed[i]
+	if c, ok := cs.counters[key]; ok && c.periodStart >= start {
+		for i, kind := range dailyKinds {
+			u.counts[kind] = c.base[i] + c.unflushed[i]
+		}
 	}
 	return u
 }
@@ -482,6 +493,7 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	e := bs.entryNoLock(key, now)
 	e.seen = now.UnixNano()
 	if rule.Burst <= 0 {
+		e.countNoLock(key, rule.Kind, n, s.dbTime(now))
 		return Decision{OK: true}
 	}
 	b := &e.buckets[rule.Kind]
@@ -493,6 +505,7 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
+	e.countNoLock(key, rule.Kind, n, s.dbTime(now))
 	return Decision{OK: true}
 }
 
@@ -515,6 +528,7 @@ func (s *Service) reset(key string, kind Kind) {
 	bs.mu.Lock()
 	if e, ok := bs.entries[key]; ok {
 		e.buckets[kind].tokens = float64(e.buckets[kind].burst)
+		e.counts[kind] = 0
 	}
 	bs.mu.Unlock()
 	i := dailyIndex(kind)
@@ -556,6 +570,19 @@ func (bs *bucketShard) entryNoLock(key string, now time.Time) *bucketEntry {
 		bs.entries[key] = e
 	}
 	return e
+}
+
+// countNoLock adds n units of a kind without a counter to the entry's counts of the current
+// period, starting them over if the period has ended. The caller must hold the shard's lock.
+func (e *bucketEntry) countNoLock(key string, kind Kind, n int64, dbNow time.Time) {
+	if dailyIndex(kind) >= 0 {
+		return // Counted in the key's counter
+	}
+	if start := periodStart(key, dbNow); e.periodStart < start {
+		e.counts = [numKinds]int64{}
+		e.periodStart = start
+	}
+	e.counts[kind] += n
 }
 
 // noteFull moves the time from which every bucket is full again to when this bucket is full, if

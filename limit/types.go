@@ -49,7 +49,7 @@ type Decision struct {
 
 // Usage is a key's daily counts in its current period
 type Usage struct {
-	counts [numDaily]int64
+	counts [numKinds]int64
 }
 
 // Config configures the service
@@ -67,9 +67,11 @@ type counter struct {
 
 // bucketEntry is one key's token buckets
 type bucketEntry struct {
-	buckets [numKinds]bucket
-	seen    int64 // Last use, unix nanoseconds
-	full    int64 // When every bucket is full again, unix nanoseconds
+	buckets     [numKinds]bucket
+	counts      [numKinds]int64 // Units used in the current period of the kinds without a counter (bandwidth, ...), memory only
+	periodStart int64           // The period of counts (see periodStart)
+	seen        int64           // Last use, unix nanoseconds
+	full        int64           // When every bucket is full again, unix nanoseconds
 }
 
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
@@ -107,8 +109,8 @@ func ParseKind(name string) (Kind, bool) {
 
 // Count returns the usage of the given kind; 0 for a kind without a daily count
 func (u Usage) Count(kind Kind) int64 {
-	if i := dailyIndex(kind); i >= 0 {
-		return u.counts[i]
+	if kind < numKinds {
+		return u.counts[kind]
 	}
 	return 0
 }

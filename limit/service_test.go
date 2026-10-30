@@ -127,7 +127,7 @@ func TestService_Allow_N(t *testing.T) {
 	require.Equal(t, 200*time.Millisecond, d.RetryAfter)
 	clock.advance(200 * time.Millisecond)
 	require.True(t, s.Allow("k", rule, 600).OK)
-	require.Equal(t, int64(0), s.Usage("k").Count(KindBandwidth)) // Buckets only, no daily count
+	require.Equal(t, int64(1200), s.Usage("k").Count(KindBandwidth))
 
 	// More than the burst can never be allowed, so there is no retry time
 	d = s.Allow("k", rule, 1001)
@@ -198,7 +198,7 @@ func TestService_Allow_Unlimited(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		require.True(t, s.Allow("k", Rule{Kind: KindTopics}, 1).OK)
 	}
-	require.Equal(t, 1, s.Size())
+	require.Equal(t, int64(1000), s.Usage("k").Count(KindTopics))
 }
 
 func TestService_Allow_NeverRefills(t *testing.T) {
@@ -443,6 +443,7 @@ func TestService_Allow_ConcurrentBucketOnly(t *testing.T) {
 	close(start)
 	wg.Wait()
 	require.Equal(t, rule.Burst, admitted.Load())
+	require.Equal(t, admitted.Load(), s.Usage("hot").Count(rule.Kind))
 	require.Zero(t, s.Tokens("hot", rule))
 }
 
@@ -485,6 +486,7 @@ func TestService_Prune_ConcurrentAllow(t *testing.T) {
 	close(start)
 	wg.Wait()
 	require.Zero(t, admitted.Load())
+	require.Equal(t, int64(1), s.Usage("hot").Count(rule.Kind))
 	require.Equal(t, 1, s.Size())
 }
 

@@ -72,9 +72,11 @@ var persistedKinds = [numKinds]bool{
 
 // meshKinds are the kinds whose buckets converge across nodes through the mesh: each node tells
 // its peers what it admitted (TakeDeltas) and charges what they admitted into its own buckets
-// (Burn). The persisted kinds go through the store instead.
+// (Burn). Daily counts go through the store instead; emails have both, since without a tier the
+// email bucket is the only email limit.
 var meshKinds = [numKinds]bool{
 	KindRequests:  true,
+	KindEmails:    true,
 	KindBandwidth: true,
 	KindTopics:    true,
 	KindAccount:   true,
@@ -299,8 +301,8 @@ func (s *Service) Lookup(key string) (Usage, error) {
 
 // Prune forgets keys that have not been used for longer than idle, except keys with counts that
 // are still to be written, keys with a row, which stay for at least promotedRetention, and keys
-// whose buckets are not full again, and returns how many it forgot. A key that comes back starts with full buckets, and with its counts
-// read back from the store if it has rows.
+// whose buckets are not full again, and returns how many it forgot. A key that comes back starts
+// with full buckets, and with its counts read back from the store if it has rows.
 func (s *Service) Prune(idle time.Duration) int {
 	now := s.now()
 	cutoff := now.Add(-idle).UnixNano()

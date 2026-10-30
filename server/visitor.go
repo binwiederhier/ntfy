@@ -24,8 +24,9 @@ const (
 	visitorExpungeAfter = oneDay
 
 	// visitorExpungeAfterPersisted is the same for limiter keys when usage is persisted: a key's
-	// daily counts are in the usage table (or it never had any worth a row) and its buckets refill
-	// anyway, so the limiter only has to hold the active keys
+	// daily counts are in the usage table (or it never had any worth a row), and the limiter keeps
+	// a key whose buckets are not full again anyway (see limit.Service.Prune), so it only has to
+	// hold the active keys
 	visitorExpungeAfterPersisted = 5 * time.Minute
 
 	// visitorThresholdRate is the share of a daily quota at which an IP-keyed visitor's usage gets a
@@ -101,7 +102,7 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 		user:   u,
 		limits: limits,
 	}
-	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is; its daily counts are the limiter's (read from the usage table as needed), so nothing is seeded
+	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is
 	return v
 }
 

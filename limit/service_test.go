@@ -859,7 +859,8 @@ func TestService_TakeDeltas_NonTrivialOnly(t *testing.T) {
 }
 
 func TestService_TakeDeltas_MeshKindsOnly(t *testing.T) {
-	// Daily quotas go through the store, not the mesh; bytes and strikes do go through the mesh
+	// Daily quotas go through the store, not the mesh; bytes, strikes and the email bucket do go
+	// through the mesh
 	s, _ := newTestServiceWithClock(t)
 	require.True(t, s.Allow("k", Rule{
 		Kind:  KindMessages,
@@ -884,6 +885,11 @@ func TestService_TakeDeltas_MeshKindsOnly(t *testing.T) {
 	require.ElementsMatch(t, []Delta{
 		{
 			Key:  "k",
+			Kind: KindEmails,
+			N:    5,
+		},
+		{
+			Key:  "k",
 			Kind: KindBandwidth,
 			N:    600,
 		},
@@ -893,6 +899,31 @@ func TestService_TakeDeltas_MeshKindsOnly(t *testing.T) {
 			N:    10,
 		},
 	}, s.TakeDeltas())
+}
+
+func TestService_Burn_EmailBucketConvergesAcrossNodes(t *testing.T) {
+	// Without a tier, the email bucket is the only email limit (no daily cap since #2129), so the
+	// nodes must share it like the request bucket, or a client spread over three nodes gets three
+	// bursts of emails
+	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
+	conf := &Config{
+		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
+		FlushInterval: time.Hour,
+	}
+	a, b := newService(conf, clock.now, nil), newService(conf, clock.now, nil)
+	rule := Rule{
+		Kind:   KindEmails,
+		Burst:  4,
+		Refill: time.Hour,
+	}
+	require.True(t, b.Allow("k", rule, 1).OK) // b has served the key before
+	for i := 0; i < 3; i++ {
+		require.True(t, a.Allow("k", rule, 1).OK)
+	}
+	for _, d := range a.TakeDeltas() {
+		b.Burn(d.Key, d.Kind, d.N)
+	}
+	require.False(t, b.Allow("k", rule, 1).OK) // 4 of 4 used across both nodes
 }
 
 func TestService_Burn_DebtCappedAtOneBurst(t *testing.T) {

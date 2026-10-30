@@ -117,7 +117,7 @@ const (
 )
 
 var (
-	// DefaultVisitorStatsResetTime defines the time at which visitor stats are reset (wall clock only)
+	// DefaultVisitorStatsResetTime defines the time of day at which the usage day starts over (wall clock only)
 	DefaultVisitorStatsResetTime = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
 
 	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
@@ -216,7 +216,7 @@ type Config struct {
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
-	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
+	VisitorStatsResetTime                time.Time      // Time of the day at which the usage day (daily messages, emails, calls) starts over
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)

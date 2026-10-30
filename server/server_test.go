@@ -1216,7 +1216,6 @@ func TestServer_StatsResetter(t *testing.T) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorStatsResetTime = time.Now().Add(2 * time.Second)
 		s := newTestServer(t, c)
-		go s.runStatsResetter()
 
 		// Create user with tier (tieruser) and user without tier (phil)
 		require.Nil(t, s.userManager.AddTier(&user.Tier{
@@ -1345,8 +1344,8 @@ func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
 		require.Equal(t, int64(123456), account.Stats.Messages)
 		require.Equal(t, int64(999), account.Stats.Emails)
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		require.Equal(t, int64(123456), v.Stats().Messages)
-		require.Equal(t, int64(999), v.Stats().Emails)
+		require.Equal(t, int64(123456), v.Usage().Count(limit.KindMessages))
+		require.Equal(t, int64(999), v.Usage().Count(limit.KindEmails))
 	})
 }
 
@@ -3589,8 +3588,8 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		publisher := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(0), publisher.Stats().Messages)
-		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
+		require.Equal(t, int64(0), publisher.Usage().Count(limit.KindMessages))
+		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Usage().Count(limit.KindMessages))
 
 		// Expire visitor: its subscriber has been gone for a day, and its key is pruned once idle and refilled
 		ageRateVisitor(s.topics["upAAAAAAAAAAAA"], 25*time.Hour)
@@ -3600,9 +3599,9 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		// Publish message again, observe that rateVisitor is not used anymore and is reset
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
-		require.Equal(t, int64(1), publisher.Stats().Messages)
+		require.Equal(t, int64(1), publisher.Usage().Count(limit.KindMessages))
 		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
-		require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
+		require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Usage().Count(limit.KindMessages))
 	})
 }
 
@@ -3728,7 +3727,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsPollerAsRateVisitor(t *tes
 	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
-	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
+	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Usage().Count(limit.KindMessages))
 }
 
 func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoked(t *testing.T) {
@@ -3804,7 +3803,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalive
 	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
-	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
+	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Usage().Count(limit.KindMessages))
 }
 
 func TestServer_SubscriberRateLimiting_ClosedStreamIsLastSeen(t *testing.T) {

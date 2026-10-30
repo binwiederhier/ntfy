@@ -2,8 +2,6 @@ package limit
 
 import (
 	"time"
-
-	"heckel.io/ntfy/v2/util"
 )
 
 const (
@@ -25,14 +23,17 @@ func shardIndex(key string) int {
 	return int(h % shardCount)
 }
 
-// untilReset returns how long until the next daily reset after now; a full day if now is the
-// reset time itself
-func untilReset(now time.Time, resetTime time.Time) time.Duration {
-	next := util.NextOccurrenceUTC(resetTime, now)
-	if !next.After(now) {
-		next = next.Add(oneDay)
+// dailyIndex returns the index of the kind in a counter's arrays, or -1 if the kind has no daily count
+func dailyIndex(kind Kind) int {
+	switch kind {
+	case KindMessages:
+		return 0
+	case KindEmails:
+		return 1
+	case KindCalls:
+		return 2
 	}
-	return next.Sub(now)
+	return -1
 }
 
 // keyOffset returns the key's reset time of day (UTC). It is a hash of the key, so the resets of

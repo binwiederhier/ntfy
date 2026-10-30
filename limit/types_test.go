@@ -32,14 +32,14 @@ func TestUsage_Count(t *testing.T) {
 	}, 42).OK)
 	u := s.Usage("k")
 	require.Equal(t, int64(3), u.Count(KindMessages))
-	require.Equal(t, int64(42), u.Count(KindBandwidth))
+	require.Equal(t, int64(0), u.Count(KindBandwidth)) // Buckets only, no daily count
 	require.Equal(t, int64(0), u.Count(KindEmails))
 }
 
 func TestLimiter_AllowNRefundsNegative(t *testing.T) {
 	s := newTestService(t)
 	l := s.Limiter("k", Rule{
-		Kind:   KindBandwidth,
+		Kind:   KindMessages,
 		Burst:  10,
 		Refill: time.Hour,
 	})

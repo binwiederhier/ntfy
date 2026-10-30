@@ -92,15 +92,7 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 		user:   u,
 		limits: limits,
 	}
-	if tier != nil {
-		// Carry the persisted stats into the key's daily counts, if the key is new to the limiter
-		var usage limit.Usage
-		usage.Set(limit.KindMessages, u.Stats.Messages)
-		usage.Set(limit.KindEmails, u.Stats.Emails)
-		usage.Set(limit.KindCalls, u.Stats.Calls)
-		env.limiter.Seed(v.key, usage)
-	}
-	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is (after Seed, which only fills unknown keys)
+	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is
 	return v
 }
 

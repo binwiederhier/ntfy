@@ -431,44 +431,6 @@ func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 	})
 }
 
-func TestVisitor_DailyResetKeepsEmailBucket(t *testing.T) {
-	// The daily reset starts the day's counts over, but it does not refill the email bucket: a
-	// visitor who emptied it right before the reset still has to wait for the refill
-	c := newTestConfig(t, "")
-	c.VisitorMessageDailyLimit = 2
-	c.VisitorEmailLimitBurst = 2
-	c.VisitorEmailLimitReplenish = time.Hour // Daily limit 24
-	s := newTestServer(t, c)
-	s.mailer = &testMailer{}
-	for i := 0; i < 2; i++ {
-		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-			"Email": "test@email.com",
-		})
-		require.Equal(t, 200, response.Code)
-	}
-	response := request(t, s, "PUT", "/mytopic", "test", nil)
-	require.Equal(t, 429, response.Code)
-	require.Equal(t, 42908, toHTTPError(t, response.Body.String()).Code)
-
-	// After the reset: messages are back, emails are not
-	s.resetStats()
-	response = request(t, s, "GET", "/v1/account", "", nil)
-	require.Equal(t, 200, response.Code)
-	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-	require.Nil(t, err)
-	require.Equal(t, int64(0), account.Stats.Messages)
-	require.Equal(t, int64(2), account.Stats.MessagesRemaining)
-	require.Equal(t, int64(0), account.Stats.Emails)
-	require.Equal(t, int64(24), account.Stats.EmailsRemaining)
-	response = request(t, s, "PUT", "/mytopic", "test", nil)
-	require.Equal(t, 200, response.Code)
-	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
-		"Email": "test@email.com",
-	})
-	require.Equal(t, 429, response.Code)
-	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
-}
-
 func TestVisitor_RequestLimiterZeroBurstAdmitsNothing(t *testing.T) {
 	// A request burst of zero admits nothing, as the old rate.Limiter did; the limit service
 	// reads a zero burst as "no bucket", so the visitor must not hand it one. A tier's burst is

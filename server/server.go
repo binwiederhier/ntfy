@@ -301,7 +301,7 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime}),
+		limiter:         limit.New(&limit.Config{}),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
@@ -2159,7 +2159,6 @@ func (s *Server) resetStats() {
 	log.Info("Resetting all visitor stats (daily task)")
 	s.mu.Lock()
 	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
-	s.limiter.ResetUsage()
 	if s.userManager != nil {
 		if err := s.userManager.ResetStats(); err != nil {
 			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())

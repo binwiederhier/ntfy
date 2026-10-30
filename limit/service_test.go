@@ -31,8 +31,7 @@ func (c *testClock) advance(d time.Duration) {
 func newTestServiceWithClock(t *testing.T) (*Service, *testClock) {
 	t.Helper()
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	conf := &Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}
-	return newService(conf, clock.now), clock
+	return newService(&Config{}, clock.now), clock
 }
 
 func newTestService(t *testing.T) *Service {
@@ -75,7 +74,7 @@ func TestService_Allow_Bucket(t *testing.T) {
 }
 
 func TestService_Allow_Daily(t *testing.T) {
-	s, _ := newTestServiceWithClock(t) // Noon UTC, 12 hours before the reset
+	s, _ := newTestServiceWithClock(t) // Noon UTC; "k" resets at 03:48:26 UTC
 	rule := Rule{
 		Kind:  KindMessages,
 		Daily: 2,
@@ -84,16 +83,10 @@ func TestService_Allow_Daily(t *testing.T) {
 	require.True(t, s.Allow("k", rule, 1).OK)
 	d := s.Allow("k", rule, 1)
 	require.False(t, d.OK)
-	require.Equal(t, 12*time.Hour, d.RetryAfter)
-	require.Equal(t, int64(2), s.Usage("k").Count(KindMessages))
+	require.Equal(t, 15*time.Hour+48*time.Minute+26*time.Second, d.RetryAfter)
 
 	// Denied usage is not counted
 	require.Equal(t, int64(2), s.Usage("k").Count(KindMessages))
-
-	// The reset starts the day over
-	s.ResetUsage()
-	require.Equal(t, int64(0), s.Usage("k").Count(KindMessages))
-	require.True(t, s.Allow("k", rule, 1).OK)
 }
 
 func TestService_Allow_BucketAndDaily(t *testing.T) {
@@ -115,7 +108,7 @@ func TestService_Allow_BucketAndDaily(t *testing.T) {
 	clock.advance(time.Hour)
 	d = s.Allow("k", rule, 1)
 	require.False(t, d.OK)
-	require.Equal(t, 11*time.Hour-time.Minute, d.RetryAfter) // The daily cap is what denies now
+	require.Equal(t, 14*time.Hour+47*time.Minute+26*time.Second, d.RetryAfter) // The daily cap is what denies now, until 03:48:26 UTC
 	require.Equal(t, int64(3), s.Usage("k").Count(KindEmails))
 }
 
@@ -132,7 +125,7 @@ func TestService_Allow_N(t *testing.T) {
 	require.Equal(t, 200*time.Millisecond, d.RetryAfter)
 	clock.advance(200 * time.Millisecond)
 	require.True(t, s.Allow("k", rule, 600).OK)
-	require.Equal(t, int64(1200), s.Usage("k").Count(KindBandwidth))
+	require.Equal(t, int64(0), s.Usage("k").Count(KindBandwidth)) // Buckets only, no daily count
 
 	// More than the burst can never be allowed, so there is no retry time
 	d = s.Allow("k", rule, 1001)
@@ -203,7 +196,7 @@ func TestService_Allow_Unlimited(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		require.True(t, s.Allow("k", Rule{Kind: KindTopics}, 1).OK)
 	}
-	require.Equal(t, int64(1000), s.Usage("k").Count(KindTopics))
+	require.Equal(t, 1, s.Size())
 }
 
 func TestService_Allow_NeverRefills(t *testing.T) {
@@ -223,22 +216,22 @@ func TestService_Allow_NeverRefills(t *testing.T) {
 func TestService_Refund(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
 	rule := Rule{
-		Kind:   KindBandwidth,
+		Kind:   KindMessages,
 		Burst:  3,
 		Refill: time.Hour,
 		Daily:  100,
 	}
 	require.True(t, s.Allow("k", rule, 3).OK)
 	require.False(t, s.Allow("k", rule, 1).OK)
-	s.Refund("k", KindBandwidth, 1)
+	s.Refund("k", KindMessages, 1)
 	require.True(t, s.Allow("k", rule, 1).OK)
 	require.False(t, s.Allow("k", rule, 1).OK)
-	require.Equal(t, int64(3), s.Usage("k").Count(KindBandwidth))
+	require.Equal(t, int64(3), s.Usage("k").Count(KindMessages))
 
 	// A refund cannot exceed the burst, nor make the count negative
-	s.Refund("k", KindBandwidth, 100)
+	s.Refund("k", KindMessages, 100)
 	require.Equal(t, int64(3), s.Tokens("k", rule))
-	require.Equal(t, int64(0), s.Usage("k").Count(KindBandwidth))
+	require.Equal(t, int64(0), s.Usage("k").Count(KindMessages))
 
 	// Refunding an unknown key or kind is harmless
 	s.Refund("unknown", KindBandwidth, 1)
@@ -259,33 +252,12 @@ func TestService_Tokens_DoesNotConsume(t *testing.T) {
 	require.Equal(t, int64(0), s.Tokens("k", Rule{Kind: KindAuth})) // No bucket, no tokens
 }
 
-func TestService_Seed(t *testing.T) {
-	s, _ := newTestServiceWithClock(t)
-	var usage Usage
-	usage.Set(KindMessages, 120)
-	usage.Set(KindEmails, 7)
-	s.Seed("k", usage)
-	require.Equal(t, int64(120), s.Usage("k").Count(KindMessages))
-	require.Equal(t, int64(7), s.Usage("k").Count(KindEmails)) // Every kind at once, not only the first
-	usage.Set(KindMessages, 999)
-	s.Seed("k", usage) // Known key: ignored
-	require.Equal(t, int64(120), s.Usage("k").Count(KindMessages))
-	require.False(t, s.Allow("k", Rule{
-		Kind:  KindMessages,
-		Daily: 120,
-	}, 1).OK)
-	require.True(t, s.Allow("k", Rule{
-		Kind:  KindMessages,
-		Daily: 121,
-	}, 1).OK)
-}
-
 func TestService_Prune(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  1,
-		Refill: time.Hour,
+		Refill: time.Minute,
 	}
 	require.True(t, s.Allow("old", rule, 1).OK)
 	clock.advance(10 * time.Minute)
@@ -297,10 +269,49 @@ func TestService_Prune(t *testing.T) {
 	require.False(t, s.Allow("fresh", rule, 1).OK) // Kept
 }
 
-func TestService_Allow_Concurrent(t *testing.T) {
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
+func TestService_Prune_KeepsKeyUntilBucketsRefill(t *testing.T) {
+	// A forgotten key comes back with full buckets, so an idle key is only forgotten once its
+	// buckets are full again; otherwise a slow bucket (e.g. one email every few hours) would
+	// hand out a fresh burst after every prune
+	s, clock := newTestServiceWithClock(t)
 	rule := Rule{
-		Kind:   KindRequests,
+		Kind:   KindEmails,
+		Burst:  1,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("key", rule, 1).OK)
+	clock.advance(10 * time.Minute)
+	s.Prune(5 * time.Minute)
+	require.Equal(t, 1, s.Size())
+	require.False(t, s.Allow("key", rule, 1).OK)
+	clock.advance(time.Hour)
+	s.Prune(5 * time.Minute)
+	require.Equal(t, 0, s.Size())
+	require.True(t, s.Allow("key", rule, 1).OK)
+}
+
+func TestService_Prune_DropsEndedPeriods(t *testing.T) {
+	// Daily counts are kept until their period ends, however idle the key is
+	s, clock := newTestServiceWithClock(t) // Noon UTC; "k" resets at 03:48:26 UTC
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 10,
+	}
+	require.True(t, s.Allow("k", rule, 4).OK)
+	clock.advance(15 * time.Hour)
+	s.Prune(time.Minute)
+	require.Equal(t, 0, s.Size())
+	require.Equal(t, int64(4), s.Usage("k").Count(KindMessages))
+	require.Len(t, s.counters[shardIndex("k")].counters, 1)
+	clock.advance(time.Hour)
+	s.Prune(time.Minute)
+	require.Empty(t, s.counters[shardIndex("k")].counters)
+}
+
+func TestService_Allow_Concurrent(t *testing.T) {
+	s := New(&Config{})
+	rule := Rule{
+		Kind:   KindMessages,
 		Burst:  500,
 		Refill: time.Hour,
 		Daily:  400,
@@ -328,12 +339,12 @@ func TestService_Allow_Concurrent(t *testing.T) {
 		return true
 	})
 	require.Equal(t, 400, total) // The daily cap, exactly once
-	require.Equal(t, int64(400), s.Usage("hot").Count(KindRequests))
+	require.Equal(t, int64(400), s.Usage("hot").Count(KindMessages))
 	require.Equal(t, 1601, s.Size())
 }
 
 func BenchmarkAllow_HotKey(b *testing.B) {
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
+	s := New(&Config{})
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -348,7 +359,7 @@ func BenchmarkAllow_HotKey(b *testing.B) {
 }
 
 func BenchmarkAllow_ManyKeys(b *testing.B) {
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
+	s := New(&Config{})
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -367,7 +378,7 @@ func BenchmarkAllow_ManyKeys(b *testing.B) {
 }
 
 func BenchmarkAllow_Parallel(b *testing.B) {
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)})
+	s := New(&Config{})
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -404,25 +415,6 @@ func TestService_FirebaseKind(t *testing.T) {
 	require.Equal(t, KindFirebase, kind)
 }
 
-func TestService_ResetUsage_KeepsBuckets(t *testing.T) {
-	// The daily reset starts the counts over, but the buckets keep their tokens: an email bucket
-	// emptied right before the reset is not refilled by it (it used to be)
-	s, _ := newTestServiceWithClock(t)
-	rule := Rule{
-		Kind:   KindEmails,
-		Burst:  2,
-		Refill: time.Hour,
-		Daily:  3,
-	}
-	require.True(t, s.Allow("k", rule, 2).OK)
-	s.ResetUsage()
-	require.Equal(t, int64(0), s.Usage("k").Count(KindEmails))
-	require.Equal(t, int64(0), s.Tokens("k", rule))
-	d := s.Allow("k", rule, 1)
-	require.False(t, d.OK)
-	require.Equal(t, time.Hour, d.RetryAfter) // The bucket is what denies, not the day
-}
-
 // Fails if Allow stops debiting bucket tokens; weighted concurrent calls must share one burst.
 func TestService_Allow_ConcurrentBucketOnly(t *testing.T) {
 	s := newTestService(t)
@@ -449,52 +441,7 @@ func TestService_Allow_ConcurrentBucketOnly(t *testing.T) {
 	close(start)
 	wg.Wait()
 	require.Equal(t, rule.Burst, admitted.Load())
-	require.Equal(t, admitted.Load(), s.Usage("hot").Count(rule.Kind))
 	require.Zero(t, s.Tokens("hot", rule))
-}
-
-// Fails if ResetUsage also clears buckets; a reset racing with publishes grants only one new daily allowance.
-func TestService_ResetUsage_ConcurrentAllow(t *testing.T) {
-	for round := 0; round < 20; round++ {
-		s := newTestService(t)
-		rule := Rule{
-			Kind:  KindMessages,
-			Burst: 81,
-			Daily: 40,
-		}
-		require.True(t, s.Allow("hot", rule, 40).OK)
-		start := make(chan struct{})
-		var wg sync.WaitGroup
-		var admitted atomic.Int64
-		for g := 0; g < 16; g++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				<-start
-				for i := 0; i < 40; i++ {
-					if s.Allow("hot", rule, 1).OK {
-						admitted.Add(1)
-					}
-				}
-			}()
-		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-start
-			s.ResetUsage()
-		}()
-		close(start)
-		wg.Wait()
-		for i := 0; i < 40; i++ {
-			if s.Allow("hot", rule, 1).OK {
-				admitted.Add(1)
-			}
-		}
-		require.Equal(t, int64(40), admitted.Load())
-		require.Equal(t, admitted.Load(), s.Usage("hot").Count(rule.Kind))
-		require.Equal(t, int64(1), s.Tokens("hot", rule))
-	}
 }
 
 // Fails if Allow no longer refreshes seen; pruning must retain an active exhausted key while deleting idle keys.
@@ -536,34 +483,7 @@ func TestService_Prune_ConcurrentAllow(t *testing.T) {
 	close(start)
 	wg.Wait()
 	require.Zero(t, admitted.Load())
-	require.Equal(t, int64(1), s.Usage("hot").Count(rule.Kind))
 	require.Equal(t, 1, s.Size())
-}
-
-// Fails if Seed overwrites existing entries, including a key known only through another kind or a daily reset.
-func TestService_Seed_ConcurrentKnownKey(t *testing.T) {
-	s := newTestService(t)
-	require.True(t, s.Allow("hot", Rule{Kind: KindRequests}, 1).OK)
-	s.ResetUsage()
-	var usage Usage
-	usage.Set(KindMessages, 9999)
-	start := make(chan struct{})
-	var wg sync.WaitGroup
-	for g := 0; g < 16; g++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			<-start
-			for i := 0; i < 100; i++ {
-				s.Seed("hot", usage)
-				s.Allow("hot", Rule{Kind: KindMessages}, 1)
-			}
-		}()
-	}
-	close(start)
-	wg.Wait()
-	require.Equal(t, int64(1600), s.Usage("hot").Count(KindMessages))
-	require.Zero(t, s.Usage("hot").Count(KindRequests))
 }
 
 // Fails if refill is disabled; nanosecond and century intervals must earn exactly one token per interval.
@@ -607,4 +527,53 @@ func TestService_Allow_ClockGoingBackDoesNotCharge(t *testing.T) {
 	require.False(t, s.Allow("k", rule, 1).OK)
 	clock.advance(time.Second)
 	require.True(t, s.Allow("k", rule, 1).OK)
+}
+
+func TestService_PeriodRollover(t *testing.T) {
+	// Each key's daily counts start over at the end of its own 24h period, lazily on the next
+	// use, while its buckets keep their tokens: a rollover never hands back a bucket
+	s, clock := newTestServiceWithClock(t) // Noon UTC; "k" resets at 03:48:26 UTC, "ip:1.2.3.4" at 17:14:44 UTC
+	rule := Rule{
+		Kind:   KindEmails,
+		Burst:  3,
+		Refill: time.Hour,
+		Daily:  3,
+	}
+	require.True(t, s.Allow("k", rule, 3).OK)
+	require.True(t, s.Allow("ip:1.2.3.4", rule, 3).OK)
+	clock.advance(5*time.Hour + 14*time.Minute + 44*time.Second) // 17:14:44 UTC, both buckets full again
+	require.Equal(t, int64(3), s.Usage("k").Count(KindEmails))
+	require.Equal(t, int64(0), s.Usage("ip:1.2.3.4").Count(KindEmails))
+	require.True(t, s.Allow("ip:1.2.3.4", rule, 3).OK)
+	d := s.Allow("k", rule, 1)
+	require.False(t, d.OK)
+	require.Equal(t, 10*time.Hour+33*time.Minute+42*time.Second, d.RetryAfter) // Until 03:48:26 UTC
+	clock.advance(d.RetryAfter)
+	require.Equal(t, int64(0), s.Usage("k").Count(KindEmails))
+	require.Equal(t, int64(3), s.Usage("ip:1.2.3.4").Count(KindEmails))
+
+	// The bucket does not refill at the rollover
+	require.True(t, s.Allow("k", rule, 3).OK)
+	d = s.Allow("k", rule, 1)
+	require.False(t, d.OK)
+	require.Equal(t, time.Hour, d.RetryAfter)
+	require.Equal(t, int64(3), s.Usage("k").Count(KindEmails))
+}
+
+func TestService_ResetAt(t *testing.T) {
+	s, clock := newTestServiceWithClock(t) // Noon UTC
+	require.Equal(t, time.Date(2026, 10, 26, 3, 48, 26, 0, time.UTC), s.ResetAt("k"))
+	require.Equal(t, time.Date(2026, 10, 25, 17, 14, 44, 0, time.UTC), s.ResetAt("ip:1.2.3.4"))
+	clock.advance(6 * time.Hour) // 18:00 UTC
+	require.Equal(t, time.Date(2026, 10, 26, 17, 14, 44, 0, time.UTC), s.ResetAt("ip:1.2.3.4"))
+
+	// Retry-After of a daily cap points at the same time
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 1,
+	}
+	require.True(t, s.Allow("k", rule, 1).OK)
+	d := s.Allow("k", rule, 1)
+	require.False(t, d.OK)
+	require.Equal(t, s.ResetAt("k").Sub(clock.now()), d.RetryAfter)
 }

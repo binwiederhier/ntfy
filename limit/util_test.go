@@ -20,17 +20,6 @@ func TestShardIndex(t *testing.T) {
 	require.Greater(t, len(seen), 3) // Spreads
 }
 
-func TestUntilReset(t *testing.T) {
-	resetTime := time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC) // Midnight UTC
-	now := time.Date(2026, 10, 25, 23, 59, 0, 0, time.UTC)
-	require.Equal(t, time.Minute, untilReset(now, resetTime))
-	now = time.Date(2026, 10, 25, 0, 0, 0, 0, time.UTC)
-	require.Equal(t, 24*time.Hour, untilReset(now, resetTime))
-	resetTime = time.Date(0, 0, 0, 6, 30, 0, 0, time.UTC)
-	now = time.Date(2026, 10, 25, 6, 0, 0, 0, time.UTC)
-	require.Equal(t, 30*time.Minute, untilReset(now, resetTime))
-}
-
 func TestKeyOffset_StableAndSpread(t *testing.T) {
 	// Pinned: every node and every restart must agree on a key's offset (FNV-1a 64, unseeded)
 	require.Equal(t, 62084*time.Second, keyOffset("ip:1.2.3.4")) // 17:14:44 UTC

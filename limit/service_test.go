@@ -841,3 +841,30 @@ func TestService_Persist_LeftoverAfterRollover(t *testing.T) {
 		}, usageRowOf(t, store, "b"))
 	})
 }
+
+func TestService_Allow_DenyRacesRollover(t *testing.T) {
+	// A daily denial computes its retry time from the counter it decided on, while other calls
+	// roll the counter over; run with -race
+	var ticks atomic.Int64
+	start := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	s := newService(&Config{}, func() time.Time {
+		return start.Add(time.Duration(ticks.Add(1)) * time.Hour)
+	})
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 1,
+	}
+	var wg sync.WaitGroup
+	for g := 0; g < 8; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 3000; i++ {
+				if d := s.Allow("k", rule, 1); !d.OK {
+					require.Greater(t, d.RetryAfter, time.Duration(0))
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}

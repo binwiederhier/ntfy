@@ -125,11 +125,12 @@ func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 	c := cs.counterNoLock(key, start)
 	total := c.base[i] + c.unflushed[i]
 	if rule.Daily > 0 && total+n > rule.Daily {
+		end := time.Unix(c.periodStart+daySeconds, 0) // Read under the lock: another call may roll the counter over
 		cs.mu.Unlock()
 		if rule.Burst > 0 {
 			s.refundTokens(key, rule.Kind, n)
 		}
-		return Decision{RetryAfter: time.Unix(c.periodStart+daySeconds, 0).Sub(dbNow)}
+		return Decision{RetryAfter: end.Sub(dbNow)}
 	}
 	c.unflushed[i] += n
 	if rule.Threshold == 0 || total+n >= rule.Threshold {

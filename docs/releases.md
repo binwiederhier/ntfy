@@ -2297,7 +2297,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Behavior changes:**
 
-* The daily reset job is gone: the usage day starts over at midnight UTC by itself, and the `stats_*` columns of the user table are no longer written or read (the account page reads the usage table)
+* The daily reset job is gone, and the `stats_*` columns of the user table are no longer written or read (the account page reads the usage table)
+* Daily limits (messages, e-mails, phone calls) now reset on a rolling 24-hour window per account or IP address instead of for everyone at once at midnight UTC: each visitor's window starts at its own time of day, which spreads the resets (and the traffic of visitors waiting for them) over the day. The account page and the `/v1/account` API (`stats.reset_at`) show when the visitor's counts reset
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

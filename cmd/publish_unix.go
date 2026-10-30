@@ -2,9 +2,15 @@
 
 package cmd
 
-import "syscall"
+import (
+	"errors"
+	"syscall"
+)
 
 func processExists(pid int) bool {
 	err := syscall.Kill(pid, syscall.Signal(0))
-	return err == nil
+	if err == nil {
+		return true
+	}
+	return errors.Is(err, syscall.EPERM)
 }

@@ -60,8 +60,7 @@ type Server struct {
 	httpProfileServer   *http.Server
 	httpClusterServer   *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	unixListener        net.Listener
-	adminSocketServer   *http.Server // Serves the admin API on the local admin socket, see handleAdminSocket
-	adminSocketListener net.Listener
+	adminSocketListener net.Listener // Serves the admin API on the local admin socket, see handleAdminSocket
 	smtpServer          *smtp.Server
 	smtpServerBackend   *smtpBackend
 	mailer              mail.Sender
@@ -503,17 +502,26 @@ func (s *Server) Run() error {
 		}()
 	}
 	if s.config.ListenAdminUnix != "" && s.userManager != nil { // Without auth, there is nothing to administer
-		if listener, err := s.listenAdminSocket(); err != nil {
-			// Not fatal, unlike the other listeners: the CLI falls back to writing to the database (deprecated)
-			log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated and stops working after 2026-12-30, see https://ntfy.sh/docs/deprecations/", s.config.ListenAdminUnix)
-		} else {
+		go func() {
+			var err error
+			s.mu.Lock()
+			if s.stopped.Load() {
+				s.mu.Unlock()
+				return // Nobody would close this listener anymore
+			}
+			s.adminSocketListener, err = s.listenAdminSocket()
+			if err != nil {
+				s.mu.Unlock()
+				// Not fatal, unlike the other listeners: the CLI falls back to writing to the database (deprecated)
+				log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated and stops working after 2026-12-30, see https://ntfy.sh/docs/deprecations/", s.config.ListenAdminUnix)
+				return
+			}
+			defer s.adminSocketListener.Close()
+			s.mu.Unlock()
 			log.Tag(tagStartup).Info("Admin socket listening on %s", s.config.ListenAdminUnix)
-			s.adminSocketListener = listener
-			s.adminSocketServer = &http.Server{Handler: http.HandlerFunc(s.handleAdminSocket)}
-			go func() {
-				errChan <- s.adminSocketServer.Serve(listener)
-			}()
-		}
+			httpServer := &http.Server{Handler: http.HandlerFunc(s.handleAdminSocket)}
+			errChan <- httpServer.Serve(s.adminSocketListener)
+		}()
 	}
 	if s.config.MetricsListenHTTP != "" {
 		s.httpMetricsServer = &http.Server{Addr: s.config.MetricsListenHTTP, Handler: promhttp.Handler()}
@@ -591,9 +599,8 @@ func (s *Server) stop() {
 	if s.unixListener != nil {
 		s.unixListener.Close()
 	}
-	if s.adminSocketServer != nil {
-		s.adminSocketServer.Close()
-		s.adminSocketListener.Close() // Serve may not have picked it up yet; closing it removes the socket file
+	if s.adminSocketListener != nil {
+		s.adminSocketListener.Close()
 	}
 	if s.smtpServer != nil {
 		s.smtpServer.Close()

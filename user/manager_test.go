@@ -1887,6 +1887,49 @@ func TestMigrationFrom6Postgres(t *testing.T) {
 	require.Equal(t, dbtest.PostgresSchema(t, freshDB), dbtest.PostgresSchema(t, testDB))
 }
 
+func TestMigrationFrom9ZeroesStatsSqlite(t *testing.T) {
+	// The usage table replaces the stats_* columns (9 -> 10): they stay, unused, and are zeroed
+	// so that nothing reads stale numbers from them
+	filename := filepath.Join(t.TempDir(), "user.db")
+	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
+	_, err := testDB(a).Exec(`
+		DROP TABLE usage;
+		UPDATE user SET stats_messages = 5, stats_emails = 2, stats_calls = 1;
+		UPDATE schemaVersion SET version = 9 WHERE id = 1;
+	`)
+	require.Nil(t, err)
+	require.Nil(t, a.Close())
+	a = newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	defer a.Close()
+	var messages, emails, calls int64
+	require.Nil(t, testDB(a).QueryRow(`SELECT stats_messages, stats_emails, stats_calls FROM user WHERE user = 'phil'`).Scan(&messages, &emails, &calls))
+	require.Equal(t, []int64{0, 0, 0}, []int64{messages, emails, calls})
+}
+
+func TestMigrationFrom9ZeroesStatsPostgres(t *testing.T) {
+	testDB := dbtest.CreateTestPostgres(t)
+	conf := &Config{
+		DefaultAccess:       PermissionDenyAll,
+		BcryptCost:          bcrypt.MinCost,
+		QueueWriterInterval: DefaultUserStatsQueueWriterInterval,
+	}
+	a, err := NewPostgresManager(testDB, conf)
+	require.Nil(t, err)
+	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
+	_, err = testDB.Exec(`
+		DROP TABLE usage;
+		UPDATE "user" SET stats_messages = 5, stats_emails = 2, stats_calls = 1;
+		UPDATE schema_version SET version = 9 WHERE store = 'user';
+	`)
+	require.Nil(t, err)
+	_, err = NewPostgresManager(testDB, conf)
+	require.Nil(t, err)
+	var messages, emails, calls int64
+	require.Nil(t, testDB.QueryRow(`SELECT stats_messages, stats_emails, stats_calls FROM "user" WHERE user_name = 'phil'`).Scan(&messages, &emails, &calls))
+	require.Equal(t, []int64{0, 0, 0}, []int64{messages, emails, calls})
+}
+
 // checkMigratedSqliteSchema verifies that a migrated database is structurally identical to a
 // freshly created one (this pins, among other things, that the foreign keys of the tables
 // rebuilt in migration 5 -> 6 still point at "user", not at a dropped "user_old"), and that

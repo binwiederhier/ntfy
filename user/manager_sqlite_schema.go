@@ -380,6 +380,12 @@ const (
 		CREATE INDEX IF NOT EXISTS idx_usage_updated_at ON usage (updated_at);
 	`
 
+	// The usage table replaces the stats_* columns, which stay in the schema but are zeroed, so
+	// nothing reads their stale numbers
+	sqliteMigrate9To10UpdateQueries = sqliteCreateUsageTableQuery + `
+		UPDATE user SET stats_messages = 0, stats_emails = 0, stats_calls = 0;
+	`
+
 	// The topic table holds what a topic has to remember while it is not in memory: who a
 	// UnifiedPush topic bills to (its rate visitor), and when it was created, last subscribed to and
 	// last published on (see package limit, topics.go)
@@ -412,7 +418,7 @@ var (
 		{From: 6, To: 7}:   schema.Query(sqliteMigrate6To7UpdateQueries),
 		{From: 7, To: 8}:   schema.Query(sqliteMigrate7To8UpdateQueries),
 		{From: 8, To: 9}:   schema.Query(sqliteMigrate8To9UpdateQueries),
-		{From: 9, To: 10}:  schema.Query(sqliteCreateUsageTableQuery), // The usage table (see package limit)
+		{From: 9, To: 10}:  schema.Query(sqliteMigrate9To10UpdateQueries),
 		{From: 10, To: 11}: schema.Query(sqliteCreateTopicTableQuery), // The topic table (see package limit)
 	}
 )

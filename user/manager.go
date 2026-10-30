@@ -1959,6 +1959,12 @@ func (a *Manager) maybeProvisionTokens(tx *sql.Tx, provisionUsernames []string, 
 	return nil
 }
 
+// DB returns the manager's database. It also holds the usage table, which package limit reads and
+// writes (see the usage table in the schema files).
+func (a *Manager) DB() *db.DB {
+	return a.db
+}
+
 // Close stops background goroutines and closes the underlying database.
 func (a *Manager) Close() error {
 	select {

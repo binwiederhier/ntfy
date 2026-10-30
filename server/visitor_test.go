@@ -194,9 +194,10 @@ func TestVisitor_EmailDailyLimitCapsBelowBurst(t *testing.T) {
 // package limit; these confirm the server wiring.
 
 func TestVisitor_UsageSurvivesRestart(t *testing.T) {
-	// Case 1: a graceful restart keeps the quota; a crash loses at most what was not flushed
+	// Case 1: a graceful restart keeps the quota; a crash loses at most what was not flushed. On
+	// SQLite, the usage table lives in the user database (auth-file).
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorMessageDailyLimit = 3
 		c.UsageFlushInterval = time.Hour // Nothing is flushed but by Stop
 		s := newTestServer(t, c)
@@ -236,7 +237,7 @@ func TestVisitor_EvictedBelowThresholdResumesAtZero(t *testing.T) {
 	// Case 3: a key without a row (below 1% of the quota) is evicted after a few minutes and
 	// comes back at zero, as designed
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorMessageDailyLimit = 1000 // Threshold 10
 		s := newTestServer(t, c)
 		for i := 0; i < 2; i++ {
@@ -253,7 +254,7 @@ func TestVisitor_EvictedBelowThresholdResumesAtZero(t *testing.T) {
 func TestVisitor_EvictedPastThresholdContinues(t *testing.T) {
 	// Case 4: a key with a row comes back with its count
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorMessageDailyLimit = 100 // Threshold 1: every message counts
 		s := newTestServer(t, c)
 		for i := 0; i < 5; i++ {
@@ -286,7 +287,7 @@ func TestVisitor_AccountUsageFromNodeThatNeverSawTheKey(t *testing.T) {
 		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindMessages}, 42).OK)
 		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindEmails}, 7).OK)
 		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindCalls}, 1).OK)
-		require.Nil(t, other.Close())
+		other.Close()
 		rr := request(t, s, "GET", "/v1/account", "", map[string]string{"Authorization": util.BasicAuth("phil", "phil")})
 		require.Equal(t, 200, rr.Code)
 		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
@@ -340,7 +341,7 @@ func TestVisitor_SlowUsageLoadDoesNotHoldTheVisitorLock(t *testing.T) {
 	// then waited too, and with it every other request's visitor lookup. Visitors have no lock
 	// since they are per request; this still pins that the read holds no lock Keepalive needs.
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		s := newTestServer(t, c)
 		release := lockUsageTable(t, s)
 		v := s.visitor(netip.MustParseAddr("7.7.7.7"), nil)
@@ -364,7 +365,7 @@ func lockUsageTable(t *testing.T, s *Server) func() {
 		d = s.db.Primary()
 	} else {
 		var err error
-		d, err = sql.Open("sqlite3", s.config.UsageFile)
+		d, err = sql.Open("sqlite3", s.config.AuthFile) // The usage table is in the user database
 		require.Nil(t, err)
 		t.Cleanup(func() { d.Close() })
 		statements = []string{`BEGIN EXCLUSIVE`}

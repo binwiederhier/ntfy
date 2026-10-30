@@ -372,9 +372,9 @@ func (s *Service) Size() int {
 	return size
 }
 
-// Close stops the loops, writes what is unflushed, and closes the store
-func (s *Service) Close() error {
-	var err error
+// Close stops the loops and writes what is unflushed. The store's database is its owner's to close
+// (the user manager's, or the shared pool), after this.
+func (s *Service) Close() {
 	s.closeOnce.Do(func() {
 		close(s.closeChan)
 		s.wg.Wait()
@@ -385,9 +385,7 @@ func (s *Service) Close() error {
 		ctx, cancel := context.WithTimeout(context.Background(), flushTimeout)
 		defer cancel()
 		s.write(ctx, store)
-		err = store.Close()
 	})
-	return err
 }
 
 // runFlushLoop writes and reads back usage every FlushInterval until Close

@@ -123,14 +123,31 @@ const (
 	`
 )
 
+// The usage table holds the visitors' daily usage counts (see package limit, which reads and writes
+// it). It lives here so it shares the user schema's migrations; in a cluster, every node uses it.
+const (
+	postgresCreateUsageTableQuery = `
+		CREATE TABLE IF NOT EXISTS usage (
+			key TEXT NOT NULL,
+			day TEXT NOT NULL,
+			kind TEXT NOT NULL,
+			count BIGINT NOT NULL DEFAULT 0,
+			updated_at BIGINT NOT NULL,
+			PRIMARY KEY (key, day, kind)
+		);
+		CREATE INDEX IF NOT EXISTS idx_usage_day_updated_at ON usage (day, updated_at);
+	`
+)
+
 var (
-	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries)
+	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries + postgresCreateUsageTableQuery)
 
 	// postgresMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
 	postgresMigrations = schema.Migrations{
-		{From: 6, To: 7}: schema.Query(postgresMigrate6To7UpdateQueries),
-		{From: 7, To: 8}: schema.Query(postgresMigrate7To8UpdateQueries),
-		{From: 8, To: 9}: schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
+		{From: 6, To: 7}:  schema.Query(postgresMigrate6To7UpdateQueries),
+		{From: 7, To: 8}:  schema.Query(postgresMigrate7To8UpdateQueries),
+		{From: 8, To: 9}:  schema.Nop,                                  // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
+		{From: 9, To: 10}: schema.Query(postgresCreateUsageTableQuery), // The usage table (see package limit)
 	}
 )

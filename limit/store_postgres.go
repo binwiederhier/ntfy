@@ -20,26 +20,9 @@ const (
 	postgresPruneQuery = `DELETE FROM usage WHERE day < $1`
 )
 
-// Schema
-var (
-	postgresCreateTables = schema.AsMigrateFunc(`
-		CREATE TABLE IF NOT EXISTS usage (
-			key TEXT NOT NULL,
-			day TEXT NOT NULL,
-			kind TEXT NOT NULL,
-			count BIGINT NOT NULL DEFAULT 0,
-			updated_at BIGINT NOT NULL,
-			PRIMARY KEY (key, day, kind)
-		);
-		CREATE INDEX IF NOT EXISTS idx_usage_day_updated_at ON usage (day, updated_at);
-	`)
-)
-
-// NewPostgresStore sets up the usage table on the shared pool
-func NewPostgresStore(d *db.DB) (*Store, error) {
-	if err := schema.Migrate(d.Primary(), schema.Postgres, schemaStore, postgresCreateTables, nil); err != nil {
-		return nil, err
-	}
+// NewPostgresStore returns the store on the shared pool; the usage table is the user schema's (see
+// package user, which creates and migrates it)
+func NewPostgresStore(d *db.DB) *Store {
 	return &Store{
 		db:      d,
 		dialect: schema.Postgres,
@@ -50,5 +33,5 @@ func NewPostgresStore(d *db.DB) (*Store, error) {
 			upsert:      postgresUpsertQuery,
 			prune:       postgresPruneQuery,
 		},
-	}, nil
+	}
 }

@@ -1,9 +1,6 @@
 package limit
 
 import (
-	"database/sql"
-
-	_ "github.com/mattn/go-sqlite3" // SQLite driver
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
 )
@@ -18,32 +15,11 @@ const (
 	sqlitePruneQuery          = `DELETE FROM usage WHERE day < ?`
 )
 
-// Schema
-var (
-	sqliteCreateTables = schema.AsMigrateFunc(`
-		CREATE TABLE IF NOT EXISTS usage (
-			key TEXT NOT NULL,
-			day TEXT NOT NULL,
-			kind TEXT NOT NULL,
-			count INT NOT NULL DEFAULT 0,
-			updated_at INT NOT NULL,
-			PRIMARY KEY (key, day, kind)
-		);
-		CREATE INDEX IF NOT EXISTS idx_usage_day_updated_at ON usage (day, updated_at);
-	`)
-)
-
-// NewSQLiteStore opens (or creates) the usage database in the given file
-func NewSQLiteStore(filename string) (*Store, error) {
-	d, err := sql.Open("sqlite3", filename)
-	if err != nil {
-		return nil, err
-	}
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, nil); err != nil {
-		return nil, err
-	}
+// NewSQLiteStore returns the store on the user database (auth-file), which holds the usage table
+// (see package user, which creates and migrates it)
+func NewSQLiteStore(d *db.DB) *Store {
 	return &Store{
-		db:      db.New(&db.Host{DB: d}, nil),
+		db:      d,
 		dialect: schema.SQLite,
 		queries: queries{
 			selectClock:    sqliteSelectClockQuery,
@@ -54,6 +30,5 @@ func NewSQLiteStore(filename string) (*Store, error) {
 			upsertConflict: sqliteUpsertConflictQuery,
 			prune:          sqlitePruneQuery,
 		},
-		closer: d,
-	}, nil
+	}
 }

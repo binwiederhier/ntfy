@@ -235,10 +235,6 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	usageStore, err := createUsageStore(conf, pool)
-	if err != nil {
-		return nil, err
-	}
 	var wp *webpush.Store
 	if conf.WebPushPublicKey != "" {
 		if pool != nil {
@@ -305,12 +301,8 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		limiter: limit.New(&limit.Config{
-			ResetTime:     conf.VisitorStatsResetTime,
-			FlushInterval: conf.UsageFlushInterval,
-		}, usageStore),
-		stripe:  stripe,
-		streams: newStreamRegistry(),
+		stripe:          stripe,
+		streams:         newStreamRegistry(),
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager
@@ -355,6 +347,10 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
+	s.limiter = limit.New(&limit.Config{
+		ResetTime:     conf.VisitorStatsResetTime,
+		FlushInterval: conf.UsageFlushInterval,
+	}, createUsageStore(pool, userManager))
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.firebaseClient = firebaseClient
 	if pool != nil {
@@ -399,15 +395,16 @@ func (s *Server) dbPoolStats() []*metrics.DBPool {
 	return pools
 }
 
-// createUsageStore opens the usage table: on the shared pool if there is one, in the usage file
-// if one is configured, or not at all (usage is then counted in memory only, as before)
-func createUsageStore(conf *Config, pool *db.DB) (*limit.Store, error) {
+// createUsageStore returns the store of the usage table, which is part of the user database: the
+// shared pool on Postgres, the auth-file on SQLite. Without a user database, usage is counted in
+// memory only, as before.
+func createUsageStore(pool *db.DB, userManager *user.Manager) *limit.Store {
 	if pool != nil {
 		return limit.NewPostgresStore(pool)
-	} else if conf.UsageFile != "" {
-		return limit.NewSQLiteStore(conf.UsageFile)
+	} else if userManager != nil {
+		return limit.NewSQLiteStore(userManager.DB())
 	}
-	return nil, nil
+	return nil
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -602,9 +599,7 @@ func (s *Server) stop() {
 	if s.tail != nil {
 		s.tail.Close() // Before the databases close under it
 	}
-	if err := s.limiter.Close(); err != nil { // Writes what is unflushed, before the pool closes under it
-		log.Tag(tagStartup).Err(err).Warn("Closing the usage store failed")
-	}
+	s.limiter.Close() // Writes what is unflushed, before the databases close under it
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()

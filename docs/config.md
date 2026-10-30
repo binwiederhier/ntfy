@@ -410,7 +410,7 @@ This generator helps you configure your self-hosted ntfy instance. It's not full
 </div>
 
 ## Database options
-ntfy uses a database for storing messages ([message cache](#message-cache)), users and [access control](#access-control), and [web push](#web-push) subscriptions.
+ntfy uses a database for storing messages ([message cache](#message-cache)), users and [access control](#access-control) (which includes the visitors' daily usage counts, see [message limits](#message-limits)), and [web push](#web-push) subscriptions.
 You can choose between **SQLite** and **PostgreSQL** as the database backend.
 
 ### SQLite
@@ -1926,7 +1926,17 @@ For instance, if the request limit allows for 15,000 requests per day, and all o
 to publish messages, then that is the daily message limit.
 
 To limit the number of daily messages per visitor, you can set `visitor-message-daily-limit`. This defines the number 
-of messages a visitor can send in a day. This counter is reset every day at midnight (UTC).
+of messages a visitor can send in a day. The day is a rolling 24-hour period per visitor (per account, or per IP address
+for anonymous visitors), not the calendar day: each visitor's period starts at its own time of day, derived from the
+visitor, so not every count resets at once. The account page shows when a visitor's counts reset next.
+
+The daily counts (messages, e-mails and phone calls) are kept in the user database if `auth-file` (SQLite) or
+`database-url` (PostgreSQL) is set, so they survive a restart. With PostgreSQL, all ntfy servers sharing the database
+also share the counts: each server writes what it counted every 5 seconds and reads what the others counted, so a visitor
+gets one daily allowance in total, not one per server (it may overshoot by a few seconds of traffic). An anonymous
+visitor's message count is only written once it reaches 10% of its daily limit, so the many visitors that publish a
+few messages never touch the database; a restart forgets those few. Without a user database, the counts are kept in
+memory only and start over with every restart.
 
 ### Attachment limits
 Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 
@@ -1947,6 +1957,9 @@ are enabled):
 
 * `visitor-email-limit-burst` is the initial bucket of emails each visitor has. This defaults to 16.
 * `visitor-email-limit-replenish` is the rate at which the bucket is refilled (one email per x). Defaults to 1h.
+
+Visitors without a tier can send at most 24h / `visitor-email-limit-replenish` e-mails per day (24 by default), a daily
+limit that, like the message limit, survives restarts and is shared between servers if a user database is configured.
 
 ### Topic creation limits
 To mitigate topic-enumeration / squatting attacks (where a single source pokes thousands of guessable
@@ -2559,7 +2572,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size*                                              | 500M              | Rate limiting: Total daily traffic limit per visitor, covering attachment downloads/uploads and messages replayed from the cache by poll requests. This is to protect your bandwidth costs from exploding.                              |
 | `visitor-email-limit-burst`                | `NTFY_VISITOR_EMAIL_LIMIT_BURST`                | *number*                                            | 16                | Rate limiting:Initial limit of e-mails per visitor                                                                                                                                                                                      |
 | `visitor-email-limit-replenish`            | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH`            | *duration*                                          | 1h                | Rate limiting: Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled                                                                                                                                |
-| `visitor-message-daily-limit`              | `NTFY_VISITOR_MESSAGE_DAILY_LIMIT`              | *number*                                            | -                 | Rate limiting: Allowed number of messages per day per visitor, reset every day at midnight (UTC). By default, this value is unset.                                                                                                      |
+| `visitor-message-daily-limit`              | `NTFY_VISITOR_MESSAGE_DAILY_LIMIT`              | *number*                                            | -                 | Rate limiting: Allowed number of messages per day per visitor, reset every 24 hours at the visitor's own time of day. By default, this value is unset.                                                                                  |
 | `visitor-request-limit-burst`              | `NTFY_VISITOR_REQUEST_LIMIT_BURST`              | *number*                                            | 60                | Rate limiting: Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has                                                                                                   |
 | `visitor-request-limit-replenish`          | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH`          | *duration*                                          | 5s                | Rate limiting: Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled                                                                                                                              |
 | `visitor-request-limit-exempt-hosts`       | `NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS`       | *comma-separated host/IP/CIDR list*                 | -                 | Rate limiting: List of hostnames and IPs to be exempt from request rate limiting                                                                                                                                                        |

@@ -2288,6 +2288,18 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.36.0 (UNRELEASED)
+
+**Features:**
+
+* Daily limits (messages, e-mails, phone calls) are kept in the user database (`auth-file` for SQLite, or `database-url` for PostgreSQL) and survive restarts; with PostgreSQL, all servers share them, so a visitor gets one daily allowance in total, not one per server (see [message limits](config.md#message-limits))
+
+**Behavior changes:**
+
+* Daily limits now reset on a rolling 24-hour period per account or IP address instead of for everyone at midnight UTC: each visitor's period starts at its own time of day, which spreads the resets over the day. The account page and the `/v1/account` API (`stats.reset_at`) show when the visitor's counts reset
+* Visitors without a tier have a daily e-mail limit again (24h / `visitor-email-limit-replenish`), now that it is shared between servers and survives restarts
+* The daily reset job is gone; the `stats_*` columns of the user table are zeroed by the upgrade and no longer read or written
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

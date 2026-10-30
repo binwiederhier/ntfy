@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1345,6 +1346,7 @@ func TestAdminSocket_StaleSocketFile(t *testing.T) {
 	require.Nil(t, os.WriteFile(conf.ListenAdminUnix, []byte("stale"), 0600))
 	s := newTestServer(t, conf)
 	runTestServer(t, s)
+	waitFor(t, func() bool { return adminSocketListening(s) })
 	resp, err := adminSocketClient(conf.ListenAdminUnix).Get("http://ntfy/v1/users")
 	require.Nil(t, err)
 	require.Equal(t, 200, resp.StatusCode)
@@ -1358,11 +1360,11 @@ func TestAdminSocket_AnotherServerListening(t *testing.T) {
 	require.Nil(t, err)
 	defer other.Close()
 	s := newTestServer(t, conf)
-	output := captureLog(t, func() {
+	output := captureLogUntil(t, "another server is listening", func() {
 		runTestServer(t, s)
 	})
 	require.Contains(t, output, "another server is listening")
-	require.Nil(t, s.adminSocketServer)
+	require.False(t, adminSocketListening(s))
 
 	// The other listener is untouched
 	_, err = os.Stat(conf.ListenAdminUnix)
@@ -1379,13 +1381,12 @@ func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t, "")
 	conf.ListenAdminUnix = filepath.Join(dir, "sub", "admin.sock")
 	s := newTestServer(t, conf)
-	output := captureLog(t, func() {
+	output := captureLogUntil(t, "not available", func() {
 		runTestServer(t, s)
 	})
 	require.Contains(t, output, "Admin socket")
-	require.Contains(t, output, "not available")
 	require.Contains(t, output, "which is deprecated and stops working after 2026-12-30, see https://ntfy.sh/docs/deprecations/")
-	require.Nil(t, s.adminSocketServer)
+	require.False(t, adminSocketListening(s))
 }
 
 func TestAdminSocket_DisabledWithoutPathOrAuth(t *testing.T) {
@@ -1394,7 +1395,7 @@ func TestAdminSocket_DisabledWithoutPathOrAuth(t *testing.T) {
 	output := captureLog(t, func() {
 		runTestServer(t, s)
 	})
-	require.Nil(t, s.adminSocketServer)
+	require.False(t, adminSocketListening(s)) // Run does not even try, so there is nothing to wait for
 	require.NotContains(t, output, "Admin socket")
 
 	// No auth configured: nothing to administer, so no listener either
@@ -1402,7 +1403,7 @@ func TestAdminSocket_DisabledWithoutPathOrAuth(t *testing.T) {
 	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
 	s = newTestServer(t, conf)
 	runTestServer(t, s)
-	require.Nil(t, s.adminSocketServer)
+	require.False(t, adminSocketListening(s))
 	_, err := os.Stat(conf.ListenAdminUnix)
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
@@ -1467,8 +1468,15 @@ func newTestServerWithAdminSocket(t *testing.T, conf *Config) (*Server, string) 
 	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
 	s := newTestServer(t, conf)
 	runTestServer(t, s)
-	require.NotNil(t, s.adminSocketServer)
+	waitFor(t, func() bool { return adminSocketListening(s) })
 	return s, conf.ListenAdminUnix
+}
+
+// adminSocketListening reports whether Run's admin socket goroutine is listening
+func adminSocketListening(s *Server) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.adminSocketListener != nil
 }
 
 // runTestServer runs the server in the background without network listeners, and waits until
@@ -1504,6 +1512,39 @@ func shortTempDir(t *testing.T) string {
 }
 
 // captureLog runs f and returns what was logged meanwhile (at info level or above)
+// captureLogUntil is captureLog for log lines written by goroutines: it waits until the output
+// contains until
+func captureLogUntil(t *testing.T, until string, f func()) string {
+	buf := &syncBuffer{}
+	log.SetOutput(buf)
+	log.SetLevel(log.InfoLevel)
+	defer func() {
+		log.SetLevel(log.ErrorLevel)                  // As in TestMain
+		log.SetOutput(struct{ io.Writer }{os.Stderr}) // Wrapped, so the log package does not treat stderr as a log file
+	}()
+	f()
+	waitFor(t, func() bool { return strings.Contains(buf.String(), until) })
+	return buf.String()
+}
+
+// syncBuffer is a bytes.Buffer that the log package and a test can use at the same time
+type syncBuffer struct {
+	buf bytes.Buffer
+	mu  sync.Mutex
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 func captureLog(t *testing.T, f func()) string {
 	var buf bytes.Buffer
 	log.SetOutput(&buf)

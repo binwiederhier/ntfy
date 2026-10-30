@@ -23,8 +23,7 @@ const (
 		INSERT INTO topic (id, created_at, last_subscribed_at, last_subscriber_key) VALUES ($1, $2, $3, $4)
 		ON CONFLICT (id) DO UPDATE SET
 			last_subscribed_at = EXCLUDED.last_subscribed_at,
-			last_subscriber_key = EXCLUDED.last_subscriber_key,
-			rate_visitor_seen_at = CASE WHEN topic.rate_visitor_key = EXCLUDED.last_subscriber_key THEN EXCLUDED.last_subscribed_at ELSE topic.rate_visitor_seen_at END
+			last_subscriber_key = EXCLUDED.last_subscriber_key
 	`
 	postgresUpsertTopicPublishQuery = `
 		INSERT INTO topic (id, created_at, last_published_at, last_publisher_key) VALUES ($1, $2, $3, $4)

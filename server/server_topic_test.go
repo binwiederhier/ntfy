@@ -101,6 +101,25 @@ func TestServer_MatrixGateway_RejectsFromTopicTable(t *testing.T) {
 	})
 }
 
+func TestServer_UnifiedPush_StreamOnOtherNodeKeepsRateVisitor(t *testing.T) {
+	// The stream-count model across nodes: the subscriber's stream is open on another node, which
+	// records the topic's subscriber every few minutes; that keeps the rate visitor live here past
+	// a day, whoever's stream it is (as an open stream does on one node)
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.VisitorSubscriberRateLimiting = true
+		s := newTestServer(t, c)
+		other := newOtherNodeLimiter(t, s)
+		require.Nil(t, other.SetTopicRateVisitor("upJJJJJJJJJJJJ", "ip:1.2.3.4", ""))
+		backdateTopic(t, s, "upJJJJJJJJJJJJ", 25*time.Hour)
+		require.Nil(t, other.RecordTopicSubscriber("upJJJJJJJJJJJJ", "ip:5.6.7.8")) // A keepalive over there
+		other.Close()
+		rr := request(t, s, "POST", "/upJJJJJJJJJJJJ?up=1", "some message", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Usage().Count(limit.KindMessages))
+	})
+}
+
 // evictTopic removes the topic from memory, as the manager does with an idle one
 func evictTopic(s *Server, id string) {
 	s.mu.Lock()

@@ -49,18 +49,16 @@ func TestService_Topics_RateVisitor_SetReplaceAndExpire(t *testing.T) {
 		require.Equal(t, "user:u_abc", key)
 		require.Equal(t, "u_abc", uid)
 
-		// The assignment expires when the subscriber has not been seen for topicRateVisitorTTL; a
-		// keepalive of that subscriber (RecordTopicSubscriber with its key) extends it, one of
-		// another subscriber does not
+		// The assignment stays live while any subscriber of the topic shows up (as on one node,
+		// where any open stream keeps it, see server/topic.go), whoever it is, and expires
+		// topicRateVisitorTTL after the last one
 		clock.advance(topicRateVisitorTTL - time.Hour)
-		require.Nil(t, s.RecordTopicSubscriber("up123456789012", "user:u_abc"))
+		require.Nil(t, s.RecordTopicSubscriber("up123456789012", "ip:9.9.9.9"))
 		clock.advance(2 * time.Hour)
 		key, _, err = s.TopicRateVisitor("up123456789012")
 		require.Nil(t, err)
 		require.Equal(t, "user:u_abc", key)
-		clock.advance(topicRateVisitorTTL - time.Hour)
-		require.Nil(t, s.RecordTopicSubscriber("up123456789012", "ip:9.9.9.9"))
-		clock.advance(2 * time.Hour)
+		clock.advance(topicRateVisitorTTL)
 		_, _, err = s.TopicRateVisitor("up123456789012")
 		require.ErrorIs(t, err, ErrTopicNotFound)
 		info, err := s.Topic("up123456789012")

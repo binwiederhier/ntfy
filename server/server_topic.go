@@ -141,7 +141,7 @@ func (s *Server) maybeLoadRateVisitor(t *topic) {
 		log.Tag(tagTopic).Err(err).Debug("Cannot restore rate visitor %s of topic %s", info.RateVisitorKey, t.ID)
 		return
 	}
-	t.SetRateVisitorSeen(v, info.RateVisitorSeenAt)
+	t.SetRateVisitorSeen(v, info.RateVisitorSeen())
 }
 
 // topicIdleSince returns when the topic last showed a sign of a subscriber: from the topic table

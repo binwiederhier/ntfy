@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	// topicRateVisitorTTL is how long after the rate visitor's last observed activity (its
-	// subscription or a keepalive of it) the assignment remains valid. A connected subscriber
-	// keeps it alive indefinitely; only departed subscribers expire.
+	// topicRateVisitorTTL is how long after the topic's last sign of a subscriber (the rate
+	// visitor's subscription, or any subscriber's, see RecordTopicSubscriber) the assignment
+	// remains valid, as on one node (see visitorExpungeAfter in package server): an open stream
+	// anywhere keeps it alive, since its node records it every few minutes.
 	topicRateVisitorTTL = 24 * time.Hour
 
 	// topicRetention is how long rows without any recorded activity are kept before PruneTopics
@@ -47,7 +48,7 @@ type TopicInfo struct {
 	LastPublisherKey  string
 	RateVisitorKey    string // Empty if no rate visitor was ever assigned
 	RateVisitorUID    string // User ID for user-keyed rate visitors, empty otherwise
-	RateVisitorSeenAt time.Time
+	RateVisitorSeenAt time.Time // When the rate visitor was assigned
 }
 
 // LastActivity returns the latest of the topic's recorded times
@@ -56,13 +57,19 @@ func (i *TopicInfo) LastActivity() time.Time {
 }
 
 // RateVisitorLive reports whether the topic's rate visitor assignment is still valid at now:
-// there is one, and it was seen within topicRateVisitorTTL
+// there is one, and the topic showed a subscriber within topicRateVisitorTTL
 func (i *TopicInfo) RateVisitorLive(now time.Time) bool {
-	return i.RateVisitorKey != "" && now.Sub(i.RateVisitorSeenAt) <= topicRateVisitorTTL
+	return i.RateVisitorKey != "" && now.Sub(i.RateVisitorSeen()) <= topicRateVisitorTTL
+}
+
+// RateVisitorSeen returns when the rate visitor was last vouched for: its assignment, or the
+// topic's last subscriber, whoever it was
+func (i *TopicInfo) RateVisitorSeen() time.Time {
+	return latest(i.RateVisitorSeenAt, i.LastSubscribedAt)
 }
 
 // LastSubscriberActivity returns when the topic last showed a sign of a subscriber: its last
-// subscription or rate-visitor keepalive, or its creation if it never had one. Publishes do not
+// subscription or rate visitor assignment, or its creation if it never had one. Publishes do not
 // count: a publisher pushing to a topic nobody reads is exactly what this is meant to catch.
 func (i *TopicInfo) LastSubscriberActivity() time.Time {
 	return latest(i.CreatedAt, i.LastSubscribedAt, i.RateVisitorSeenAt)
@@ -92,9 +99,9 @@ func (s *Service) Topic(id string) (*TopicInfo, error) {
 	return info, nil
 }
 
-// RecordTopicSubscriber records that the visitor key is (still) subscribed to the topic. If the
-// key is the topic's rate visitor, the assignment's liveness is refreshed too. The caller
-// throttles calls per topic.
+// RecordTopicSubscriber records that the visitor key is (still) subscribed to the topic, which
+// also keeps the topic's rate visitor live (see RateVisitorLive). The caller throttles calls per
+// topic.
 func (s *Service) RecordTopicSubscriber(id, key string) error {
 	now := s.now().Unix()
 	return s.execTopic(topicUpsertSubscriber, id, now, now, key)
@@ -120,8 +127,8 @@ func (s *Service) SetTopicRateVisitor(id, key, userID string) error {
 	return s.execTopic(topicUpsertRateVisitor, id, now, key, userID, now)
 }
 
-// TopicRateVisitor returns the topic's rate visitor if the assignment is still live (the visitor
-// was seen within topicRateVisitorTTL), or ErrTopicNotFound
+// TopicRateVisitor returns the topic's rate visitor if the assignment is still live (see
+// RateVisitorLive), or ErrTopicNotFound
 func (s *Service) TopicRateVisitor(id string) (key string, userID string, err error) {
 	info, err := s.Topic(id)
 	if err != nil {

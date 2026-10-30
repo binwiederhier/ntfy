@@ -18,8 +18,7 @@ const (
 		INSERT INTO topic (id, created_at, last_subscribed_at, last_subscriber_key) VALUES (?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET
 			last_subscribed_at = excluded.last_subscribed_at,
-			last_subscriber_key = excluded.last_subscriber_key,
-			rate_visitor_seen_at = CASE WHEN topic.rate_visitor_key = excluded.last_subscriber_key THEN excluded.last_subscribed_at ELSE topic.rate_visitor_seen_at END
+			last_subscriber_key = excluded.last_subscriber_key
 	`
 	sqliteUpsertTopicPublishQuery = `
 		INSERT INTO topic (id, created_at, last_published_at, last_publisher_key) VALUES (?, ?, ?, ?)

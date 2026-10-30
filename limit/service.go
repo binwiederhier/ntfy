@@ -72,9 +72,11 @@ var persistedKinds = [numKinds]bool{
 
 // meshKinds are the kinds whose buckets converge across nodes through the mesh: each node tells
 // its peers what it admitted (TakeDeltas) and charges what they admitted into its own buckets
-// (Burn). The persisted kinds go through the store instead.
+// (Burn). Daily counts go through the store instead; emails have both, since without a tier the
+// email bucket is the only email limit.
 var meshKinds = [numKinds]bool{
 	KindRequests:  true,
+	KindEmails:    true,
 	KindBandwidth: true,
 	KindTopics:    true,
 	KindAccount:   true,

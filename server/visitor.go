@@ -17,7 +17,7 @@ const (
 	oneDay = 24 * time.Hour
 
 	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
-	// forgotten when usage is counted in memory only (no usage file, no database; see
+	// forgotten when usage is counted in memory only (no user database; see
 	// Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber is gone. This
 	// number has to be very high to prevent e-mail abuse, but it doesn't really affect the other
 	// limits anyway, since they are replenished faster (typically).

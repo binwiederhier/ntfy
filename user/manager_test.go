@@ -1853,7 +1853,7 @@ func TestManager_UsageTable(t *testing.T) {
 	// server keeps them in its auth-file, and a cluster in the shared Postgres
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		a := newTestManager(t, newManager, PermissionDenyAll)
-		_, err := testDB(a).Exec(`INSERT INTO usage (key, day, kind, count, updated_at) VALUES ('ip:1.2.3.4', '2026-10-30', 'messages', 3, 1)`)
+		_, err := testDB(a).Exec(`INSERT INTO usage (key, period, kind, count, updated_at) VALUES ('ip:1.2.3.4', 20755, 'messages', 3, 1)`)
 		require.Nil(t, err)
 		var count int64
 		require.Nil(t, testDB(a).QueryRow(`SELECT count FROM usage WHERE key = 'ip:1.2.3.4'`).Scan(&count))

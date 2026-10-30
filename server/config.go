@@ -117,9 +117,6 @@ const (
 )
 
 var (
-	// DefaultVisitorStatsResetTime defines the time of day at which the usage day starts over (wall clock only)
-	DefaultVisitorStatsResetTime = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-
 	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
 	// extended using the server.yml config. If updated, also update in Android and web app.
 	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "metrics", "account", "settings", "signup", "login", "v1"}
@@ -216,7 +213,6 @@ type Config struct {
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
-	VisitorStatsResetTime                time.Time      // Time of the day at which the usage day (daily messages, emails, calls) starts over
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
@@ -337,7 +333,6 @@ func NewConfig() *Config {
 		VisitorAccountCreationLimitReplenish: DefaultVisitorAccountCreationLimitReplenish,
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
-		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
 		UsageFlushInterval:                   limit.DefaultFlushInterval,
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6

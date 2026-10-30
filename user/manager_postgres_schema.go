@@ -123,19 +123,20 @@ const (
 	`
 )
 
-// The usage table holds the visitors' daily usage counts (see package limit, which reads and writes
-// it). It lives here so it shares the user schema's migrations; in a cluster, every node uses it.
+// The usage table holds the visitors' daily usage counts, one row per key, 24h period and kind (see
+// package limit, which reads and writes it). It lives here so it shares the user schema's
+// migrations; in a cluster, every node uses it.
 const (
 	postgresCreateUsageTableQuery = `
 		CREATE TABLE IF NOT EXISTS usage (
 			key TEXT NOT NULL,
-			day TEXT NOT NULL,
+			period BIGINT NOT NULL,
 			kind TEXT NOT NULL,
 			count BIGINT NOT NULL DEFAULT 0,
 			updated_at BIGINT NOT NULL,
-			PRIMARY KEY (key, day, kind)
+			PRIMARY KEY (key, period, kind)
 		);
-		CREATE INDEX IF NOT EXISTS idx_usage_day_updated_at ON usage (day, updated_at);
+		CREATE INDEX IF NOT EXISTS idx_usage_updated_at ON usage (updated_at);
 	`
 )
 

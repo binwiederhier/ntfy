@@ -840,12 +840,16 @@ const AddPhoneNumberDialog = (props) => {
 const Stats = () => {
   const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext);
+  const { dateFormat, timeFormat } = usePrefCache();
 
   if (!account) {
     return <></>;
   }
 
   const normalize = (value, max) => Math.min((value / max) * 100, 100);
+  const resetDaily = t("account_usage_limits_reset_at", {
+    time: formatDateTime(account.stats.reset_at, dateFormat, timeFormat),
+  });
 
   return (
     <Card sx={{ p: 3 }} aria-label={t("account_usage_title")}>
@@ -881,7 +885,7 @@ const Stats = () => {
           title={
             <>
               {t("account_usage_messages_title")}
-              <Tooltip title={t("account_usage_limits_reset_daily")}>
+              <Tooltip title={resetDaily}>
                 <span>
                   <InfoIcon />
                 </span>
@@ -911,7 +915,7 @@ const Stats = () => {
             title={
               <>
                 {t("account_usage_emails_title")}
-                <Tooltip title={t("account_usage_limits_reset_daily")}>
+                <Tooltip title={resetDaily}>
                   <span>
                     <InfoIcon />
                   </span>
@@ -942,7 +946,7 @@ const Stats = () => {
             title={
               <>
                 {t("account_usage_calls_title")}
-                <Tooltip title={t("account_usage_limits_reset_daily")}>
+                <Tooltip title={resetDaily}>
                   <span>
                     <InfoIcon />
                   </span>

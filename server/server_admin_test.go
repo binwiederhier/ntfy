@@ -1527,7 +1527,7 @@ func newTestServerWithAdminSocket(t *testing.T, conf *Config) (*Server, string) 
 func adminSocketListening(s *Server) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.adminSocketListener != nil
+	return s.adminUnixListener != nil
 }
 
 // runTestServer runs the server in the background without network listeners, and waits until

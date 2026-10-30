@@ -99,7 +99,7 @@ type Service struct {
 	day             string                          // The usage day the counts refer to (see today)
 	clockOffset     time.Duration                   // The store's clock minus this node's, as of the last flush; the day follows the store's clock
 	pulledAt        int64                           // Store clock watermark of the last read-back; 0 before the first
-	dayOverride     string                          // Tests only: the day today returns (see rollDayForTest)
+	dayOverride     string                          // Tests only: the day today returns (see RollDayForTest)
 	carried         map[string]map[carriedKey]int64 // Counts of earlier days not written yet, by day (see maybeRollDay)
 	syncMu          sync.Mutex                      // Serializes every store read and the apply of its rows with every write and its retirement (see write)
 	afterWriteHook  func()                          // Tests only: runs between a write's commit and its retirement
@@ -138,6 +138,7 @@ type entry struct {
 	loaded    bool            // Whether the key's rows were read back (or there is no store)
 	missNoted bool            // Whether the key waits in misses for its read-back
 	seen      int64           // Unix nanoseconds of the last use, for pruning
+	full      int64           // Unix nanoseconds from which every bucket is full again, for pruning
 }
 
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
@@ -207,6 +208,7 @@ func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 	}
 	if rule.Burst > 0 {
 		b.tokens -= float64(n)
+		e.noteFull(b, &rule)
 	}
 	e.unflushed[rule.Kind] += n
 	if meshKinds[rule.Kind] {
@@ -296,13 +298,14 @@ func (s *Service) Lookup(key string) (Usage, error) {
 }
 
 // Prune forgets keys that have not been used for longer than idle, except keys with counts that
-// are still to be written, and keys with a row, which stay for at least promotedRetention. A key
-// that comes back starts with full buckets, and with its counts read back from the store if it
-// has rows.
-func (s *Service) Prune(idle time.Duration) {
+// are still to be written, keys with a row, which stay for at least promotedRetention, and keys
+// whose buckets are not full again, and returns how many it forgot. A key that comes back starts with full buckets, and with its counts
+// read back from the store if it has rows.
+func (s *Service) Prune(idle time.Duration) int {
 	now := s.now()
 	cutoff := now.Add(-idle).UnixNano()
 	promotedCutoff := now.Add(-max(idle, promotedRetention)).UnixNano()
+	pruned := 0
 	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
@@ -310,12 +313,36 @@ func (s *Service) Prune(idle time.Duration) {
 				continue
 			} else if e.anyPromoted() && e.seen >= promotedCutoff {
 				continue
-			} else if e.seen < cutoff {
+			} else if e.seen < cutoff && now.UnixNano() >= e.full {
 				delete(sh.entries, key)
+				pruned++
 			}
 		}
 		sh.mu.Unlock()
 	}
+	return pruned
+}
+
+// Touch marks the key as used now, so Prune keeps it, e.g. for a long-lived subscription
+func (s *Service) Touch(key string) {
+	now := s.now()
+	store := s.store.Load()
+	sh := s.shards[shardIndex(key)]
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	sh.entryNoLock(key, now, store == nil).seen = now.UnixNano()
+}
+
+// Seen returns when the key was last used, or the zero time if the service does not know it
+func (s *Service) Seen(key string) time.Time {
+	sh := s.shards[shardIndex(key)]
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	e, ok := sh.entries[key]
+	if !ok {
+		return time.Time{}
+	}
+	return time.Unix(0, e.seen).UTC()
 }
 
 // TakeDeltas returns what the node's peers should charge into their buckets: the units each key
@@ -761,10 +788,10 @@ func (s *Service) maybeRollDay() {
 	s.missMu.Unlock()
 }
 
-// rollDayForTest makes the clock read the given day from now on and rolls over to it, exactly as
+// RollDayForTest makes the clock read the given day from now on and rolls over to it, exactly as
 // flush does when the clock reaches a new day. Tests use it, because the day follows the store's
 // clock, which a test cannot move.
-func (s *Service) rollDayForTest(day string) {
+func (s *Service) RollDayForTest(day string) {
 	s.mu.Lock()
 	s.dayOverride = day
 	s.mu.Unlock()
@@ -914,6 +941,19 @@ func (e *entry) pending() bool {
 	return false
 }
 
+// noteFull moves the time from which every bucket is full again to when this bucket is full, if
+// that is later. A bucket without refill never fills, so it does not hold the key.
+func (e *entry) noteFull(b *bucket, rule *Rule) {
+	missing := float64(rule.Burst) - b.tokens
+	if missing <= 0 || rule.Refill <= 0 {
+		return
+	}
+	full := b.last + int64(math.Ceil(missing*float64(rule.Refill)))
+	if full > e.full {
+		e.full = full
+	}
+}
+
 // refill adds the tokens earned since the last refill, capped at the rule's burst, and remembers
 // the burst. A bucket that was never used starts full.
 func (b *bucket) refill(now time.Time, rule *Rule) {
@@ -926,14 +966,18 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 			// difference, down to a debt of one burst
 			b.tokens = math.Max(b.tokens+float64(rule.Burst-b.burst), -float64(rule.Burst))
 		}
-		if rule.Refill > 0 {
+		// A timestamp older than the last refill (a call that read the clock before another one
+		// took the lock, or a wall clock set back) neither charges nor moves the refill point back
+		if rule.Refill > 0 && nowNanos > b.last {
 			b.tokens += float64(nowNanos-b.last) / float64(rule.Refill)
 		}
 	}
 	if b.tokens > float64(rule.Burst) {
 		b.tokens = float64(rule.Burst)
 	}
-	b.last = nowNanos
+	if nowNanos > b.last {
+		b.last = nowNanos
+	}
 	b.burst = rule.Burst
 	b.interval = rule.Refill
 }

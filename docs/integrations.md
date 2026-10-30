@@ -204,6 +204,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Pethost](https://pethost.dev/templates/ntfy/) - One-click ntfy server on Pethost, with an admin user made at the first start and anonymous access denied
 - [Sanctumd](https://github.com/Phioster/sanctum_daemon) - Android app for Jellyfin and the *arr stack; subscribes to ntfy topics for live pushes with images, priorities and action buttons (Kotlin)
 - [MeetAlert](https://github.com/roypadina/MeetAlert) - macOS meeting alerts from your calendars; when you're away from the Mac it escalates to your phone via ntfy with Ack/Join/Snooze actions (Swift)
+- [aibot-hostkit](https://github.com/monarchsofchaos004-gif/aibot-hostkit) - Keeps an AI coding agent (Claude Code, Codex, Gemini CLI) running on a cloud Linux box and pushes an ntfy alert to your phone whenever it restarts (Bash)
 
 ## Blog + forum posts
 

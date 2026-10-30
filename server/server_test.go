@@ -2246,6 +2246,56 @@ func TestServer_PublishActions_AndPoll(t *testing.T) {
 	})
 }
 
+func TestServer_PublishSmallIconAndColor_AndPoll(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic", "my message", map[string]string{
+			"Small-Icon": "mdi:mailbox",
+			"Color":      "#009688",
+			"Icon":       "https://ntfy.sh/static/img/ntfy.png",
+		})
+		require.Equal(t, 200, response.Code)
+		m := toMessage(t, response.Body.String())
+		require.Equal(t, "mdi:mailbox", m.SmallIcon)
+		require.Equal(t, "#009688", m.Color)
+		require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
+
+		response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, response.Code)
+		m = toMessage(t, response.Body.String())
+		require.Equal(t, "mdi:mailbox", m.SmallIcon)
+		require.Equal(t, "#009688", m.Color)
+		require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
+	})
+}
+
+func TestServer_PublishSmallIconAndColor_QueryParam(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		response := request(t, s, "PUT", "/mytopic?small-icon=mdi:bell-ring&color=%23FF5722", "my message", nil)
+		require.Equal(t, 200, response.Code)
+		m := toMessage(t, response.Body.String())
+		require.Equal(t, "mdi:bell-ring", m.SmallIcon)
+		require.Equal(t, "#FF5722", m.Color)
+	})
+}
+
+func TestServer_PublishSmallIconAndColor_Invalid(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		for _, smallIcon := range []string{"bell", "mdi:", "mdi:Bell", "mdi:-bell", "mdi:bell_ring", "https://example.com/icon.png", "mdi:" + strings.Repeat("a", 65)} {
+			response := request(t, s, "PUT", "/mytopic", "my message", map[string]string{"Small-Icon": smallIcon})
+			require.Equal(t, 400, response.Code, smallIcon)
+			require.Equal(t, 40062, toHTTPError(t, response.Body.String()).Code, smallIcon)
+		}
+		for _, color := range []string{"red", "#fff", "#ff5722aa", "#gggggg", "ff5722"} {
+			response := request(t, s, "PUT", "/mytopic", "my message", map[string]string{"Color": color})
+			require.Equal(t, 400, response.Code, color)
+			require.Equal(t, 40063, toHTTPError(t, response.Body.String()).Code, color)
+		}
+	})
+}
+
 func TestServer_PublishMarkdown(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))
@@ -2332,7 +2382,7 @@ func TestServer_PublishAsJSON(t *testing.T) {
 		s := newTestServer(t, newTestConfig(t, databaseURL))
 		body := `{"topic":"mytopic","message":"A message","title":"a title\nwith lines","tags":["tag1","tag 2"],` +
 			`"not-a-thing":"ok", "attach":"http://google.com","filename":"google.pdf", "click":"http://ntfy.sh","priority":4,` +
-			`"icon":"https://ntfy.sh/static/img/ntfy.png", "delay":"30min"}`
+			`"icon":"https://ntfy.sh/static/img/ntfy.png", "small_icon":"mdi:mailbox", "color":"#009688", "delay":"30min"}`
 		response := request(t, s, "PUT", "/", body, nil)
 		require.Equal(t, 200, response.Code)
 
@@ -2345,6 +2395,8 @@ func TestServer_PublishAsJSON(t *testing.T) {
 		require.Equal(t, "google.pdf", m.Attachment.Name)
 		require.Equal(t, "http://ntfy.sh", m.Click)
 		require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
+		require.Equal(t, "mdi:mailbox", m.SmallIcon)
+		require.Equal(t, "#009688", m.Color)
 		require.Equal(t, "", m.ContentType)
 
 		require.Equal(t, 4, m.Priority)

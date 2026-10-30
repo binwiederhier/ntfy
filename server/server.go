@@ -153,6 +153,8 @@ var (
 	urlRegex                                             = regexp.MustCompile(`^https?://`)
 	phoneNumberRegex                                     = regexp.MustCompile(`^\+\d{1,100}$`)
 	emailAddressRegex                                    = regexp.MustCompile(`^[^\s,;]+@[^\s,;]+$`)
+	smallIconRegex                                       = regexp.MustCompile(`^mdi:[a-z0-9][-a-z0-9]{0,63}$`) // Material Design Icons name, e.g. mdi:bell
+	colorRegex                                           = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
 	//go:embed site
 	webFs       embed.FS
@@ -1333,6 +1335,20 @@ func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bo
 		}
 		m.Icon = icon
 	}
+	smallIcon := readParam(r, "x-small-icon", "small-icon")
+	if smallIcon != "" {
+		if !smallIconRegex.MatchString(smallIcon) {
+			return false, false, "", "", "", false, "", errHTTPBadRequestSmallIconInvalid
+		}
+		m.SmallIcon = smallIcon
+	}
+	color := readParam(r, "x-color", "color")
+	if color != "" {
+		if !colorRegex.MatchString(color) {
+			return false, false, "", "", "", false, "", errHTTPBadRequestColorInvalid
+		}
+		m.Color = color
+	}
 	email = readParam(r, "x-email", "x-e-mail", "email", "e-mail", "mail", "e")
 	if email != "" && !emailAddressRegex.MatchString(email) && !toBool(email) {
 		return false, false, "", "", "", false, "", errHTTPBadRequestEmailAddressInvalid
@@ -2296,6 +2312,12 @@ func (s *Server) transformBodyJSON(next handleFunc) handleFunc {
 		}
 		if m.Icon != "" {
 			r.Header.Set("X-Icon", m.Icon)
+		}
+		if m.SmallIcon != "" {
+			r.Header.Set("X-Small-Icon", m.SmallIcon)
+		}
+		if m.Color != "" {
+			r.Header.Set("X-Color", m.Color)
 		}
 		if m.Markdown {
 			r.Header.Set("X-Markdown", "yes")

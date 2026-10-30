@@ -969,6 +969,124 @@ Here's an example of how it will look on Android:
   <figcaption>Custom icon from an external URL</figcaption>
 </figure>
 
+## Small icon and color
+_Supported on:_ :material-android:
+
+On Android, every notification shows a small, monochrome icon in the status bar and in the notification header. By
+default, this is the ntfy logo. To make notifications easier to tell apart at a glance, you can replace it with any icon
+from [Material Design Icons](https://pictogrammers.com/library/mdi/) by passing the `X-Small-Icon` header or query
+parameter (or its alias `Small-Icon`) with the icon name, prefixed with `mdi:`, e.g. `mdi:garage-open`. You can also set
+the notification's accent color with the `X-Color` header or query parameter (or its alias `Color`), as a `#RRGGBB` hex
+color. Android uses the accent color for the small icon, e.g. as its background circle; exactly where it is shown depends
+on the Android version, and recent versions ignore it for notifications that are grouped together.
+
+This is independent of the [icon](#icons) above, which shows a (larger) image next to the notification text, so you can
+use both together. The small icons are bundled with the app, so nothing is downloaded. If the app doesn't know an icon
+name (e.g. because it was added to Material Design Icons after the app was released), it shows the ntfy logo instead.
+
+Here's an example that uses a small icon and an accent color:
+
+=== "Command line (curl)"
+    ```
+    curl \
+        -H "Small-Icon: mdi:garage-open" \
+        -H "Color: #FF9800" \
+        -H "Title: Garage door open" \
+        -d "The garage door has been open for 15 minutes" \
+        ntfy.sh/home
+    ```
+
+=== "ntfy CLI"
+    ```
+    ntfy publish \
+        --small-icon="mdi:garage-open" \
+        --color="#FF9800" \
+        --title="Garage door open" \
+        home \
+        "The garage door has been open for 15 minutes"
+    ```
+
+=== "HTTP"
+    ``` http
+    POST /home HTTP/1.1
+    Host: ntfy.sh
+    Small-Icon: mdi:garage-open
+    Color: #FF9800
+    Title: Garage door open
+
+    The garage door has been open for 15 minutes
+    ```
+
+=== "JavaScript"
+    ``` javascript
+    fetch('https://ntfy.sh/home', {
+        method: 'POST',
+        headers: {
+            'Small-Icon': 'mdi:garage-open',
+            'Color': '#FF9800',
+            'Title': 'Garage door open'
+        },
+        body: "The garage door has been open for 15 minutes"
+    })
+    ```
+
+=== "Go"
+    ``` go
+    req, _ := http.NewRequest("POST", "https://ntfy.sh/home", strings.NewReader("The garage door has been open for 15 minutes"))
+    req.Header.Set("Small-Icon", "mdi:garage-open")
+    req.Header.Set("Color", "#FF9800")
+    req.Header.Set("Title", "Garage door open")
+    http.DefaultClient.Do(req)
+    ```
+
+=== "PowerShell"
+    ``` powershell
+    $Request = @{
+      Method = "POST"
+      URI = "https://ntfy.sh/home"
+      Headers = @{
+        "Small-Icon" = "mdi:garage-open"
+        Color = "#FF9800"
+        Title = "Garage door open"
+      }
+      Body = "The garage door has been open for 15 minutes"
+    }
+    Invoke-RestMethod @Request
+    ```
+
+=== "Python"
+    ``` python
+    requests.post("https://ntfy.sh/home",
+        data="The garage door has been open for 15 minutes",
+        headers={
+            "Small-Icon": "mdi:garage-open",
+            "Color": "#FF9800",
+            "Title": "Garage door open"
+        })
+    ```
+
+=== "PHP"
+    ``` php-inline
+    file_get_contents('https://ntfy.sh/home', false, stream_context_create([
+        'http' => [
+        'method' => 'POST',
+        'header' =>
+            "Content-Type: text/plain\r\n" . // Does not matter
+            "Small-Icon: mdi:garage-open\r\n" .
+            "Color: #FF9800\r\n" .
+            "Title: Garage door open",
+        ],
+        'content' => "The garage door has been open for 15 minutes"
+    ]));
+    ```
+
+Here's an example of how it will look on Android:
+
+<figure markdown>
+  ![small icon and color](static/img/android-screenshot-small-icon.png){ width=500 }
+  <figcaption>Small icon and accent color, together with a custom icon</figcaption>
+</figure>
+
 ## Attachments
 _Supported on:_ :material-android: :material-apple: :material-firefox:
 
@@ -3732,6 +3850,8 @@ all the supported fields:
 | `attach`      | -        | *URL*                            | `https://example.com/file.jpg`            | URL of an attachment, see [attach via URL](#attach-file-from-a-url)                       |
 | `markdown`    | -        | *bool*                           | `true`                                    | Set to true if the `message` is Markdown-formatted                                        |
 | `icon`        | -        | *string*                         | `https://example.com/icon.png`            | URL to use as notification [icon](#icons)                                                 |
+| `small_icon`  | -        | *string*                         | `mdi:garage-open`                         | Material Design Icons name to use as [small icon](#small-icon-and-color)                  |
+| `color`       | -        | *string*                         | `#FF9800`                                 | Notification [accent color](#small-icon-and-color) as `#RRGGBB`                           |
 | `filename`    | -        | *string*                         | `file.jpg`                                | File name of the attachment                                                               |
 | `delay`       | -        | *string*                         | `30min`, `9am`                            | Timestamp or duration for delayed delivery                                                |
 | `timezone`    | -        | *string*                         | `Asia/Tokyo`                             | Timezone for natural language delayed delivery times                                      |
@@ -4990,6 +5110,8 @@ table in their canonical form.
 | `X-Attach`      | `Attach`, `a`                              | URL to send as an [attachment](#attachments), as an alternative to PUT/POST-ing an attachment |
 | `X-Markdown`    | `Markdown`, `md`                           | Enable [Markdown formatting](#markdown-formatting) in the notification body                   |
 | `X-Icon`        | `Icon`                                     | URL to use as notification [icon](#icons)                                                     |
+| `X-Small-Icon`  | `Small-Icon`                               | Material Design Icons name to use as [small icon](#small-icon-and-color)                      |
+| `X-Color`       | `Color`                                    | Notification [accent color](#small-icon-and-color) as `#RRGGBB`                               |
 | `X-Filename`    | `Filename`, `file`, `f`                    | Optional [attachment](#attachments) filename, as it appears in the client                     |
 | `X-Email`       | `X-E-Mail`, `Email`, `E-Mail`, `mail`, `e` | E-mail address (or `yes`) for [e-mail notifications](#e-mail-notifications)                   |
 | `X-Call`        | `Call`                                     | Phone number for [phone calls](#phone-calls)                                                  |

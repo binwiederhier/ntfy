@@ -273,8 +273,8 @@ func (s *Service) Lookup(key string) (Usage, error) {
 
 // Prune forgets keys that have not been used for longer than idle, except keys with counts that
 // are still to be written, keys with a row, which stay for at least promotedRetention, and keys
-// whose buckets are not full again, and returns how many it forgot. A key that comes back starts with full buckets, and with its counts
-// read back from the store if it has rows.
+// whose buckets are not full again, and returns how many it forgot. A key that comes back starts
+// with full buckets, and with its counts read back from the store if it has rows.
 func (s *Service) Prune(idle time.Duration) int {
 	now := s.now()
 	cutoff := now.Add(-idle).UnixNano()

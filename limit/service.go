@@ -166,19 +166,43 @@ func (s *Service) ResetUsage() {
 	}
 }
 
-// Prune forgets keys that have not been used for longer than idle. A key that comes back starts
-// with full buckets and zero counts.
-func (s *Service) Prune(idle time.Duration) {
+// Prune forgets keys that have not been used for longer than idle, and returns how many. A key
+// that comes back starts with full buckets and zero counts.
+func (s *Service) Prune(idle time.Duration) int {
 	cutoff := s.now().Add(-idle).UnixNano()
+	pruned := 0
 	for _, sh := range s.shards {
 		sh.mu.Lock()
 		for key, e := range sh.entries {
 			if e.seen < cutoff {
 				delete(sh.entries, key)
+				pruned++
 			}
 		}
 		sh.mu.Unlock()
 	}
+	return pruned
+}
+
+// Touch marks the key as used now, so Prune keeps it, e.g. for a long-lived subscription
+func (s *Service) Touch(key string) {
+	now := s.now()
+	sh := s.shards[shardIndex(key)]
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	sh.entryNoLock(key, now).seen = now.UnixNano()
+}
+
+// Seen returns when the key was last used, or the zero time if the service does not know it
+func (s *Service) Seen(key string) time.Time {
+	sh := s.shards[shardIndex(key)]
+	sh.mu.Lock()
+	defer sh.mu.Unlock()
+	e, ok := sh.entries[key]
+	if !ok {
+		return time.Time{}
+	}
+	return time.Unix(0, e.seen).UTC()
 }
 
 // Limiter returns a util.Limiter view of the key's bucket for the rule, for the readers and

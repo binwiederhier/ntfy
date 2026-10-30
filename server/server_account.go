@@ -326,9 +326,8 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
 	if u == nil {
-		// ensureUser already checked, but the user can be nil'd between that check and this
-		// re-read: IP-keyed visitors are shared, and a concurrent anonymous request on the
-		// same IP calls SetUser(nil) on this very object (recurring production panic)
+		// ensureUser already checked; kept as a guard, since a nil user here was a recurring
+		// production panic while visitors were shared between requests (#1051)
 		return errHTTPUnauthorized
 	}
 	req, err := readJSONWithLimit[apiAccountTokenUpdateRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!

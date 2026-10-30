@@ -64,9 +64,9 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	visitors          map[string]*visitor // ip:<ip> or user:<user>
-	limiter           *limit.Service      // Decides on and counts the visitors' usage, keyed by visitor key
-	ban               *ban.Service        // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
+	visitors          *visitorEnv    // Shared by all visitors, which are built per request
+	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
@@ -126,6 +126,8 @@ var (
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
+	apiUsersTokensPath                                   = "/v1/users/tokens"
+	apiUsersPasswordResetPath                            = "/v1/users/password/reset"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountLoginPath                                  = "/v1/account/login"
 	apiAccountTokenPath                                  = "/v1/account/token"
@@ -141,6 +143,7 @@ var (
 	apiAccountEmailResendPath                            = "/v1/account/email/resend"
 	apiAccountPasswordResetRequestPath                   = "/v1/account/password/reset/request"
 	apiAccountPasswordResetPath                          = "/v1/account/password/reset"
+	apiAccountBillingTiersPath                           = "/v1/account/billing/tiers"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -301,7 +304,6 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		visitors:        make(map[string]*visitor),
 		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime}),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
@@ -349,6 +351,7 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
+	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
@@ -712,6 +715,22 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensGet)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensDelete)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPasswordResetPath {
+		return s.ensureAdmin(s.handleUsersPasswordReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath && v.User().IsAdmin() {
+		return s.ensureAdmin(s.handleAdminTiersGet)(w, r, v) // Non-admins get the billing tiers, see below
+	} else if r.Method == http.MethodPost && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersAdd)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersUpdate)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
@@ -778,8 +797,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountBillingTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
+		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v) // Non-admins: web apps before v2.36.0, remove after 2026-11-22
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
@@ -1115,10 +1136,6 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		if err := s.messageCache.AddMessage(m); err != nil {
 			return nil, err
 		}
-	}
-	u := v.User()
-	if s.userManager != nil && u != nil && u.Tier != nil {
-		go v.EnqueueUserStatsDelta()
 	}
 	s.mu.Lock()
 	s.messages++
@@ -2164,9 +2181,6 @@ func (s *Server) resetStats() {
 	s.mu.Lock()
 	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
 	s.limiter.ResetUsage()
-	for _, v := range s.visitors {
-		v.ResetStats()
-	}
 	if s.userManager != nil {
 		if err := s.userManager.ResetStats(); err != nil {
 			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
@@ -2178,7 +2192,7 @@ func (s *Server) runFirebaseKeepaliver() {
 	if s.firebaseClient == nil {
 		return
 	}
-	v := newVisitor(s.config, s.limiter, s.messageCache, s.userManager, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
+	v := newVisitor(s.visitors, netip.IPv4Unspecified(), nil) // Background process, not a real visitor, uses IP 0.0.0.0
 	for {
 		select {
 		case <-time.After(s.config.FirebaseKeepaliveInterval):
@@ -2357,18 +2371,10 @@ func (s *Server) transformMatrixJSON(next handleFunc) handleFunc {
 	}
 }
 
+// visitor returns the visitor for this request. It is built per request, so concurrent requests from
+// the same IP (which share a limiter key) cannot see each other's user (#1051).
 func (s *Server) visitor(ip netip.Addr, user *user.User) *visitor {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	id := visitorID(ip, user, s.config)
-	v, exists := s.visitors[id]
-	if !exists {
-		s.visitors[id] = newVisitor(s.config, s.limiter, s.messageCache, s.userManager, ip, user)
-		return s.visitors[id]
-	}
-	v.Keepalive()
-	v.SetUser(user) // Always update with the latest user, may be nil!
-	return v
+	return newVisitor(s.visitors, ip, user)
 }
 
 func (s *Server) writeJSON(w http.ResponseWriter, v any) error {

@@ -418,12 +418,13 @@ type queries struct {
 	deleteExcessTokens         string
 
 	// Tier queries
-	insertTier          string
-	selectTiers         string
-	selectTierByCode    string
-	selectTierByPriceID string
-	updateTier          string
-	deleteTier          string
+	insertTier           string
+	selectTiers          string
+	selectTierByCode     string
+	selectTierByPriceID  string
+	selectTierUsersCount string
+	updateTier           string
+	deleteTier           string
 
 	// Phone queries
 	selectPhoneNumbers string

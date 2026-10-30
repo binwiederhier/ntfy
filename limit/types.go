@@ -18,13 +18,14 @@ const (
 	KindTopics                // Topics created in the server's in-memory topic map
 	KindAccount               // Account actions: signups and password reset requests
 	KindAuth                  // Failed authentication attempts
+	KindFirebase              // Firebase sends, paused for a while after Firebase reports the quota exceeded
 	KindStrikes               // Weighted strikes of the abuse ban feed, keyed by prefix (see package ban)
 	numKinds                  // Sentinel, keep last
 )
 
 // kindNames are the stable names of the kinds, used in the usage table and on the wire; they
 // must never change once released
-var kindNames = [numKinds]string{"requests", "messages", "emails", "calls", "bandwidth", "topics", "account", "auth", "strikes"}
+var kindNames = [numKinds]string{"requests", "messages", "emails", "calls", "bandwidth", "topics", "account", "auth", "firebase", "strikes"}
 
 // Rule says how much of a kind a key may use: a token bucket of Burst tokens refilling one token
 // per Refill, a Daily cap, or both. A zero Rule allows everything.

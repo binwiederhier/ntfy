@@ -95,8 +95,8 @@ type AdminToken struct {
 	Token       string `json:"token"`
 	Label       string `json:"label,omitempty"`
 	Expires     int64  `json:"expires"`
-	LastAccess  int64  `json:"last_access"`
-	LastOrigin  string `json:"last_origin"`
+	LastAccess  int64  `json:"last_access,omitempty"` // Unix seconds; omitted if never used
+	LastOrigin  string `json:"last_origin,omitempty"` // IP; omitted if never used
 	Provisioned bool   `json:"provisioned,omitempty"`
 }
 

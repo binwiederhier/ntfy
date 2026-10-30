@@ -195,7 +195,11 @@ func execTokenList(c *cli.Context) error {
 		if t.Provisioned {
 			provisioned = " (server config)"
 		}
-		fmt.Fprintf(c.App.Writer, "- %s%s, %s, accessed from %s at %s%s\n", t.Token, label, expires, t.LastOrigin, time.Unix(t.LastAccess, 0).Format(time.RFC822), provisioned)
+		accessed := "never used"
+		if t.LastOrigin != "" {
+			accessed = fmt.Sprintf("accessed from %s at %s", t.LastOrigin, time.Unix(t.LastAccess, 0).Format(time.RFC822))
+		}
+		fmt.Fprintf(c.App.Writer, "- %s%s, %s, %s%s\n", t.Token, label, expires, accessed, provisioned)
 	}
 	return nil
 }

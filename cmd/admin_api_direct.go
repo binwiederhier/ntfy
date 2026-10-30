@@ -350,15 +350,18 @@ func (d *directAdminAPI) toAdminUser(u *user.User, grants []user.Grant) *client.
 }
 
 func toAdminToken(username string, t *user.Token) *client.AdminToken {
-	return &client.AdminToken{
+	token := &client.AdminToken{
 		Username:    username,
 		Token:       t.Value,
 		Label:       t.Label,
 		Expires:     t.Expires.Unix(),
-		LastAccess:  t.LastAccess.Unix(),
-		LastOrigin:  t.LastOrigin.String(),
 		Provisioned: t.Provisioned,
 	}
+	if t.LastOrigin.IsValid() && !t.LastOrigin.IsUnspecified() { // Never used, as the server reports it (see newAPIUserTokenResponse)
+		token.LastAccess = t.LastAccess.Unix()
+		token.LastOrigin = t.LastOrigin.String()
+	}
+	return token
 }
 
 func toAdminTier(t *user.Tier, users int64) *client.AdminTier {

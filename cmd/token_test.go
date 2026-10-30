@@ -26,7 +26,7 @@ func TestCLI_Token_AddListRemove(t *testing.T) {
 
 		app, _, stdout, _ = newTestApp()
 		require.Nil(t, runTokenCommand(app, conf, "list", "phil"))
-		require.Regexp(t, `user phil\n- tk_.+, never expires, accessed from 0.0.0.0 at .+`, stdout.String())
+		require.Regexp(t, `user phil\n- tk_.+, never expires, never used`, stdout.String())
 		re := regexp.MustCompile(`tk_\w+`)
 		token := re.FindString(stdout.String())
 
@@ -54,7 +54,7 @@ func TestCLI_Token_Admin(t *testing.T) {
 
 		app, _, stdout, _ = newTestApp()
 		require.Nil(t, runTokenCommand(app, conf, "list"))
-		require.Regexp(t, `user phil\n- tk_.+ \(mine\), expires .+, accessed from 0.0.0.0 at .+`, stdout.String())
+		require.Regexp(t, `user phil\n- tk_.+ \(mine\), expires .+, never used`, stdout.String())
 
 		app, _, _, _ = newTestApp()
 		err := runTokenCommand(app, conf, "remove", "phil", "tk_doesnotexistdoesnotexist12345")

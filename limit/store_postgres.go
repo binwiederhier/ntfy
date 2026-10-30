@@ -23,7 +23,7 @@ const (
 			period_start = GREATEST(u.period_start, EXCLUDED.period_start),
 			updated_at = EXCLUDED.updated_at
 	`
-	postgresPruneQuery = `DELETE FROM usage WHERE key IN (SELECT key FROM usage WHERE updated_at < $1 LIMIT $2)`
+	postgresPruneQuery = `DELETE FROM usage WHERE updated_at < $1 AND key IN (SELECT key FROM usage WHERE updated_at < $1 LIMIT $2)` // The outer age check is rechecked on a row updated while the delete waits for it
 )
 
 // NewPostgresStore returns the store on the shared pool; the usage table is the user schema's

@@ -22,7 +22,7 @@ const (
 			period_start = MAX(period_start, excluded.period_start),
 			updated_at = excluded.updated_at
 	`
-	sqlitePruneQuery = `DELETE FROM usage WHERE key IN (SELECT key FROM usage WHERE updated_at < ? LIMIT ?)`
+	sqlitePruneQuery = `DELETE FROM usage WHERE updated_at < ?1 AND key IN (SELECT key FROM usage WHERE updated_at < ?1 LIMIT ?2)`
 )
 
 // NewSQLiteStore returns the store on the user database (auth-file), which holds the usage

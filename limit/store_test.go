@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/db"
@@ -170,6 +171,36 @@ func TestStore_Prune(t *testing.T) {
 		require.Equal(t, int64(20), deleted)
 		require.Equal(t, []string{"k20", "k21", "k22", "k23", "k24"}, keysOf(readAll(t, s, 0)))
 	})
+}
+
+func TestStore_PruneKeepsRowRefreshedMeanwhile(t *testing.T) {
+	// A row another node updates while the prune waits for its lock must survive: Postgres
+	// rechecks the outer predicate on the updated row, so it must test the age, not only the key
+	d := dbtest.CreateTestPostgres(t)
+	_, err := user.NewPostgresManager(d, &user.Config{})
+	require.Nil(t, err)
+	d.Primary().SetMaxOpenConns(3)
+	store := NewPostgresStore(d)
+	_, err = d.Exec(`INSERT INTO usage (key, period_start, messages, emails, calls, updated_at) VALUES ('k', 1, 10, 0, 0, 1)`)
+	require.Nil(t, err)
+	tx, err := d.Begin()
+	require.Nil(t, err)
+	defer tx.Rollback()
+	_, err = tx.Exec(`UPDATE usage SET period_start = 200, messages = 100, updated_at = 200 WHERE key = 'k'`)
+	require.Nil(t, err)
+	done := make(chan error, 1)
+	go func() {
+		_, err := store.prune(context.Background(), 100)
+		done <- err
+	}()
+	require.Eventually(t, func() bool {
+		var n int
+		err := d.QueryRow(`SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query = $1`, postgresPruneQuery).Scan(&n)
+		return err == nil && n > 0
+	}, 2*time.Second, time.Millisecond)
+	require.Nil(t, tx.Commit())
+	require.Nil(t, <-done)
+	require.Equal(t, int64(100), readAll(t, store, 0)["k"].counts[0])
 }
 
 // keysOf returns the map's keys, sorted

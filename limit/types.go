@@ -33,10 +33,11 @@ var kindNames = [numKinds]string{"requests", "messages", "emails", "calls", "ban
 // Rule says how much of a kind a key may use: a token bucket of Burst tokens refilling one token
 // per Refill, a Daily cap, or both. A zero Rule allows everything.
 type Rule struct {
-	Kind   Kind
-	Burst  int64         // Token bucket size; 0 for no bucket
-	Refill time.Duration // Time to refill one token; 0 for a bucket that never refills
-	Daily  int64         // Cap per 24h period of the key (see periodStart), for kinds with a daily count; 0 for none
+	Kind      Kind
+	Burst     int64         // Token bucket size; 0 for no bucket
+	Refill    time.Duration // Time to refill one token; 0 for a bucket that never refills
+	Daily     int64         // Cap per 24h period of the key (see periodStart), for kinds with a daily count; 0 for none
+	Threshold int64         // Daily count from which the key's counts are written to the store; 0 from the first unit
 }
 
 // Decision is the answer to Allow: whether the usage was admitted, and if not, how long until
@@ -53,6 +54,7 @@ type Usage struct {
 
 // Config configures the service
 type Config struct {
+	Store *Store // Where the daily counts are shared and kept across restarts; nil for memory only
 }
 
 // counter is one key's daily usage in its current period

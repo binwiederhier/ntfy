@@ -4,23 +4,53 @@
 // both. Rules are not baked into the state, so a changed rule (a tier change) applies on the next
 // call without rebuilding anything and without handing back a full bucket.
 //
-// The service knows nothing about users, tiers or HTTP. All state is in memory, sharded by key:
-// token buckets per node, and daily counts (messages, emails, calls) per key and 24h period. A
-// key's period starts at an offset hashed from the key (see periodStart), so the resets of all
-// keys are spread over the day, lazily, on the key's next use.
+// The service knows nothing about users, tiers or HTTP. All decisions are made from memory,
+// sharded by key: token buckets per node, and daily counts (messages, emails, calls) per key and
+// 24h period. A key's period starts at an offset hashed from the key (see periodStart), so the
+// resets of all keys are spread over the day, lazily, on the key's next use.
+//
+// With a store, a sync worker writes what this node admitted to the shared usage table every
+// syncInterval and reads back what changed, so a key's count is base (the row as last read: all
+// nodes) plus unflushed (admitted here since the last write). At startup the service loads the
+// current rows. Store failures never reach the request path: counts stay unflushed and are
+// written once the store is back (fail open, per-node limits meanwhile).
 package limit
 
 import (
+	"context"
 	"math"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/util"
 )
 
 const (
+	tag        = "limit"
 	shardCount = 64 // Keys are spread over this many independently locked maps
+
+	// syncInterval is how often a node writes its unflushed counts and reads the others'. It
+	// bounds the overshoot in a cluster ((nodes - 1) x what a key is admitted in this time).
+	syncInterval = 5 * time.Second
+
+	// statementTimeout bounds each store call of a sync. A row's updated_at is the database
+	// time its statement started, so it may commit up to this much later; reads re-read
+	// readOverlap behind the watermark so such a row is not skipped (rows are totals, so a
+	// re-read is harmless).
+	statementTimeout = 5 * time.Second
+	readOverlap      = statementTimeout + time.Second
+
+	// loadWait is how long Start waits for the startup load before serving from memory, while
+	// the load goes on in the background; loadTimeout bounds one load attempt
+	loadWait    = 30 * time.Second
+	loadTimeout = 2 * time.Minute
+
+	// pruneInterval is how often a node deletes rows not written for pruneAfter; a row older
+	// than a period is never current again
+	pruneInterval = time.Hour
+	pruneAfter    = 25 * time.Hour
 )
 
 // Service decides on usage from memory; see the package comment
@@ -29,7 +59,14 @@ type Service struct {
 	now         func() time.Time          // Injectable clock, for tests
 	counters    [shardCount]*counterShard // Daily counts, kept until their period ends
 	buckets     [shardCount]*bucketShard  // Token buckets, per node, evicted when idle and full
+	store       *Store                    // Nil: memory only
+	watermark   int64                     // Database time of the last read; the sync worker's only
+	prunedAt    int64                     // Database time of the last prune; the sync worker's only
 	clockOffset atomic.Int64              // Database clock minus ours, nanoseconds
+	interval    time.Duration             // How often the worker syncs (syncInterval); tests change it
+	closeChan   chan struct{}
+	closeOnce   sync.Once
+	wg          sync.WaitGroup
 }
 
 // counterShard is one independently locked part of the daily counters
@@ -51,8 +88,11 @@ func New(conf *Config) *Service {
 
 func newService(conf *Config, now func() time.Time) *Service {
 	s := &Service{
-		conf: conf,
-		now:  now,
+		conf:      conf,
+		now:       now,
+		store:     conf.Store,
+		interval:  syncInterval,
+		closeChan: make(chan struct{}),
 	}
 	for i := 0; i < shardCount; i++ {
 		s.counters[i] = &counterShard{
@@ -92,8 +132,46 @@ func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 		return Decision{RetryAfter: time.Unix(c.periodStart+daySeconds, 0).Sub(dbNow)}
 	}
 	c.unflushed[i] += n
+	if rule.Threshold == 0 || total+n >= rule.Threshold {
+		c.promoted = true
+	}
 	cs.mu.Unlock()
 	return Decision{OK: true}
+}
+
+// Start loads the current counts from the store, if there is one, and starts the sync worker.
+// It returns once the load is done, or after loadWait (or when ctx is done), whichever is first;
+// the load then goes on in the background while the service decides from memory.
+func (s *Service) Start(ctx context.Context) error {
+	if s.store == nil {
+		return nil
+	}
+	loaded := make(chan struct{})
+	s.wg.Add(1)
+	go s.runSync(loaded)
+	select {
+	case <-loaded:
+	case <-time.After(loadWait):
+		log.Tag(tag).Warn("Loading usage takes longer than %v; serving from memory, loading in the background", loadWait)
+	case <-ctx.Done():
+		log.Tag(tag).Warn("Loading usage was not done in time; serving from memory, loading in the background")
+	}
+	return nil
+}
+
+// Close stops the sync worker and writes what is unflushed. The store's database is its owner's
+// to close (the user manager's, or the shared pool), after this.
+func (s *Service) Close() {
+	s.closeOnce.Do(func() {
+		close(s.closeChan)
+		s.wg.Wait()
+		if s.store == nil {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), statementTimeout)
+		defer cancel()
+		s.write(ctx)
+	})
 }
 
 // Tokens returns the whole tokens the key's bucket for the rule's kind has right now, without
@@ -224,6 +302,172 @@ func (s *Service) Size() int {
 		bs.mu.Unlock()
 	}
 	return size
+}
+
+// runSync loads the current counts, retrying until it succeeds, then syncs every interval until
+// Close. It is the only caller of the store, so writes and reads never interleave.
+func (s *Service) runSync(loaded chan struct{}) {
+	defer s.wg.Done()
+	for !s.load() {
+		select {
+		case <-s.closeChan:
+			return
+		case <-time.After(s.interval):
+		}
+	}
+	close(loaded)
+	ticker := time.NewTicker(s.interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.sync()
+		case <-s.closeChan:
+			return
+		}
+	}
+}
+
+// load reads every row written in the last day and keeps those of their key's current period,
+// and reports whether it succeeded
+func (s *Service) load() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), loadTimeout)
+	defer cancel()
+	started := time.Now()
+	dbNow, err := s.syncClock(ctx)
+	if err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot load usage; retrying in %v", s.interval)
+		return false
+	}
+	n, err := s.read(ctx, dbNow-daySeconds)
+	if err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot load usage; retrying in %v", s.interval)
+		return false
+	}
+	s.watermark, s.prunedAt = dbNow, dbNow
+	log.Tag(tag).Info("Loaded usage of %d key(s) in %v", n, time.Since(started).Round(time.Millisecond))
+	return true
+}
+
+// sync is one round of the sync worker: measure the database clock, write the unflushed counts
+// of the promoted keys, read back the rows changed since the last round, and prune once in a
+// while. Every error is logged and leaves the state as it was, for the next round.
+func (s *Service) sync() {
+	ctx, cancel := context.WithTimeout(context.Background(), statementTimeout)
+	dbNow, err := s.syncClock(ctx)
+	cancel()
+	if err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot read the database clock; usage is not synced")
+		return
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), statementTimeout)
+	s.write(ctx)
+	cancel()
+	ctx, cancel = context.WithTimeout(context.Background(), statementTimeout)
+	_, err = s.read(ctx, s.watermark-int64(readOverlap/time.Second))
+	cancel()
+	if err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot read usage; counts of other nodes are stale until the next round")
+	} else {
+		s.watermark = dbNow
+	}
+	if dbNow-s.prunedAt >= int64(pruneInterval/time.Second) {
+		s.prunedAt = dbNow
+		ctx, cancel = context.WithTimeout(context.Background(), statementTimeout)
+		deleted, err := s.store.prune(ctx, dbNow-int64(pruneAfter/time.Second))
+		cancel()
+		if err != nil {
+			log.Tag(tag).Err(err).Warn("Cannot prune usage")
+		} else {
+			log.Tag(tag).Debug("Pruned %d usage row(s)", deleted)
+		}
+	}
+}
+
+// syncClock reads the database clock and remembers its offset from ours
+func (s *Service) syncClock(ctx context.Context) (int64, error) {
+	dbNow, err := s.store.clock(ctx)
+	if err != nil {
+		return 0, err
+	}
+	s.clockOffset.Store(int64(time.Unix(dbNow, 0).Sub(s.now())))
+	return dbNow, nil
+}
+
+// write writes the unflushed counts of the promoted keys. A written row moves its counts from
+// unflushed to base, so the total does not change and nothing is written twice; the counts of a
+// failed chunk stay unflushed for the next round.
+func (s *Service) write(ctx context.Context) {
+	rows := s.unflushedRows()
+	if len(rows) == 0 {
+		return
+	}
+	written, err := s.store.write(ctx, rows)
+	for i := range rows[:written] {
+		s.retire(&rows[i])
+	}
+	if err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot write usage, %d of %d key(s) written; the rest is retried", written, len(rows))
+	}
+}
+
+// unflushedRows returns the unflushed counts of the promoted keys, each under its counter's period
+func (s *Service) unflushedRows() []usageRow {
+	rows := make([]usageRow, 0)
+	for _, cs := range s.counters {
+		cs.mu.Lock()
+		for key, c := range cs.counters {
+			if c.promoted && c.unflushed != [numDaily]int64{} {
+				rows = append(rows, usageRow{
+					key:         key,
+					periodStart: c.periodStart,
+					counts:      c.unflushed,
+				})
+			}
+		}
+		cs.mu.Unlock()
+	}
+	return rows
+}
+
+// retire moves a written row's counts from unflushed to base. A counter that rolled over since
+// was started over; its new counts are not the row's.
+func (s *Service) retire(r *usageRow) {
+	cs := s.counters[shardIndex(r.key)]
+	cs.mu.Lock()
+	defer cs.mu.Unlock()
+	c, ok := cs.counters[r.key]
+	if !ok || c.periodStart != r.periodStart {
+		return
+	}
+	for i := 0; i < numDaily; i++ {
+		c.unflushed[i] -= r.counts[i]
+		c.base[i] += r.counts[i]
+	}
+}
+
+// read sets the base of every key with a row of its current period written since the given
+// database time, creating counters as needed; a key with a row is promoted, so this node's
+// counts of it are written too. It returns how many rows it applied.
+func (s *Service) read(ctx context.Context, since int64) (int, error) {
+	dbNow := s.dbTime(s.now())
+	applied := 0
+	err := s.store.readSince(ctx, since, func(r *usageRow) {
+		start := periodStart(r.key, dbNow)
+		if r.periodStart != start {
+			return // Stale, or a period this node's clock has not reached yet (the next read has it)
+		}
+		cs := s.counters[shardIndex(r.key)]
+		cs.mu.Lock()
+		c := cs.counterNoLock(r.key, start)
+		if c.periodStart == start {
+			c.base = r.counts
+			c.promoted = true
+			applied++
+		}
+		cs.mu.Unlock()
+	})
+	return applied, err
 }
 
 // takeTokens marks the key as used and takes n tokens from its bucket for the rule, if the rule

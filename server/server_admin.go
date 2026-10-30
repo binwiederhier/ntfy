@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -47,14 +46,6 @@ var (
 		Billing: &user.Billing{}, // Read by the visitor's log context
 	}
 )
-
-// peerCredentials identifies the process on the other end of a unix socket connection, for the
-// audit log. Zero values mean "unknown" (other OS, or the lookup failed).
-type peerCredentials struct {
-	UID int
-	GID int
-	PID int
-}
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	return s.writeJSON(w, &apiVersionResponse{
@@ -514,8 +505,7 @@ func (s *Server) startAdminSocket() {
 	}
 	s.adminSocketListener = listener
 	s.adminSocketServer = &http.Server{
-		Handler:     http.HandlerFunc(s.handleAdminSocket),
-		ConnContext: adminSocketConnContext,
+		Handler: http.HandlerFunc(s.handleAdminSocket),
 	}
 	go func(server *http.Server) {
 		// Not fed into Run's error channel: losing the socket must not take the server down
@@ -566,12 +556,6 @@ func (s *Server) handleAdminSocket(w http.ResponseWriter, r *http.Request) {
 	if err := s.handleInternal(w, r, v); err != nil {
 		s.handleError(w, r, v, err)
 	}
-}
-
-// adminSocketConnContext is the http.Server ConnContext for the admin socket: it reads the
-// peer's credentials once per connection and stores them for the handlers' audit log.
-func adminSocketConnContext(ctx context.Context, conn net.Conn) context.Context {
-	return context.WithValue(ctx, contextAdminSocketPeer, readPeerCredentials(conn))
 }
 
 func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
@@ -762,16 +746,9 @@ func isAdminSocketRequest(r *http.Request) bool {
 
 // adminLog returns the audit log event for a mutating admin request, with how it arrived
 func adminLog(v *visitor, r *http.Request) *log.Event {
-	if !isAdminSocketRequest(r) {
-		return logvr(v, r).Tag(tagAdmin).Field("admin_via", "http")
+	via := "http"
+	if isAdminSocketRequest(r) {
+		via = "socket"
 	}
-	ev := logvr(v, r).Tag(tagAdmin).Field("admin_via", "socket")
-	if peer, err := fromContext[peerCredentials](r, contextAdminSocketPeer); err == nil {
-		ev = ev.Fields(log.Context{
-			"peer_uid": peer.UID,
-			"peer_gid": peer.GID,
-			"peer_pid": peer.PID,
-		})
-	}
-	return ev
+	return logvr(v, r).Tag(tagAdmin).Field("admin_via", via)
 }

@@ -13,9 +13,8 @@ const (
 	contextRateVisitor contextKey = iota + 2586
 	contextTopic
 	contextMatrixPushKey
-	contextVisitorIP       // Client IP extracted in maybeAuthenticate; reused by the abuse ban-feed (see ban.Service.Record)
-	contextAdminSocket     // Set (to true) on requests that arrived over the admin socket, see isAdminSocketRequest
-	contextAdminSocketPeer // peerCredentials of the admin socket connection, for the audit log
+	contextVisitorIP   // Client IP extracted in maybeAuthenticate; reused by the abuse ban-feed (see ban.Service.Record)
+	contextAdminSocket // Set (to true) on requests that arrived over the admin socket, see isAdminSocketRequest
 )
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {

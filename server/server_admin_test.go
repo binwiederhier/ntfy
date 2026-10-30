@@ -13,7 +13,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -1407,10 +1406,7 @@ func TestAdminSocket_DisabledWithoutPathOrAuth(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
-func TestAdminSocket_AuditLogPeerCredentials(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("peer credentials are only read on Linux")
-	}
+func TestAdminSocket_AuditLog(t *testing.T) {
 	_, socket := newTestServerWithAdminSocket(t, newTestConfigWithAuthFile(t, ""))
 	output := captureLog(t, func() {
 		resp, err := adminSocketClient(socket).Post("http://ntfy/v1/users", "application/json", strings.NewReader(`{"username":"ben","password":"ben"}`))
@@ -1420,8 +1416,6 @@ func TestAdminSocket_AuditLogPeerCredentials(t *testing.T) {
 	})
 	require.Contains(t, output, "Adding user ben")
 	require.Contains(t, output, "admin_via=socket")
-	require.Contains(t, output, fmt.Sprintf("peer_uid=%d", os.Getuid()))
-	require.Contains(t, output, fmt.Sprintf("peer_pid=%d", os.Getpid()))
 }
 
 func TestAdminSocket_NoBanFeed(t *testing.T) {

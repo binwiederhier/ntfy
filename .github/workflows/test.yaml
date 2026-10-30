@@ -62,4 +62,4 @@ jobs:
         run: mkdir -p server/docs server/site && touch server/docs/index.html server/site/app.html
       - name: Run Windows-specific tests
         shell: bash
-        run: go test -count=1 -run 'AdminSocket|DefaultListenAdminUnix' ./server/
+        run: go test -v -count=1 -run 'AdminSocket|DefaultListenAdminUnix' ./server/

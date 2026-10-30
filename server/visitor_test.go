@@ -188,22 +188,30 @@ func TestVisitor_TierFieldChangeAppliesAtOnce(t *testing.T) {
 }
 
 func TestVisitor_EmailDailyLimitCapsBelowBurst(t *testing.T) {
-	// The daily email limit (what the account page shows) is enforced, not only the bucket: with
-	// a burst of 16 and a refill every 12 hours, the day's limit is 2, and the third email is
-	// denied even though the bucket has tokens
-	c := newTestConfig(t, "")
+	// A tier's daily email limit (what the account page shows) is enforced, not only the bucket:
+	// with a daily limit of 2 and a burst of 16, the third email is denied even though the bucket
+	// has tokens
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorEmailLimitBurst = 16
-	c.VisitorEmailLimitReplenish = 12 * time.Hour
 	s := newTestServer(t, c)
 	s.mailer = &testMailer{}
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 10,
+		EmailLimit:   2,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 	for i := 0; i < 2; i++ {
 		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-			"Email": "test@email.com",
+			"Authorization": util.BasicAuth("phil", "phil"),
+			"Email":         "test@email.com",
 		})
 		require.Equal(t, 200, response.Code)
 	}
 	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-		"Email": "test@email.com",
+		"Authorization": util.BasicAuth("phil", "phil"),
+		"Email":         "test@email.com",
 	})
 	require.Equal(t, 429, response.Code)
 	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
@@ -337,16 +345,9 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 	require.True(t, vip.AccountActionAllowed())
 }
 
-func TestVisitor_NewVisitorIsNotStale(t *testing.T) {
-	// A visitor is seen when it is built for a request, like it was when visitors were shared
-	s := newTestServer(t, newTestConfig(t, ""))
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	require.False(t, v.Stale())
-}
-
 func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
 	// A subscriber from a request-limit-exempt prefix spends nothing before it becomes a topic's
-	// rate visitor; the topic must still keep it. Fails if a new visitor counts as stale.
+	// rate visitor; the topic must still keep it. Fails if a new rate visitor counts as stale.
 	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.0/24")}
@@ -356,7 +357,7 @@ func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
-	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics, false))
+	s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics)
 	require.NotNil(t, topics[0].RateVisitor())
 }
 
@@ -730,10 +731,37 @@ func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
-	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics, false))
+	s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics)
 	s.limiter.Prune(0) // The key is gone, the subscriber is not
 	require.NotNil(t, topics[0].RateVisitor())
-	v.seen.Store(time.Now().Add(-2 * visitorExpungeAfter).UnixNano()) // The subscriber is gone
-	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK)    // A publisher charges the key
+	ageRateVisitor(topics[0], 2*visitorExpungeAfter)               // The subscriber is gone
+	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK) // A publisher charges the key
 	require.Nil(t, topics[0].RateVisitor())
+}
+
+func TestVisitor_EmailsWithoutTierHaveNoDailyCap(t *testing.T) {
+	// Without a tier, emails are limited by the email bucket alone, as before: the daily limit derived
+	// from the refill (24 with a refill of an hour) is not a cap, so a full burst of 30 can be sent
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 30
+	c.VisitorEmailLimitReplenish = time.Hour
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	for i := 0; i < 30; i++ {
+		require.True(t, v.EmailAllowed(), "email %d", i)
+	}
+	require.False(t, v.EmailAllowed())
+}
+
+func TestVisitor_EmailsWithoutTierAllowedWithSlowRefill(t *testing.T) {
+	// A refill slower than a day derives a daily limit of zero, which must not turn off email
+	// without a tier: the bucket alone limits it
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 2
+	c.VisitorEmailLimitReplenish = 48 * time.Hour
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.True(t, v.EmailAllowed())
+	require.True(t, v.EmailAllowed())
+	require.False(t, v.EmailAllowed())
 }

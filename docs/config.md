@@ -1933,7 +1933,7 @@ of messages a visitor can send in a day. The usage day starts over every day at 
 The daily counts (messages, e-mails and phone calls) are kept in a database if `usage-file` (SQLite) or `database-url`
 (PostgreSQL) is set, so they survive a restart; a crash loses at most the last 5 seconds of counting. Without either, they
 are counted in memory only and start over with every restart. With a database, idle visitors are also dropped from
-memory after a few minutes instead of a day, since their counts are in the database (an anonymous visitor only gets a
+memory after a few minutes instead of a day (once their rate limits are full again), since their counts are in the database (an anonymous visitor only gets a
 row once it has used 1% of a daily quota, so the many visitors that publish once or twice never touch it). In an
 [experimental cluster](#clustering-experimental), the counts are shared by all nodes through the database, and the
 request, e-mail and other rate limit buckets converge across the nodes within seconds, so a client spread over several

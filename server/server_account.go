@@ -96,6 +96,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			ReservationsRemaining:        stats.ReservationsRemaining,
 			AttachmentTotalSize:          stats.AttachmentTotalSize,
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
+			ResetAt:                      stats.ResetAt.Unix(),
 		},
 	}
 	u := v.User()

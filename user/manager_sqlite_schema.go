@@ -364,20 +364,20 @@ const (
 	`
 )
 
-// The usage table holds the visitors' daily usage counts (see package limit, which reads and writes
-// it). It lives here so a single-node server keeps it in its user database, under the user schema's
-// migrations.
+// The usage table holds the visitors' daily usage counts, one row per key, 24h period and kind (see
+// package limit, which reads and writes it). It lives here so a single-node server keeps it in its
+// user database, under the user schema's migrations.
 const (
 	sqliteCreateUsageTableQuery = `
 		CREATE TABLE IF NOT EXISTS usage (
 			key TEXT NOT NULL,
-			day TEXT NOT NULL,
+			period INT NOT NULL,
 			kind TEXT NOT NULL,
 			count INT NOT NULL DEFAULT 0,
 			updated_at INT NOT NULL,
-			PRIMARY KEY (key, day, kind)
+			PRIMARY KEY (key, period, kind)
 		);
-		CREATE INDEX IF NOT EXISTS idx_usage_day_updated_at ON usage (day, updated_at);
+		CREATE INDEX IF NOT EXISTS idx_usage_updated_at ON usage (updated_at);
 	`
 )
 

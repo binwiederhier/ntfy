@@ -563,8 +563,8 @@ func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 	})
 }
 
-func TestVisitor_DayRolloverKeepsEmailBucket(t *testing.T) {
-	// The day rollover starts the day's counts over, but it does not refill the email bucket: a
+func TestVisitor_RolloverKeepsEmailBucket(t *testing.T) {
+	// The daily rollover starts the counts over, but it does not refill the email bucket: a
 	// visitor who emptied it right before the rollover still has to wait for the refill
 	c := newTestConfig(t, "")
 	c.VisitorMessageDailyLimit = 2
@@ -583,7 +583,7 @@ func TestVisitor_DayRolloverKeepsEmailBucket(t *testing.T) {
 	require.Equal(t, 42908, toHTTPError(t, response.Body.String()).Code)
 
 	// After the rollover: messages are back, emails are not
-	s.limiter.RollDayForTest("2099-01-01")
+	s.limiter.ShiftClockForTest(24 * time.Hour)
 	response = request(t, s, "GET", "/v1/account", "", nil)
 	require.Equal(t, 200, response.Code)
 	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))

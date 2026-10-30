@@ -348,7 +348,6 @@ func New(conf *Config) (*Server, error) {
 	}
 	s.userManager = userManager
 	s.limiter = limit.New(&limit.Config{
-		ResetTime:     conf.VisitorStatsResetTime,
 		FlushInterval: conf.UsageFlushInterval,
 	}, createUsageStore(pool, userManager))
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)

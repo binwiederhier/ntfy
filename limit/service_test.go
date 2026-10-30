@@ -35,7 +35,6 @@ func newTestServiceWithClock(t *testing.T) (*Service, *testClock) {
 	t.Helper()
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
 	conf := &Config{
-		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
 		FlushInterval: time.Hour,
 	}
 	return newService(conf, clock.now, nil), clock
@@ -81,7 +80,7 @@ func TestService_Allow_Bucket(t *testing.T) {
 }
 
 func TestService_Allow_Daily(t *testing.T) {
-	s, _ := newTestServiceWithClock(t) // Noon UTC, 12 hours before the reset
+	s, clock := newTestServiceWithClock(t) // Noon UTC; key "k" resets at 06:53:30 UTC (see TestKeyOffset_StableAndSpread)
 	rule := Rule{
 		Kind:  KindMessages,
 		Daily: 2,
@@ -90,16 +89,20 @@ func TestService_Allow_Daily(t *testing.T) {
 	require.True(t, s.Allow("k", rule, 1).OK)
 	d := s.Allow("k", rule, 1)
 	require.False(t, d.OK)
-	require.Equal(t, 12*time.Hour, d.RetryAfter)
+	require.Equal(t, 18*time.Hour+53*time.Minute+30*time.Second, d.RetryAfter) // Until the key's own reset, not midnight
+	require.Equal(t, time.Date(2026, 10, 26, 6, 53, 30, 0, time.UTC), s.ResetAt("k"))
 	require.Equal(t, int64(2), s.Usage("k").Count(KindMessages))
 
 	// Denied usage is not counted
 	require.Equal(t, int64(2), s.Usage("k").Count(KindMessages))
 
-	// The next day starts over (see TestService_DayRollover)
-	s.RollDayForTest("2099-01-01")
+	// Midnight UTC changes nothing; the key's own reset starts over (see TestService_PeriodRollover)
+	clock.advance(12 * time.Hour)
+	require.False(t, s.Allow("k", rule, 1).OK)
+	clock.advance(d.RetryAfter - 12*time.Hour)
 	require.Equal(t, int64(0), s.Usage("k").Count(KindMessages))
 	require.True(t, s.Allow("k", rule, 1).OK)
+	require.Equal(t, time.Date(2026, 10, 27, 6, 53, 30, 0, time.UTC), s.ResetAt("k"))
 }
 
 func TestService_Allow_BucketAndDaily(t *testing.T) {
@@ -121,7 +124,7 @@ func TestService_Allow_BucketAndDaily(t *testing.T) {
 	clock.advance(time.Hour)
 	d = s.Allow("k", rule, 1)
 	require.False(t, d.OK)
-	require.Equal(t, 11*time.Hour-time.Minute, d.RetryAfter) // The daily cap is what denies now
+	require.Equal(t, s.ResetAt("k").Sub(clock.now()), d.RetryAfter) // The daily cap is what denies now, until the key's own reset
 	require.Equal(t, int64(3), s.Usage("k").Count(KindEmails))
 }
 
@@ -304,7 +307,7 @@ func TestService_Prune_KeepsKeyUntilBucketsRefill(t *testing.T) {
 }
 
 func TestService_Allow_Concurrent(t *testing.T) {
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
+	s := New(&Config{}, nil)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  500,
@@ -339,7 +342,7 @@ func TestService_Allow_Concurrent(t *testing.T) {
 }
 
 func BenchmarkAllow_HotKey(b *testing.B) {
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
+	s := New(&Config{}, nil)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -354,7 +357,7 @@ func BenchmarkAllow_HotKey(b *testing.B) {
 }
 
 func BenchmarkAllow_ManyKeys(b *testing.B) {
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
+	s := New(&Config{}, nil)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -373,7 +376,7 @@ func BenchmarkAllow_ManyKeys(b *testing.B) {
 }
 
 func BenchmarkAllow_Parallel(b *testing.B) {
-	s := New(&Config{ResetTime: time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)}, nil)
+	s := New(&Config{}, nil)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -396,7 +399,6 @@ func BenchmarkAllow_Parallel(b *testing.B) {
 func newPersistentTestService(t *testing.T, store *Store, clock *testClock) *Service {
 	t.Helper()
 	conf := &Config{
-		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
 		FlushInterval: time.Hour,
 	}
 	s := newService(conf, clock.now, store)
@@ -453,16 +455,16 @@ func TestService_Persist_Threshold(t *testing.T) {
 		} // 1% of the quota, rounded up
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 2).OK)
 		s.flush()
-		rows, err := store.readKeys(context.Background(), s.today(), []string{"ip:1.2.3.4"})
+		rows, err := store.readKeys(context.Background(), []string{"ip:1.2.3.4"})
 		require.Nil(t, err)
 		require.Empty(t, rows) // Below the threshold: no row
 
 		// The third message promotes the key; the row then carries everything, not just the delta since
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 		s.flush()
-		rows, err = store.readKeys(context.Background(), s.today(), []string{"ip:1.2.3.4"})
+		rows, err = store.readKeys(context.Background(), []string{"ip:1.2.3.4"})
 		require.Nil(t, err)
-		require.Equal(t, map[string]int64{"ip:1.2.3.4/messages": 3}, rowsByKeyKind(rows))
+		require.Equal(t, map[string]int64{"ip:1.2.3.4/messages": 3}, rowsByKeyKind(rows, s.periodNow("ip:1.2.3.4")))
 
 		// Bucket kinds are never persisted, whatever the threshold
 		require.True(t, s.Allow("ip:1.2.3.4", Rule{
@@ -471,7 +473,7 @@ func TestService_Persist_Threshold(t *testing.T) {
 			Refill: time.Second,
 		}, 50).OK)
 		s.flush()
-		rows, err = store.readKeys(context.Background(), s.today(), []string{"ip:1.2.3.4"})
+		rows, err = store.readKeys(context.Background(), []string{"ip:1.2.3.4"})
 		require.Nil(t, err)
 		require.Len(t, rows, 1)
 	})
@@ -500,44 +502,64 @@ func TestService_Persist_FlushErrorRetainsDeltas(t *testing.T) {
 		s.setStore(good)
 		s.flush()
 		s.flush()
-		rows, err := good.readKeys(context.Background(), s.today(), []string{"user:u_1"})
+		rows, err := good.readKeys(context.Background(), []string{"user:u_1"})
 		require.Nil(t, err)
-		require.Equal(t, map[string]int64{"user:u_1/messages": 3}, rowsByKeyKind(rows))
+		require.Equal(t, map[string]int64{"user:u_1/messages": 3}, rowsByKeyKind(rows, s.periodNow("user:u_1")))
 		require.Equal(t, int64(3), s.Usage("user:u_1").Count(KindMessages))
 	})
 }
 
-func TestService_Persist_DayFromDatabaseClock(t *testing.T) {
+func TestService_Persist_PeriodFromDatabaseClock(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
-		// This node's clock is years off; the usage day still follows the database's clock
-		clock := &testClock{t: time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC)}
-		s := newPersistentTestService(t, newStore(), clock)
-		s.flush()
-		require.Equal(t, time.Now().UTC().Format("2006-01-02"), s.today())
+		// Two nodes whose clocks are years and hours off agree on the key's period, because it
+		// follows the database's clock, and so they read back each other's rows
+		a := newPersistentTestService(t, newStore(), &testClock{t: time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC)})
+		b := newPersistentTestService(t, newStore(), &testClock{t: time.Now().Add(13 * time.Hour)})
+		a.flush()
+		b.flush()
+		require.Equal(t, periodOf("user:u_1", time.Now()), a.periodNow("user:u_1"))
+		require.Equal(t, a.periodNow("user:u_1"), b.periodNow("user:u_1"))
+		require.Equal(t, a.ResetAt("user:u_1"), b.ResetAt("user:u_1"))
+		require.True(t, a.Allow("user:u_1", Rule{
+			Kind:  KindMessages,
+			Daily: 10,
+		}, 4).OK)
+		a.flush()
+		usage, err := b.Lookup("user:u_1")
+		require.Nil(t, err)
+		require.Equal(t, int64(4), usage.Count(KindMessages))
 	})
 }
 
-func TestService_DayRollover(t *testing.T) {
-	// In memory (no store), the day follows the local clock: at the reset time the counts start
-	// over at the next flush, with no reset job
+func TestService_PeriodRollover(t *testing.T) {
+	// Each key starts over at its own time, 24 hours after its period started, with no reset job:
+	// "k" at 06:53:30 UTC, "other" at 09:12:21 UTC (see TestKeyOffset_StableAndSpread)
 	s, clock := newTestServiceWithClock(t) // Noon UTC
 	rule := Rule{
 		Kind:  KindMessages,
 		Daily: 3,
 	}
-	require.True(t, s.Allow("k", rule, 3).OK)
-	require.False(t, s.Allow("k", rule, 1).OK)
-	clock.advance(11 * time.Hour)
-	s.flush()
-	require.False(t, s.Allow("k", rule, 1).OK) // Still the same day
-	clock.advance(2 * time.Hour)
-	s.flush()
+	for _, key := range []string{"k", "other"} {
+		require.True(t, s.Allow(key, rule, 3).OK)
+		require.False(t, s.Allow(key, rule, 1).OK)
+	}
+	require.Equal(t, time.Date(2026, 10, 26, 6, 53, 30, 0, time.UTC), s.ResetAt("k"))
+	require.Equal(t, time.Date(2026, 10, 26, 9, 12, 21, 0, time.UTC), s.ResetAt("other"))
+	clock.advance(s.ResetAt("k").Sub(clock.now()) - time.Second)
+	require.False(t, s.Allow("k", rule, 1).OK) // One second before its reset
+	clock.advance(time.Second)
 	require.Equal(t, int64(0), s.Usage("k").Count(KindMessages))
 	require.True(t, s.Allow("k", rule, 1).OK)
 	require.Equal(t, int64(1), s.Usage("k").Count(KindMessages))
+	require.Equal(t, int64(3), s.Usage("other").Count(KindMessages)) // Not yet
+	require.False(t, s.Allow("other", rule, 1).OK)
+	clock.advance(s.ResetAt("other").Sub(clock.now()))
+	require.True(t, s.Allow("other", rule, 1).OK)
+	require.Equal(t, int64(1), s.Usage("other").Count(KindMessages))
+	require.Equal(t, int64(1), s.Usage("k").Count(KindMessages))
 }
 
-func TestService_Persist_DayRolloverKeepsYesterdaysRows(t *testing.T) {
+func TestService_Persist_PeriodRolloverKeepsOldRows(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
@@ -547,20 +569,31 @@ func TestService_Persist_DayRolloverKeepsYesterdaysRows(t *testing.T) {
 			Daily: 10,
 		}, 4).OK)
 		s.flush()
-		today := s.today()
-		s.RollDayForTest("2099-01-01")
+		before := s.periodNow("user:u_1")
+		s.ShiftClockForTest(24 * time.Hour)
+		require.Equal(t, before+1, s.periodNow("user:u_1"))
 		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages))
 		require.True(t, s.Allow("user:u_1", Rule{
 			Kind:  KindMessages,
 			Daily: 10,
 		}, 1).OK)
 		s.flush()
-		rows, err := store.readKeys(context.Background(), today, []string{"user:u_1"})
+		rows, err := store.readKeys(context.Background(), []string{"user:u_1"})
 		require.Nil(t, err)
-		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
-		rows, err = store.readKeys(context.Background(), "2099-01-01", []string{"user:u_1"})
+		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows, before))
+		require.Equal(t, map[string]int64{"user:u_1/messages": 1}, rowsByKeyKind(rows, before+1))
+
+		// A restart within the period keeps the count; in the next period it is gone
+		s.Close()
+		restarted := newPersistentTestService(t, newStore(), clock)
+		restarted.ShiftClockForTest(24 * time.Hour)
+		usage, err := restarted.Lookup("user:u_1")
 		require.Nil(t, err)
-		require.Equal(t, map[string]int64{"user:u_1/messages": 1}, rowsByKeyKind(rows))
+		require.Equal(t, int64(1), usage.Count(KindMessages))
+		restarted.ShiftClockForTest(24 * time.Hour)
+		usage, err = restarted.Lookup("user:u_1")
+		require.Nil(t, err)
+		require.Equal(t, int64(0), usage.Count(KindMessages))
 	})
 }
 
@@ -650,12 +683,15 @@ func TestService_Persist_PruneStore(t *testing.T) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
-		old := clock.now().Add(-usageRetention - 24*time.Hour).UTC().Format("2006-01-02")
-		_, err := store.flush(context.Background(), old, []usageRow{{
-			key:   "user:u_1",
-			kind:  KindMessages,
-			count: 1,
+		old := s.periodNow("user:u_1") - 3
+		_, err := store.flush(context.Background(), []usageRow{{
+			key:    "user:u_1",
+			period: old,
+			kind:   KindMessages,
+			count:  1,
 		}})
+		require.Nil(t, err)
+		_, err = store.db.Exec(`UPDATE usage SET updated_at = updated_at - 3 * 24 * 3600`) // Last written three days ago
 		require.Nil(t, err)
 		require.True(t, s.Allow("user:u_1", Rule{
 			Kind:  KindMessages,
@@ -663,12 +699,10 @@ func TestService_Persist_PruneStore(t *testing.T) {
 		}, 1).OK)
 		s.flush()
 		require.Nil(t, s.PruneStore())
-		rows, err := store.readKeys(context.Background(), old, []string{"user:u_1"})
-		require.Nil(t, err)
-		require.Empty(t, rows)
-		rows, err = store.readKeys(context.Background(), s.today(), []string{"user:u_1"})
+		rows, err := store.readKeys(context.Background(), []string{"user:u_1"})
 		require.Nil(t, err)
 		require.Len(t, rows, 1)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 1}, rowsByKeyKind(rows, s.periodNow("user:u_1")))
 	})
 }
 
@@ -676,7 +710,6 @@ func TestService_Persist_Loops(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		// With the loops on, two services converge on their own
 		conf := &Config{
-			ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
 			FlushInterval: 100 * time.Millisecond,
 		}
 		a := New(conf, newStore())
@@ -701,7 +734,6 @@ func BenchmarkFlush(b *testing.B) {
 	// 10,000 promoted keys with a delta each, flushed to SQLite in one go
 	store := NewSQLiteStore(newTestUserDB(b))
 	s := New(&Config{
-		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
 		FlushInterval: time.Hour,
 	}, store)
 	defer s.Close()
@@ -802,40 +834,41 @@ func TestService_Forget(t *testing.T) {
 	})
 }
 
-func TestService_Persist_DayRolloverWritesYesterdaysPending(t *testing.T) {
-	// Codex review #2: the rollover cleared what was counted in the day's last flush interval
-	// before it was written, so every day lost its last few seconds of usage
+func TestService_Persist_PeriodRolloverWritesPendingUnderOldPeriod(t *testing.T) {
+	// Codex review #2: a rollover must not clear what was counted in the period's last flush
+	// interval before it is written. An idle key's unwritten counts are written under the period
+	// they were counted in; the next use of the key in the new period starts it at zero.
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		store := newStore()
 		s := newPersistentTestService(t, store, clock)
-		yesterday := s.today()
+		before := s.periodNow("user:u_1")
 		require.True(t, s.Allow("user:u_1", Rule{
 			Kind:  KindMessages,
 			Daily: 10,
 		}, 4).OK) // Not flushed
-		s.RollDayForTest("2099-01-01")
-		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages)) // The new day starts at zero
+		s.ShiftClockForTest(24 * time.Hour)
+		require.Equal(t, int64(0), s.Usage("user:u_1").Count(KindMessages)) // The new period starts at zero
+		s.flush()
+		rows, err := store.readKeys(context.Background(), []string{"user:u_1"})
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows, before))
 		require.True(t, s.Allow("user:u_1", Rule{
 			Kind:  KindMessages,
 			Daily: 10,
 		}, 1).OK)
 		s.flush()
-		rows, err := store.readKeys(context.Background(), yesterday, []string{"user:u_1"})
-		require.Nil(t, err)
-		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
-		rows, err = store.readKeys(context.Background(), "2099-01-01", []string{"user:u_1"})
-		require.Nil(t, err)
-		require.Equal(t, map[string]int64{"user:u_1/messages": 1}, rowsByKeyKind(rows))
 		s.flush() // Written once, not again
-		rows, err = store.readKeys(context.Background(), yesterday, []string{"user:u_1"})
+		rows, err = store.readKeys(context.Background(), []string{"user:u_1"})
 		require.Nil(t, err)
-		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows))
+		require.Equal(t, map[string]int64{"user:u_1/messages": 4}, rowsByKeyKind(rows, before))
+		require.Equal(t, map[string]int64{"user:u_1/messages": 1}, rowsByKeyKind(rows, before+1))
+		require.Equal(t, int64(1), s.Usage("user:u_1").Count(KindMessages))
 	})
 }
 
-func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
-	// An outage spanning midnight must not lose the retained deltas of the day before
+func TestService_Persist_OutageAcrossRolloverKeepsDeltas(t *testing.T) {
+	// An outage spanning a key's reset must not lose the retained deltas of the period before
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := &testClock{t: time.Now()}
 		good := newStore()
@@ -845,19 +878,19 @@ func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
 		closed.Close()
 		broken.db = db.New(&db.Host{DB: closed}, nil)
 		s := newPersistentTestService(t, broken, clock)
-		yesterday := s.today()
+		before := s.periodNow("user:u_1")
 		require.True(t, s.Allow("user:u_1", Rule{
 			Kind:  KindMessages,
 			Daily: 10,
 		}, 3).OK)
 		s.flush() // Fails: retained
-		s.RollDayForTest("2099-01-01")
+		s.ShiftClockForTest(24 * time.Hour)
 		s.flush() // Still failing: still retained
 		s.setStore(good)
 		s.flush()
-		rows, err := good.readKeys(context.Background(), yesterday, []string{"user:u_1"})
+		rows, err := good.readKeys(context.Background(), []string{"user:u_1"})
 		require.Nil(t, err)
-		require.Equal(t, map[string]int64{"user:u_1/messages": 3}, rowsByKeyKind(rows))
+		require.Equal(t, map[string]int64{"user:u_1/messages": 3}, rowsByKeyKind(rows, before))
 	})
 }
 
@@ -946,8 +979,8 @@ func TestService_FirebaseKind(t *testing.T) {
 	require.Equal(t, KindFirebase, kind)
 }
 
-func TestService_DayRollover_KeepsBuckets(t *testing.T) {
-	// The day rollover starts the counts over, but the buckets keep their tokens: an email bucket
+func TestService_PeriodRollover_KeepsBuckets(t *testing.T) {
+	// The rollover starts the counts over, but the buckets keep their tokens: an email bucket
 	// emptied right before the rollover is not refilled by it (the daily reset used to)
 	s, _ := newTestServiceWithClock(t)
 	rule := Rule{
@@ -957,12 +990,12 @@ func TestService_DayRollover_KeepsBuckets(t *testing.T) {
 		Daily:  3,
 	}
 	require.True(t, s.Allow("k", rule, 2).OK)
-	s.RollDayForTest("2099-01-01")
+	s.ShiftClockForTest(24 * time.Hour)
 	require.Equal(t, int64(0), s.Usage("k").Count(KindEmails))
 	require.Equal(t, int64(0), s.Tokens("k", rule))
 	d := s.Allow("k", rule, 1)
 	require.False(t, d.OK)
-	require.Equal(t, time.Hour, d.RetryAfter) // The bucket is what denies, not the day
+	require.Equal(t, time.Hour, d.RetryAfter) // The bucket is what denies, not the daily cap
 }
 
 // Fails if Allow stops debiting bucket tokens; weighted concurrent calls must share one burst.
@@ -995,8 +1028,8 @@ func TestService_Allow_ConcurrentBucketOnly(t *testing.T) {
 	require.Zero(t, s.Tokens("hot", rule))
 }
 
-// Fails if the day rollover also clears buckets; a rollover racing with publishes grants only one new daily allowance.
-func TestService_DayRollover_ConcurrentAllow(t *testing.T) {
+// Fails if the rollover also clears buckets; a rollover racing with publishes grants only one new daily allowance.
+func TestService_PeriodRollover_ConcurrentAllow(t *testing.T) {
 	for round := 0; round < 20; round++ {
 		s := newTestService(t)
 		rule := Rule{
@@ -1024,7 +1057,7 @@ func TestService_DayRollover_ConcurrentAllow(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			s.RollDayForTest("2099-01-01")
+			s.ShiftClockForTest(24 * time.Hour)
 		}()
 		close(start)
 		wg.Wait()

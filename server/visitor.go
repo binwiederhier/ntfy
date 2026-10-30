@@ -75,6 +75,7 @@ type visitorStats struct {
 	ReservationsRemaining        int64
 	AttachmentTotalSize          int64
 	AttachmentTotalSizeRemaining int64
+	ResetAt                      time.Time // When the daily counts start over: the key's own 24h period ends
 }
 
 func newVisitorEnv(conf *Config, limiter *limit.Service, messageCache *message.Cache, userManager *user.Manager) *visitorEnv {
@@ -273,7 +274,7 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 	return v.env.limiter.Limiter(v.key, v.bandwidthRule())
 }
 
-// Usage returns the visitor's usage today as this node knows it (see limit.Service.Usage)
+// Usage returns the visitor's usage in its current 24h period as this node knows it (see limit.Service.Usage)
 func (v *visitor) Usage() limit.Usage {
 	return v.env.limiter.Usage(v.key)
 }
@@ -461,6 +462,7 @@ func (v *visitor) infoFromUsage(usage limit.Usage) *visitorInfo {
 			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - emails),
 			Calls:             calls,
 			CallsRemaining:    zeroIfNegative(limits.CallLimit - calls),
+			ResetAt:           v.env.limiter.ResetAt(v.key),
 		},
 	}
 }

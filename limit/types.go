@@ -33,7 +33,7 @@ type Rule struct {
 	Kind      Kind
 	Burst     int64         // Token bucket size; 0 for no bucket
 	Refill    time.Duration // Time to refill one token; 0 for a bucket that never refills
-	Daily     int64         // Daily cap; 0 for none
+	Daily     int64         // Cap per 24h period of the key (see periodOf); 0 for none
 	Threshold int64         // Daily count from which the key's usage of the kind is persisted; 0 persists from the first unit
 }
 
@@ -51,16 +51,14 @@ type Delta struct {
 	N    int64
 }
 
-// Usage is a key's usage of every kind today
+// Usage is a key's usage of every kind in its current period
 type Usage struct {
 	counts [numKinds]int64
 }
 
-// Config configures the service. ResetTime is the wall-clock time of day (UTC) at which the
-// usage day starts over. FlushInterval is how often usage is written to and read from the store
-// (DefaultFlushInterval when 0); tests set it.
+// Config configures the service. FlushInterval is how often usage is written to and read from
+// the store (DefaultFlushInterval when 0); tests set it.
 type Config struct {
-	ResetTime     time.Time
 	FlushInterval time.Duration
 }
 
@@ -111,7 +109,7 @@ func (l *limiter) AllowN(n int64) bool {
 	return l.s.Allow(l.key, l.rule, n).OK
 }
 
-// Value returns the key's usage of the kind today
+// Value returns the key's usage of the kind in its current period
 func (l *limiter) Value() int64 {
 	return l.s.Usage(l.key).Count(l.rule.Kind)
 }

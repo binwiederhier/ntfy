@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"slices"
 	"strings"
+	"time"
 
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/schema"
@@ -20,11 +21,12 @@ const (
 	readKeysChunk = 1000
 )
 
-// usageRow is one (key, kind, count) of one day: a delta on the way to the store, a sum on the way back
+// usageRow is one (key, period, kind, count): a delta on the way to the store, a sum on the way back
 type usageRow struct {
-	key   string
-	kind  Kind
-	count int64
+	key    string
+	period int64 // The key's usage period (see periodOf)
+	kind   Kind
+	count  int64
 }
 
 // Store persists the daily usage counts in the usage table, on SQLite or Postgres. Timestamps
@@ -83,16 +85,17 @@ func (s *Store) clock(ctx context.Context) (int64, error) {
 	return now, err
 }
 
-// flush adds the rows' counts to the day's rows (creating them as needed), in chunks of one
-// statement each. It returns how many rows are committed: on an error, the rows before that are.
-func (s *Store) flush(ctx context.Context, day string, rows []usageRow) (int, error) {
+// flush adds the rows' counts to the rows of their key, period and kind (creating them as
+// needed), in chunks of one statement each. It returns how many rows are committed: on an error,
+// the rows before that are.
+func (s *Store) flush(ctx context.Context, rows []usageRow) (int, error) {
 	written := 0
 	for chunk := range slices.Chunk(rows, flushChunkRows) {
 		var err error
 		if s.dialect == schema.Postgres {
-			err = s.flushPostgres(ctx, day, chunk)
+			err = s.flushPostgres(ctx, chunk)
 		} else {
-			err = s.flushSQLite(ctx, day, chunk)
+			err = s.flushSQLite(ctx, chunk)
 		}
 		if err != nil {
 			return written, err
@@ -102,20 +105,21 @@ func (s *Store) flush(ctx context.Context, day string, rows []usageRow) (int, er
 	return written, nil
 }
 
-// readSince returns the day's rows written at or after the given database time
-func (s *Store) readSince(ctx context.Context, day string, since int64) ([]usageRow, error) {
-	rows, err := s.db.QueryContext(ctx, s.queries.selectSince, day, since) // Deliberately the primary: the read must see this node's own just-flushed rows (replicas may lag)
+// readSince returns the rows written at or after the given database time, of any period
+func (s *Store) readSince(ctx context.Context, since int64) ([]usageRow, error) {
+	rows, err := s.db.QueryContext(ctx, s.queries.selectSince, since) // Deliberately the primary: the read must see this node's own just-flushed rows (replicas may lag)
 	if err != nil {
 		return nil, err
 	}
 	return scanUsageRows(rows)
 }
 
-// readKeys returns the day's rows of the given keys
-func (s *Store) readKeys(ctx context.Context, day string, keys []string) ([]usageRow, error) {
+// readKeys returns the rows of the given keys, of any period still in the table (at most the
+// current and the previous one, see prune)
+func (s *Store) readKeys(ctx context.Context, keys []string) ([]usageRow, error) {
 	result := make([]usageRow, 0)
 	for chunk := range slices.Chunk(keys, readKeysChunk) {
-		rows, err := s.readKeysChunk(ctx, day, chunk)
+		rows, err := s.readKeysChunk(ctx, chunk)
 		if err != nil {
 			return nil, err
 		}
@@ -124,24 +128,25 @@ func (s *Store) readKeys(ctx context.Context, day string, keys []string) ([]usag
 	return result, nil
 }
 
-// prune deletes the rows of days before the given one
-func (s *Store) prune(ctx context.Context, day string) error {
-	_, err := s.db.ExecContext(ctx, s.queries.prune, day)
+// prune deletes the rows not written for longer than retention, by the database clock
+func (s *Store) prune(ctx context.Context, retention time.Duration) error {
+	_, err := s.db.ExecContext(ctx, s.queries.prune, int64(retention.Seconds()))
 	return err
 }
 
-func (s *Store) flushPostgres(ctx context.Context, day string, rows []usageRow) error {
+func (s *Store) flushPostgres(ctx context.Context, rows []usageRow) error {
 	keys := make([]string, len(rows))
+	periods := make([]int64, len(rows))
 	kinds := make([]string, len(rows))
 	counts := make([]int64, len(rows))
 	for i, r := range rows {
-		keys[i], kinds[i], counts[i] = r.key, r.kind.String(), r.count
+		keys[i], periods[i], kinds[i], counts[i] = r.key, r.period, r.kind.String(), r.count
 	}
-	_, err := s.db.ExecContext(ctx, s.queries.upsert, day, keys, kinds, counts)
+	_, err := s.db.ExecContext(ctx, s.queries.upsert, keys, periods, kinds, counts)
 	return err
 }
 
-func (s *Store) flushSQLite(ctx context.Context, day string, rows []usageRow) error {
+func (s *Store) flushSQLite(ctx context.Context, rows []usageRow) error {
 	var query strings.Builder
 	query.WriteString(s.queries.upsertPrefix)
 	args := make([]any, 0, 4*len(rows))
@@ -150,21 +155,20 @@ func (s *Store) flushSQLite(ctx context.Context, day string, rows []usageRow) er
 			query.WriteString(", ")
 		}
 		query.WriteString(s.queries.upsertRow)
-		args = append(args, r.key, day, r.kind.String(), r.count)
+		args = append(args, r.key, r.period, r.kind.String(), r.count)
 	}
 	query.WriteString(s.queries.upsertConflict)
 	_, err := s.db.ExecContext(ctx, query.String(), args...)
 	return err
 }
 
-func (s *Store) readKeysChunk(ctx context.Context, day string, keys []string) ([]usageRow, error) {
+func (s *Store) readKeysChunk(ctx context.Context, keys []string) ([]usageRow, error) {
 	var rows *sql.Rows
 	var err error
 	if s.dialect == schema.Postgres {
-		rows, err = s.db.QueryContext(ctx, s.queries.selectKeys, day, keys)
+		rows, err = s.db.QueryContext(ctx, s.queries.selectKeys, keys)
 	} else {
-		args := make([]any, 0, len(keys)+1)
-		args = append(args, day)
+		args := make([]any, 0, len(keys))
 		for _, key := range keys {
 			args = append(args, key)
 		}
@@ -177,15 +181,15 @@ func (s *Store) readKeysChunk(ctx context.Context, day string, keys []string) ([
 	return scanUsageRows(rows)
 }
 
-// scanUsageRows reads (key, kind, count) rows; a kind this build does not know (a newer node
-// wrote it) is skipped, not fatal
+// scanUsageRows reads (key, period, kind, count) rows; a kind this build does not know (a newer
+// node wrote it) is skipped, not fatal
 func scanUsageRows(rows *sql.Rows) ([]usageRow, error) {
 	defer rows.Close()
 	result := make([]usageRow, 0)
 	for rows.Next() {
 		var key, kindName string
-		var count int64
-		if err := rows.Scan(&key, &kindName, &count); err != nil {
+		var period, count int64
+		if err := rows.Scan(&key, &period, &kindName, &count); err != nil {
 			return nil, err
 		}
 		kind, ok := ParseKind(kindName)
@@ -194,9 +198,10 @@ func scanUsageRows(rows *sql.Rows) ([]usageRow, error) {
 			continue
 		}
 		result = append(result, usageRow{
-			key:   key,
-			kind:  kind,
-			count: count,
+			key:    key,
+			period: period,
+			kind:   kind,
+			count:  count,
 		})
 	}
 	return result, rows.Err()

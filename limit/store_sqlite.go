@@ -7,12 +7,12 @@ import (
 
 const (
 	sqliteSelectClockQuery    = `SELECT CAST(strftime('%s', 'now') AS INTEGER)`
-	sqliteSelectSinceQuery    = `SELECT key, kind, count FROM usage WHERE day = ? AND updated_at >= ?`
-	sqliteSelectKeysInQuery   = `SELECT key, kind, count FROM usage WHERE day = ? AND key IN (` // Completed per chunk
-	sqliteUpsertPrefixQuery   = `INSERT INTO usage (key, day, kind, count, updated_at) VALUES `
+	sqliteSelectSinceQuery    = `SELECT key, period, kind, count FROM usage WHERE updated_at >= ?`
+	sqliteSelectKeysInQuery   = `SELECT key, period, kind, count FROM usage WHERE key IN (` // Completed per chunk
+	sqliteUpsertPrefixQuery   = `INSERT INTO usage (key, period, kind, count, updated_at) VALUES `
 	sqliteUpsertRowQuery      = `(?, ?, ?, ?, CAST(strftime('%s', 'now') AS INTEGER))`
-	sqliteUpsertConflictQuery = ` ON CONFLICT (key, day, kind) DO UPDATE SET count = count + excluded.count, updated_at = excluded.updated_at`
-	sqlitePruneQuery          = `DELETE FROM usage WHERE day < ?`
+	sqliteUpsertConflictQuery = ` ON CONFLICT (key, period, kind) DO UPDATE SET count = count + excluded.count, updated_at = excluded.updated_at`
+	sqlitePruneQuery          = `DELETE FROM usage WHERE updated_at < CAST(strftime('%s', 'now') AS INTEGER) - ?`
 
 	sqliteUpsertTopicSubscriberQuery = `
 		INSERT INTO topic (id, created_at, last_subscribed_at, last_subscriber_key) VALUES (?, ?, ?, ?)

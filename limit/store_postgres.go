@@ -10,14 +10,14 @@ import (
 // statement for a whole chunk (unnest), because per-call SQL bloats pgx's statement cache.
 const (
 	postgresSelectClockQuery = `SELECT EXTRACT(EPOCH FROM now())::BIGINT`
-	postgresSelectSinceQuery = `SELECT key, kind, count FROM usage WHERE day = $1 AND updated_at >= $2`
-	postgresSelectKeysQuery  = `SELECT key, kind, count FROM usage WHERE day = $1 AND key = ANY($2)`
+	postgresSelectSinceQuery = `SELECT key, period, kind, count FROM usage WHERE updated_at >= $1`
+	postgresSelectKeysQuery  = `SELECT key, period, kind, count FROM usage WHERE key = ANY($1)`
 	postgresUpsertQuery      = `
-		INSERT INTO usage (key, day, kind, count, updated_at)
-		SELECT k, $1, kd, c, EXTRACT(EPOCH FROM now())::BIGINT FROM unnest($2::TEXT[], $3::TEXT[], $4::BIGINT[]) AS t(k, kd, c)
-		ON CONFLICT (key, day, kind) DO UPDATE SET count = usage.count + EXCLUDED.count, updated_at = EXCLUDED.updated_at
+		INSERT INTO usage (key, period, kind, count, updated_at)
+		SELECT k, p, kd, c, EXTRACT(EPOCH FROM now())::BIGINT FROM unnest($1::TEXT[], $2::BIGINT[], $3::TEXT[], $4::BIGINT[]) AS t(k, p, kd, c)
+		ON CONFLICT (key, period, kind) DO UPDATE SET count = usage.count + EXCLUDED.count, updated_at = EXCLUDED.updated_at
 	`
-	postgresPruneQuery = `DELETE FROM usage WHERE day < $1`
+	postgresPruneQuery = `DELETE FROM usage WHERE updated_at < EXTRACT(EPOCH FROM now())::BIGINT - $1`
 
 	postgresUpsertTopicSubscriberQuery = `
 		INSERT INTO topic (id, created_at, last_subscribed_at, last_subscriber_key) VALUES ($1, $2, $3, $4)

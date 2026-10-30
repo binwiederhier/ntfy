@@ -1208,13 +1208,13 @@ func TestServer_Auth_NonBasicHeader(t *testing.T) {
 func TestServer_StatsResetter(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()
-		// This tests the stats resetter for
+		// This tests the daily reset for
 		// - an anonymous user
 		// - a user without a tier (treated like the same as the anonymous user)
 		// - a user with a tier
+		// Each key resets 24 hours after its own period started, not all at midnight
 
 		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.VisitorStatsResetTime = time.Now().Add(2 * time.Second)
 		s := newTestServer(t, c)
 
 		// Create user with tier (tieruser) and user without tier (phil)
@@ -1271,17 +1271,15 @@ func TestServer_StatsResetter(t *testing.T) {
 		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
 		require.Nil(t, err)
 		require.Equal(t, int64(2), account.Stats.Messages)
+		tierUserResetAt := account.Stats.ResetAt
+		tierUser, err := s.userManager.User("tieruser")
+		require.Nil(t, err)
+		require.Equal(t, s.limiter.ResetAt("user:"+tierUser.ID).Unix(), tierUserResetAt) // The account's own reset time
+		require.Greater(t, tierUserResetAt, time.Now().Unix())
+		require.LessOrEqual(t, tierUserResetAt, time.Now().Add(24*time.Hour).Unix()+1)
 
-		// Wait for stats resetter to run
-		waitFor(t, func() bool {
-			response = request(t, s, "GET", "/v1/account", "", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-			account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-			require.Nil(t, err)
-			return account.Stats.Messages == 0
-		})
+		// A day later, every key has passed its reset
+		s.limiter.ShiftClockForTest(24 * time.Hour)
 
 		// User stats show 0 messages now!
 		response = request(t, s, "GET", "/v1/account", "", map[string]string{
@@ -1307,7 +1305,36 @@ func TestServer_StatsResetter(t *testing.T) {
 		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
 		require.Nil(t, err)
 		require.Equal(t, int64(0), account.Stats.Messages)
+		require.Equal(t, tierUserResetAt+24*3600, account.Stats.ResetAt)
 	})
+}
+
+func TestServer_AccountStatsResetAtPerKey(t *testing.T) {
+	// The anonymous visitor's key (its IP) and a tier user's key reset at different times of the
+	// day (a user without a tier shares the IP's key)
+	c := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 10,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	response := request(t, s, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, response.Code)
+	anonymous, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
+	require.Equal(t, s.limiter.ResetAt("ip:9.9.9.9").Unix(), anonymous.Stats.ResetAt)
+	response = request(t, s, "GET", "/v1/account", "", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	})
+	require.Equal(t, 200, response.Code)
+	phil, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, s.limiter.ResetAt("user:"+u.ID).Unix(), phil.Stats.ResetAt)
+	require.NotEqual(t, anonymous.Stats.ResetAt, phil.Stats.ResetAt)
 }
 
 func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
@@ -5554,7 +5581,6 @@ func newOtherNodeLimiter(t *testing.T, s *Server) *limit.Service {
 	store := createUsageStore(s.db, s.userManager)
 	require.NotNil(t, store) // Needs a user database (auth-file on SQLite)
 	return limit.New(&limit.Config{
-		ResetTime:     s.config.VisitorStatsResetTime,
 		FlushInterval: time.Hour,
 	}, store)
 }
@@ -6253,7 +6279,7 @@ func TestServer_Account_RemainingMatchesAdmissions(t *testing.T) {
 		response = request(t, s, "PUT", "/quota", "test", auth)
 		require.Equal(t, 429, response.Code)
 		require.Zero(t, account().Stats.MessagesRemaining)
-		s.limiter.RollDayForTest(fmt.Sprintf("2099-01-%02d", day+1)) // The next day; the daily reset no longer touches the counts
+		s.limiter.ShiftClockForTest(24 * time.Hour) // The next period; the daily reset no longer touches the counts
 	}
 }
 

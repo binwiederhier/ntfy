@@ -2288,6 +2288,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.36.0 (UNRELEASED)
+
+**Features:**
+
+* Daily quotas (messages, e-mails, phone calls) are kept in the user database (`auth-file` for SQLite, or `database-url`) and survive a restart; a crash loses at most 5 seconds of counting. Before, every restart reset them (see [message limits](config.md#message-limits))
+* Idle visitors are dropped from memory after a few minutes instead of a day when usage is persisted (once their rate limits are full again), which cuts the server's memory on busy instances
+
+**Behavior changes:**
+
+* The daily reset job is gone: the usage day starts over at midnight UTC by itself, and the `stats_*` columns of the user table are no longer written or read (the account page reads the usage table)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

@@ -410,7 +410,7 @@ This generator helps you configure your self-hosted ntfy instance. It's not full
 </div>
 
 ## Database options
-ntfy uses a database for storing messages ([message cache](#message-cache)), users and [access control](#access-control), and [web push](#web-push) subscriptions.
+ntfy uses a database for storing messages ([message cache](#message-cache)), users and [access control](#access-control) (which includes the visitors' daily usage counts, see [rate limiting](#message-limits)), and [web push](#web-push) subscriptions.
 You can choose between **SQLite** and **PostgreSQL** as the database backend.
 
 ### SQLite
@@ -1926,7 +1926,14 @@ For instance, if the request limit allows for 15,000 requests per day, and all o
 to publish messages, then that is the daily message limit.
 
 To limit the number of daily messages per visitor, you can set `visitor-message-daily-limit`. This defines the number 
-of messages a visitor can send in a day. This counter is reset every day at midnight (UTC).
+of messages a visitor can send in a day. The usage day starts over every day at midnight (UTC).
+
+The daily counts (messages, e-mails and phone calls) are kept in the user database if `auth-file` (SQLite) or
+`database-url` (PostgreSQL) is set, so they survive a restart; a crash loses at most the last 5 seconds of counting.
+Without either, they are counted in memory only and start over with every restart. With a database, idle visitors are
+also dropped from memory after a few minutes instead of a day (once their rate limits are full again), since their counts
+are in the database (an anonymous visitor only gets a row once it has used 1% of a daily quota, so the many visitors that
+publish once or twice never touch it).
 
 ### Attachment limits
 Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 

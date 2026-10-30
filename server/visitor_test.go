@@ -19,42 +19,14 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-func TestVisitor_UserStatsDeltaFlush(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 300 * time.Millisecond
-		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{
-			Code:         "test",
-			MessageLimit: 100,
-		}))
-		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
-
-		// Publish 3 messages; the visitor enqueues a stats delta after each publish
-		for i := 0; i < 3; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-		}
-
-		// After two flush intervals, the persisted count must be exactly 3: per-publish
-		// enqueues must be deltas, not absolute snapshots (snapshots would add up to 1+2+3=6)
-		time.Sleep(time.Second)
-		u, err := s.userManager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(3), u.Stats.Messages)
-	})
-}
-
 func TestVisitor_TierUserDoesNotGetAnonymousUsage(t *testing.T) {
 	// What a user's IP counted anonymously must not land on the account once the user (with a
 	// tier) shows up from that IP.
-	c := newTestConfigWithAuthFile(t, "")
-	c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
-	s := newTestServer(t, c)
-	require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "test", MessageLimit: 100}))
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 100,
+	}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 	u, err := s.userManager.User("phil")
@@ -64,11 +36,7 @@ func TestVisitor_TierUserDoesNotGetAnonymousUsage(t *testing.T) {
 		require.True(t, v.MessageAllowed())
 	}
 
-	require.True(t, s.visitor(netip.MustParseAddr("9.9.9.9"), u).RequestAllowed())
-	time.Sleep(500 * time.Millisecond)
-	u, err = s.userManager.User("phil")
-	require.Nil(t, err)
-	require.Equal(t, int64(0), u.Stats.Messages)
+	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("9.9.9.9"), u).Usage().Count(limit.KindMessages))
 }
 
 func TestVisitor_BandwidthRefund(t *testing.T) {
@@ -226,9 +194,10 @@ func TestVisitor_EmailDailyLimitCapsBelowBurst(t *testing.T) {
 // package limit; these confirm the server wiring.
 
 func TestVisitor_UsageSurvivesRestart(t *testing.T) {
-	// Case 1: a graceful restart keeps the quota; a crash loses at most what was not flushed
+	// Case 1: a graceful restart keeps the quota; a crash loses at most what was not flushed. On
+	// SQLite, the usage table lives in the user database (auth-file).
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorMessageDailyLimit = 3
 		c.UsageFlushInterval = time.Hour // Nothing is flushed but by Stop
 		s := newTestServer(t, c)
@@ -268,7 +237,7 @@ func TestVisitor_EvictedBelowThresholdResumesAtZero(t *testing.T) {
 	// Case 3: a key without a row (below 1% of the quota) is evicted after a few minutes and
 	// comes back at zero, as designed
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorMessageDailyLimit = 1000 // Threshold 10
 		s := newTestServer(t, c)
 		for i := 0; i < 2; i++ {
@@ -277,7 +246,7 @@ func TestVisitor_EvictedBelowThresholdResumesAtZero(t *testing.T) {
 		evictVisitor(t, s, "ip:9.9.9.9")
 		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "test", nil).Code)
 		waitFor(t, func() bool {
-			return s.visitor(netip.MustParseAddr("9.9.9.9"), nil).Stats().Messages == 1
+			return s.visitor(netip.MustParseAddr("9.9.9.9"), nil).Usage().Count(limit.KindMessages) == 1
 		})
 	})
 }
@@ -285,7 +254,7 @@ func TestVisitor_EvictedBelowThresholdResumesAtZero(t *testing.T) {
 func TestVisitor_EvictedPastThresholdContinues(t *testing.T) {
 	// Case 4: a key with a row comes back with its count
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorMessageDailyLimit = 100 // Threshold 1: every message counts
 		s := newTestServer(t, c)
 		for i := 0; i < 5; i++ {
@@ -294,7 +263,7 @@ func TestVisitor_EvictedPastThresholdContinues(t *testing.T) {
 		evictVisitor(t, s, "ip:9.9.9.9")
 		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "test", nil).Code)
 		waitFor(t, func() bool {
-			return s.visitor(netip.MustParseAddr("9.9.9.9"), nil).Stats().Messages == 6
+			return s.visitor(netip.MustParseAddr("9.9.9.9"), nil).Usage().Count(limit.KindMessages) == 6
 		})
 	})
 }
@@ -318,7 +287,7 @@ func TestVisitor_AccountUsageFromNodeThatNeverSawTheKey(t *testing.T) {
 		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindMessages}, 42).OK)
 		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindEmails}, 7).OK)
 		require.True(t, other.Allow("user:"+u.ID, limit.Rule{Kind: limit.KindCalls}, 1).OK)
-		require.Nil(t, other.Close())
+		other.Close()
 		rr := request(t, s, "GET", "/v1/account", "", map[string]string{"Authorization": util.BasicAuth("phil", "phil")})
 		require.Equal(t, 200, rr.Code)
 		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
@@ -372,7 +341,7 @@ func TestVisitor_SlowUsageLoadDoesNotHoldTheVisitorLock(t *testing.T) {
 	// then waited too, and with it every other request's visitor lookup. Visitors have no lock
 	// since they are per request; this still pins that the read holds no lock Keepalive needs.
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		s := newTestServer(t, c)
 		release := lockUsageTable(t, s)
 		v := s.visitor(netip.MustParseAddr("7.7.7.7"), nil)
@@ -396,7 +365,7 @@ func lockUsageTable(t *testing.T, s *Server) func() {
 		d = s.db.Primary()
 	} else {
 		var err error
-		d, err = sql.Open("sqlite3", s.config.UsageFile)
+		d, err = sql.Open("sqlite3", s.config.AuthFile) // The usage table is in the user database
 		require.Nil(t, err)
 		t.Cleanup(func() { d.Close() })
 		statements = []string{`BEGIN EXCLUSIVE`}
@@ -557,9 +526,7 @@ func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 	// Two visitors with the same user key (the user from two addresses) share one count in the
 	// limiter, and each admitted unit is persisted once, so the user's stats are not double counted
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
-		s := newTestServer(t, c)
+		s := newTestServer(t, newTestConfigWithAuthFile(t, databaseURL))
 		require.Nil(t, s.userManager.AddTier(&user.Tier{
 			Code:         "test",
 			MessageLimit: 10,
@@ -577,19 +544,8 @@ func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 		for i := 0; i < 2; i++ {
 			require.True(t, v2.MessageAllowed())
 		}
-		require.Equal(t, int64(5), v1.Stats().Messages)
-		require.Equal(t, int64(5), v2.Stats().Messages)
-
-		// Persisted once: 3 + 2, not 5 + 5
-		waitFor(t, func() bool {
-			u, err := s.userManager.User("phil")
-			require.Nil(t, err)
-			return u.Stats.Messages > 0
-		})
-		time.Sleep(300 * time.Millisecond) // Any double counting would have been flushed by now
-		u, err = s.userManager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(5), u.Stats.Messages)
+		require.Equal(t, int64(5), v1.Usage().Count(limit.KindMessages))
+		require.Equal(t, int64(5), v2.Usage().Count(limit.KindMessages))
 
 		// The account sees the shared count, and the day's remaining messages are shared too
 		response := request(t, s, "GET", "/v1/account", "", map[string]string{
@@ -685,13 +641,10 @@ func TestVisitor_TopicCreationLimiterDisabledByZero(t *testing.T) {
 }
 
 func TestVisitor_TierChangeDoesNotReseedCounts(t *testing.T) {
-	// The persisted stats seed a key only on its first sight. On a tier change (and for a new
-	// visitor object of a known key), the live counts win over the user's stale database row,
-	// which lags behind by whatever the stats queue has not flushed yet.
+	// A tier change keeps the key's counts: the next request's visitor carries the new tier's
+	// limits and continues where the old one left off, nothing is read from the user row.
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = time.Hour // Never flushed during the test: the row stays stale
-		s := newTestServer(t, c)
+		s := newTestServer(t, newTestConfigWithAuthFile(t, databaseURL))
 		require.Nil(t, s.userManager.AddTier(&user.Tier{
 			Code:         "small",
 			MessageLimit: 5,
@@ -712,15 +665,14 @@ func TestVisitor_TierChangeDoesNotReseedCounts(t *testing.T) {
 		require.Nil(t, s.userManager.ChangeTier("phil", "large"))
 		u, err = s.userManager.User("phil")
 		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages) // Stale
-		v = s.visitor(ip, u)                         // The next request carries the new tier
-		require.Equal(t, int64(4), v.Stats().Messages)
+		v = s.visitor(ip, u) // The next request carries the new tier
+		require.Equal(t, int64(4), v.Usage().Count(limit.KindMessages))
 		for i := 0; i < 6; i++ {
 			require.True(t, v.MessageAllowed())
 		}
 		require.False(t, v.MessageAllowed())
 		fresh := s.visitor(ip, u)
-		require.Equal(t, int64(10), fresh.Stats().Messages)
+		require.Equal(t, int64(10), fresh.Usage().Count(limit.KindMessages))
 		require.False(t, fresh.MessageAllowed())
 	})
 }
@@ -740,7 +692,7 @@ func TestVisitor_IPPrefixKeying(t *testing.T) {
 	require.True(t, v.MessageAllowed())
 	peer := s.visitor(netip.MustParseAddr("1.2.3.200"), nil)
 	require.Equal(t, v.key, peer.key)
-	require.Equal(t, int64(2), peer.Stats().Messages)
+	require.Equal(t, int64(2), peer.Usage().Count(limit.KindMessages))
 	require.True(t, s.visitor(netip.MustParseAddr("1.2.4.1"), nil).MessageAllowed())
 	vu := s.visitor(netip.MustParseAddr("1.2.3.77"), u)
 	require.Equal(t, v.key, vu.key)
@@ -777,7 +729,7 @@ func TestVisitor_TierDowngradeReturnsToIPBucket(t *testing.T) {
 	require.Nil(t, err)
 	vu := s.visitor(ip, u)
 	require.NotEqual(t, anon.key, vu.key)
-	require.Equal(t, int64(0), vu.Stats().Messages)
+	require.Equal(t, int64(0), vu.Usage().Count(limit.KindMessages))
 	for i := 0; i < 5; i++ {
 		require.True(t, vu.MessageAllowed())
 	}
@@ -789,7 +741,7 @@ func TestVisitor_TierDowngradeReturnsToIPBucket(t *testing.T) {
 	require.Nil(t, u.Tier)
 	vd := s.visitor(ip, u)
 	require.Equal(t, anon.key, vd.key)
-	require.Equal(t, int64(2), vd.Stats().Messages)
+	require.Equal(t, int64(2), vd.Usage().Count(limit.KindMessages))
 	require.True(t, vd.MessageAllowed())
 	require.False(t, vd.MessageAllowed())
 
@@ -799,7 +751,7 @@ func TestVisitor_TierDowngradeReturnsToIPBucket(t *testing.T) {
 	require.Nil(t, err)
 	vr := s.visitor(ip, u)
 	require.Equal(t, vu.key, vr.key)
-	require.Equal(t, int64(5), vr.Stats().Messages)
+	require.Equal(t, int64(5), vr.Usage().Count(limit.KindMessages))
 }
 
 func TestVisitor_ConcurrentSharedKey(t *testing.T) {
@@ -834,7 +786,7 @@ func TestVisitor_ConcurrentSharedKey(t *testing.T) {
 					admitted.Add(1)
 				}
 				v.RequestAllowed()
-				v.Stats()
+				v.Usage()
 				v.Context()
 				vip := s.visitor(ip, nil)
 				vip.RequestAllowed()
@@ -857,7 +809,7 @@ func TestVisitor_ConcurrentSharedKey(t *testing.T) {
 		require.Nil(t, err)
 	}
 	require.Equal(t, int64(50), admitted.Load())
-	require.Equal(t, int64(50), s.visitor(ip, u).Stats().Messages)
+	require.Equal(t, int64(50), s.visitor(ip, u).Usage().Count(limit.KindMessages))
 }
 
 // Fails if negative bandwidth AllowN becomes a no-op; a later reader limiter's rejection must refund the shared quota.

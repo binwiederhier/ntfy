@@ -235,10 +235,6 @@ func New(conf *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	usageStore, err := createUsageStore(conf, pool)
-	if err != nil {
-		return nil, err
-	}
 	var wp *webpush.Store
 	if conf.WebPushPublicKey != "" {
 		if pool != nil {
@@ -276,21 +272,6 @@ func New(conf *Config) (*Server, error) {
 		CallFormat:    conf.TwilioCallFormat,
 		BuildVersion:  conf.BuildVersion,
 	})
-	limiter := limit.New(&limit.Config{
-		ResetTime:     conf.VisitorStatsResetTime,
-		FlushInterval: conf.UsageFlushInterval,
-	}, usageStore)
-	var banner *ban.Service
-	if conf.BanFile != "" {
-		banner = ban.NewService(&ban.Config{
-			File:           conf.BanFile,
-			Window:         conf.BanWindow,
-			Threshold:      conf.BanThreshold,
-			Weights:        conf.BanWeights,
-			PrefixBitsIPv4: conf.VisitorPrefixBitsIPv4,
-			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
-		}, limiter)
-	}
 	// Peers reach this node on the dedicated cluster listener, never on the public ones
 	advertiseURL := conf.ClusterAdvertiseURL
 	if advertiseURL == "" && conf.ClusterListen != "" {
@@ -304,12 +285,10 @@ func New(conf *Config) (*Server, error) {
 		attachment:      attachmentStore,
 		twilio:          twilioClient,
 		mailer:          sender,
-		ban:             banner,
 		topics:          topics,
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		limiter:         limiter,
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
@@ -356,6 +335,20 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
+	s.limiter = limit.New(&limit.Config{
+		ResetTime:     conf.VisitorStatsResetTime,
+		FlushInterval: conf.UsageFlushInterval,
+	}, createUsageStore(pool, userManager))
+	if conf.BanFile != "" {
+		s.ban = ban.NewService(&ban.Config{
+			File:           conf.BanFile,
+			Window:         conf.BanWindow,
+			Threshold:      conf.BanThreshold,
+			Weights:        conf.BanWeights,
+			PrefixBitsIPv4: conf.VisitorPrefixBitsIPv4,
+			PrefixBitsIPv6: conf.VisitorPrefixBitsIPv6,
+		}, s.limiter) // Its strike buckets are the limiter's (see package ban)
+	}
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.firebaseClient = firebaseClient
 	if pool != nil {
@@ -401,15 +394,16 @@ func (s *Server) dbPoolStats() []*metrics.DBPool {
 	return pools
 }
 
-// createUsageStore opens the usage table: on the shared pool if there is one, in the usage file
-// if one is configured, or not at all (usage is then counted in memory only, as before)
-func createUsageStore(conf *Config, pool *db.DB) (*limit.Store, error) {
+// createUsageStore returns the store of the usage table, which is part of the user database: the
+// shared pool on Postgres, the auth-file on SQLite. Without a user database, usage is counted in
+// memory only, as before.
+func createUsageStore(pool *db.DB, userManager *user.Manager) *limit.Store {
 	if pool != nil {
 		return limit.NewPostgresStore(pool)
-	} else if conf.UsageFile != "" {
-		return limit.NewSQLiteStore(conf.UsageFile)
+	} else if userManager != nil {
+		return limit.NewSQLiteStore(userManager.DB())
 	}
-	return nil, nil
+	return nil
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -555,7 +549,6 @@ func (s *Server) Run() error {
 	if s.config.ClusterListen != "" {
 		go s.runUsageGossip()
 	}
-	go s.runStatsResetter()
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
 
@@ -608,9 +601,7 @@ func (s *Server) stop() {
 	if s.tail != nil {
 		s.tail.Close() // Before the databases close under it
 	}
-	if err := s.limiter.Close(); err != nil { // Writes what is unflushed, before the pool closes under it
-		log.Tag(tagStartup).Err(err).Warn("Closing the usage store failed")
-	}
+	s.limiter.Close() // Writes what is unflushed, before the databases close under it
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -2158,36 +2149,6 @@ func (s *Server) runManager() {
 				Debug("Manager finished")
 		case <-s.closeChan:
 			return
-		}
-	}
-}
-
-// runStatsResetter runs once a day (usually midnight UTC) to reset all the visitor's message and
-// email counters. The stats are used to display the counters in the web app, as well as for rate limiting.
-func (s *Server) runStatsResetter() {
-	for {
-		runAt := util.NextOccurrenceUTC(s.config.VisitorStatsResetTime, time.Now())
-		timer := time.NewTimer(time.Until(runAt))
-		log.Tag(tagResetter).Debug("Waiting until %v to reset visitor stats", runAt)
-		select {
-		case <-timer.C:
-			log.Tag(tagResetter).Debug("Running stats resetter")
-			s.resetStats()
-		case <-s.closeChan:
-			log.Tag(tagResetter).Debug("Stopping stats resetter")
-			timer.Stop()
-			return
-		}
-	}
-}
-
-func (s *Server) resetStats() {
-	log.Info("Resetting all visitor stats (daily task)")
-	s.mu.Lock()
-	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
-	if s.userManager != nil {
-		if err := s.userManager.ResetStats(); err != nil {
-			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
 		}
 	}
 }

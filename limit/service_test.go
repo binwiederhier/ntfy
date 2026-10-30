@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -485,7 +484,7 @@ func TestService_Persist_FlushErrorRetainsDeltas(t *testing.T) {
 		broken := newStore()
 		closed, err := sql.Open("sqlite3", ":memory:")
 		require.Nil(t, err)
-		require.Nil(t, closed.Close())
+		closed.Close()
 		broken.db = db.New(&db.Host{DB: closed}, nil) // Every statement fails from here on
 		s := newPersistentTestService(t, broken, clock)
 		rule := Rule{
@@ -632,7 +631,7 @@ func TestService_Persist_CloseFlushes_CrashLoses(t *testing.T) {
 		}
 		graceful := newPersistentTestService(t, store, clock)
 		require.True(t, graceful.Allow("user:u_1", rule, 5).OK)
-		require.Nil(t, graceful.Close())
+		graceful.Close()
 		crashed := newPersistentTestService(t, store, clock)
 		require.True(t, crashed.Allow("user:u_2", rule, 5).OK) // Never flushed, never closed
 
@@ -700,11 +699,7 @@ func TestService_Persist_Loops(t *testing.T) {
 
 func BenchmarkFlush(b *testing.B) {
 	// 10,000 promoted keys with a delta each, flushed to SQLite in one go
-	store, err := NewSQLiteStore(filepath.Join(b.TempDir(), "usage.db"))
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer store.Close()
+	store := NewSQLiteStore(newTestUserDB(b))
 	s := New(&Config{
 		ResetTime:     time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC),
 		FlushInterval: time.Hour,
@@ -1092,7 +1087,7 @@ func TestService_Persist_OutageAcrossMidnightKeepsDeltas(t *testing.T) {
 		broken := newStore()
 		closed, err := sql.Open("sqlite3", ":memory:")
 		require.Nil(t, err)
-		require.Nil(t, closed.Close())
+		closed.Close()
 		broken.db = db.New(&db.Host{DB: closed}, nil)
 		s := newPersistentTestService(t, broken, clock)
 		yesterday := s.today()
@@ -1122,7 +1117,7 @@ func newReadWriteRaceSetup(t *testing.T, newStore func() *Store) *Service {
 		Kind:  KindMessages,
 		Daily: 100,
 	}, 10).OK)
-	require.Nil(t, other.Close())
+	other.Close()
 	s := newPersistentTestService(t, newStore(), clock)
 	require.True(t, s.Allow("user:u_1", Rule{
 		Kind:  KindMessages,

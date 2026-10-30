@@ -17,7 +17,7 @@ const (
 	oneDay = 24 * time.Hour
 
 	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
-	// forgotten when usage is counted in memory only (no usage file, no database; see
+	// forgotten when usage is counted in memory only (no user database; see
 	// Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber is gone. This
 	// number has to be very high to prevent e-mail abuse, but it doesn't really affect the other
 	// limits anyway, since they are replenished faster (typically).
@@ -191,13 +191,7 @@ func (v *visitor) MessageAllowed() bool {
 	if v.limits.MessageLimit <= 0 {
 		return false // A daily limit of zero admits nothing; the limit service reads it as "no cap"
 	}
-	allowed := v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Messages: 1,
-		})
-	}
-	return allowed
+	return v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
 }
 
 func (v *visitor) EmailAllowed() bool {
@@ -206,35 +200,14 @@ func (v *visitor) EmailAllowed() bool {
 	} else if v.limits.Basis == vis.BasisTier && v.limits.EmailLimit <= 0 {
 		return false // No emails on the tier: the limit service reads a daily limit of zero as "no cap"
 	}
-	allowed := v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Emails: 1,
-		})
-	}
-	return allowed
+	return v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
 }
 
 func (v *visitor) CallAllowed() bool {
 	if v.limits.CallLimit <= 0 {
 		return false // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
 	}
-	allowed := v.env.limiter.Allow(v.key, v.callRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Calls: 1,
-		})
-	}
-	return allowed
-}
-
-// enqueueUserStats hands what a tier user's request admitted to the user manager's write queue, which
-// adds it to the persisted stats (deltas add up across requests and cluster nodes)
-func (v *visitor) enqueueUserStats(delta *user.Stats) {
-	if v.env.userManager == nil || v.user == nil || v.user.Tier == nil {
-		return
-	}
-	v.env.userManager.EnqueueUserStats(v.user.ID, delta)
+	return v.env.limiter.Allow(v.key, v.callRule(), 1).OK
 }
 
 // SubscriptionAllowed takes one of the visitor key's subscription slots on this node, if one is free.
@@ -300,16 +273,9 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 	return v.env.limiter.Limiter(v.key, v.bandwidthRule())
 }
 
-func (v *visitor) Stats() *user.Stats {
-	return statsFromUsage(v.env.limiter.Usage(v.key))
-}
-
-func statsFromUsage(usage limit.Usage) *user.Stats {
-	return &user.Stats{
-		Messages: usage.Count(limit.KindMessages),
-		Emails:   usage.Count(limit.KindEmails),
-		Calls:    usage.Count(limit.KindCalls),
-	}
+// Usage returns the visitor's usage today as this node knows it (see limit.Service.Usage)
+func (v *visitor) Usage() limit.Usage {
+	return v.env.limiter.Usage(v.key)
 }
 
 // User returns the visitor user, or nil if there is none
@@ -484,17 +450,17 @@ func (v *visitor) infoLight() *visitorInfo {
 }
 
 func (v *visitor) infoFromUsage(usage limit.Usage) *visitorInfo {
-	stats := statsFromUsage(usage)
+	messages, emails, calls := usage.Count(limit.KindMessages), usage.Count(limit.KindEmails), usage.Count(limit.KindCalls)
 	limits := v.limits
 	return &visitorInfo{
 		Limits: limits,
 		Stats: &visitorStats{
-			Messages:          stats.Messages,
-			MessagesRemaining: zeroIfNegative(limits.MessageLimit - stats.Messages),
-			Emails:            stats.Emails,
-			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - stats.Emails),
-			Calls:             stats.Calls,
-			CallsRemaining:    zeroIfNegative(limits.CallLimit - stats.Calls),
+			Messages:          messages,
+			MessagesRemaining: zeroIfNegative(limits.MessageLimit - messages),
+			Emails:            emails,
+			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - emails),
+			Calls:             calls,
+			CallsRemaining:    zeroIfNegative(limits.CallLimit - calls),
 		},
 	}
 }

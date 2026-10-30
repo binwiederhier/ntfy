@@ -798,54 +798,6 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	})
 }
 
-func TestManager_EnqueueStats_ResetStats(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
-		conf := &Config{
-			DefaultAccess:       PermissionReadWrite,
-			BcryptCost:          bcrypt.MinCost,
-			QueueWriterInterval: 1500 * time.Millisecond,
-		}
-		a := newTestManagerFromConfig(t, newManager, conf)
-		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
-
-		// Baseline: No messages or emails
-		u, err := a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
-		a.EnqueueUserStats(u.ID, &Stats{
-			Messages: 11,
-			Emails:   2,
-		})
-
-		// Still no change, because it's queued asynchronously
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
-
-		// After 2 seconds they should be persisted
-		time.Sleep(2 * time.Second)
-
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(11), u.Stats.Messages)
-		require.Equal(t, int64(2), u.Stats.Emails)
-
-		// Now reset stats (enqueued stats will be thrown out)
-		a.EnqueueUserStats(u.ID, &Stats{
-			Messages: 99,
-			Emails:   23,
-		})
-		require.Nil(t, a.ResetStats())
-
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
-	})
-}
-
 func TestManager_EnqueueTokenUpdate(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		conf := &Config{
@@ -1896,6 +1848,19 @@ func TestMigrationFrom4(t *testing.T) {
 	checkMigratedSqliteSchema(t, filename)
 }
 
+func TestManager_UsageTable(t *testing.T) {
+	// The daily usage counts (package limit) live in the user database, so a single-node SQLite
+	// server keeps them in its auth-file, and a cluster in the shared Postgres
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		_, err := testDB(a).Exec(`INSERT INTO usage (key, day, kind, count, updated_at) VALUES ('ip:1.2.3.4', '2026-10-30', 'messages', 3, 1)`)
+		require.Nil(t, err)
+		var count int64
+		require.Nil(t, testDB(a).QueryRow(`SELECT count FROM usage WHERE key = 'ip:1.2.3.4'`).Scan(&count))
+		require.Equal(t, int64(3), count)
+	})
+}
+
 // TestMigrationFrom6Postgres tests the Postgres migration chain from its oldest supported
 // version (6, the version PostgreSQL support first shipped with).
 func TestMigrationFrom6Postgres(t *testing.T) {
@@ -1909,7 +1874,7 @@ func TestMigrationFrom6Postgres(t *testing.T) {
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'user'`).Scan(&version))
-	require.Equal(t, 9, version)
+	require.Equal(t, 10, version)
 	// The manager works against the migrated schema
 	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
 	u, err := a.User("phil")
@@ -1951,7 +1916,7 @@ func checkSchemaVersion(t *testing.T, d *db.DB) {
 
 	var schemaVersion int
 	require.Nil(t, rows.Scan(&schemaVersion))
-	require.Equal(t, 9, schemaVersion)
+	require.Equal(t, 10, schemaVersion)
 	require.Nil(t, rows.Close())
 }
 
@@ -3019,41 +2984,6 @@ func TestStoreChangeBilling(t *testing.T) {
 	})
 }
 
-func TestStoreUpdateStats(t *testing.T) {
-	forEachStoreBackend(t, func(t *testing.T, manager *Manager) {
-		require.Nil(t, manager.AddUser("phil", "mypass", RoleUser, false))
-		u, err := manager.User("phil")
-		require.Nil(t, err)
-
-		manager.EnqueueUserStats(u.ID, &Stats{Messages: 42, Emails: 3, Calls: 1})
-		require.Nil(t, manager.writeUserStatsQueue())
-
-		u2, err := manager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(42), u2.Stats.Messages)
-		require.Equal(t, int64(3), u2.Stats.Emails)
-		require.Equal(t, int64(1), u2.Stats.Calls)
-	})
-}
-
-func TestStoreResetStats(t *testing.T) {
-	forEachStoreBackend(t, func(t *testing.T, manager *Manager) {
-		require.Nil(t, manager.AddUser("phil", "mypass", RoleUser, false))
-		u, err := manager.User("phil")
-		require.Nil(t, err)
-
-		manager.EnqueueUserStats(u.ID, &Stats{Messages: 42, Emails: 3, Calls: 1})
-		require.Nil(t, manager.writeUserStatsQueue())
-		require.Nil(t, manager.ResetStats())
-
-		u2, err := manager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u2.Stats.Messages)
-		require.Equal(t, int64(0), u2.Stats.Emails)
-		require.Equal(t, int64(0), u2.Stats.Calls)
-	})
-}
-
 func TestStoreMarkUserRemoved(t *testing.T) {
 	forEachStoreBackend(t, func(t *testing.T, manager *Manager) {
 		require.Nil(t, manager.AddUser("phil", "mypass", RoleUser, false))
@@ -3694,41 +3624,4 @@ func TestManager_AccountReadsUsePrimary(t *testing.T) {
 	pendingEmails, err := a.PendingEmails(u.ID)
 	require.Nil(t, err)
 	require.Len(t, pendingEmails, 1)
-}
-
-func TestManager_EnqueueStats_DeltasAccumulate(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
-		conf := &Config{
-			DefaultAccess:       PermissionReadWrite,
-			BcryptCost:          bcrypt.MinCost,
-			QueueWriterInterval: time.Hour, // Flushed manually below
-		}
-		a := newTestManagerFromConfig(t, newManager, conf)
-		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
-		u, err := a.User("ben")
-		require.Nil(t, err)
-
-		// Two enqueues before a flush add up (deltas, not absolute snapshots)
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 3, Emails: 1})
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 2, Calls: 4})
-		require.Nil(t, a.writeUserStatsQueue())
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(5), u.Stats.Messages)
-		require.Equal(t, int64(1), u.Stats.Emails)
-		require.Equal(t, int64(4), u.Stats.Calls)
-
-		// A flush from a second manager on the same database (= another cluster node)
-		// adds to the existing stats instead of overwriting them
-		b := newManager(conf)
-		b.EnqueueUserStats(u.ID, &Stats{Messages: 10, Emails: 2})
-		require.Nil(t, b.writeUserStatsQueue())
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 1})
-		require.Nil(t, a.writeUserStatsQueue())
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(16), u.Stats.Messages)
-		require.Equal(t, int64(3), u.Stats.Emails)
-		require.Equal(t, int64(4), u.Stats.Calls)
-	})
 }

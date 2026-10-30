@@ -271,7 +271,7 @@ func TestService_Prune(t *testing.T) {
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  1,
-		Refill: time.Hour,
+		Refill: time.Minute,
 	}
 	require.True(t, s.Allow("old", rule, 1).OK)
 	clock.advance(10 * time.Minute)
@@ -281,6 +281,27 @@ func TestService_Prune(t *testing.T) {
 	require.Equal(t, 1, s.Size())
 	require.True(t, s.Allow("old", rule, 1).OK)    // Forgotten: back with a full bucket
 	require.False(t, s.Allow("fresh", rule, 1).OK) // Kept
+}
+
+func TestService_Prune_KeepsKeyUntilBucketsRefill(t *testing.T) {
+	// A forgotten key comes back with full buckets, so an idle key is only forgotten once its
+	// buckets are full again; otherwise a slow bucket (e.g. one email every few hours) would
+	// hand out a fresh burst after every prune
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindEmails,
+		Burst:  1,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("key", rule, 1).OK)
+	clock.advance(10 * time.Minute)
+	s.Prune(5 * time.Minute)
+	require.Equal(t, 1, s.Size())
+	require.False(t, s.Allow("key", rule, 1).OK)
+	clock.advance(time.Hour)
+	s.Prune(5 * time.Minute)
+	require.Equal(t, 0, s.Size())
+	require.True(t, s.Allow("key", rule, 1).OK)
 }
 
 func TestService_Allow_Concurrent(t *testing.T) {

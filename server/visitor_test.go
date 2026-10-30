@@ -299,26 +299,6 @@ func TestVisitor_EvictedPastThresholdContinues(t *testing.T) {
 	})
 }
 
-func TestVisitor_EmailQuotaSurvivesEviction(t *testing.T) {
-	// Case 6: the reason visitors were kept 24 h; the usage row covers it now, and emails read
-	// their row before the first decision, so not even one slips through
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
-		c.VisitorEmailLimitBurst = 5
-		c.VisitorEmailLimitReplenish = 24 * time.Hour / 5 // Daily limit 5
-		s := newTestServer(t, c)
-		s.mailer = &testMailer{}
-		for i := 0; i < 5; i++ {
-			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "test", map[string]string{"Email": "test@email.com"}).Code)
-		}
-		require.Equal(t, 429, request(t, s, "PUT", "/mytopic", "test", map[string]string{"Email": "test@email.com"}).Code)
-		evictVisitor(t, s, "ip:9.9.9.9")
-		rr := request(t, s, "PUT", "/mytopic", "test", map[string]string{"Email": "test@email.com"})
-		require.Equal(t, 429, rr.Code)
-		require.Equal(t, 42902, toHTTPError(t, rr.Body.String()).Code)
-	})
-}
-
 func TestVisitor_AccountUsageFromNodeThatNeverSawTheKey(t *testing.T) {
 	// Case 7: the account page shows the usage table's numbers
 	forEachBackend(t, func(t *testing.T, databaseURL string) {

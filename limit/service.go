@@ -120,6 +120,7 @@ type entry struct {
 	loaded    bool            // Whether the key's rows were read back (or there is no store)
 	missNoted bool            // Whether the key waits in misses for its read-back
 	seen      int64           // Unix nanoseconds of the last use, for pruning
+	full      int64           // Unix nanoseconds from which every bucket is full again, for pruning
 }
 
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
@@ -188,6 +189,7 @@ func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 	}
 	if rule.Burst > 0 {
 		b.tokens -= float64(n)
+		e.noteFull(b, &rule)
 	}
 	e.unflushed[rule.Kind] += n
 	if store != nil && persistedKinds[rule.Kind] {
@@ -270,8 +272,8 @@ func (s *Service) Lookup(key string) (Usage, error) {
 }
 
 // Prune forgets keys that have not been used for longer than idle, except keys with counts that
-// are still to be written, and keys with a row, which stay for at least promotedRetention, and
-// returns how many it forgot. A key that comes back starts with full buckets, and with its counts
+// are still to be written, keys with a row, which stay for at least promotedRetention, and keys
+// whose buckets are not full again, and returns how many it forgot. A key that comes back starts with full buckets, and with its counts
 // read back from the store if it has rows.
 func (s *Service) Prune(idle time.Duration) int {
 	now := s.now()
@@ -285,7 +287,7 @@ func (s *Service) Prune(idle time.Duration) int {
 				continue
 			} else if e.anyPromoted() && e.seen >= promotedCutoff {
 				continue
-			} else if e.seen < cutoff {
+			} else if e.seen < cutoff && now.UnixNano() >= e.full {
 				delete(sh.entries, key)
 				pruned++
 			}
@@ -852,6 +854,19 @@ func (e *entry) pending() bool {
 		}
 	}
 	return false
+}
+
+// noteFull moves the time from which every bucket is full again to when this bucket is full, if
+// that is later. A bucket without refill never fills, so it does not hold the key.
+func (e *entry) noteFull(b *bucket, rule *Rule) {
+	missing := float64(rule.Burst) - b.tokens
+	if missing <= 0 || rule.Refill <= 0 {
+		return
+	}
+	full := b.last + int64(math.Ceil(missing*float64(rule.Refill)))
+	if full > e.full {
+		e.full = full
+	}
 }
 
 // refill adds the tokens earned since the last refill, capped at the rule's burst, and remembers

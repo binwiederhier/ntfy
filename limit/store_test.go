@@ -1,0 +1,183 @@
+package limit
+
+import (
+	"context"
+	"fmt"
+	"path/filepath"
+	"slices"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/db"
+	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/user"
+)
+
+// forEachBackend runs f against a fresh usage table on SQLite and on Postgres (if
+// NTFY_TEST_DATABASE_URL is set). newStore returns a store on the same table every time, like a
+// second node or a restarted one.
+func forEachBackend(t *testing.T, f func(t *testing.T, newStore func() *Store)) {
+	t.Run("sqlite", func(t *testing.T) {
+		d := newTestUserDB(t)
+		f(t, func() *Store {
+			return NewSQLiteStore(d)
+		})
+	})
+	t.Run("postgres", func(t *testing.T) {
+		d := dbtest.CreateTestPostgres(t)
+		_, err := user.NewPostgresManager(d, &user.Config{}) // Creates the usage table
+		require.Nil(t, err)
+		f(t, func() *Store {
+			return NewPostgresStore(d)
+		})
+	})
+}
+
+// newTestUserDB returns a fresh SQLite user database, which holds the usage table
+func newTestUserDB(t testing.TB) *db.DB {
+	manager, err := user.NewSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &user.Config{})
+	require.Nil(t, err)
+	t.Cleanup(func() {
+		manager.Close()
+	})
+	return manager.DB()
+}
+
+// readAll returns the rows written at or after since, by key
+func readAll(t *testing.T, s *Store, since int64) map[string]usageRow {
+	t.Helper()
+	rows := make(map[string]usageRow)
+	require.Nil(t, s.readSince(context.Background(), since, func(r *usageRow) {
+		rows[r.key] = *r
+	}))
+	return rows
+}
+
+func TestStore_WriteAddsSamePeriodReplacesNewer(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newStore()
+		ctx := context.Background()
+		written, err := s.write(ctx, []usageRow{
+			{
+				key:         "user:u_1",
+				periodStart: 1000,
+				counts:      [numDaily]int64{10, 0, 1},
+			},
+			{
+				key:         "ip:1.2.3.4",
+				periodStart: 2000,
+				counts:      [numDaily]int64{3, 1, 0},
+			},
+		})
+		require.Nil(t, err)
+		require.Equal(t, 2, written)
+		written, err = s.write(ctx, []usageRow{
+			{
+				key:         "ip:1.2.3.4",
+				periodStart: 2000,
+				counts:      [numDaily]int64{2, 0, 0},
+			}, // Same period: adds up
+			{
+				key:         "user:u_1",
+				periodStart: 1000 + daySeconds,
+				counts:      [numDaily]int64{4, 0, 0},
+			}, // Newer period: replaces
+		})
+		require.Nil(t, err)
+		require.Equal(t, 2, written)
+		rows := readAll(t, s, 0)
+		require.Equal(t, usageRow{
+			key:         "ip:1.2.3.4",
+			periodStart: 2000,
+			counts:      [numDaily]int64{5, 1, 0},
+		}, rows["ip:1.2.3.4"])
+		require.Equal(t, usageRow{
+			key:         "user:u_1",
+			periodStart: 1000 + daySeconds,
+			counts:      [numDaily]int64{4, 0, 0},
+		}, rows["user:u_1"])
+
+		// A leftover of an older period lands in the stored, newer one instead of taking the row back
+		_, err = s.write(ctx, []usageRow{
+			{
+				key:         "user:u_1",
+				periodStart: 1000,
+				counts:      [numDaily]int64{2, 0, 0},
+			},
+		})
+		require.Nil(t, err)
+		require.Equal(t, usageRow{
+			key:         "user:u_1",
+			periodStart: 1000 + daySeconds,
+			counts:      [numDaily]int64{6, 0, 0},
+		}, readAll(t, s, 0)["user:u_1"])
+	})
+}
+
+func TestStore_WriteManyRows_Chunked(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newStore()
+		rows := make([]usageRow, 2500)
+		for i := range rows {
+			rows[i] = usageRow{
+				key:         fmt.Sprintf("ip:10.0.%d.%d", i/256, i%256),
+				periodStart: 1000,
+				counts:      [numDaily]int64{int64(i), 0, 0},
+			}
+		}
+		written, err := s.write(context.Background(), rows)
+		require.Nil(t, err)
+		require.Equal(t, 2500, written)
+		read := readAll(t, s, 0)
+		require.Len(t, read, 2500)
+		require.Equal(t, int64(2499), read["ip:10.0.9.195"].counts[0])
+	})
+}
+
+func TestStore_ReadSince(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newStore()
+		ctx := context.Background()
+		_, err := s.db.Exec(`INSERT INTO usage (key, period_start, messages, emails, calls, updated_at) VALUES ('old', 1, 1, 0, 0, 100), ('new', 1, 2, 0, 0, 200)`)
+		require.Nil(t, err)
+		require.Equal(t, []string{"new"}, keysOf(readAll(t, s, 200)))
+		require.Equal(t, []string{"new", "old"}, keysOf(readAll(t, s, 100)))
+
+		// A write stamps the database clock
+		dbNow, err := s.clock(ctx)
+		require.Nil(t, err)
+		_, err = s.write(ctx, []usageRow{
+			{
+				key:         "written",
+				periodStart: 1,
+				counts:      [numDaily]int64{0, 0, 1},
+			},
+		})
+		require.Nil(t, err)
+		require.Equal(t, []string{"written"}, keysOf(readAll(t, s, dbNow)))
+	})
+}
+
+func TestStore_Prune(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newStore()
+		for i := 0; i < 25; i++ {
+			_, err := s.db.Exec(fmt.Sprintf(`INSERT INTO usage (key, period_start, messages, emails, calls, updated_at) VALUES ('k%d', 1, 1, 0, 0, %d)`, i, 100+i))
+			require.Nil(t, err)
+		}
+		deleted, err := s.prune(context.Background(), 120)
+		require.Nil(t, err)
+		require.Equal(t, int64(20), deleted)
+		require.Equal(t, []string{"k20", "k21", "k22", "k23", "k24"}, keysOf(readAll(t, s, 0)))
+	})
+}
+
+// keysOf returns the map's keys, sorted
+func keysOf(rows map[string]usageRow) []string {
+	keys := make([]string, 0, len(rows))
+	for key := range rows {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
+}

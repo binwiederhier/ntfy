@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/user"
 )
@@ -104,7 +105,7 @@ func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visit
 	if err != nil {
 		return err
 	} else if !user.AllowedUsername(req.Username) || (req.Password == "" && req.Hash == "") {
-		return errHTTPBadRequest.Wrap("username invalid, or password/password_hash missing")
+		return errHTTPBadRequest.Wrap("username invalid, or \"password\" or \"hash\" missing")
 	}
 	role := user.RoleUser
 	if req.Role != "" {
@@ -146,7 +147,7 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 	} else if !user.AllowedUsername(req.Username) {
 		return errHTTPBadRequest.Wrap("username invalid")
 	} else if req.Password == "" && req.Hash == "" && req.Tier == "" && req.Role == "" {
-		return errHTTPBadRequest.Wrap("need to provide at least one of \"password\", \"password_hash\", \"tier\" or \"role\"")
+		return errHTTPBadRequest.Wrap("need to provide at least one of \"password\", \"hash\", \"tier\" or \"role\"")
 	}
 	var role user.Role
 	if req.Role != "" {
@@ -164,7 +165,7 @@ func (s *Server) handleUsersUpdate(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	} else if u != nil {
 		if u.IsAdmin() && !isAdminSocketRequest(r) {
-			return errHTTPForbidden
+			return errHTTPForbiddenAdminSocketOnly
 		}
 		if req.Hash != "" || req.Password != "" {
 			adminLog(v, r).Info("Changing password of user %s", req.Username)
@@ -232,9 +233,7 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 			adminLog(v, r).Err(err).Warn("Failed to remove web push subscriptions of user %s", req.Username)
 		}
 	}
-	if err := s.killUserSubscriber(u, "*"); err != nil { // FIXME super inefficient
-		return err
-	}
+	s.userDeleted(u) // FIXME super inefficient
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -266,6 +265,8 @@ func (s *Server) handleAccessReset(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	} else if req.Username == "" && req.Topic != "" {
 		return errHTTPBadRequest.Wrap("topic requires a username")
+	} else if req.Username == "" && !isAdminSocketRequest(r) {
+		return errHTTPForbiddenAdminSocketOnly // Resetting the whole ACL also opens all reserved topics
 	}
 	var u *user.User
 	if req.Username != "" {
@@ -297,8 +298,12 @@ func (s *Server) handleUsersTokensGet(w http.ResponseWriter, r *http.Request, v 
 		u, err := s.userManager.User(username)
 		if err != nil {
 			return mapUserErrorToHTTP(err)
+		} else if u.IsAdmin() && !isAdminSocketRequest(r) {
+			return errHTTPForbiddenAdminSocketOnly // Admin users' tokens can only be managed over the admin socket
 		}
 		users = []*user.User{u}
+	} else if !isAdminSocketRequest(r) {
+		return errHTTPForbiddenAdminSocketOnly // All users' tokens in one call, too much for a leaked admin token
 	} else {
 		var err error
 		if users, err = s.userManager.Users(); err != nil {
@@ -307,9 +312,6 @@ func (s *Server) handleUsersTokensGet(w http.ResponseWriter, r *http.Request, v 
 	}
 	response := make([]*apiUserTokenResponse, 0)
 	for _, u := range users {
-		if u.IsAdmin() && !isAdminSocketRequest(r) {
-			continue // Tokens are secrets; the network API never touches admins
-		}
 		tokens, err := s.userManager.Tokens(u.ID)
 		if err != nil {
 			return err
@@ -328,9 +330,11 @@ func (s *Server) handleUsersTokensAdd(w http.ResponseWriter, r *http.Request, v 
 	} else if req.Username == user.Everyone {
 		return errHTTPBadRequest.Wrap("cannot create tokens for the everyone user")
 	}
-	u, err := s.readAdminTokenUser(r, req.Username)
+	u, err := s.userManager.User(req.Username)
 	if err != nil {
-		return err
+		return mapUserErrorToHTTP(err)
+	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
+		return errHTTPForbiddenAdminSocketOnly // Admin users' tokens can only be managed over the admin socket
 	}
 	expires := time.Unix(0, 0)
 	if req.Expires != 0 {
@@ -352,9 +356,11 @@ func (s *Server) handleUsersTokensDelete(w http.ResponseWriter, r *http.Request,
 	if err != nil {
 		return err
 	}
-	u, err := s.readAdminTokenUser(r, req.Username)
+	u, err := s.userManager.User(req.Username)
 	if err != nil {
-		return err
+		return mapUserErrorToHTTP(err)
+	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
+		return errHTTPForbiddenAdminSocketOnly // Admin users' tokens can only be managed over the admin socket
 	}
 	adminLog(v, r).Info("Removing token for user %s", req.Username)
 	if err := s.userManager.RemoveToken(u.ID, req.Token); err != nil {
@@ -376,7 +382,7 @@ func (s *Server) handleUsersPasswordReset(w http.ResponseWriter, r *http.Request
 	} else if u.Provisioned {
 		return errHTTPConflictProvisionedUserChange
 	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
-		return errHTTPForbidden
+		return errHTTPForbiddenAdminSocketOnly
 	}
 	var email string
 	if req.SendEmail {
@@ -551,7 +557,7 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 // contextAdminSocket so handlers can allow what the network API refuses.
 func (s *Server) handleAdminSocket(w http.ResponseWriter, r *http.Request) {
 	r = withContext(r, map[contextKey]any{contextAdminSocket: true})
-	v := newVisitor(s.config, s.messageCache, s.userManager, netip.AddrFrom4([4]byte{127, 0, 0, 1}), adminSocketUser)
+	v := newVisitor(s.visitors, netip.AddrFrom4([4]byte{127, 0, 0, 1}), adminSocketUser)
 	adminLog(v, r).Debug("Admin socket request")
 	if !slices.Contains(adminSocketPaths, r.URL.Path) {
 		s.handleError(w, r, v, errHTTPNotFound) // Publishing, subscribing, the web app, etc. are not served here
@@ -579,16 +585,95 @@ func (s *Server) killUserSubscriber(u *user.User, topicPattern string) error {
 	return nil
 }
 
-// readAdminTokenUser looks up the owner of tokens to be created or removed. Admin users' tokens
-// can only be managed over the admin socket.
-func (s *Server) readAdminTokenUser(r *http.Request, username string) (*user.User, error) {
-	u, err := s.userManager.User(username)
-	if err != nil {
-		return nil, mapUserErrorToHTTP(err)
-	} else if u.IsAdmin() && !isAdminSocketRequest(r) {
-		return nil, errHTTPForbidden
+// broadcastAccessChanged tells the other cluster nodes that this node changed access entries, so
+// they reload their access cache, which ends the streams that lost access there (see
+// reauthorizeSubscribers). The user manager calls it after every access write. The signal is
+// best effort: the periodic reload catches a lost one.
+func (s *Server) broadcastAccessChanged() {
+	s.cluster.BroadcastState(&cluster.State{
+		AccessChanged: true,
+	})
+}
+
+// handlePeerAccessChanged has the access cache reloaded after a peer changed access entries, never
+// re-broadcasting it (loop prevention)
+func (s *Server) handlePeerAccessChanged() {
+	if s.userManager == nil {
+		return
 	}
-	return u, nil
+	s.userManager.RequestAccessCacheReload() // Coalesced: a burst of peer changes costs at most two reloads
+}
+
+// userDeleted ends a deleted user's streams on this node and tells the other cluster nodes, which end
+// theirs (see handleUsersDeleted). Called by both deletes: by an admin, and of one's own account.
+func (s *Server) userDeleted(u *user.User) {
+	s.handleUsersDeleted([]string{u.ID})
+	s.cluster.BroadcastState(&cluster.State{
+		DeletedUserIDs: []string{u.ID},
+	})
+}
+
+// handleUsersDeleted ends all streams of the given (deleted) users on this node, on every topic,
+// after a local delete or a peer's, never re-broadcasting. An access cache reload does not find
+// them: a user without access entries (e.g. an admin) leaves nothing in the cache to compare.
+func (s *Server) handleUsersDeleted(userIDs []string) {
+	for _, t := range s.allTopics() {
+		for _, userID := range userIDs {
+			t.CancelSubscriberUser(userID) // An empty user ID cancels nobody
+		}
+	}
+}
+
+// reauthorizeSubscribers ends the subscriptions that changed access entries no longer allow, checking
+// only matching topics. The user manager calls it after an access cache reload that found changes.
+// It authorizes each subscription's own user as of subscribing, against the cache, without a
+// database query; a deleted user's streams end through handleUsersDeleted instead.
+func (s *Server) reauthorizeSubscribers(changes []*user.AccessChange) {
+	for _, change := range changes {
+		for _, t := range s.topicsForAccessChange(change.TopicPattern) {
+			t.CancelSubscribersWhere(func(u *user.User) bool {
+				if change.Username != user.Everyone && (u == nil || u.Name != change.Username) {
+					return false // The entry does not apply to this subscriber
+				}
+				return s.userManager.Authorize(u, t.ID, user.PermissionRead) != nil
+			})
+		}
+	}
+}
+
+// authorizeSubscribed authorizes a new stream once more, right after it subscribed. An access change
+// whose re-check (see reauthorizeSubscribers) ran between the request's authorization and its
+// subscribing would otherwise miss the stream for good. Each check sees the other: the re-check runs
+// after the cache was swapped, so either it finds the subscription or this check finds the new
+// entries. Only with the access cache, where it is a lookup in memory and re-checks happen at all.
+func (s *Server) authorizeSubscribed(v *visitor, topics []*topic) error {
+	if s.userManager == nil || !s.config.AuthAccessCacheEnabled {
+		return nil
+	}
+	for _, t := range topics {
+		if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionRead); err != nil {
+			return errHTTPForbidden
+		}
+	}
+	return nil
+}
+
+// topicsForAccessChange returns the local topics a changed access entry's topic or pattern matches
+func (s *Server) topicsForAccessChange(topicPattern string) []*topic {
+	if !strings.Contains(topicPattern, "*") {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
+		if t, ok := s.topics[topicPattern]; ok {
+			return []*topic{t}
+		}
+		return nil
+	}
+	topics, err := s.topicsFromPattern(topicPattern)
+	if err != nil {
+		log.Tag(tagSubscribe).Err(err).Warn("Cannot match topics against access pattern %s", topicPattern)
+		return nil
+	}
+	return topics
 }
 
 // checkRoleChange validates a requested role change. Roles can only be set over the admin socket.
@@ -627,15 +712,20 @@ func readAdminTierRequest(r *http.Request) (*user.Tier, error) {
 }
 
 func newAPIUserTokenResponse(username string, t *user.Token) *apiUserTokenResponse {
-	return &apiUserTokenResponse{
+	response := &apiUserTokenResponse{
 		Username:    username,
 		Token:       t.Value,
 		Label:       t.Label,
 		Expires:     t.Expires.Unix(),
-		LastAccess:  t.LastAccess.Unix(),
-		LastOrigin:  t.LastOrigin.String(),
 		Provisioned: t.Provisioned,
 	}
+	// Tokens created without a request (admin API, CLI, provisioning) carry their creation time and
+	// origin 0.0.0.0 until first used; report those as never used
+	if t.LastOrigin.IsValid() && !t.LastOrigin.IsUnspecified() {
+		response.LastAccess = t.LastAccess.Unix()
+		response.LastOrigin = t.LastOrigin.String()
+	}
+	return response
 }
 
 // mapUserErrorToHTTP maps user manager errors to HTTP errors

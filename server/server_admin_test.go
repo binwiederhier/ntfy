@@ -21,7 +21,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/ban"
+	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
@@ -509,6 +511,184 @@ func TestAccess_AllowReset_KillConnection(t *testing.T) {
 	})
 }
 
+func TestAccess_WritesTellPeers(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Subscribers are per node: an access write tells the other nodes to reload their access
+		// cache (which ends the streams that lost access there). Deleting a user also asks them to
+		// cancel the user's streams, since a user without access entries (e.g. an admin) leaves
+		// nothing in the cache to find.
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		s := newTestServer(t, c)
+		defer s.closeDatabases()
+		b := &fakeCluster{}
+		s.cluster = b
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+		require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+		require.Nil(t, s.userManager.AllowAccess("ben", "gol*", user.PermissionRead))
+		ben, err := s.userManager.User("ben")
+		require.Nil(t, err)
+		admin := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
+
+		before := b.AccessChanged()
+		rr := request(t, s, "DELETE", "/v1/users/access", `{"username": "ben", "topic":"gol*"}`, admin)
+		require.Equal(t, 200, rr.Code)
+		require.Greater(t, b.AccessChanged(), before)
+		require.Empty(t, b.DeletedUsers())
+
+		rr = request(t, s, "DELETE", "/v1/users", `{"username": "ben"}`, admin)
+		require.Equal(t, 200, rr.Code)
+		require.Equal(t, []string{ben.ID}, b.DeletedUsers())
+	})
+}
+
+func TestAccess_PeerAccessChangedReloadsAndCancels(t *testing.T) {
+	// Told by a peer that access changed, this node reloads its access cache: the reload ends the
+	// subscriber who lost access, and the client's reconnect is denied, not let in by a stale entry
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	newNode := func() *Server {
+		conf := newTestConfig(t, dsn)
+		conf.AuthDefault = user.PermissionDenyAll
+		conf.AuthAccessCacheEnabled = true
+		conf.AuthAccessCacheReloadInterval = time.Hour
+		return newTestServer(t, conf)
+	}
+	a := newNode()
+	require.Nil(t, a.userManager.AddUser("alice", "password", user.RoleUser, false))
+	require.Nil(t, a.userManager.AllowAccess("alice", "private", user.PermissionRead))
+	b := newNode()
+	headers := map[string]string{"Authorization": util.BasicAuth("alice", "password")}
+	stream := subscribeStream(t, b, "private", headers)
+
+	require.Nil(t, a.userManager.ResetAccess("alice", "private"))
+	b.handlePeerAccessChanged()
+	select {
+	case <-stream.ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("alice's stream was not canceled")
+	}
+	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", headers).Code)
+}
+
+func TestAccess_PeerUsersDeletedCancels(t *testing.T) {
+	// A peer deleted a user: this node cancels the user's streams
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleAdmin, false))
+	ben, err := s.userManager.User("ben")
+	require.Nil(t, err)
+	stream := subscribeStream(t, s, "mytopic", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
+	s.handleUsersDeleted([]string{ben.ID})
+	select {
+	case <-stream.ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("ben's stream was not canceled")
+	}
+}
+
+func TestAccess_ExternalRevocationCaughtByAccessReload(t *testing.T) {
+	// An access change made elsewhere (another node whose relay got lost, or the ntfy access CLI)
+	// reaches node B at its next access cache reload. B ends the streams of the user who lost
+	// access, and only those: carol, still allowed on the same topic, keeps her stream.
+	dsn := dbtest.CreateTestPostgresSchema(t)
+	newNode := func() *Server {
+		conf := newTestConfig(t, dsn)
+		conf.AuthDefault = user.PermissionDenyAll
+		conf.AuthAccessCacheEnabled = true
+		conf.AuthAccessCacheReloadInterval = 500 * time.Millisecond
+		return newTestServer(t, conf)
+	}
+	a := newNode()
+	for _, name := range []string{"alice", "carol"} {
+		require.Nil(t, a.userManager.AddUser(name, "password", user.RoleUser, false))
+		require.Nil(t, a.userManager.AllowAccess(name, "private", user.PermissionRead))
+	}
+	b := newNode()
+	alice := map[string]string{"Authorization": util.BasicAuth("alice", "password")}
+	carol := map[string]string{"Authorization": util.BasicAuth("carol", "password")}
+	aliceStream := subscribeStream(t, b, "private", alice)
+	carolStream := subscribeStream(t, b, "private", carol)
+
+	require.Nil(t, a.userManager.ResetAccess("alice", "private"))
+	select {
+	case <-aliceStream.ended:
+	case <-time.After(5 * time.Second):
+		t.Fatal("alice's stream on node B was not canceled by its access cache reload")
+	}
+	require.Equal(t, 403, request(t, b, "GET", "/private/json?poll=1", "", alice).Code)
+	time.Sleep(time.Second) // Two more reloads
+	select {
+	case <-carolStream.ended:
+		t.Fatal("carol's stream was canceled, but she can still read the topic")
+	default:
+	}
+}
+
+func TestAccess_RecheckUsesEachSubscriptionsOwnUser(t *testing.T) {
+	// Two streams of one user can carry different users as of subscribing, e.g. one opened before a
+	// demotion (admin) and one after (user). A revoke is checked against each stream's own user: the
+	// regular stream ends, the admin one stays (an accepted limit until it reconnects).
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.AuthDefault = user.PermissionDenyAll
+	conf.AuthAccessCacheEnabled = true
+	conf.AuthAccessCacheReloadInterval = time.Hour
+	s := newTestServer(t, conf)
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+	require.Nil(t, s.userManager.AllowAccess("ben", "private", user.PermissionRead))
+	ben, err := s.userManager.User("ben")
+	require.Nil(t, err)
+	benAsAdmin := &user.User{
+		ID:   ben.ID,
+		Name: ben.Name,
+		Role: user.RoleAdmin,
+	}
+	topics, err := s.topicsFromIDs(nil, "private")
+	require.Nil(t, err)
+	var adminCanceled, userCanceled atomic.Bool
+	noop := func(*visitor, *model.Message) error {
+		return nil
+	}
+	topics[0].Subscribe(noop, benAsAdmin, func() {
+		adminCanceled.Store(true)
+	})
+	topics[0].Subscribe(noop, ben, func() {
+		userCanceled.Store(true)
+	})
+
+	require.Nil(t, s.userManager.ResetAccess("ben", "private")) // Reloads the cache and re-checks
+	require.True(t, userCanceled.Load())
+	require.False(t, adminCanceled.Load())
+}
+
+func TestAccess_RevokeBetweenAuthorizeAndSubscribe(t *testing.T) {
+	// A revoke, and its re-check of live subscribers, can land after a request was authorized but
+	// before its stream subscribed: no later re-check would find the stream, so it must not slip through
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.AuthDefault = user.PermissionDenyAll
+	conf.AuthAccessCacheEnabled = true
+	conf.AuthAccessCacheReloadInterval = time.Hour
+	s := newTestServer(t, conf)
+	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
+	require.Nil(t, s.userManager.AllowAccess("alice", "private", user.PermissionRead))
+	testHookBeforeSubscribe = func() {
+		require.Nil(t, s.userManager.ResetAccess("alice", "private"))
+	}
+	t.Cleanup(func() {
+		testHookBeforeSubscribe = nil
+	})
+	done := make(chan int)
+	go func() {
+		rr := request(t, s, "GET", "/private/json", "", map[string]string{
+			"Authorization": util.BasicAuth("alice", "alice"),
+		})
+		done <- rr.Code
+	}()
+	select {
+	case code := <-done:
+		require.Equal(t, 403, code)
+	case <-time.After(3 * time.Second):
+		t.Fatal("the stream subscribed after the revoke stayed open")
+	}
+}
+
 func TestUser_GetWithDetails(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		conf := newTestConfigWithAuthFile(t, databaseURL)
@@ -597,6 +777,18 @@ func TestUser_AddWithInvalidHash(t *testing.T) {
 		})
 		require.Equal(t, 400, rr.Code)
 		require.Equal(t, 40069, toHTTPError(t, rr.Body.String()).Code)
+
+		// The error names the JSON fields as they are spelled
+		rr = request(t, s, "POST", "/v1/users", `{"username": "ben"}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 400, rr.Code)
+		require.Contains(t, toHTTPError(t, rr.Body.String()).Message, `"password" or "hash" missing`)
+		rr = request(t, s, "PUT", "/v1/users", `{"username": "ben"}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 400, rr.Code)
+		require.Contains(t, toHTTPError(t, rr.Body.String()).Message, `"password", "hash", "tier" or "role"`)
 	})
 }
 
@@ -746,10 +938,22 @@ func TestAccess_ResetAll(t *testing.T) {
 		require.Nil(t, s.userManager.AllowAccess("ben", "gold", user.PermissionRead))
 		require.Nil(t, s.userManager.AllowAccess("emma", "silver", user.PermissionRead))
 		require.Nil(t, s.userManager.AllowAccess(user.Everyone, "public", user.PermissionRead))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
 
-		rr := requestAdminSocket(t, s, "DELETE", "/v1/users/access", `{}`)
-		require.Equal(t, 200, rr.Code)
+		// Over HTTP, resetting the whole ACL is refused, even for admins
+		rr := request(t, s, "DELETE", "/v1/users/access", `{}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 		grants, err := s.userManager.AllGrants()
+		require.Nil(t, err)
+		require.Len(t, grants, 3)
+
+		// Over the socket, it works
+		rr = requestAdminSocket(t, s, "DELETE", "/v1/users/access", `{}`)
+		require.Equal(t, 200, rr.Code)
+		grants, err = s.userManager.AllGrants()
 		require.Nil(t, err)
 		require.Empty(t, grants)
 	})
@@ -790,7 +994,7 @@ func TestTokens_AddListRemove(t *testing.T) {
 		auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
 
 		// No tokens yet: empty array, not null
-		rr := request(t, s, "GET", "/v1/users/tokens", "", auth)
+		rr := request(t, s, "GET", "/v1/users/tokens?username=ben", "", auth)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "[]", strings.TrimSpace(rr.Body.String()))
 
@@ -803,6 +1007,8 @@ func TestTokens_AddListRemove(t *testing.T) {
 		require.Equal(t, "forever", forever.Label)
 		require.Equal(t, int64(0), forever.Expires)
 		require.True(t, user.ValidToken(forever.Token))
+		require.Equal(t, int64(0), forever.LastAccess) // Never used
+		require.Equal(t, "", forever.LastOrigin)
 
 		expires := time.Now().Add(time.Hour).Unix()
 		rr = request(t, s, "POST", "/v1/users/tokens", fmt.Sprintf(`{"username":"emma","expires":%d}`, expires), auth)
@@ -815,12 +1021,17 @@ func TestTokens_AddListRemove(t *testing.T) {
 		rr = request(t, s, "GET", "/v1/account", "", map[string]string{"Authorization": util.BearerAuth(forever.Token)})
 		require.Equal(t, 200, rr.Code)
 
-		// List all, and one user
+		// Listing all users' tokens is refused over HTTP, but works over the socket
 		rr = request(t, s, "GET", "/v1/users/tokens", "", auth)
+		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
+		rr = requestAdminSocket(t, s, "GET", "/v1/users/tokens", "")
 		require.Equal(t, 200, rr.Code)
 		var tokens []*apiUserTokenResponse
 		require.Nil(t, json.NewDecoder(rr.Body).Decode(&tokens))
 		require.Len(t, tokens, 2)
+
+		// List one user
 		rr = request(t, s, "GET", "/v1/users/tokens?username=ben", "", auth)
 		require.Equal(t, 200, rr.Code)
 		tokens = nil
@@ -871,7 +1082,7 @@ func TestTokens_Failures(t *testing.T) {
 		require.Equal(t, 40906, toHTTPError(t, rr.Body.String()).Code)
 
 		// Non-admins cannot use the API
-		rr = request(t, s, "GET", "/v1/users/tokens", "", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
+		rr = request(t, s, "GET", "/v1/users/tokens?username=ben", "", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
 		require.Equal(t, 401, rr.Code)
 	})
 }
@@ -888,8 +1099,11 @@ func TestTokens_AdminTokensOnlyOverSocket(t *testing.T) {
 		require.Nil(t, err)
 		auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
 
-		// Over HTTP, admin tokens are hidden and cannot be created or removed
-		rr := request(t, s, "GET", "/v1/users/tokens", "", auth)
+		// Over HTTP, admin tokens cannot be listed, created or removed
+		rr := request(t, s, "GET", "/v1/users/tokens?username=phil", "", auth)
+		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
+		rr = request(t, s, "GET", "/v1/users/tokens?username=ben", "", auth)
 		require.Equal(t, 200, rr.Code)
 		var tokens []*apiUserTokenResponse
 		require.Nil(t, json.NewDecoder(rr.Body).Decode(&tokens))
@@ -897,6 +1111,7 @@ func TestTokens_AdminTokensOnlyOverSocket(t *testing.T) {
 		require.Equal(t, "ben", tokens[0].Username)
 		rr = request(t, s, "POST", "/v1/users/tokens", `{"username":"phil"}`, auth)
 		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 
 		// Over the socket, they are visible and can be created
 		rr = requestAdminSocket(t, s, "GET", "/v1/users/tokens", "")

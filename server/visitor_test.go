@@ -385,7 +385,7 @@ func TestVisitor_SlowUsageLoadDoesNotHoldTheVisitorLock(t *testing.T) {
 	})
 }
 
-// lockUsageTable locks the usage table (or the given tables of the usage database) from another
+// lockUsageTable locks the usage table (or the given tables of the user database) from another
 // connection until the returned func is called (or the test ends), so every access blocks. On
 // SQLite the whole file is locked.
 func lockUsageTable(t *testing.T, s *Server, tables ...string) func() {

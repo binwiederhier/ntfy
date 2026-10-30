@@ -18,8 +18,8 @@ const (
 	// time for more requests to come in, so that we can send a {"rejected":["<pushkey>"]} response back.
 	topicExpungeAfter = 16 * time.Hour
 
-	// topicExpungeAfterPersisted is the same when the topic table exists (a usage file or a
-	// database): what the topic has to remember while idle (who it bills to, when it was last
+	// topicExpungeAfterPersisted is the same when the topic table exists (in the user database,
+	// auth-file or database-url): what the topic has to remember while idle (who it bills to, when it was last
 	// subscribed to) is in the table, so memory only has to hold the active topics
 	topicExpungeAfterPersisted = 5 * time.Minute
 
@@ -46,9 +46,9 @@ const (
 // topic represents a channel to which subscribers can subscribe, and publishers
 // can publish a message
 type topic struct {
-	ID          string
-	subscribers map[int]*topicSubscriber
-	rateVisitor *visitor
+	ID            string
+	subscribers   map[int]*topicSubscriber
+	rateVisitor   *visitor
 	rateSeen      time.Time // When the rate visitor subscribed, or a stream on the topic last closed
 	lastAccess    time.Time
 	delivered     map[string]time.Time // When recent messages went out to the subscribers, by message ID

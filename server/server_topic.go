@@ -17,8 +17,8 @@ import (
 // The topic table (see limit.TopicInfo) remembers what an in-memory topic used to: who a
 // UnifiedPush topic bills to, and when it was last subscribed to. With it, topics are evicted
 // from memory after minutes, a node that never saw a topic knows its rate visitor, and a push to
-// a topic nobody subscribed to for days is told to go away. Without it (no usage file, no
-// database), everything stays in memory as before.
+// a topic nobody subscribed to for days is told to go away. It is part of the user database
+// (auth-file, or database-url); without one, everything stays in memory as before.
 
 const (
 	tagTopic            = "topic"
@@ -36,7 +36,9 @@ func (s *Server) topicExpungeAfter() time.Duration {
 }
 
 // recordSubscribers writes to the topic table that the visitor is (still) subscribed to the
-// topics, throttled per topic, in the background
+// topics, throttled per topic, in the background. Streams call it on every keepalive: that is how
+// other nodes learn that a stream is open here, which keeps a topic's rate visitor live there
+// (see limit.TopicInfo.RateVisitorLive), as an open stream does on this node.
 func (s *Server) recordSubscribers(v *visitor, topics []*topic) {
 	if !s.limiter.Persistent() {
 		return

@@ -936,6 +936,9 @@ warning: ntfy server not reachable at /run/ntfy/admin.sock, writing to the datab
 To change the path, set `listen-admin-unix` in the `server.yml` file; the commands read it from there, too. To disable the
 socket, set `listen-admin-unix: "-"`. The admin socket is not available on Windows.
 
+If the server cannot create the socket, it logs a warning and starts anyway. This is
+[deprecated](deprecations.md): after 2027-01-30, the server will not start without it.
+
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,
 and to configure users in the `auth-users` section (see [users via the config](#users-via-the-config)), 

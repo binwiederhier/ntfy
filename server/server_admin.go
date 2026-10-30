@@ -495,29 +495,6 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 	return s.writeJSON(w, newSuccessResponse())
 }
 
-// startAdminSocket listens on the admin socket, if configured, and serves the admin API on it.
-// Failing to listen is not fatal: the CLI falls back to the database, so it only logs a warning.
-func (s *Server) startAdminSocket() {
-	if s.config.ListenAdminUnix == "" || s.userManager == nil {
-		return // Without auth, there is nothing to administer
-	}
-	listener, err := s.listenAdminSocket()
-	if err != nil {
-		log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly", s.config.ListenAdminUnix)
-		return
-	}
-	s.adminSocketListener = listener
-	s.adminSocketServer = &http.Server{
-		Handler: http.HandlerFunc(s.handleAdminSocket),
-	}
-	go func(server *http.Server) {
-		// Not fed into Run's error channel: losing the socket must not take the server down
-		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Tag(tagStartup).Err(err).Warn("Admin socket %s stopped", s.config.ListenAdminUnix)
-		}
-	}(s.adminSocketServer)
-}
-
 // listenAdminSocket creates the socket's directory, removes a stale socket file (one with no
 // server behind it) and listens. A socket that answers belongs to another running server; in
 // that case this one does not take it over.

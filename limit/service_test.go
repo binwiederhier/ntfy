@@ -868,3 +868,30 @@ func TestService_Allow_DenyRacesRollover(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestService_Close_CancelsStalledLoad(t *testing.T) {
+	// Close does not wait for a startup load stuck on the database
+	store := NewSQLiteStore(newTestUserDB(t))
+	pool := store.db.Primary()
+	pool.SetMaxOpenConns(1)
+	conn, err := pool.Conn(context.Background()) // Holds the only connection: the load waits for it
+	require.Nil(t, err)
+	defer conn.Close()
+	s := newService(&Config{Store: store}, time.Now)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.Nil(t, s.Start(ctx))
+	require.Eventually(t, func() bool {
+		return pool.Stats().WaitCount > 0
+	}, time.Second, time.Millisecond)
+	closed := make(chan struct{})
+	go func() {
+		s.Close()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("Close waits for the stalled load")
+	}
+}

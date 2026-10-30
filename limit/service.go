@@ -64,7 +64,8 @@ type Service struct {
 	prunedAt    int64                     // Database time of the last prune; the sync worker's only
 	clockOffset atomic.Int64              // Database clock minus ours, nanoseconds
 	interval    time.Duration             // How often the worker syncs (syncInterval); tests change it
-	closeChan   chan struct{}
+	ctx         context.Context           // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
+	cancel      context.CancelFunc
 	closeOnce   sync.Once
 	wg          sync.WaitGroup
 }
@@ -88,12 +89,12 @@ func New(conf *Config) *Service {
 
 func newService(conf *Config, now func() time.Time) *Service {
 	s := &Service{
-		conf:      conf,
-		now:       now,
-		store:     conf.Store,
-		interval:  syncInterval,
-		closeChan: make(chan struct{}),
+		conf:     conf,
+		now:      now,
+		store:    conf.Store,
+		interval: syncInterval,
 	}
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	for i := 0; i < shardCount; i++ {
 		s.counters[i] = &counterShard{
 			counters: make(map[string]*counter),
@@ -160,11 +161,12 @@ func (s *Service) Start(ctx context.Context) error {
 	return nil
 }
 
-// Close stops the sync worker and writes what is unflushed. The store's database is its owner's
-// to close (the user manager's, or the shared pool), after this.
+// Close stops the sync worker, cancelling its store call (a stuck load or sync), and writes what
+// is unflushed. The store's database is its owner's to close (the user manager's, or the shared
+// pool), after this.
 func (s *Service) Close() {
 	s.closeOnce.Do(func() {
-		close(s.closeChan)
+		s.cancel()
 		s.wg.Wait()
 		if s.store == nil {
 			return
@@ -311,7 +313,7 @@ func (s *Service) runSync(loaded chan struct{}) {
 	defer s.wg.Done()
 	for !s.load() {
 		select {
-		case <-s.closeChan:
+		case <-s.ctx.Done():
 			return
 		case <-time.After(s.interval):
 		}
@@ -323,7 +325,7 @@ func (s *Service) runSync(loaded chan struct{}) {
 		select {
 		case <-ticker.C:
 			s.sync()
-		case <-s.closeChan:
+		case <-s.ctx.Done():
 			return
 		}
 	}
@@ -332,7 +334,7 @@ func (s *Service) runSync(loaded chan struct{}) {
 // load reads every row written in the last day and keeps those of their key's current period,
 // and reports whether it succeeded
 func (s *Service) load() bool {
-	ctx, cancel := context.WithTimeout(context.Background(), loadTimeout)
+	ctx, cancel := context.WithTimeout(s.ctx, loadTimeout)
 	defer cancel()
 	started := time.Now()
 	dbNow, err := s.syncClock(ctx)
@@ -354,17 +356,17 @@ func (s *Service) load() bool {
 // of the promoted keys, read back the rows changed since the last round, and prune once in a
 // while. Every error is logged and leaves the state as it was, for the next round.
 func (s *Service) sync() {
-	ctx, cancel := context.WithTimeout(context.Background(), statementTimeout)
+	ctx, cancel := context.WithTimeout(s.ctx, statementTimeout)
 	dbNow, err := s.syncClock(ctx)
 	cancel()
 	if err != nil {
 		log.Tag(tag).Err(err).Warn("Cannot read the database clock; usage is not synced")
 		return
 	}
-	ctx, cancel = context.WithTimeout(context.Background(), statementTimeout)
+	ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
 	s.write(ctx)
 	cancel()
-	ctx, cancel = context.WithTimeout(context.Background(), statementTimeout)
+	ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
 	_, err = s.read(ctx, s.watermark-int64(readOverlap/time.Second))
 	cancel()
 	if err != nil {
@@ -374,7 +376,7 @@ func (s *Service) sync() {
 	}
 	if dbNow-s.prunedAt >= int64(pruneInterval/time.Second) {
 		s.prunedAt = dbNow
-		ctx, cancel = context.WithTimeout(context.Background(), statementTimeout)
+		ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
 		deleted, err := s.store.prune(ctx, dbNow-int64(pruneAfter/time.Second))
 		cancel()
 		if err != nil {

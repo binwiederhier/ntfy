@@ -596,6 +596,9 @@ func (a *Manager) UsersCount() (int64, error) {
 func (a *Manager) readUser(rows *sql.Rows) (*User, error) {
 	defer rows.Close()
 	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err // A failed read is not a missing user
+		}
 		return nil, ErrUserNotFound
 	}
 	user, err := a.scanUser(rows)

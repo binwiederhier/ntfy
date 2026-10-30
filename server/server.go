@@ -1641,8 +1641,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
-	payerTopicIDs, err := s.subscribePayers(r, v, topics)
-	if err != nil {
+	if err := s.subscribePayers(r, v, topics); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1671,6 +1670,8 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
+	s.payers.Open(topicIDs(topics))
+	defer s.payers.Close(topicIDs(topics)) // A closed stream keeps its topics' payers live for another day
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
 	}
@@ -1697,7 +1698,6 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 			for _, t := range topics {
 				t.Keepalive()
 			}
-			s.keepPayers(r, v, payerTopicIDs)
 			if err := sub(v, model.NewKeepaliveMessage(topicsStr)); err != nil { // Send keepalive message
 				return err
 			}
@@ -1737,10 +1737,6 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	defer conn.Close()
-	payerTopicIDs, err := s.subscribePayers(r, v, topics) // Before the keepalive loop below reads them
-	if err != nil {
-		return err
-	}
 
 	// Subscription connections can be canceled externally, see topic.CancelSubscribersExceptUser
 	cancelCtx, cancel := context.WithCancel(context.Background())
@@ -1794,7 +1790,6 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 				for _, t := range topics {
 					t.Keepalive()
 				}
-				s.keepPayers(r, v, payerTopicIDs)
 				if err := ping(); err != nil {
 					return err
 				}
@@ -1811,6 +1806,9 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			return err
 		}
 		return conn.WriteJSON(msg)
+	}
+	if err := s.subscribePayers(r, v, topics); err != nil {
+		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
 	if poll {
@@ -1833,6 +1831,8 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
 	}()
+	s.payers.Open(topicIDs(topics))
+	defer s.payers.Close(topicIDs(topics)) // A closed stream keeps its topics' payers live for another day
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
 	}
@@ -1875,16 +1875,12 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 // - or the topic is reserved, and v.user is the owner
 // - or the topic is not reserved, and v.user has write access
 //
-// This only applies to UnifiedPush topics ("up..."). It returns the topics v pays for, for the
-// subscription's keepalives (see keepPayers).
-func (s *Server) subscribePayers(r *http.Request, v *visitor, topics []*topic) ([]string, error) {
-	topicIDs := make([]string, 0, len(topics))
-	for _, t := range topics {
-		topicIDs = append(topicIDs, t.ID)
-	}
-	payerTopicIDs, err := s.payers.Subscribe(v, topicIDs)
+// This only applies to UnifiedPush topics ("up..."). A payer stays live while any stream on the topic
+// is open, and for a day after (see topicPayers).
+func (s *Server) subscribePayers(r *http.Request, v *visitor, topics []*topic) error {
+	payerTopicIDs, err := s.payers.Subscribe(v, topicIDs(topics))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, topicID := range payerTopicIDs {
 		logvr(v, r).
@@ -1892,14 +1888,16 @@ func (s *Server) subscribePayers(r *http.Request, v *visitor, topics []*topic) (
 			Field("topic", topicID).
 			Debug("Setting visitor as payer for topic %s", topicID)
 	}
-	return payerTopicIDs, nil
+	return nil
 }
 
-// keepPayers keeps v the payer of the subscription's topics, or takes a stale one back (see topicPayers.Keep)
-func (s *Server) keepPayers(r *http.Request, v *visitor, payerTopicIDs []string) {
-	if err := s.payers.Keep(v, payerTopicIDs); err != nil {
-		logvr(v, r).Tag(tagSubscribe).Err(err).Warn("Cannot check if visitor may pay for its topics")
+// topicIDs returns the IDs of the topics
+func topicIDs(topics []*topic) []string {
+	ids := make([]string, 0, len(topics))
+	for _, t := range topics {
+		ids = append(ids, t.ID)
 	}
+	return ids
 }
 
 // sendOldMessages selects old messages from the messageCache and calls sub for each of them. It uses since as the

@@ -3651,12 +3651,10 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 }
 
 func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T) {
-	// A poll from the subscriber of an open stream must not take the stream's place as the topic's
-	// rate visitor: only the stream's keepalives keep it alive, so UnifiedPush publishes would fail
-	// a day after the poll while the stream is still open
+	// A poll from the subscriber of an open stream makes it the topic's payer again; the open stream
+	// must keep it live, or UnifiedPush publishes would fail a day after the poll
 	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true
-	c.KeepaliveInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
 	subscriberFn := func(r *http.Request) {
 		r.RemoteAddr = "1.2.3.4:1234"
@@ -3677,9 +3675,8 @@ func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T
 	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
 
-	// A day later, the stream is still there: its keepalives must keep the topic's rate visitor
+	// A day later, the stream is still there: it keeps the topic's payer live
 	agePayer(s, "upAAAAAAAAAAAA", 25*time.Hour)
-	time.Sleep(3 * c.KeepaliveInterval)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 }
@@ -3704,10 +3701,9 @@ func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testin
 
 func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testing.T) {
 	// Two streams from the same subscriber overlap (e.g. a reconnect), and the newer one closes: the
-	// older one's keepalives must keep the topic's payer alive, though the topic holds the newer one
+	// older one must keep the topic's payer live
 	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true
-	c.KeepaliveInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
 	subscriberFn := func(r *http.Request) {
 		r.RemoteAddr = "1.2.3.4:1234"
@@ -3741,17 +3737,15 @@ func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testi
 
 	// A day later, stream A is still there
 	agePayer(s, "upAAAAAAAAAAAA", 25*time.Hour)
-	time.Sleep(3 * c.KeepaliveInterval)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 }
 
-func TestServer_SubscriberRateLimiting_StreamReclaimsTopicFromGonePoller(t *testing.T) {
+func TestServer_SubscriberRateLimiting_PollFromOtherKeyPaysWhileStreamOpen(t *testing.T) {
 	// A poll from another key (e.g. the same device over IPv4) takes the topic from an open stream
-	// (IPv6). Once the poller is gone for a day, the stream's keepalives must take the topic back.
+	// (IPv6), and stays its payer while the stream is open, even after a day
 	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true
-	c.KeepaliveInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -3770,80 +3764,26 @@ func TestServer_SubscriberRateLimiting_StreamReclaimsTopicFromGonePoller(t *test
 	})
 	require.Equal(t, 200, rr.Code)
 
-	// A day later, only the stream is still there; the publish is billed to the stream's key
+	// A day later, the stream is still open; the publish is billed to the poll's key
 	agePayer(s, "upAAAAAAAAAAAA", 25*time.Hour)
-	time.Sleep(3 * c.KeepaliveInterval)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
-	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("2001:db8::1"), nil).Stats().Messages)
+	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
+	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("2001:db8::1"), nil).Stats().Messages)
 }
 
-func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoked(t *testing.T) {
-	// A stream whose write access was revoked while it is open must not take a stale topic back:
-	// publishes would be charged to (and rejected by) the quota of a subscriber who may no longer write
-	c := newTestConfigWithAuthFile(t, "")
+func TestServer_SubscriberRateLimiting_OpenStreamKeepsPayerAlive(t *testing.T) {
+	// A payer is live while a stream on its topic is open, however long and without keepalives, and
+	// for a day after the last stream closes
+	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true
-	c.VisitorMessageDailyLimit = 1
-	c.KeepaliveInterval = 20 * time.Millisecond
-	c.AuthDefault = user.PermissionDenyAll
+	c.KeepaliveInterval = time.Hour // No keepalives in this test
 	s := newTestServer(t, c)
-	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
-	require.Nil(t, s.userManager.AddUser("bob", "bob", user.RoleUser, false))
-	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionReadWrite))
-	require.Nil(t, s.userManager.AllowAccess("bob", "upAAAAAAAAAAAA", user.PermissionReadWrite))
-	aliceHeaders := map[string]string{
-		"Authorization": util.BasicAuth("alice", "alice"),
-	}
-	bobHeaders := map[string]string{
-		"Authorization": util.BasicAuth("bob", "bob"),
-	}
-
-	// Alice streams and uses up her quota, then may only read
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	done := make(chan struct{})
 	go func() {
-		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", aliceHeaders, func(r *http.Request) {
-			r.RemoteAddr = "1.1.1.1:1234"
-			*r = *r.WithContext(ctx)
-		})
-	}()
-	waitFor(t, func() bool {
-		to := lockedTopic(s, "upAAAAAAAAAAAA")
-		return to != nil && to.SubscribersCount() == 1
-	})
-	require.True(t, s.visitor(netip.MustParseAddr("1.1.1.1"), nil).MessageAllowed()) // Alice has no tier, so her key is her IP's
-	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionRead))
-
-	// Bob takes the topic with a poll, and is gone a day later
-	response := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", bobHeaders, func(r *http.Request) {
-		r.RemoteAddr = "2.2.2.2:1234"
-	})
-	require.Equal(t, 200, response.Code)
-	agePayer(s, "upAAAAAAAAAAAA", 25*time.Hour)
-	time.Sleep(5 * c.KeepaliveInterval)
-
-	// Alice's stream did not take the topic back
-	response = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", bobHeaders, func(r *http.Request) {
-		r.RemoteAddr = "2.2.2.2:1234"
-	})
-	require.Equal(t, 200, response.Code)
-}
-
-func TestServer_SubscriberRateLimiting_StreamDoesNotKeepOtherUserWithSameKey(t *testing.T) {
-	// Two users without a tier behind one IP share a key: alice's stream must not keep alive bob's
-	// payer, which bob set with a poll and then left; alice's stream takes the topic back instead
-	c := newTestConfigWithAuthFile(t, "")
-	c.VisitorSubscriberRateLimiting = true
-	c.KeepaliveInterval = 20 * time.Millisecond
-	s := newTestServer(t, c)
-	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
-	require.Nil(t, s.userManager.AddUser("bob", "bob", user.RoleUser, false))
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", map[string]string{
-			"Authorization": util.BasicAuth("alice", "alice"),
-		}, func(r *http.Request) {
+		defer close(done)
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, func(r *http.Request) {
 			r.RemoteAddr = "1.2.3.4:1234"
 			*r = *r.WithContext(ctx)
 		})
@@ -3852,68 +3792,22 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotKeepOtherUserWithSameKey(t *
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", map[string]string{
-		"Authorization": util.BasicAuth("bob", "bob"),
-	}, func(r *http.Request) {
-		r.RemoteAddr = "1.2.3.4:1234"
-	})
-	require.Equal(t, 200, rr.Code)
 
-	// A day later, bob is gone and deleted; alice's stream pays
-	agePayer(s, "upAAAAAAAAAAAA", 25*time.Hour)
-	require.Nil(t, s.userManager.RemoveUser("bob"))
-	time.Sleep(5 * c.KeepaliveInterval)
+	// Two days later, the stream is still open: the payer is neither pruned nor stale
+	agePayer(s, "upAAAAAAAAAAAA", 48*time.Hour)
+	require.Equal(t, 0, s.payers.Prune())
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
-}
 
-func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterAdminDemoted(t *testing.T) {
-	// An admin demoted to a user without write access while its stream is open must not take a
-	// stale topic back: the stream's user is the admin it was when it subscribed
-	c := newTestConfigWithAuthFile(t, "")
-	c.VisitorSubscriberRateLimiting = true
-	c.VisitorMessageDailyLimit = 1
-	c.KeepaliveInterval = 20 * time.Millisecond
-	c.AuthDefault = user.PermissionDenyAll
-	s := newTestServer(t, c)
-	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleAdmin, false))
-	require.Nil(t, s.userManager.AddUser("bob", "bob", user.RoleUser, false))
-	require.Nil(t, s.userManager.AllowAccess("bob", "upAAAAAAAAAAAA", user.PermissionReadWrite))
-	bobHeaders := map[string]string{
-		"Authorization": util.BasicAuth("bob", "bob"),
-	}
-
-	// Alice streams and uses up her quota, then is demoted
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", map[string]string{
-			"Authorization": util.BasicAuth("alice", "alice"),
-		}, func(r *http.Request) {
-			r.RemoteAddr = "1.1.1.1:1234"
-			*r = *r.WithContext(ctx)
-		})
-	}()
-	waitFor(t, func() bool {
-		to := lockedTopic(s, "upAAAAAAAAAAAA")
-		return to != nil && to.SubscribersCount() == 1
-	})
-	require.True(t, s.visitor(netip.MustParseAddr("1.1.1.1"), nil).MessageAllowed()) // Alice has no tier, so her key is her IP's
-	require.Nil(t, s.userManager.ChangeRole("alice", user.RoleUser))
-
-	// Bob takes the topic with a poll, and is gone a day later
-	response := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", bobHeaders, func(r *http.Request) {
-		r.RemoteAddr = "2.2.2.2:1234"
-	})
+	// The stream closes; the payer is live for another day
+	cancel()
+	<-done
+	response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	agePayer(s, "upAAAAAAAAAAAA", 25*time.Hour)
-	time.Sleep(5 * c.KeepaliveInterval)
-
-	// Alice's stream did not take the topic back
-	response = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", bobHeaders, func(r *http.Request) {
-		r.RemoteAddr = "2.2.2.2:1234"
-	})
-	require.Equal(t, 200, response.Code)
+	response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 507, response.Code)
+	require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestServer_SubscriberRateLimiting_TierChangeAppliesToPublishes(t *testing.T) {

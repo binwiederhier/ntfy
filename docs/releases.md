@@ -2276,6 +2276,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * A tier with a daily email limit of zero sends no emails, a tier edited in place no longer loses pending user stats, and a clock that goes back no longer takes tokens away
 * Accept terabyte units (e.g. `1T`) in size settings such as attachment and tier limits, matching how sizes are displayed ([#2078](https://github.com/binwiederhier/ntfy/pull/2078), thanks to [@cangen185-sudo](https://github.com/cangen185-sudo) for the contribution)
 * Web app: Deleted notifications no longer come back when a poll replays messages published in the same second as the last one ([#2098](https://github.com/binwiederhier/ntfy/issues/2098), thanks to [@mattford63](https://github.com/mattford63) and [@arminus](https://github.com/arminus) for reporting)
+* Web app: A message replayed after a reconnect keeps its read state and no longer notifies again, and an older version of a sequence no longer replaces a newer one ([#2090](https://github.com/binwiederhier/ntfy/issues/2090), thanks to [@tobykaspar79](https://github.com/tobykaspar79) for reporting)
 
 **Security:**
 

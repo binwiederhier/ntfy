@@ -204,6 +204,15 @@ export class SubscriptionManager {
         if ((await this.db.notifications.get(notification.id)) || (await this.wasDeleted(subscriptionId, notification))) {
           return false;
         }
+
+        // An update replaces the stored versions of its sequence, unless a newer one is stored
+        // already (e.g. a reconnect replayed an older version)
+        const sequenceId = notification.sequence_id || notification.id;
+        const versions = await this.db.notifications.where({ subscriptionId, sequenceId }).toArray();
+        if (versions.some((v) => v.time > notification.time)) {
+          return false;
+        }
+        await this.db.notifications.bulkDelete(versions.map((v) => v.id));
         await this.db.notifications.add({
           ...messageWithSequenceId(notification),
           subscriptionId,

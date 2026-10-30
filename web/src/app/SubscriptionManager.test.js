@@ -158,6 +158,27 @@ describe("SubscriptionManager.addNotification", () => {
     expect((await db.subscriptions.get(subscriptionId)).last).toBe("m2");
   });
 
+  it("replaces an older version of the same sequence", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotification(subscriptionId, message("m1", { sequence_id: "s1", message: "Downloading" }));
+
+    expect(
+      await manager.addNotification(subscriptionId, message("m2", { sequence_id: "s1", message: "Download complete", time: 1700000001 })),
+    ).toBe(true);
+
+    expect((await db.notifications.toArray()).map((n) => [n.id, n.new])).toEqual([["m2", 1]]);
+  });
+
+  it("does not replace a newer version of the same sequence when the WebSocket replays an older one", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotification(subscriptionId, message("m2", { sequence_id: "s1", message: "Download complete", time: 1700000001 }));
+
+    expect(await manager.addNotification(subscriptionId, message("m1", { sequence_id: "s1", message: "Downloading" }))).toBe(false);
+
+    expect((await db.notifications.toArray()).map((n) => n.message)).toEqual(["Download complete"]);
+    expect((await db.subscriptions.get(subscriptionId)).last).toBe("m2");
+  });
+
   it("does not store delete and clear events", async () => {
     const { db, manager } = await setup();
     expect(await manager.addNotification(subscriptionId, message("d1", { event: "message_delete", sequence_id: "s1" }))).toBe(false);

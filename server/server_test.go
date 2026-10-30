@@ -3829,6 +3829,93 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 	require.Equal(t, 200, response.Code)
 }
 
+func TestServer_SubscriberRateLimiting_StreamDoesNotKeepOtherUserWithSameKey(t *testing.T) {
+	// Two users without a tier behind one IP share a key: alice's stream must not keep alive bob's
+	// payer, which bob set with a poll and then left; alice's stream takes the topic back instead
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.KeepaliveInterval = 20 * time.Millisecond
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
+	require.Nil(t, s.userManager.AddUser("bob", "bob", user.RoleUser, false))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", map[string]string{
+			"Authorization": util.BasicAuth("alice", "alice"),
+		}, func(r *http.Request) {
+			r.RemoteAddr = "1.2.3.4:1234"
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", map[string]string{
+		"Authorization": util.BasicAuth("bob", "bob"),
+	}, func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// A day later, bob is gone and deleted; alice's stream pays
+	agePayer(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	require.Nil(t, s.userManager.RemoveUser("bob"))
+	time.Sleep(5 * c.KeepaliveInterval)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterAdminDemoted(t *testing.T) {
+	// An admin demoted to a user without write access while its stream is open must not take a
+	// stale topic back: the stream's user is the admin it was when it subscribed
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.VisitorMessageDailyLimit = 1
+	c.KeepaliveInterval = 20 * time.Millisecond
+	c.AuthDefault = user.PermissionDenyAll
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleAdmin, false))
+	require.Nil(t, s.userManager.AddUser("bob", "bob", user.RoleUser, false))
+	require.Nil(t, s.userManager.AllowAccess("bob", "upAAAAAAAAAAAA", user.PermissionReadWrite))
+	bobHeaders := map[string]string{
+		"Authorization": util.BasicAuth("bob", "bob"),
+	}
+
+	// Alice streams and uses up her quota, then is demoted
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", map[string]string{
+			"Authorization": util.BasicAuth("alice", "alice"),
+		}, func(r *http.Request) {
+			r.RemoteAddr = "1.1.1.1:1234"
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	require.True(t, s.visitor(netip.MustParseAddr("1.1.1.1"), nil).MessageAllowed()) // Alice has no tier, so her key is her IP's
+	require.Nil(t, s.userManager.ChangeRole("alice", user.RoleUser))
+
+	// Bob takes the topic with a poll, and is gone a day later
+	response := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", bobHeaders, func(r *http.Request) {
+		r.RemoteAddr = "2.2.2.2:1234"
+	})
+	require.Equal(t, 200, response.Code)
+	agePayer(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	time.Sleep(5 * c.KeepaliveInterval)
+
+	// Alice's stream did not take the topic back
+	response = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", bobHeaders, func(r *http.Request) {
+		r.RemoteAddr = "2.2.2.2:1234"
+	})
+	require.Equal(t, 200, response.Code)
+}
+
 func TestServer_SubscriberRateLimiting_TierChangeAppliesToPublishes(t *testing.T) {
 	// Publishes to a UnifiedPush topic are billed with the subscriber's current tier, not the one it
 	// had when it subscribed

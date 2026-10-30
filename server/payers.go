@@ -54,7 +54,7 @@ func (p *topicPayers) Subscribe(v *visitor, topicIDs []string) ([]string, error)
 		if !strings.HasPrefix(topicID, unifiedPushTopicPrefix) || len(topicID) != unifiedPushTopicLength {
 			continue
 		}
-		ok, err := p.mayPay(v, topicID)
+		ok, err := p.mayPay(v.User(), topicID)
 		if err != nil {
 			return nil, err
 		} else if ok {
@@ -75,15 +75,23 @@ func (p *topicPayers) Subscribe(v *visitor, topicIDs []string) ([]string, error)
 }
 
 // Keep is called on the keepalives of a subscription, with the topics Subscribe returned for it. A
-// subscriber with the payer's key keeps it alive, whichever of its subscriptions set it. A stale topic
-// is taken back only if v may still pay for it; its write access may have been revoked since.
+// subscriber with the payer's key and user keeps it alive, whichever of its subscriptions set it. A
+// stale topic is taken back only if v's current user may still pay for it; its write access or role
+// may have changed since it subscribed.
 func (p *topicPayers) Keep(v *visitor, topicIDs []string) error {
 	errs := make([]error, 0)
 	for _, topicID := range topicIDs {
 		if !p.keepOrStale(v, topicID) {
 			continue
 		}
-		ok, err := p.mayPay(v, topicID)
+		u, exists, err := p.currentUser(v.MaybeUserID())
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		} else if !exists {
+			continue
+		}
+		ok, err := p.mayPay(u, topicID)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -103,15 +111,11 @@ func (p *topicPayers) Resolve(topicID string) (*visitor, error) {
 	p.mu.Unlock()
 	if !ok || py.stale() {
 		return nil, nil
-	} else if py.userID == "" {
-		return newVisitor(p.visitors, py.ip, nil), nil
 	}
-	u, err := p.userByID(py.userID)
-	if errors.Is(err, user.ErrUserNotFound) {
-		return nil, nil
-	} else if err != nil {
+	u, exists, err := p.currentUser(py.userID)
+	if err != nil {
 		return nil, err
-	} else if u.Deleted {
+	} else if !exists {
 		return nil, nil
 	}
 	return newVisitor(p.visitors, py.ip, u), nil
@@ -139,13 +143,14 @@ func (p *topicPayers) Prune() int {
 	return pruned
 }
 
-// keepOrStale marks the topic's payer as seen if it has v's key. Otherwise, it returns true if the
-// topic has no live payer, so v may take it (see takeIfStale).
+// keepOrStale marks the topic's payer as seen if it has v's key and user; users without a tier behind
+// one IP share a key. Otherwise, it returns true if the topic has no live payer, so v may take it (see
+// takeIfStale).
 func (p *topicPayers) keepOrStale(v *visitor, topicID string) (stale bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	py, ok := p.payers[topicID]
-	if ok && py.key == v.key {
+	if ok && py.key == v.key && py.userID == v.MaybeUserID() {
 		py.seen = time.Now()
 		p.payers[topicID] = py
 		return false
@@ -168,11 +173,11 @@ func (p *topicPayers) takeIfStale(v *visitor, topicID string) {
 	}
 }
 
-// mayPay returns true if v may pay for the topic:
+// mayPay returns true if the user (nil if anonymous) may pay for the topic:
 // - access controls are off
-// - or the topic is reserved, and v.user is the owner
-// - or the topic is not reserved, and v.user has write access
-func (p *topicPayers) mayPay(v *visitor, topicID string) (bool, error) {
+// - or the topic is reserved, and the user is the owner
+// - or the topic is not reserved, and the user has write access
+func (p *topicPayers) mayPay(u *user.User, topicID string) (bool, error) {
 	if p.userManager == nil {
 		return true, nil
 	}
@@ -181,9 +186,26 @@ func (p *topicPayers) mayPay(v *visitor, topicID string) (bool, error) {
 		return false, err
 	}
 	if ownerUserID == "" {
-		return p.userManager.Authorize(v.User(), topicID, user.PermissionWrite) == nil, nil
+		return p.userManager.Authorize(u, topicID, user.PermissionWrite) == nil, nil
 	}
-	return ownerUserID == v.MaybeUserID(), nil
+	return u != nil && ownerUserID == u.ID, nil
+}
+
+// currentUser looks up the user with the given ID as it is now, or returns nil for "" (anonymous).
+// It returns exists=false if the user was deleted; a deleted user pays for nothing.
+func (p *topicPayers) currentUser(userID string) (u *user.User, exists bool, err error) {
+	if userID == "" {
+		return nil, true, nil
+	}
+	u, err = p.userByID(userID)
+	if errors.Is(err, user.ErrUserNotFound) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	} else if u.Deleted {
+		return nil, false, nil
+	}
+	return u, true, nil
 }
 
 // stale is true if no subscriber with the payer's key has been seen for visitorExpungeAfter

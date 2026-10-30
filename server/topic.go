@@ -30,6 +30,7 @@ type topic struct {
 	ID          string
 	subscribers map[int]*topicSubscriber
 	rateVisitor *visitor
+	rateSeen    time.Time // When the rate visitor subscribed, or a stream on the topic last closed
 	lastAccess  time.Time
 	delivered   map[string]time.Time // When recent messages went out to the subscribers, by message ID
 	mu          sync.RWMutex
@@ -109,7 +110,7 @@ func (t *topic) ExpireDelivered() {
 func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
+	if !t.rateVisitorStaleNoLock() {
 		return false
 	}
 	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpungeAfter
@@ -121,20 +122,33 @@ func (t *topic) LastAccess() time.Time {
 	return t.lastAccess
 }
 
+// SetRateVisitor makes the subscriber's visitor the topic's rate visitor; the latest subscriber wins
 func (t *topic) SetRateVisitor(v *visitor) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.rateVisitor = v
+	t.rateSeen = time.Now()
 	t.lastAccess = time.Now()
 }
 
+// RateVisitor returns the topic's rate visitor, or nil if there is none or it is stale
 func (t *topic) RateVisitor() *visitor {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && t.rateVisitor.Stale() {
+	if t.rateVisitorStaleNoLock() {
 		t.rateVisitor = nil
 	}
 	return t.rateVisitor
+}
+
+// rateVisitorStaleNoLock is true if there is no rate visitor, or the topic has no open stream and
+// none closed or polled within visitorExpungeAfter. Any open stream keeps the rate visitor alive,
+// which is the subscriber's own, or whoever subscribed last.
+func (t *topic) rateVisitorStaleNoLock() bool {
+	if t.rateVisitor == nil {
+		return true
+	}
+	return len(t.subscribers) == 0 && time.Since(t.rateSeen) > visitorExpungeAfter
 }
 
 // Unsubscribe removes the subscription from the list of subscribers
@@ -142,6 +156,7 @@ func (t *topic) Unsubscribe(id int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.subscribers, id)
+	t.rateSeen = time.Now() // The subscriber was last seen now; the rate visitor stays for another visitorExpungeAfter
 }
 
 // Publish sends a live message to the subscribers that have not had it (see deliver), without

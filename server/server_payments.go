@@ -63,7 +63,7 @@ func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _
 	if err != nil {
 		return err
 	}
-	freeTier := vis.LimitsFor(visitorConfigFrom(s.config), nil)
+	freeTier := s.visitors.ipLimits
 	response := []*apiAccountBillingTier{
 		{
 			// This is a bit of a hack: This is the "Free" tier. It has no tier code, name or price.
@@ -211,7 +211,7 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	logvr(v, r).
 		With(tier).
 		Tag(tagStripe).
@@ -435,7 +435,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(r *http.Request,
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	tier, err := s.userManager.TierByStripePrice(priceID)
 	if err != nil {
 		return err
@@ -458,7 +458,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(r *http.Request,
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	logvr(v, r).
 		Tag(tagStripe).
 		Field("stripe_webhook_type", event.Type).

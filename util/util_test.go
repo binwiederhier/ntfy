@@ -157,6 +157,33 @@ func TestParseSize_10kLowerCaseSuccess(t *testing.T) {
 	require.Equal(t, int64(10*1024), s)
 }
 
+func TestParseSize_Terabytes(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		size  int64
+	}{
+		{"1T", 1 << 40},
+		{"10t", 10 << 40},
+		{"0T", 0},
+		{"8388607T", 8388607 << 40},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			s, err := ParseSize(tc.input)
+			require.NoError(t, err)
+			require.Equal(t, tc.size, s)
+		})
+	}
+}
+
+func TestParseSize_TerabyteOverflow(t *testing.T) {
+	for _, input := range []string{"8388608T", "16777216t", "9223372036854775807T"} {
+		t.Run(input, func(t *testing.T) {
+			_, err := ParseSize(input)
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestParseSize_FailureInvalid(t *testing.T) {
 	_, err := ParseSize("not a size")
 	require.Error(t, err)
@@ -171,6 +198,7 @@ func TestFormatSize(t *testing.T) {
 		{10 * 1024, "10K"},
 		{10 * 1024 * 1024, "10M"},
 		{10 * 1024 * 1024 * 1024, "10G"},
+		{1024 * 1024 * 1024 * 1024, "1T"},
 	}
 	for _, value := range values {
 		require.Equal(t, value.expected, FormatSize(value.size))

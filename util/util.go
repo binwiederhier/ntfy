@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	sizeStrRegex       = regexp.MustCompile(`(?i)^(\d+)([gmkb])?$`)
+	sizeStrRegex       = regexp.MustCompile(`(?i)^(\d+)([tgmkb])?$`)
 	errInvalidPriority = errors.New("invalid priority")
 	noQuotesRegex      = regexp.MustCompile(`^[-_./:@a-zA-Z0-9]+$`)
 )
@@ -268,6 +268,9 @@ func ParseSize(s string) (int64, error) {
 	}
 	switch strings.ToUpper(matches[2]) {
 	case "T":
+		if int64(value) > math.MaxInt64/(1024*1024*1024*1024) {
+			return -1, fmt.Errorf("size %s is too large", s)
+		}
 		return int64(value) * 1024 * 1024 * 1024 * 1024, nil
 	case "G":
 		return int64(value) * 1024 * 1024 * 1024, nil

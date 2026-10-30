@@ -26,7 +26,6 @@ func TestService_Topics_RecordAndGet(t *testing.T) {
 		require.Equal(t, "ip:5.6.7.8", info.LastSubscriberKey)
 		require.Equal(t, info.CreatedAt.Add(time.Minute), info.LastSubscribedAt)
 		require.Equal(t, "", info.RateVisitorKey)
-		require.Equal(t, info.LastSubscribedAt, info.LastActivity())
 	})
 }
 

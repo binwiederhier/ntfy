@@ -51,11 +51,6 @@ type TopicInfo struct {
 	RateVisitorSeenAt time.Time // When the rate visitor was assigned
 }
 
-// LastActivity returns the latest of the topic's recorded times
-func (i *TopicInfo) LastActivity() time.Time {
-	return latest(i.CreatedAt, i.LastSubscribedAt, i.LastPublishedAt, i.RateVisitorSeenAt)
-}
-
 // RateVisitorLive reports whether the topic's rate visitor assignment is still valid at now:
 // there is one, and the topic showed a subscriber within topicRateVisitorTTL
 func (i *TopicInfo) RateVisitorLive(now time.Time) bool {

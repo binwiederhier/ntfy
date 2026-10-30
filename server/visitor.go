@@ -22,8 +22,10 @@ const (
 	// the other limits anyway, since they are replenished faster (typically).
 	visitorExpungeAfter = oneDay
 
-	// promoteRate is the fraction of the daily message cap (1/promoteRate) from which the count of
-	// a visitor without a user is written to the usage table; below it, a restart forgets it
+	// promoteRate is the divisor of the daily message cap (cap / promoteRate, i.e. 10%) from which
+	// the count of a visitor without a user is written to the usage table; below it, a restart
+	// forgets it, and N nodes may admit up to N x (threshold - 1) without a row. A larger
+	// divisor writes more keys.
 	promoteRate = 10
 )
 
@@ -326,7 +328,8 @@ func (v *visitor) requestRule() limit.Rule {
 
 // messageRule is the daily message limit. The count of a visitor without a user is written to the
 // usage table only from a tenth of the cap on (most keys never get there, so their rows are
-// saved); a logged-in user's from the first message, so the account page agrees across nodes.
+// saved); a logged-in user's from the first message. A user without a tier is keyed by the IP
+// (see vis.Key), so that persists the IP key's count, shared with the IP's anonymous visitors.
 func (v *visitor) messageRule() limit.Rule {
 	rule := limit.Rule{
 		Kind:  limit.KindMessages,

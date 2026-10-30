@@ -31,8 +31,10 @@ const (
 	tag        = "limit"
 	shardCount = 64 // Keys are spread over this many independently locked maps
 
-	// syncInterval is how often a node writes its unflushed counts and reads the others'. It
-	// bounds the overshoot in a cluster ((nodes - 1) x what a key is admitted in this time).
+	// syncInterval is how often a node writes its unflushed counts and reads the others'. A count
+	// reaches the other nodes within about two intervals in healthy operation (one to be written,
+	// one to be read), which bounds the overshoot in a cluster to about (nodes - 1) x what a key
+	// is admitted in that time.
 	syncInterval = 5 * time.Second
 
 	// statementTimeout bounds each store call of a sync. A row's updated_at is the database

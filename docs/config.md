@@ -1933,10 +1933,11 @@ visitor, so not every count resets at once. The account page shows when a visito
 The daily counts (messages, e-mails and phone calls) are kept in the user database if `auth-file` (SQLite) or
 `database-url` (PostgreSQL) is set, so they survive a restart. With PostgreSQL, all ntfy servers sharing the database
 also share the counts: each server writes what it counted every 5 seconds and reads what the others counted, so a visitor
-gets one daily allowance in total, not one per server (it may overshoot by a few seconds of traffic). An anonymous
-visitor's message count is only written once it reaches 10% of its daily limit, so the many visitors that publish a
-few messages never touch the database; a restart forgets those few. Without a user database, the counts are kept in
-memory only and start over with every restart.
+gets one daily allowance in total, not one per server. Counts reach the other servers within about 10 seconds (two
+rounds), so a visitor may overshoot by about that much traffic. An anonymous visitor's message count is only written once
+it reaches 10% of its daily limit on a server, so the many visitors that publish a few messages never touch the database;
+a restart forgets those few, and N servers may admit up to N times that much before the count is shared. Without a user
+database, the counts are kept in memory only and start over with every restart.
 
 ### Attachment limits
 Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 
@@ -1960,6 +1961,7 @@ are enabled):
 
 Visitors without a tier can send at most 24h / `visitor-email-limit-replenish` e-mails per day (24 by default), a daily
 limit that, like the message limit, survives restarts and is shared between servers if a user database is configured.
+If `visitor-email-limit-replenish` is longer than a day, there is no daily limit, only the bucket.
 
 ### Topic creation limits
 To mitigate topic-enumeration / squatting attacks (where a single source pokes thousands of guessable

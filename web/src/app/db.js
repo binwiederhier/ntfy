@@ -18,11 +18,6 @@ const createDatabase = (username) => {
     prefs: "&key",
   });
 
-  // Deleted notifications, so that a replay of the marker's second (since=<id>) doesn't add them again
-  db.version(4).stores({
-    deleted: "&id,subscriptionId,time,[subscriptionId+sequenceId]",
-  });
-
   // When another connection (e.g., service worker or another tab) wants to upgrade,
   // close this connection gracefully to allow the upgrade to proceed
   db.on("versionchange", () => {

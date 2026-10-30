@@ -507,9 +507,8 @@ func (s *Server) Run() error {
 	}
 	if s.config.ListenAdminUnix != "" && s.userManager != nil { // Without auth, there is nothing to administer
 		if listener, err := s.listenAdminSocket(); err != nil {
-			// Deprecated: not fatal yet, unlike the other listeners, because the CLI can fall back to the
-			// database. After 2027-01-30, this fails the startup (see docs/deprecations.md).
-			log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly. DEPRECATED: after 2027-01-30, ntfy will not start without it, see https://ntfy.sh/docs/deprecations/", s.config.ListenAdminUnix)
+			// Not fatal, unlike the other listeners: the CLI falls back to writing to the database
+			log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly", s.config.ListenAdminUnix)
 		} else {
 			s.adminSocketListener = listener
 			s.adminSocketServer = &http.Server{Handler: http.HandlerFunc(s.handleAdminSocket)}

@@ -2292,7 +2292,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working for now; after 2027-01-30, the server will not start without the socket (see [deprecations](deprecations.md))
+* Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working as before (see [admin socket](config.md#admin-socket))
 * Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
 
 **Bug fixes + maintenance:**

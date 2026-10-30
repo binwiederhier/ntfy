@@ -21,12 +21,12 @@
     "@mui/material": "^9.1.2",
     "dexie": "^4.4.4",
     "dexie-react-hooks": "^4.4.0",
-    "i18next": "^26.4.2",
+    "i18next": "^26.4.4",
     "i18next-browser-languagedetector": "^8.2.1",
     "i18next-http-backend": "^4.0.0",
     "react": "latest",
     "react-dom": "latest",
-    "react-i18next": "^17.0.15",
+    "react-i18next": "^17.0.16",
     "react-infinite-scroll-component": "^7.2.1",
     "react-remark": "^2.1.0",
     "react-router-dom": "^7.18.4",
@@ -48,7 +48,7 @@
     "prettier": "^3.9.4",
     "vite": "^8.0.16",
     "vite-plugin-pwa": "^2.0.0",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.4"
   },
   "browserslist": {
     "production": [

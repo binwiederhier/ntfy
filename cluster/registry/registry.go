@@ -100,6 +100,19 @@ type Peer struct {
 	HeartbeatAt  time.Time // When the peer last heartbeated, on this node's clock (database clock age at read time)
 }
 
+// Peers is a list of live peers, as returned by Peers and Refresh
+type Peers []*Peer
+
+// HasActive reports whether any of the peers is active, i.e. can take clients
+func (p Peers) HasActive() bool {
+	for _, peer := range p {
+		if peer.Role == RoleActive {
+			return true
+		}
+	}
+	return false
+}
+
 // Registry is the node membership table (control plane): each node upserts its own row with a
 // fresh heartbeat every few seconds, and peers are the other rows with a heartbeat newer than
 // the TTL. Stale rows are pruned by the leader.
@@ -116,11 +129,11 @@ type Registry struct {
 	advertiseURL string
 	role         Role
 	ttl          time.Duration
-	peers        []*Peer    // Snapshot of the last Refresh; nil until the first one
+	peers        Peers      // Snapshot of the last Refresh; nil until the first one
 	registeredAt time.Time  // When the last successful Register was ISSUED; zero = never
 	refreshedAt  time.Time  // When the last successful Refresh was ISSUED; zero = never
 	lowestSince  time.Time  // When this node first saw itself as the lowest live active id; zero = it is not
-	mu           sync.Mutex // Protects peers, registeredAt, refreshedAt and lowestSince
+	mu           sync.Mutex // Protects role, peers, registeredAt, refreshedAt and lowestSince
 }
 
 // New creates or migrates the registry schema and returns this node's membership handle. It
@@ -139,6 +152,15 @@ func New(pool *db.DB, nodeID, advertiseURL string, role Role, ttl time.Duration)
 	}, nil
 }
 
+// SetRole changes the role this node registers with, at runtime (a draining active node acts as
+// passive). Leadership ends at once on a step down to passive; peers see the new role
+// at the next Register.
+func (r *Registry) SetRole(role Role) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.role = role
+}
+
 // Register upserts this node into the registry with a fresh heartbeat. The registration is
 // dated from when the statement was ISSUED, not when it returned: that timestamp bounds how
 // long this node may believe it is the leader, and a late response must not extend it.
@@ -146,7 +168,10 @@ func (r *Registry) Register() error {
 	ctx, cancel := r.opContext()
 	defer cancel()
 	issued := time.Now()
-	if _, err := r.pool.ExecContext(ctx, upsertNodeQuery, r.nodeID, r.advertiseURL, r.role); err != nil {
+	r.mu.Lock()
+	role := r.role
+	r.mu.Unlock()
+	if _, err := r.pool.ExecContext(ctx, upsertNodeQuery, r.nodeID, r.advertiseURL, role); err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -159,7 +184,7 @@ func (r *Registry) Register() error {
 // heartbeat then, excluding this node). It never touches the database: before the first Refresh
 // there are no peers, and during an outage the snapshot is served as is (dead peers in it only
 // cost failed sends).
-func (r *Registry) Peers() []*Peer {
+func (r *Registry) Peers() Peers {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.peers
@@ -216,7 +241,9 @@ func (r *Registry) Prune() error {
 func (r *Registry) IsLeader() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.registeredAt.IsZero() || time.Since(r.registeredAt) >= r.lease() {
+	if r.role != RoleActive {
+		return false // A passive node never leads; checked here too, since its row may still say active
+	} else if r.registeredAt.IsZero() || time.Since(r.registeredAt) >= r.lease() {
 		return false // Our registration is stale: peers no longer count us as live
 	}
 	if r.refreshedAt.IsZero() || time.Since(r.refreshedAt) >= r.lease() {
@@ -253,7 +280,7 @@ func (r *Registry) Deregister() error {
 // updates this node's leadership standing. The mesh calls it once at startup and on every
 // heartbeat tick, so both are bounded by the heartbeat interval. On error the previous snapshot
 // and standing stay in place; leadership then lapses on its own via the registration deadline.
-func (r *Registry) Refresh() ([]*Peer, error) {
+func (r *Registry) Refresh() (Peers, error) {
 	issued := time.Now()
 	peers, lowest, otherActive, err := r.queryLiveNodes()
 	if err != nil {
@@ -279,7 +306,7 @@ func (r *Registry) Refresh() ([]*Peer, error) {
 // (which may be this node, and is empty if no active node is live), and whether another active
 // node was live recently: within the lease plus the hold-off, the longest that node may still
 // believe it leads after its last heartbeat. Rows that recent but not live are not peers.
-func (r *Registry) queryLiveNodes() ([]*Peer, string, bool, error) {
+func (r *Registry) queryLiveNodes() (Peers, string, bool, error) {
 	ctx, cancel := r.opContext()
 	defer cancel()
 	rows, err := r.pool.QueryContext(ctx, selectLiveNodesQuery, int64(r.recent().Seconds()))
@@ -287,7 +314,7 @@ func (r *Registry) queryLiveNodes() ([]*Peer, string, bool, error) {
 		return nil, "", false, err
 	}
 	defer rows.Close()
-	peers := make([]*Peer, 0)
+	peers := make(Peers, 0)
 	lowest := ""
 	otherActive := false
 	for rows.Next() { // Ordered by node_id, so the first live active row is the lowest

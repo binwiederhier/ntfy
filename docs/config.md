@@ -24,6 +24,10 @@ get a list of [command line options](#command-line-options).
 The most basic settings are `base-url` (the external URL of the ntfy server), the HTTP/HTTPS listen address (`listen-http`
 and `listen-https`), and socket path (`listen-unix`). All the other things are additional features.
 
+`listen-http` may list several comma-separated addresses, e.g. `10.0.0.5:2586,10.0.0.5:2588`. This is useful behind a
+load balancer: it connects to each address from one source IP, so a single address caps it at ~63k connections (one per
+source port), and every extra address adds as many again.
+
 Here are a few working sample configs using a `/etc/ntfy/server.yml` file:
 
 === "server.yml (HTTP-only, with cache + attachments)"
@@ -2336,10 +2340,40 @@ A few important notes:
   `passive` node never leads and never becomes ready, so it stays out of the load balancer; use it for test clients
   only, since while it is cut off from the database, its clients can miss messages published elsewhere.
 * **Health checks:** point your load balancer at `/v1/ready`, not `/v1/health` (see [Health checks](#health-checks)).
+* **Draining on shutdown:** when an active node gets `SIGTERM` (e.g. `systemctl restart ntfy` during a deploy) and
+  another active node is up, it moves its clients to the other nodes gradually before it exits, so a restart does not
+  cause a reconnect storm. See [draining on shutdown](#draining-on-shutdown).
 * **Limits are per node.** Rate limits and daily quotas are counted on each node separately, so a visitor spreading
   requests across N nodes gets N times the limits. Access changes (e.g. a revoked token) reach the other nodes when
   their access cache reloads.
 * Messages published with `cache: no` are not in the database, so for those, delivery across nodes is best effort.
+
+### Draining on shutdown
+Restarting a node drops all of its subscriber connections at once, and all of its clients reconnect to the other nodes
+in one burst. To avoid that, an active node that gets `SIGTERM` while another active node is up **drains** before it
+exits, moving its clients to the other nodes gradually, and without failed requests:
+
+1. **Withdrawing** (`experimental-cluster-drain-delay`, default 15 seconds): `/v1/ready` fails at once, so your load
+   balancer stops sending the node new requests, but the node still serves everything, so requests already on their
+   way succeed. In the cluster, the node acts as passive from now on: another node takes over the leader's jobs, and
+   it sends no scheduled (delayed) messages.
+2. **Read-only** (`experimental-cluster-drain-duration`, default 1 minute): new subscriptions and publishes get HTTP
+   503 (incoming email gets a temporary SMTP error, so mail servers retry), and the open subscriber connections are
+   closed evenly over the duration (all at once with `0`). The clients reconnect, through the load balancer, to the
+   other nodes, and catch up on what they missed. Once no connections are left, the node exits.
+
+| | Active | Passive | Draining: withdrawing | Draining: read-only |
+|---|---|---|---|---|
+| `/v1/ready` | 200 | 503 | 503, `"role": "passive", "draining": true` | 503, `"role": "passive", "draining": true` |
+| New subscriptions (streams, WebSockets) | accepted | accepted | accepted | 503 |
+| Open subscriber connections | kept | kept | kept | closed gradually |
+| Polls (`poll=1`) | served | served | served | served |
+| Publishes (HTTP and email) | served | served | served | rejected (503, SMTP 451) |
+| Leads the cluster's jobs, sends delayed messages | may | never | never | never |
+
+Your load balancer should stop routing to a node once its `/v1/ready` fails, and your service manager must wait for
+both phases (e.g. systemd's `TimeoutStopSec`, default 90 seconds). A passive node, and the last active node, exit at
+once.
 
 ### Cluster status
 `/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,
@@ -2405,10 +2439,12 @@ few seconds, has failed for 30 seconds.
 For load balancers, use `/v1/ready` instead: it returns 200 only if the server should receive clients. Without
 clustering that is always the case. With clustering, a passive node is never ready, and an unhealthy active node is not ready
 while another active node can take its clients. The only active node stays ready even when it is unhealthy, since there is
-nowhere better for its clients.
+nowhere better for its clients. A node [draining](#draining-on-shutdown) before a shutdown is not ready either: it acts
+as passive, and says so:
 
 ```json
 {"ready":true,"role":"active"}
+{"ready":false,"role":"passive","draining":true}
 ```
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
@@ -2530,7 +2566,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | Config option                              | Env variable                                    | Format                                              | Default           | Description                                                                                                                                                                                                                             |
 |--------------------------------------------|-------------------------------------------------|-----------------------------------------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `base-url`                                 | `NTFY_BASE_URL`                                 | *URL*                                               | -                 | Public facing base URL of the service (e.g. `https://ntfy.sh`)                                                                                                                                                                          |
-| `listen-http`                              | `NTFY_LISTEN_HTTP`                              | `[host]:port`                                       | `:80`             | Listen address for the HTTP web server                                                                                                                                                                                                  |
+| `listen-http`                              | `NTFY_LISTEN_HTTP`                              | `[host]:port`                                       | `:80`             | Listen address for the HTTP web server; several comma-separated addresses are allowed                                                                                                                                                   |
 | `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`                                       | -                 | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                                       |
 | `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*                                          | -                 | Path to a Unix socket to listen on                                                                                                                                                                                                      |
 | `listen-unix-mode`                         | `NTFY_LISTEN_UNIX_MODE`                         | *file mode*                                         | *system default*  | File mode of the Unix socket, e.g. 0700 or 0777                                                                                                                                                                                         |
@@ -2545,6 +2581,8 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `experimental-cluster-secret`              | `NTFY_EXPERIMENTAL_CLUSTER_SECRET`              | *string*                                            | -                 | Experimental, not ready for production. Shared secret authenticating node-to-node traffic; must match on all nodes.                                                                                                                      |
 | `experimental-cluster-batch-linger`        | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
 | `experimental-cluster-role`                | `NTFY_EXPERIMENTAL_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
+| `experimental-cluster-drain-delay`         | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY`         | *duration*                                          | `15s`             | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long a node withdraws: it is not ready but still serves everything, so the load balancer stops sending it requests before the node turns read-only. |
+| `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` closes them all at once. The service manager's stop timeout must be longer than the delay plus this. |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |
@@ -2651,7 +2689,7 @@ OPTIONS:
    --log-file value, --log_file value                                                                                     set log file, default is STDOUT [$NTFY_LOG_FILE]
    --config value, -c value                                                                                               config file (default: "/etc/ntfy/server.yml") [$NTFY_CONFIG_FILE]
    --base-url value, --base_url value, -B value                                                                           externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
-   --listen-http value, --listen_http value, -l value                                                                     ip:port used as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
+   --listen-http value, --listen_http value, -l value                                                                     ip:port used as HTTP listen address; several comma-separated addresses are allowed (default: ":80") [$NTFY_LISTEN_HTTP]
    --listen-https value, --listen_https value, -L value                                                                   ip:port used as HTTPS listen address [$NTFY_LISTEN_HTTPS]
    --listen-unix value, --listen_unix value, -U value                                                                     listen on unix socket path [$NTFY_LISTEN_UNIX]
    --listen-unix-mode value, --listen_unix_mode value                                                                     file permissions of unix socket, e.g. 0700 (default: system default) [$NTFY_LISTEN_UNIX_MODE]

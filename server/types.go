@@ -151,8 +151,9 @@ type apiHealthResponse struct {
 }
 
 type apiReadyResponse struct {
-	Ready bool         `json:"ready"`
-	Role  cluster.Role `json:"role"`
+	Ready    bool         `json:"ready"`
+	Role     cluster.Role `json:"role"`
+	Draining bool         `json:"draining,omitempty"`
 }
 
 type apiVersionResponse struct {
@@ -220,9 +221,9 @@ type apiUserTokenResponse struct {
 	Username    string `json:"username"`
 	Token       string `json:"token"`
 	Label       string `json:"label,omitempty"`
-	Expires     int64  `json:"expires"`     // Unix seconds; 0 = never
-	LastAccess  int64  `json:"last_access"` // Unix seconds
-	LastOrigin  string `json:"last_origin"` // IP
+	Expires     int64  `json:"expires"`               // Unix seconds; 0 = never
+	LastAccess  int64  `json:"last_access,omitempty"` // Unix seconds; omitted if never used
+	LastOrigin  string `json:"last_origin,omitempty"` // IP; omitted if never used
 	Provisioned bool   `json:"provisioned,omitempty"`
 }
 

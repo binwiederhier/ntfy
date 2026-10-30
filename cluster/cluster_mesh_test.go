@@ -330,22 +330,22 @@ func TestMesh_HealthyReflectsRegistration(t *testing.T) {
 	require.True(t, mesh.Healthy())
 }
 
-func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
-	// A subscriber-cancel broadcast from node A must invoke node B's CancelFunc; node A's own
-	// callback must not fire (no loop).
+func TestMesh_UsersDeletedBroadcast(t *testing.T) {
+	// Users deleted on node A must reach node B's UsersDeletedFunc; node A's own callback must not
+	// fire (no loop).
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	var mu sync.Mutex
-	var receivedB []*SubscriberCancel
-	canceledA := 0
+	var receivedB []string
+	deletedA := 0
 
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
-	confB.CancelFunc = func(cancel *SubscriberCancel) {
+	confB.UsersDeletedFunc = func(userIDs []string) {
 		mu.Lock()
 		defer mu.Unlock()
-		receivedB = append(receivedB, cancel)
+		receivedB = append(receivedB, userIDs...)
 	}
 	meshB, err := newMeshCluster(confB, poolB, nil)
 	require.Nil(t, err)
@@ -355,19 +355,18 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	defer srvB.Close()
 
 	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	confA.CancelFunc = func(_ *SubscriberCancel) {
+	confA.UsersDeletedFunc = func(_ []string) {
 		mu.Lock()
 		defer mu.Unlock()
-		canceledA++
+		deletedA++
 	}
 	meshA, err := newMeshCluster(confA, poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
 
-	meshA.BroadcastState(&State{SubscriberCancels: []*SubscriberCancel{
-		{Topic: "mytopic", ExceptUserID: "u_owner"},
-		{Topic: "up*", UserID: "u_revoked"},
-	}})
+	meshA.BroadcastState(&State{
+		DeletedUserIDs: []string{"u_deleted", "u_other"},
+	})
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -375,11 +374,8 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	})
 	mu.Lock()
 	defer mu.Unlock()
-	require.Equal(t, "mytopic", receivedB[0].Topic)
-	require.Equal(t, "u_owner", receivedB[0].ExceptUserID)
-	require.Equal(t, "up*", receivedB[1].Topic)
-	require.Equal(t, "u_revoked", receivedB[1].UserID)
-	require.Equal(t, 0, canceledA)
+	require.Equal(t, []string{"u_deleted", "u_other"}, receivedB)
+	require.Equal(t, 0, deletedA)
 }
 
 func TestMesh_ForwardsEveryTopicToEveryPeer(t *testing.T) {
@@ -837,4 +833,92 @@ func peerMetricValue(t *testing.T, name, peer string) float64 {
 // discardMessage is the deliver callback for tests that do not look at deliveries
 func discardMessage(_ *model.Message) {
 	// Nothing to do: these tests only check status and counters
+}
+
+func TestMesh_DrainingActsAsPassive(t *testing.T) {
+	// A draining node takes no clients and gives up leadership, and its peers see it as passive, so
+	// they no longer count it as a place for clients. Its configured role stays.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, mesh.IsLeader)
+	require.True(t, mesh.Ready())
+
+	mesh.SetDraining(true)
+	require.True(t, mesh.Draining())
+	require.False(t, mesh.Ready())
+	require.False(t, mesh.IsLeader())
+	require.Equal(t, RolePassive, mesh.Role()) // The role it acts in; the configured one is in its config
+	require.Equal(t, RolePassive, mesh.Members()[0].Role)
+	observer, err := registry.New(pool, "observer", "http://192.168.1.99:2587", RolePassive, time.Minute)
+	require.Nil(t, err)
+	waitFor(t, func() bool {
+		peers, err := observer.Refresh()
+		require.Nil(t, err)
+		return len(peers) == 1 && peers[0].Role == RolePassive
+	})
+
+	mesh.SetDraining(false)
+	require.False(t, mesh.Draining())
+	require.True(t, mesh.Ready())
+	require.Equal(t, RoleActive, mesh.Role())
+	require.Equal(t, RoleActive, mesh.Members()[0].Role)
+}
+
+func TestMesh_PeersHasActive(t *testing.T) {
+	// A node only drains if another active node can take its clients
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.True(t, mesh.Peers().HasActive())
+}
+
+func TestMesh_PassivePeerIsNoActivePeer(t *testing.T) {
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeerWithRole(t, pool, "node-passive", "http://192.168.1.51:2587", RolePassive)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.False(t, mesh.Peers().HasActive())
+}
+
+func TestMesh_AccessChangedBroadcast(t *testing.T) {
+	// Node A changed access entries: node B must be told, so it reloads its access cache; node A's
+	// own callback must not fire (no loop)
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
+	changedA, changedB := atomic.Int32{}, atomic.Int32{}
+
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
+	confB.AccessChangedFunc = func() {
+		changedB.Add(1)
+	}
+	meshB, err := newMeshCluster(confB, poolB, nil)
+	require.Nil(t, err)
+	defer meshB.Close()
+	srvB := &http.Server{Handler: meshB}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+
+	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	confA.AccessChangedFunc = func() {
+		changedA.Add(1)
+	}
+	meshA, err := newMeshCluster(confA, poolA, nil)
+	require.Nil(t, err)
+	defer meshA.Close()
+
+	meshA.BroadcastState(&State{
+		AccessChanged: true,
+	})
+	waitFor(t, func() bool {
+		return changedB.Load() == 1
+	})
+	require.Equal(t, int32(0), changedA.Load())
 }

@@ -922,6 +922,26 @@ func TestService_Burn_DebtCappedAtOneBurst(t *testing.T) {
 	require.Empty(t, s.TakeDeltas())
 }
 
+func TestService_Burn_KeepsKeyUntilBucketsRefill(t *testing.T) {
+	// A key drained by its peers' usage is held like one drained here (see Prune): forgetting it
+	// would hand this node a fresh burst while the peers' charges are still unpaid
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	require.True(t, s.Allow("k", rule, 1).OK)
+	s.Burn("k", KindRequests, 119) // Peers used the rest, and one burst of debt on top
+	clock.advance(6 * time.Minute)
+	s.Prune(5 * time.Minute)
+	require.Equal(t, 1, s.Size())
+	require.Equal(t, int64(12), s.Tokens("k", rule)) // 72 of 120 tokens earned back, not a full bucket
+	clock.advance(5 * time.Minute)
+	s.Prune(5 * time.Minute)
+	require.Equal(t, 0, s.Size())
+}
+
 func TestService_Burn_UnknownKeyOrBucketIgnored(t *testing.T) {
 	// A key this node never served has a full bucket here anyway (one burst per node, once);
 	// nothing to charge until it shows up

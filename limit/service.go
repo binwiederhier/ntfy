@@ -208,7 +208,7 @@ func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 	}
 	if rule.Burst > 0 {
 		b.tokens -= float64(n)
-		e.noteFull(b, &rule)
+		e.noteFull(b)
 	}
 	e.unflushed[rule.Kind] += n
 	if meshKinds[rule.Kind] {
@@ -390,6 +390,7 @@ func (s *Service) Burn(key string, kind Kind, n int64) {
 	b.catchUp(s.now())
 	if n >= 0 {
 		b.tokens = math.Max(b.tokens-float64(n), -float64(b.burst))
+		e.noteFull(b) // A key drained by peers is held until it refills, as if drained here
 	} else {
 		b.tokens = math.Min(b.tokens-float64(n), float64(b.burst)) // A peer's refund (see Refund)
 	}
@@ -942,13 +943,14 @@ func (e *entry) pending() bool {
 }
 
 // noteFull moves the time from which every bucket is full again to when this bucket is full, if
-// that is later. A bucket without refill never fills, so it does not hold the key.
-func (e *entry) noteFull(b *bucket, rule *Rule) {
-	missing := float64(rule.Burst) - b.tokens
-	if missing <= 0 || rule.Refill <= 0 {
+// that is later. A bucket without refill never fills, so it does not hold the key. It reads the
+// burst and refill the bucket was last used with, so a peer's charge (Burn) holds the key too.
+func (e *entry) noteFull(b *bucket) {
+	missing := float64(b.burst) - b.tokens
+	if missing <= 0 || b.interval <= 0 {
 		return
 	}
-	full := b.last + int64(math.Ceil(missing*float64(rule.Refill)))
+	full := b.last + int64(math.Ceil(missing*float64(b.interval)))
 	if full > e.full {
 		e.full = full
 	}

@@ -59,15 +59,18 @@ func TestCLI_AdminAPI_SocketDisabled(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
-	// "-" disables the socket, like in the server: no socket named "-", straight to the database
-	app, _, stdout, stderr := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=-", "list"}))
-	require.Contains(t, stdout.String(), "user * (role: anonymous, tier: none)")
-	require.NotContains(t, stderr.String(), "admin socket")
+	// "-" and "" disable the socket, like in the server: no socket named "-", straight to the
+	// database, which is deprecated just the same
+	for _, socket := range []string{"-", ""} {
+		app, _, stdout, stderr := newTestApp()
+		require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
+		require.Contains(t, stdout.String(), "user * (role: anonymous, tier: none)")
+		require.Contains(t, stderr.String(), "DEPRECATION WARNING: The admin socket is disabled\n(listen-admin-unix is \"-\" or empty), writing to the database")
+	}
 }
 
 func TestCLI_AdminAPI_FallbackWarningBanner(t *testing.T) {
-	plain := adminFallbackWarning("/run/ntfy/admin.sock", "no such file or directory", false)
+	plain := adminFallbackWarning("No ntfy server answered on the admin socket\n/run/ntfy/admin.sock (no such file or directory)", false)
 	require.Equal(t, `**********************************************************************
 DEPRECATION WARNING: No ntfy server answered on the admin socket
 /run/ntfy/admin.sock (no such file or directory), writing to the database
@@ -78,7 +81,7 @@ ntfy user/access/token/tier commands need a running server.
 See https://docs.ntfy.sh/deprecations/ for details.
 **********************************************************************
 `, plain)
-	yellow := adminFallbackWarning("/run/ntfy/admin.sock", "no such file or directory", true)
+	yellow := adminFallbackWarning("No ntfy server answered on the admin socket\n/run/ntfy/admin.sock (no such file or directory)", true)
 	require.Equal(t, "\033[1;33m"+strings.TrimSuffix(plain, "\n")+"\033[0m\n", yellow)
 }
 

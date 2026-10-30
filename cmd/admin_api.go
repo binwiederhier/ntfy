@@ -18,15 +18,15 @@ import (
 
 const (
 	adminFallbackWarningBanner = "**********************************************************************"
-	adminFallbackWarningText   = `DEPRECATION WARNING: No ntfy server answered on the admin socket
-%s (%s), writing to the database
+	adminFallbackWarningText   = `DEPRECATION WARNING: %s, writing to the database
 directly. A running server may not see this change right away.
 
 Direct database access will be removed after 2026-12-30. After that, the
 ntfy user/access/token/tier commands need a running server.
 See https://docs.ntfy.sh/deprecations/ for details.`
-	adminWarningColorYellow = "\033[1;33m"
-	adminWarningColorReset  = "\033[0m"
+	adminSocketDisabledCause = "The admin socket is disabled\n(listen-admin-unix is \"-\" or empty)"
+	adminWarningColorYellow  = "\033[1;33m"
+	adminWarningColorReset   = "\033[0m"
 )
 
 // adminAPI is what the user, access, token and tier commands need. client.Admin implements it
@@ -65,29 +65,34 @@ func newAdminAPI(c *cli.Context) (adminAPI, error) {
 		return client.NewAdmin(server, token), nil
 	}
 	authConfigured := c.String("auth-file") != "" || c.String("database-url") != ""
-	if socket := c.String("listen-admin-unix"); socket != "" && socket != "-" && authConfigured { // "-" disables it, as in the server
-		admin := client.NewAdminSocket(socket)
-		err := admin.Ping()
-		var apiErr *client.AdminError
-		switch {
-		case err == nil:
-			return admin, nil
-		case errors.As(err, &apiErr) && apiErr.Code == client.AdminErrCodeNotFound:
-			// The server runs without auth, i.e. it does not use this database; createUserManager decides
-		case errors.Is(err, fs.ErrPermission):
-			// Either this user may not manage the server, or the socket is some other server's (e.g. the
-			// system's, while managing one's own instance). Only the database can tell the two apart.
-			direct, directErr := newDirectAdminAPI(c)
-			if directErr != nil {
-				return nil, fmt.Errorf("permission denied on the admin socket %s, run this command as root or as a member of the server's group (usually ntfy)", socket)
-			}
-			printAdminFallbackWarning(c.App.ErrWriter, socket, err)
-			return direct, nil
-		case errors.Is(err, client.ErrAdminUnreachable):
-			printAdminFallbackWarning(c.App.ErrWriter, socket, err)
-		default:
-			return nil, err // The server answered with some other error; do not hide it behind a fallback
+	socket := c.String("listen-admin-unix")
+	if !authConfigured {
+		return newDirectAdminAPI(c) // Fails with the message for the missing auth config
+	} else if socket == "" || socket == "-" { // "-" disables it, as in the server
+		printAdminFallbackWarning(c.App.ErrWriter, adminSocketDisabledCause)
+		return newDirectAdminAPI(c)
+	}
+	admin := client.NewAdminSocket(socket)
+	err := admin.Ping()
+	var apiErr *client.AdminError
+	switch {
+	case err == nil:
+		return admin, nil
+	case errors.As(err, &apiErr) && apiErr.Code == client.AdminErrCodeNotFound:
+		// The server runs without auth, i.e. it does not use this database; createUserManager decides
+	case errors.Is(err, fs.ErrPermission):
+		// Either this user may not manage the server, or the socket is some other server's (e.g. the
+		// system's, while managing one's own instance). Only the database can tell the two apart.
+		direct, directErr := newDirectAdminAPI(c)
+		if directErr != nil {
+			return nil, fmt.Errorf("permission denied on the admin socket %s, run this command as root or as a member of the server's group (usually ntfy)", socket)
 		}
+		printAdminFallbackWarning(c.App.ErrWriter, adminUnreachableCause(socket, err))
+		return direct, nil
+	case errors.Is(err, client.ErrAdminUnreachable):
+		printAdminFallbackWarning(c.App.ErrWriter, adminUnreachableCause(socket, err))
+	default:
+		return nil, err // The server answered with some other error; do not hide it behind a fallback
 	}
 	return newDirectAdminAPI(c)
 }
@@ -143,6 +148,11 @@ func adminError(err error, username, tier, token string) error {
 	return apiErr
 }
 
+// adminUnreachableCause is the start of the fallback warning when no server answered on the socket
+func adminUnreachableCause(socket string, err error) string {
+	return fmt.Sprintf("No ntfy server answered on the admin socket\n%s (%s)", socket, adminUnreachableReason(err))
+}
+
 // adminUnreachableReason extracts the cause from a wrapped client.ErrAdminUnreachable, e.g.
 // "no such file or directory", for the fallback warning
 func adminUnreachableReason(err error) string {
@@ -156,16 +166,16 @@ func adminUnreachableReason(err error) string {
 // printAdminFallbackWarning tells the user, loudly, that the change bypasses the running server, and
 // that this fallback is deprecated (see docs/deprecations.md).
 // It is yellow on a terminal, and plain text in logs and pipes, or if NO_COLOR is set.
-func printAdminFallbackWarning(w io.Writer, socket string, err error) {
+func printAdminFallbackWarning(w io.Writer, cause string) {
 	color := false
 	if f, ok := w.(*os.File); ok && os.Getenv("NO_COLOR") == "" {
 		color = term.IsTerminal(int(f.Fd()))
 	}
-	fmt.Fprint(w, adminFallbackWarning(socket, adminUnreachableReason(err), color))
+	fmt.Fprint(w, adminFallbackWarning(cause, color))
 }
 
-func adminFallbackWarning(socket, reason string, color bool) string {
-	warning := adminFallbackWarningBanner + "\n" + fmt.Sprintf(adminFallbackWarningText, socket, reason) + "\n" + adminFallbackWarningBanner
+func adminFallbackWarning(cause string, color bool) string {
+	warning := adminFallbackWarningBanner + "\n" + fmt.Sprintf(adminFallbackWarningText, cause) + "\n" + adminFallbackWarningBanner
 	if color {
 		warning = adminWarningColorYellow + warning + adminWarningColorReset
 	}

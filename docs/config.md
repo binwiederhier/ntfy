@@ -930,7 +930,8 @@ The socket needs no password or token: **being able to open the socket is the au
 mode `0660`, owned by the user and group ntfy runs as, so only that user, members of that group, and `root` can use it.
 The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`).
 
-If no server answers on the socket (the server is not running, or it could not create the socket), the commands fall
+If no server answers on the socket (the server is not running, or it could not create the socket), or the socket is
+disabled (`listen-admin-unix: "-"`), the commands fall
 back to editing the database directly, like they did before, and print a warning (in yellow on a terminal, unless
 `NO_COLOR` is set). This fallback is [deprecated](deprecations.md) and will be removed after 2026-12-30:
 

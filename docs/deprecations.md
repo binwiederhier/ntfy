@@ -10,7 +10,7 @@ before the behavior is changed depends on the severity of the change, and how pr
 
 The `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` commands now talk to the running ntfy server through
 its local [admin socket](config.md#admin-socket), so changes take effect immediately. If no server answers on the
-socket, they still edit the database directly, like they used to, and print a deprecation warning. This fallback
+socket, or the socket is disabled (`listen-admin-unix: "-"`), they still edit the database directly, like they used to, and print a deprecation warning. This fallback
 will be removed: after that, these commands need a running server, either through the admin socket or with
 `--server` and `--token`.
 

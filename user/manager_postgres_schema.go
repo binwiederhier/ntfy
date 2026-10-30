@@ -138,6 +138,12 @@ const (
 		);
 		CREATE INDEX IF NOT EXISTS idx_usage_updated_at ON usage (updated_at);
 	`
+
+	// The usage table replaces the stats_* columns, which stay in the schema but are zeroed, so
+	// nothing reads their stale numbers
+	postgresMigrate9To10UpdateQueries = postgresCreateUsageTableQuery + `
+		UPDATE "user" SET stats_messages = 0, stats_emails = 0, stats_calls = 0;
+	`
 )
 
 var (
@@ -148,7 +154,7 @@ var (
 	postgresMigrations = schema.Migrations{
 		{From: 6, To: 7}:  schema.Query(postgresMigrate6To7UpdateQueries),
 		{From: 7, To: 8}:  schema.Query(postgresMigrate7To8UpdateQueries),
-		{From: 8, To: 9}:  schema.Nop,                                  // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
-		{From: 9, To: 10}: schema.Query(postgresCreateUsageTableQuery), // The usage table (see package limit)
+		{From: 8, To: 9}:  schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
+		{From: 9, To: 10}: schema.Query(postgresMigrate9To10UpdateQueries),
 	}
 )

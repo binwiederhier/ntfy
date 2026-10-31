@@ -74,3 +74,16 @@ func runTokenCommand(app *cli.App, conf *server.Config, args ...string) error {
 	}
 	return app.Run(append(userArgs, args...))
 }
+
+func TestCLI_Token_Server(t *testing.T) {
+	s, port, remote := newTestServerWithAdminToken(t)
+	defer test.StopServer(t, s, port)
+
+	// All users' tokens cannot be listed over the network, and the error says what is socket-only, not just roles
+	_, err := remote.run("token", "list")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "listing all users' tokens")
+	out, err := remote.run("token", "list", "ben")
+	require.Nil(t, err)
+	require.Contains(t, out, "user ben has no access tokens")
+}

@@ -100,3 +100,14 @@ func runAccessCommand(app *cli.App, conf *server.Config, args ...string) error {
 	}
 	return app.Run(append(userArgs, args...))
 }
+
+func TestCLI_Access_Server(t *testing.T) {
+	s, port, remote := newTestServerWithAdminToken(t)
+	defer test.StopServer(t, s, port)
+
+	_, err := remote.run("access", "ben", "mytopic", "ro")
+	require.Nil(t, err)
+	out, err := remote.run("access", "ben")
+	require.Nil(t, err)
+	require.Contains(t, out, "- read-only access to topic mytopic")
+}

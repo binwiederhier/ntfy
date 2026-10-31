@@ -293,3 +293,22 @@ func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {
 	}
 	return app.Run(append(userArgs, args...))
 }
+
+func TestCLI_User_Server(t *testing.T) {
+	s, port, remote := newTestServerWithAdminToken(t)
+	defer test.StopServer(t, s, port)
+
+	out, err := remote.run("user", "list")
+	require.Nil(t, err)
+	require.Contains(t, out, "user ben (role: user, tier: none)")
+
+	// Admins cannot be created or changed over the network
+	app, stdin, _, _ := newTestApp()
+	stdin.WriteString("mypass\nmypass")
+	err = app.Run([]string{"ntfy", "user", "--config=" + remote.conf.File, "--server=" + remote.url, "--token=" + remote.token, "add", "--role=admin", "emma"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "only possible over the admin socket")
+	_, err = remote.run("user", "del", "phil")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "only possible over the admin socket")
+}

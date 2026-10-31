@@ -24,12 +24,11 @@ func TestCLI_Backend_SocketDoesNotTouchDatabase(t *testing.T) {
 	defer test.StopServer(t, s, port)
 
 	// The CLI only needs to know that auth is configured; with a socket, it never opens the file
-	app, stdin, stdout, stderr := newTestApp()
-	stdin.WriteString("mypass\nmypass")
+	app, _, stdout, stderr := newTestApp()
 	confWithBadFile := *conf
 	confWithBadFile.AuthFile = "/does/not/exist/user.db"
-	require.Nil(t, runUserCommand(app, &confWithBadFile, "add", "phil"))
-	require.Contains(t, stdout.String(), "user phil added with role user")
+	require.Nil(t, runTierCommand(app, &confWithBadFile, "add", "--name=Pro", "pro"))
+	require.Contains(t, stdout.String(), "tier added")
 	require.NotContains(t, stderr.String(), "warning")
 }
 
@@ -40,8 +39,8 @@ func TestCLI_Backend_FallbackWarning(t *testing.T) {
 	// Missing socket file
 	app, _, stdout, stderr := newTestApp()
 	socket := filepath.Join(shortTempDir(t), "admin.sock")
-	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
-	require.Contains(t, stdout.String(), "user * (role: anonymous, tier: none)")
+	require.Nil(t, app.Run([]string{"ntfy", "tier", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "add", "--name=Pro", "pro"}))
+	require.Contains(t, stdout.String(), "tier added")
 	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket)
 	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
 
@@ -51,7 +50,7 @@ func TestCLI_Backend_FallbackWarning(t *testing.T) {
 	listener.(*net.UnixListener).SetUnlinkOnClose(false)
 	listener.Close()
 	app, _, _, stderr = newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
+	require.Nil(t, app.Run([]string{"ntfy", "tier", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
 	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket)
 	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
 }
@@ -63,9 +62,8 @@ func TestCLI_Backend_SocketDisabled(t *testing.T) {
 	// "-" and "" disable the socket, like in the server: no socket named "-", straight to the
 	// database, which is deprecated just the same
 	for _, socket := range []string{"-", ""} {
-		app, _, stdout, stderr := newTestApp()
-		require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
-		require.Contains(t, stdout.String(), "user * (role: anonymous, tier: none)")
+		app, _, _, stderr := newTestApp()
+		require.Nil(t, app.Run([]string{"ntfy", "tier", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
 		require.Contains(t, stderr.String(), "DEPRECATION WARNING: The admin socket is disabled\n(listen-admin-unix is \"-\" or empty), writing to the database")
 	}
 }
@@ -102,81 +100,47 @@ func TestCLI_Backend_SocketErrorNoFallback(t *testing.T) {
 	defer httpServer.Close()
 
 	app, _, stdout, _ := newTestApp()
-	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"})
+	err = app.Run([]string{"ntfy", "tier", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"})
 	require.Error(t, err)
 	require.Empty(t, stdout.String())
 }
 
 func TestCLI_Backend_Server(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t, false)
+	s, port, remote := newTestServerWithAdminToken(t)
 	defer test.StopServer(t, s, port)
 
-	// Admin with a token, and a regular user, created directly
-	manager, err := user.NewSQLiteManager(conf.AuthFile, "", &user.Config{BcryptCost: user.DefaultUserPasswordBcryptCost})
+	// Add and list over the network
+	out, err := remote.run("tier", "add", "--name=Pro", "pro")
 	require.Nil(t, err)
-	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin, false))
-	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser, false))
-	phil, err := manager.User("phil")
+	require.Contains(t, out, "tier added")
+	out, err = remote.run("tier", "list")
 	require.Nil(t, err)
-	token, err := manager.CreateToken(phil.ID, "", time.Unix(0, 0), netip.IPv4Unspecified(), false)
-	require.Nil(t, err)
-	require.Nil(t, manager.Close())
-	serverURL := fmt.Sprintf("http://127.0.0.1:%d", port)
-	remote := func(command string, args ...string) (string, error) {
-		app, _, stdout, _ := newTestApp()
-		err := app.Run(append([]string{"ntfy", command, "--config=" + conf.File, "--server=" + serverURL, "--token=" + token.Value}, args...))
-		return stdout.String(), err
-	}
-
-	// List, grant and show access
-	out, err := remote("user", "list")
-	require.Nil(t, err)
-	require.Contains(t, out, "user ben (role: user, tier: none)")
-	_, err = remote("access", "ben", "mytopic", "ro")
-	require.Nil(t, err)
-	out, err = remote("access", "ben")
-	require.Nil(t, err)
-	require.Contains(t, out, "- read-only access to topic mytopic")
-
-	// Admins cannot be created or changed over the network
-	app, stdin, _, _ := newTestApp()
-	stdin.WriteString("mypass\nmypass")
-	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--server=" + serverURL, "--token=" + token.Value, "add", "--role=admin", "emma"})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "only possible over the admin socket")
-	_, err = remote("user", "del", "phil")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "only possible over the admin socket")
-
-	// Neither can all users' tokens be listed, and the error says what is socket-only, not just roles
-	_, err = remote("token", "list")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "listing all users' tokens")
+	require.Contains(t, out, "tier pro (id: ti_")
 
 	// Flags after the arguments would be ignored, i.e. the command would silently go to the local
 	// server (here: the database) instead of --server
-	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "change-role", "ben", "admin", "--server=" + serverURL, "--token=" + token.Value})
+	app, _, _, _ := newTestApp()
+	err = app.Run([]string{"ntfy", "tier", "--config=" + remote.conf.File, "--auth-file=" + remote.conf.AuthFile, "change", "--name=Changed", "pro", "--server=" + remote.url, "--token=" + remote.token})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must come before")
-	out, err = remote("user", "list")
+	out, err = remote.run("tier", "list")
 	require.Nil(t, err)
-	require.Contains(t, out, "user ben (role: user, tier: none)")
+	require.Contains(t, out, "- Name: Pro")
 
 	// The token goes over plain HTTP: warn, unless it stays on this machine
 	app, _, _, stderr := newTestApp()
-	_ = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--server=http://ntfy.invalid:1", "--token=" + token.Value, "list"})
+	_ = app.Run([]string{"ntfy", "tier", "--config=" + remote.conf.File, "--server=http://ntfy.invalid:1", "--token=" + remote.token, "list"})
 	require.Contains(t, stderr.String(), "warning: --server http://ntfy.invalid:1 is not HTTPS, the token is sent unencrypted")
 	app, _, _, stderr = newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--server=" + serverURL, "--token=" + token.Value, "list"}))
+	require.Nil(t, app.Run([]string{"ntfy", "tier", "--config=" + remote.conf.File, "--server=" + remote.url, "--token=" + remote.token, "list"}))
 	require.NotContains(t, stderr.String(), "not HTTPS")
 
 	// --token is required, and must be an admin's
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--server=" + serverURL, "list"})
+	err = app.Run([]string{"ntfy", "tier", "--config=" + remote.conf.File, "--server=" + remote.url, "list"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "--token is required")
-	_, err = remote("user", "--token=tk_doesnotexistdoesnotexist12345", "list")
+	_, err = remote.run("tier", "--token=tk_doesnotexistdoesnotexist12345", "list")
 	require.Error(t, err)
 }
 
@@ -192,7 +156,7 @@ func TestCLI_Backend_SocketPermissionDenied(t *testing.T) {
 	dir := filepath.Dir(conf.AuthFile)
 	require.Nil(t, os.Chmod(dir, 0))
 	app, _, _, stderr := newTestApp()
-	err := runUserCommand(app, conf, "list")
+	err := runTierCommand(app, conf, "list")
 	require.Nil(t, os.Chmod(dir, 0700))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "permission denied on the admin socket")
@@ -200,8 +164,8 @@ func TestCLI_Backend_SocketPermissionDenied(t *testing.T) {
 
 	// Database accessible: the socket belongs to some other server (e.g. the system's), use the database
 	app, _, stdout, stderr := newTestApp()
-	require.Nil(t, runUserCommand(app, conf, "list"))
-	require.Contains(t, stdout.String(), "user * (role: anonymous")
+	require.Nil(t, runTierCommand(app, conf, "add", "--name=Pro", "pro"))
+	require.Contains(t, stdout.String(), "tier added")
 	require.Contains(t, stderr.String(), "(permission denied), writing to the database\ndirectly")
 }
 
@@ -255,4 +219,38 @@ func waitForAdminSocket(t *testing.T, socket string) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatalf("admin socket %s did not come up", socket)
+}
+
+// testRemote runs CLI commands against a test server over --server, with an admin's token
+type testRemote struct {
+	conf  *server.Config
+	url   string
+	token string
+}
+
+func (r *testRemote) run(command string, args ...string) (string, error) {
+	app, _, stdout, _ := newTestApp()
+	err := app.Run(append([]string{"ntfy", command, "--config=" + r.conf.File, "--server=" + r.url, "--token=" + r.token}, args...))
+	return stdout.String(), err
+}
+
+// newTestServerWithAdminToken starts a test server without admin socket, with an admin user "phil"
+// (whose token the remote uses) and a regular user "ben", both created directly in the database
+func newTestServerWithAdminToken(t *testing.T) (s *server.Server, port int, remote *testRemote) {
+	s, conf, port := newTestServerWithAuth(t, false)
+	manager, err := user.NewSQLiteManager(conf.AuthFile, "", &user.Config{BcryptCost: user.DefaultUserPasswordBcryptCost})
+	require.Nil(t, err)
+	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin, false))
+	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser, false))
+	phil, err := manager.User("phil")
+	require.Nil(t, err)
+	token, err := manager.CreateToken(phil.ID, "", time.Unix(0, 0), netip.IPv4Unspecified(), false)
+	require.Nil(t, err)
+	require.Nil(t, manager.Close())
+	remote = &testRemote{
+		conf:  conf,
+		url:   fmt.Sprintf("http://127.0.0.1:%d", port),
+		token: token.Value,
+	}
+	return s, port, remote
 }

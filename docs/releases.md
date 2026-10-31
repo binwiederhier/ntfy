@@ -2294,6 +2294,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working as before (see [admin socket](config.md#admin-socket))
 * Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
+* Export `ntfy_db_up` (1 if the last health check of a PostgreSQL pool's database succeeded, per pool) and health-check the primary like the replicas, to alert on a server that is cut off from its database (see [PostgreSQL](config.md#postgresql))
 
 **Bug fixes + maintenance:**
 

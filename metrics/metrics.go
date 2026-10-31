@@ -167,10 +167,11 @@ func init() {
 type DBPool struct {
 	Role  string // db.PoolRolePrimary or db.PoolRoleReplica
 	Addr  string // "host:port"
+	Up    bool   // The last health check of the pool's database succeeded
 	Stats sql.DBStats
 }
 
-// SetDBPoolsFunc sets the function that the ntfy_db_pool_* metrics read their values from on
+// SetDBPoolsFunc sets the function that the ntfy_db_* metrics read their values from on
 // every scrape; nil (the default) reports no pools
 func SetDBPoolsFunc(fn func() []*DBPool) {
 	dbPools.fn.Store(&fn)
@@ -184,39 +185,45 @@ type dbPoolCollector struct {
 	metrics []*dbPoolMetric
 }
 
-// dbPoolMetric is one ntfy_db_pool_* metric: its description, and how to read it from a pool
+// dbPoolMetric is one ntfy_db_* metric: its description, and how to read it from a pool
 type dbPoolMetric struct {
 	desc      *prometheus.Desc
 	valueType prometheus.ValueType
-	value     func(stats sql.DBStats) float64
+	value     func(pool *DBPool) float64
 }
 
 func newDBPoolCollector() *dbPoolCollector {
 	return &dbPoolCollector{
 		metrics: []*dbPoolMetric{
-			newDBPoolMetric("ntfy_db_pool_connections_max", "Maximum open database connections (pool_max_conns), per pool", prometheus.GaugeValue, func(stats sql.DBStats) float64 {
-				return float64(stats.MaxOpenConnections)
+			newDBPoolMetric("ntfy_db_up", "1 if the last health check of the pool's database (a ping every 30s) succeeded, 0 if not, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				if pool.Up {
+					return 1
+				}
+				return 0
 			}),
-			newDBPoolMetric("ntfy_db_pool_connections_open", "Open database connections, in use or idle, per pool", prometheus.GaugeValue, func(stats sql.DBStats) float64 {
-				return float64(stats.OpenConnections)
+			newDBPoolMetric("ntfy_db_pool_connections_max", "Maximum open database connections (pool_max_conns), per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.MaxOpenConnections)
 			}),
-			newDBPoolMetric("ntfy_db_pool_connections_in_use", "Database connections currently in use, per pool", prometheus.GaugeValue, func(stats sql.DBStats) float64 {
-				return float64(stats.InUse)
+			newDBPoolMetric("ntfy_db_pool_connections_open", "Open database connections, in use or idle, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.OpenConnections)
 			}),
-			newDBPoolMetric("ntfy_db_pool_connections_idle", "Idle database connections, per pool", prometheus.GaugeValue, func(stats sql.DBStats) float64 {
-				return float64(stats.Idle)
+			newDBPoolMetric("ntfy_db_pool_connections_in_use", "Database connections currently in use, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.InUse)
 			}),
-			newDBPoolMetric("ntfy_db_pool_waits_total", "Times a query had to wait for a free database connection, per pool", prometheus.CounterValue, func(stats sql.DBStats) float64 {
-				return float64(stats.WaitCount)
+			newDBPoolMetric("ntfy_db_pool_connections_idle", "Idle database connections, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.Idle)
 			}),
-			newDBPoolMetric("ntfy_db_pool_wait_seconds_total", "Total time spent waiting for a free database connection, per pool", prometheus.CounterValue, func(stats sql.DBStats) float64 {
-				return stats.WaitDuration.Seconds()
+			newDBPoolMetric("ntfy_db_pool_waits_total", "Times a query had to wait for a free database connection, per pool", prometheus.CounterValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.WaitCount)
+			}),
+			newDBPoolMetric("ntfy_db_pool_wait_seconds_total", "Total time spent waiting for a free database connection, per pool", prometheus.CounterValue, func(pool *DBPool) float64 {
+				return pool.Stats.WaitDuration.Seconds()
 			}),
 		},
 	}
 }
 
-func newDBPoolMetric(name, help string, valueType prometheus.ValueType, value func(stats sql.DBStats) float64) *dbPoolMetric {
+func newDBPoolMetric(name, help string, valueType prometheus.ValueType, value func(pool *DBPool) float64) *dbPoolMetric {
 	return &dbPoolMetric{
 		desc:      prometheus.NewDesc(name, help, []string{"role", "host"}, nil),
 		valueType: valueType,
@@ -239,7 +246,7 @@ func (c *dbPoolCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	for _, pool := range (*fn)() {
 		for _, m := range c.metrics {
-			ch <- prometheus.MustNewConstMetric(m.desc, m.valueType, m.value(pool.Stats), pool.Role, pool.Addr)
+			ch <- prometheus.MustNewConstMetric(m.desc, m.valueType, m.value(pool), pool.Role, pool.Addr)
 		}
 	}
 }

@@ -500,6 +500,10 @@ To size the pools, watch the `ntfy_db_pool_*` [metrics](#monitoring), one series
 and `ntfy_db_pool_wait_seconds_total` count queries that had to wait for a free connection. The open connection count
 says little, since the pool rotates through all of them. Waits that keep going up mean the pool is too small.
 
+`ntfy_db_up` is 1 if the server reached the pool's database at its last health check (a ping every 30 seconds), and 0
+if not, one series per pool like the above. Alert on `ntfy_db_up{role="primary"} == 0`: a server that cannot reach its
+primary cannot publish or authenticate, and enforces the daily limits on its own until it is back.
+
 
 ## Message cache
 If desired, ntfy can temporarily keep notifications in an in-memory or an on-disk cache. Caching messages for a short period

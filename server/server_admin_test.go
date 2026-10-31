@@ -1385,10 +1385,8 @@ func TestAdminSocket_StaleSocketFile(t *testing.T) {
 	stale.(*net.UnixListener).SetUnlinkOnClose(false)
 	stale.Close() // Socket file stays behind, nobody listening (e.g. after a crash)
 	s := newTestServer(t, conf)
-	output := captureLogUntil(t, "Admin socket listening on "+conf.ListenAdminUnix, func() {
-		runTestServer(t, s)
-	})
-	require.Contains(t, output, "Admin socket listening on "+conf.ListenAdminUnix)
+	runTestServer(t, s)
+	waitFor(t, func() bool { return adminSocketListening(s) })
 	resp, err := adminSocketClient(conf.ListenAdminUnix).Get("http://ntfy/v1/users")
 	require.Nil(t, err)
 	require.Equal(t, 200, resp.StatusCode)
@@ -1461,7 +1459,6 @@ func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 		runTestServer(t, s)
 	})
 	require.Contains(t, output, "Admin socket")
-	require.NotContains(t, output, "listening")
 	require.Contains(t, output, "directly, which is deprecated, see https://ntfy.sh/docs/deprecations/")
 	require.False(t, adminSocketListening(s))
 }
@@ -1483,8 +1480,9 @@ func TestAdminSocket_InsecureDirectoryWarning(t *testing.T) {
 		conf := newTestConfigWithAuthFile(t, "")
 		conf.ListenAdminUnix = filepath.Join(dir, "admin.sock")
 		s := newTestServer(t, conf)
-		output := captureLogUntil(t, "Admin socket listening", func() {
-			runTestServer(t, s) // The warning comes before it listens
+		output := captureLog(t, func() {
+			runTestServer(t, s)
+			waitFor(t, func() bool { return adminSocketListening(s) }) // Warned before it listens
 		})
 		if tt.warn {
 			require.Contains(t, output, "Admin socket directory "+dir+" is writable by all users", tt.mode)

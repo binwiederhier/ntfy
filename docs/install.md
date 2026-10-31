@@ -423,6 +423,10 @@ services:
 
 If using a non-root user when running the docker version, be sure to chown the server.yml, user.db, and cache.db files and attachments directory to the same uid/gid.
 
+To manage users, access control entries, tokens and tiers, run the `ntfy` commands inside the running container, e.g.
+`docker exec -it ntfy ntfy user add --role=admin phil`. They talk to the server over its [admin socket](config.md#admin-socket),
+so changes apply immediately. If you set `read_only: true`, also add `tmpfs: /run/ntfy` so the server can create the socket.
+
 Alternatively, you may wish to build a customized Docker image that can be run with fewer command-line arguments and without delivering the configuration file separately.
 ```
 FROM binwiederhier/ntfy

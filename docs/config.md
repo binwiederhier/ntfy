@@ -660,8 +660,14 @@ Once configured, you can use
 and topic patterns, and
 - the `ntfy token` command and the `auth-tokens` config option to [manage access tokens](#access-tokens) for users.
 
-These commands **directly edit the auth database** (as defined in `auth-file`), so they only work on the server, 
-and only if the user accessing them has the right permissions.
+These commands only work on the server (or with `--server`, see below). They **talk to the running ntfy server over
+its local [admin socket](#admin-socket)**, so changes take effect immediately. If the server is not running, they edit
+the auth database (as defined in `auth-file` or `database-url`) directly. Either way, they only work if the user running
+them has the right permissions: `root`, or a member of the `ntfy` group with the deb/rpm packages.
+
+To manage a remote server, pass its URL and an admin user's [access token](#access-tokens), e.g.
+`ntfy user --server=https://ntfy.example.com --token=tk_... list` (or `NTFY_ADMIN_SERVER` and `NTFY_ADMIN_TOKEN`). Over
+the network, admin users cannot be created, changed or removed, and roles cannot be changed; do that on the server.
 
 ### Users and roles
 Users can be added to the ntfy user database in two different ways
@@ -920,26 +926,61 @@ has a token `tk_f099we8uzj7xi5qshzajwp6jffvkz` with the label "Backup script".
 
 ### Admin socket
 The `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` commands talk to the running ntfy server through a local
-admin socket, by default `/run/ntfy/admin.sock` (`/var/run/ntfy/admin.sock` on macOS). That way, changes take effect
-immediately: a removed user is disconnected right away, a new tier applies to the user's next request, and there is no
-delay until the server reloads its access control list.
+admin socket, by default `/run/ntfy/admin.sock` (`/var/run/ntfy/admin.sock` on macOS and the BSDs). That way, changes take
+effect immediately: a removed user is disconnected right away, and new tiers and access control entries apply to the very
+next request, even with `auth-access-cache` enabled.
 
 The socket needs no password or token: **being able to open the socket is the authorization**. It is created with
-mode `0660` in a directory with mode `0750`, both owned by the user ntfy runs as, so only that user, members of its group
-and `root` can use it. With the Debian/Ubuntu/Fedora packages, the shipped systemd unit creates `/run/ntfy` (via
-`RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group just work.
+mode `0660`, owned by the user and group ntfy runs as, so only that user, members of that group, and `root` can use it.
+The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`).
 
-The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`). If the
-server cannot create the socket, it logs a warning at startup and runs without it:
+If no server answers on the socket (the server is not running, or it could not create the socket), or the socket is
+disabled (`listen-admin-unix: "-"`), the commands fall
+back to editing the database directly, like they did before, and print a warning (in yellow on a terminal, unless
+`NO_COLOR` is set). This fallback is [deprecated](deprecations.md) and will be removed after 2026-12-30:
+
+```
+**********************************************************************
+DEPRECATION WARNING: No ntfy server answered on the admin socket
+/run/ntfy/admin.sock (no such file or directory), writing to the database
+directly. A running server may not see this change right away.
+
+Direct database access will be removed after 2026-12-30. After that, the
+ntfy user/access/token/tier commands need a running server.
+See https://docs.ntfy.sh/deprecations/ for details.
+**********************************************************************
+```
+
+If the server cannot create the socket, it logs a warning at startup and runs without it:
 
 ```
 WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
 ```
 
-To change the path, set `listen-admin-unix` in the `server.yml` file; the commands read it from there, too. To disable the
-socket, set `listen-admin-unix: "-"`. The admin socket is not available on Windows. If you change the path, pick a
-directory that only the ntfy user can write to; otherwise the server logs a warning at startup, since other users may be
-able to use or replace the socket.
+To change the path, set `listen-admin-unix` in the `server.yml` file (or `NTFY_LISTEN_ADMIN_UNIX`); the commands read it from
+there, too. To disable the socket, set `listen-admin-unix: "-"`. If you change the path, pick a directory that only the
+ntfy user can write to; otherwise the server logs a warning at startup, since other users may be able to use or replace
+the socket. Depending on how you installed ntfy:
+
+* **Debian/Ubuntu/Fedora packages**: Works out of the box. The shipped systemd unit creates `/run/ntfy` (via
+  `RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group can manage users. If you use
+  your own unit file (e.g. a copy in `/etc/systemd/system/`), add `RuntimeDirectory=ntfy` and `RuntimeDirectoryMode=0750`
+  to its `[Service]` section, or the server cannot create the socket.
+* **Binary with the shipped systemd unit or OpenRC script**: Works out of the box; both create `/run/ntfy` for the `ntfy` user.
+* **Docker**: Run the commands inside the container, e.g. `docker exec -it ntfy ntfy user add phil`. This also works with
+  `user: UID:GID`, since the image ships a `/run/ntfy` directory that any user can create the socket in. With
+  `read_only: true`, add a writable `/run/ntfy` (`tmpfs: /run/ntfy` in docker-compose, `--tmpfs /run/ntfy` with `docker run`).
+  A separate `docker run ... binwiederhier/ntfy user ...` container does not see the server's socket and edits the database
+  directly; to share the socket, put it on a volume both containers mount (e.g. `NTFY_LISTEN_ADMIN_UNIX=/var/lib/ntfy/admin.sock`).
+* **Kubernetes**: Like Docker, use `kubectl exec`. With `readOnlyRootFilesystem: true`, mount an `emptyDir` at `/run/ntfy`.
+* **Running ntfy as a regular user** (e.g. `ntfy serve -c ~/ntfy/server.yml`, a systemd user service, or Homebrew on macOS):
+  The user cannot create `/run/ntfy`, so set `listen-admin-unix` to a path the user owns, e.g. `listen-admin-unix: /home/phil/ntfy/admin.sock`,
+  and pass the same config file to the commands (`ntfy user -c ~/ntfy/server.yml ...`). Without it, the commands edit the
+  database directly, with a warning.
+* **Windows**: There is no admin socket on Windows. The commands edit the database directly, or use `--server` and `--token`.
+
+If a user who is neither `root` nor in the server's group runs a command, it fails with
+`permission denied on the admin socket /run/ntfy/admin.sock, run this command as root or as a member of the server's group (usually ntfy)`.
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,

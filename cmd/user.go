@@ -6,16 +6,15 @@ import (
 	"crypto/subtle"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
-	"heckel.io/ntfy/v2/mail"
 	"heckel.io/ntfy/v2/server"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -42,12 +41,14 @@ var flagsUser = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-from", Aliases: []string{"smtp_sender_from"}, EnvVars: []string{"NTFY_SMTP_SENDER_FROM"}, Usage: "SMTP sender address (if e-mail sending is enabled)"}),
 )
 
+var flagsUserCommand = withBackendFlags(flagsUser)
+
 var cmdUser = &cli.Command{
 	Name:      "user",
 	Usage:     "Manage/show users",
 	UsageText: "ntfy user [list|add|remove|change-pass|reset-pass|change-role] ...",
-	Flags:     flagsUser,
-	Before:    initConfigFileInputSourceFunc("config", flagsUser, initLogFunc),
+	Flags:     flagsUserCommand,
+	Before:    initConfigFileInputSourceFunc("config", flagsUserCommand, initLogFunc),
 	Category:  categoryServer,
 	Subcommands: []*cli.Command{
 		{
@@ -195,8 +196,10 @@ Example:
 
 This command is an alias to calling 'ntfy access' (display access control list).
 
-This is a server-only command. It directly reads from user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined.
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead.
 `,
 		},
 	},
@@ -205,8 +208,10 @@ file server.yml. The command only works if 'auth-file' is properly defined.
 The command allows you to add/remove/change users in the ntfy user database, as well as change 
 passwords or roles.
 
-This is a server-only command. It directly manages the user.db as defined in the server config
-file server.yml. The command only works if 'auth-file' is properly defined. Please also refer
+This is a server-only command. It talks to the running ntfy server over its local admin socket
+(listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
+server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
+directly. With --server and --token, it manages a remote server over HTTPS instead. Please also refer
 to the related command 'ntfy access'.
 
 Examples:
@@ -227,12 +232,6 @@ variable to pass the new password. This is useful if you are creating/updating u
 func execUserAdd(c *cli.Context) error {
 	username := c.Args().Get(0)
 	role := user.Role(c.String("role"))
-	password, hashed := os.LookupEnv("NTFY_PASSWORD_HASH")
-
-	if !hashed {
-		password = os.Getenv("NTFY_PASSWORD")
-	}
-
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user add --help' for help")
 	} else if username == userEveryone || username == user.Everyone {
@@ -240,26 +239,30 @@ func execUserAdd(c *cli.Context) error {
 	} else if !user.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
 	}
-	manager, err := createUserManager(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
-	if user, _ := manager.User(username); user != nil {
+	defer api.Close()
+	if _, err := api.User(username); err == nil {
 		if c.Bool("ignore-exists") {
 			fmt.Fprintf(c.App.Writer, "user %s already exists (exited successfully)\n", username)
 			return nil
 		}
 		return fmt.Errorf("user %s already exists", username)
+	} else if !isAPIErrorCode(err, client.ErrCodeUserNotFound) {
+		return mapAPIError(err, username, "", "")
 	}
-	if password == "" {
-		p, err := readPasswordAndConfirm(c)
-		if err != nil {
-			return err
-		}
-		password = p
-	}
-	if err := manager.AddUser(username, password, role, hashed); err != nil {
+	hash, err := readPasswordHash(c)
+	if err != nil {
 		return err
+	}
+	roleParam := ""
+	if role != user.RoleUser {
+		roleParam = string(role) // Only send the role if needed: over --server, the API refuses it
+	}
+	if err := api.AddUser(username, hash, "", roleParam); err != nil {
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintf(c.App.Writer, "user %s added with role %s\n", username, role)
 	return nil
@@ -272,15 +275,13 @@ func execUserDel(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createUserManager(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); errors.Is(err, user.ErrUserNotFound) {
-		return fmt.Errorf("user %s does not exist", username)
-	}
-	if err := manager.RemoveUser(username); err != nil {
-		return err
+	defer api.Close()
+	if err := api.RemoveUser(username); err != nil {
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintf(c.App.Writer, "user %s removed\n", username)
 	return nil
@@ -288,30 +289,25 @@ func execUserDel(c *cli.Context) error {
 
 func execUserChangePass(c *cli.Context) error {
 	username := c.Args().Get(0)
-	password, hashed := os.LookupEnv("NTFY_PASSWORD_HASH")
-	if !hashed {
-		password = os.Getenv("NTFY_PASSWORD")
-	}
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user change-pass --help' for help")
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createUserManager(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); errors.Is(err, user.ErrUserNotFound) {
-		return fmt.Errorf("user %s does not exist", username)
+	defer api.Close()
+	if _, err := api.User(username); err != nil {
+		return mapAPIError(err, username, "", "")
 	}
-	if password == "" {
-		password, err = readPasswordAndConfirm(c)
-		if err != nil {
-			return err
-		}
-	}
-	if err := manager.ChangePassword(username, password, hashed); err != nil {
+	hash, err := readPasswordHash(c)
+	if err != nil {
 		return err
+	}
+	if err := api.ChangePassword(username, hash); err != nil {
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintf(c.App.Writer, "changed password for user %s\n", username)
 	return nil
@@ -320,54 +316,23 @@ func execUserChangePass(c *cli.Context) error {
 func execUserResetPass(c *cli.Context) error {
 	username := c.Args().Get(0)
 	sendEmail := c.Bool("send-email")
-	baseURL := strings.TrimSuffix(c.String("base-url"), "/")
 	if username == "" {
 		return errors.New("username expected, type 'ntfy user reset-pass --help' for help")
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
-	} else if baseURL == "" {
-		return errors.New("base-url must be configured to generate a reset link")
 	}
-	manager, err := createUserManager(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
-	u, err := manager.User(username)
-	if errors.Is(err, user.ErrUserNotFound) {
-		return fmt.Errorf("user %s does not exist", username)
-	} else if err != nil {
-		return err
-	} else if u.Provisioned {
-		return fmt.Errorf("user %s is provisioned in the config file; its password cannot be reset", username)
-	}
-	// Resolve the primary email up front if we need to send -- fail before creating a token
-	var primaryEmail string
-	if sendEmail {
-		primaryEmail, err = manager.PrimaryEmail(u.ID)
-		if err != nil {
-			return err
-		} else if primaryEmail == "" {
-			return fmt.Errorf("user %s has no primary email; cannot send reset link (omit --send-email to just print it)", username)
-		}
-	}
-	// The reset token is bound to the user, not an email -- so this works even with no SMTP
-	token, err := manager.AddMagicLink(user.MagicLinkKindPasswordReset, u.ID, "", time.Hour)
+	defer api.Close()
+	reset, err := api.ResetPassword(username, sendEmail)
 	if err != nil {
-		return err
+		return mapAPIError(err, username, "", "")
 	}
-	link := baseURL + "/account/password/reset/" + token
-	fmt.Fprintln(c.App.Writer, link)
-	if sendEmail {
-		sender := mail.NewSender(&mail.Config{
-			SMTPAddr: c.String("smtp-sender-addr"),
-			SMTPUser: c.String("smtp-sender-user"),
-			SMTPPass: c.String("smtp-sender-pass"),
-			From:     c.String("smtp-sender-from"),
-		})
-		if err := sender.SendPasswordReset(primaryEmail, link); err != nil {
-			return fmt.Errorf("failed to send reset email to %s: %w", primaryEmail, err)
-		}
-		fmt.Fprintf(c.App.ErrWriter, "reset link emailed to %s\n", primaryEmail)
+	fmt.Fprintln(c.App.Writer, reset.Link)
+	if reset.Email != "" {
+		fmt.Fprintf(c.App.ErrWriter, "reset link emailed to %s\n", reset.Email)
 	}
 	return nil
 }
@@ -380,15 +345,13 @@ func execUserChangeRole(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createUserManager(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); errors.Is(err, user.ErrUserNotFound) {
-		return fmt.Errorf("user %s does not exist", username)
-	}
-	if err := manager.ChangeRole(username, role); err != nil {
-		return err
+	defer api.Close()
+	if err := api.ChangeRole(username, string(role)); err != nil {
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintf(c.App.Writer, "changed role for user %s to %s\n", username, role)
 	return nil
@@ -417,21 +380,19 @@ func execUserChangeTier(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	manager, err := createUserManager(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
-	if _, err := manager.User(username); errors.Is(err, user.ErrUserNotFound) {
-		return fmt.Errorf("user %s does not exist", username)
-	}
+	defer api.Close()
 	if tier == tierReset {
-		if err := manager.ResetTier(username); err != nil {
-			return err
+		if err := api.ChangeTier(username, tierReset); err != nil {
+			return mapAPIError(err, username, tier, "")
 		}
 		fmt.Fprintf(c.App.Writer, "removed tier from user %s\n", username)
 	} else {
-		if err := manager.ChangeTier(username, tier); err != nil {
-			return err
+		if err := api.ChangeTier(username, tier); err != nil {
+			return mapAPIError(err, username, tier, "")
 		}
 		fmt.Fprintf(c.App.Writer, "changed tier for user %s to %s\n", username, tier)
 	}
@@ -439,15 +400,16 @@ func execUserChangeTier(c *cli.Context) error {
 }
 
 func execUserList(c *cli.Context) error {
-	manager, err := createUserManager(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
-	users, err := manager.Users()
+	defer api.Close()
+	users, err := api.Users()
 	if err != nil {
-		return err
+		return mapAPIError(err, "", "", "")
 	}
-	return showUsers(c, manager, users)
+	return showUsers(c, users)
 }
 
 func createUserManager(c *cli.Context) (*user.Manager, error) {
@@ -473,7 +435,9 @@ func createUserManager(c *cli.Context) (*user.Manager, error) {
 		}
 		return user.NewPostgresManager(db.New(host, nil), authConfig)
 	} else if authFile != "" {
-		if !util.FileExists(authFile) {
+		if _, err := os.Stat(authFile); errors.Is(err, fs.ErrPermission) {
+			return nil, fmt.Errorf("cannot access auth-file %s: permission denied, run this command as root or as the user the server runs as", authFile)
+		} else if err != nil {
 			return nil, errors.New("auth-file does not exist; please start the server at least once to create it")
 		}
 		userDB, err := user.OpenSQLite(authFile)
@@ -503,4 +467,20 @@ func readPasswordAndConfirm(c *cli.Context) (string, error) {
 		return "", errors.New("passwords do not match: try it again, but this time type slooowwwlly")
 	}
 	return string(password), nil
+}
+
+// readPasswordHash returns the bcrypt hash of the new password: NTFY_PASSWORD_HASH as is, or
+// NTFY_PASSWORD or the prompted password, hashed here. The server never sees the plain password.
+func readPasswordHash(c *cli.Context) (string, error) {
+	if hash, ok := os.LookupEnv("NTFY_PASSWORD_HASH"); ok {
+		return hash, nil
+	}
+	password := os.Getenv("NTFY_PASSWORD")
+	if password == "" {
+		var err error
+		if password, err = readPasswordAndConfirm(c); err != nil {
+			return "", err
+		}
+	}
+	return user.HashPassword(password, user.DefaultUserPasswordBcryptCost)
 }

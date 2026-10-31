@@ -1,6 +1,6 @@
-//go:build !noserver
-
-package cmd
+// Package client is the CLI's client for the ntfy admin API (over the admin socket or HTTP with an admin
+// token). Not to be confused with heckel.io/ntfy/v2/client, which publishes and subscribes.
+package client
 
 import (
 	"bytes"
@@ -16,49 +16,54 @@ import (
 	"time"
 )
 
-// Error codes of the admin API, mirrored from server/errors.go. TestServerClient_ErrorCodesMatchServer asserts they match.
+// Error codes of the admin API, mirrored from server/errors.go. TestClient_ErrorCodesMatchServer asserts they match.
 const (
-	apiErrCodeNotFound               = 40401
-	apiErrCodeUnauthorized           = 40101
-	apiErrCodeForbidden              = 40301
-	apiErrCodeAdminSocketOnly        = 40302
-	apiErrCodeUserNotFound           = 40031
-	apiErrCodeUserExists             = 40901
-	apiErrCodeTierNotFound           = 40030
-	apiErrCodeTierExists             = 40909
-	apiErrCodeTierInUse              = 40910
-	apiErrCodeTierCodeInvalid        = 40062
-	apiErrCodeTierReservationsLimit  = 40063
-	apiErrCodeAccessAdminUser        = 40064
-	apiErrCodeTokenNotFound          = 40065
-	apiErrCodeRoleInvalid            = 40066
-	apiErrCodeUserNoPrimaryEmail     = 40067
-	apiErrCodeBaseURLNotConfigured   = 40068
-	apiErrCodePasswordHashInvalid    = 40069
-	apiErrCodePermissionInvalid      = 40025
-	apiErrCodeProvisionedUserChange  = 40905
-	apiErrCodeProvisionedTokenChange = 40906
+	ErrCodeNotFound               = 40401
+	ErrCodeUnauthorized           = 40101
+	ErrCodeForbidden              = 40301
+	ErrCodeAdminSocketOnly        = 40302
+	ErrCodeUserNotFound           = 40031
+	ErrCodeUserExists             = 40901
+	ErrCodeTierNotFound           = 40030
+	ErrCodeTierExists             = 40909
+	ErrCodeTierInUse              = 40910
+	ErrCodeTierCodeInvalid        = 40062
+	ErrCodeTierReservationsLimit  = 40063
+	ErrCodeAccessAdminUser        = 40064
+	ErrCodeTokenNotFound          = 40065
+	ErrCodeRoleInvalid            = 40066
+	ErrCodeUserNoPrimaryEmail     = 40067
+	ErrCodeBaseURLNotConfigured   = 40068
+	ErrCodePasswordHashInvalid    = 40069
+	ErrCodePermissionInvalid      = 40025
+	ErrCodeProvisionedUserChange  = 40905
+	ErrCodeProvisionedTokenChange = 40906
 )
 
 const (
-	serverSocketBaseURL          = "http://ntfy" // Host is ignored, the socket transport dials the socket
-	serverClientTimeout          = 10 * time.Second
-	serverClientMaxResponseBytes = 32 * 1024 * 1024 // A large user list is big, but not unbounded
-	apiPathVersion               = "/v1/version"
-	apiPathUsers                 = "/v1/users"
-	apiPathAccess                = "/v1/users/access"
-	apiPathTokens                = "/v1/users/tokens"
-	apiPathReset                 = "/v1/users/password/reset"
-	apiPathTiers                 = "/v1/tiers"
+	// TierReset is the tier value that removes a user's tier (ChangeTier)
+	TierReset = "-"
+)
+
+const (
+	socketBaseURL    = "http://ntfy" // Host is ignored, the socket transport dials the socket
+	requestTimeout   = 10 * time.Second
+	maxResponseBytes = 32 * 1024 * 1024 // A large user list is big, but not unbounded
+	apiPathVersion   = "/v1/version"
+	apiPathUsers     = "/v1/users"
+	apiPathAccess    = "/v1/users/access"
+	apiPathTokens    = "/v1/users/tokens"
+	apiPathReset     = "/v1/users/password/reset"
+	apiPathTiers     = "/v1/tiers"
 )
 
 var (
-	// errServerUnreachable is returned (wrapped with the cause) when the admin API cannot be reached at all
-	errServerUnreachable = errors.New("admin API unreachable")
+	// ErrUnreachable is returned (wrapped with the cause) when the admin API cannot be reached at all
+	ErrUnreachable = errors.New("admin API unreachable")
 )
 
-// apiError is a ntfy API error (HTTP status + ntfy error code + message), see server/errors.go
-type apiError struct {
+// Error is a ntfy API error (HTTP status + ntfy error code + message), see server/errors.go
+type Error struct {
 	HTTPCode int    `json:"http"`
 	Code     int    `json:"code"`
 	Message  string `json:"error"`
@@ -66,30 +71,30 @@ type apiError struct {
 }
 
 // Error returns the message and the ntfy error code
-func (e *apiError) Error() string {
+func (e *Error) Error() string {
 	return fmt.Sprintf("%s (error %d)", e.Message, e.Code)
 }
 
-// apiUser is a user, as returned by the admin API
-type apiUser struct {
-	Username      string      `json:"username"`
-	Role          string      `json:"role"`
-	Tier          string      `json:"tier,omitempty"`
-	TierName      string      `json:"tier_name,omitempty"`
-	Provisioned   bool        `json:"provisioned,omitempty"`
-	DefaultAccess string      `json:"default_access,omitempty"` // Only on the "*" (everyone) user
-	Grants        []*apiGrant `json:"grants,omitempty"`
+// User is a user, as returned by the admin API
+type User struct {
+	Username      string   `json:"username"`
+	Role          string   `json:"role"`
+	Tier          string   `json:"tier,omitempty"`
+	TierName      string   `json:"tier_name,omitempty"`
+	Provisioned   bool     `json:"provisioned,omitempty"`
+	DefaultAccess string   `json:"default_access,omitempty"` // Only on the "*" (everyone) user
+	Grants        []*Grant `json:"grants,omitempty"`
 }
 
-// apiGrant is an access control entry of a user
-type apiGrant struct {
+// Grant is an access control entry of a user
+type Grant struct {
 	Topic       string `json:"topic"` // May be a pattern
 	Permission  string `json:"permission"`
 	Provisioned bool   `json:"provisioned,omitempty"`
 }
 
-// apiToken is an access token of a user. Times are Unix seconds; Expires is 0 if it never expires.
-type apiToken struct {
+// Token is an access token of a user. Times are Unix seconds; Expires is 0 if it never expires.
+type Token struct {
 	Username    string `json:"username"`
 	Token       string `json:"token"`
 	Label       string `json:"label,omitempty"`
@@ -99,8 +104,8 @@ type apiToken struct {
 	Provisioned bool   `json:"provisioned,omitempty"`
 }
 
-// apiTier is a tier. Durations are in seconds, sizes in bytes.
-type apiTier struct {
+// Tier is a tier. Durations are in seconds, sizes in bytes.
+type Tier struct {
 	ID                       string `json:"id,omitempty"` // Response only
 	Code                     string `json:"code"`
 	Name                     string `json:"name"`
@@ -118,39 +123,39 @@ type apiTier struct {
 	Users                    int64  `json:"users"` // Response only: number of users on this tier
 }
 
-// apiPasswordReset is the result of a password reset: the link, and where it was emailed to (if at all)
-type apiPasswordReset struct {
+// PasswordReset is the result of a password reset: the link, and where it was emailed to (if at all)
+type PasswordReset struct {
 	Link  string `json:"link"`
 	Email string `json:"email,omitempty"`
 }
 
-// serverClient talks to the ntfy admin API, either over HTTP(S) with an admin token (newServerClient) or over
-// the server's local admin socket (newServerSocketClient). Every method returns *apiError for API
-// errors and a wrapped errServerUnreachable for transport errors.
-type serverClient struct {
+// Client talks to the ntfy admin API, either over HTTP(S) with an admin token (New) or over
+// the server's local admin socket (NewSocket). Every method returns *Error for API
+// errors and a wrapped ErrUnreachable for transport errors.
+type Client struct {
 	baseURL    string
 	token      string
 	httpClient *http.Client
 }
 
-// newServerClient creates an admin API client for a server's HTTP(S) API, authenticating with an admin's access token
-func newServerClient(baseURL, token string) *serverClient {
-	return &serverClient{
+// New creates an admin API client for a server's HTTP(S) API, authenticating with an admin's access token
+func New(baseURL, token string) *Client {
+	return &Client{
 		baseURL: strings.TrimSuffix(baseURL, "/"),
 		token:   token,
 		httpClient: &http.Client{
-			Timeout:       serverClientTimeout,
+			Timeout:       requestTimeout,
 			CheckRedirect: noRedirects,
 		},
 	}
 }
 
-// newServerSocketClient creates an admin API client for the server's local admin socket (no credentials needed)
-func newServerSocketClient(socketPath string) *serverClient {
-	return &serverClient{
-		baseURL: serverSocketBaseURL,
+// NewSocket creates an admin API client for the server's local admin socket (no credentials needed)
+func NewSocket(socketPath string) *Client {
+	return &Client{
+		baseURL: socketBaseURL,
 		httpClient: &http.Client{
-			Timeout:       serverClientTimeout,
+			Timeout:       requestTimeout,
 			CheckRedirect: noRedirects,
 			Transport: &http.Transport{
 				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
@@ -163,22 +168,22 @@ func newServerSocketClient(socketPath string) *serverClient {
 }
 
 // Ping checks that the admin API answers (GET /v1/version)
-func (c *serverClient) Ping() error {
+func (c *Client) Ping() error {
 	return c.do(http.MethodGet, apiPathVersion, nil, nil)
 }
 
 // Users returns all users, including the everyone user ("*")
-func (c *serverClient) Users() ([]*apiUser, error) {
-	var users []*apiUser
+func (c *Client) Users() ([]*User, error) {
+	var users []*User
 	if err := c.do(http.MethodGet, apiPathUsers, nil, &users); err != nil {
 		return nil, err
 	}
 	return users, nil
 }
 
-// User returns a single user, or an apiError with apiErrCodeUserNotFound
-func (c *serverClient) User(username string) (*apiUser, error) {
-	var users []*apiUser
+// User returns a single user, or an Error with ErrCodeUserNotFound
+func (c *Client) User(username string) (*User, error) {
+	var users []*User
 	if err := c.do(http.MethodGet, apiPathUsers+"?username="+url.QueryEscape(username), nil, &users); err != nil {
 		return nil, err
 	}
@@ -187,16 +192,16 @@ func (c *serverClient) User(username string) (*apiUser, error) {
 			return u, nil
 		}
 	}
-	return nil, &apiError{
+	return nil, &Error{
 		HTTPCode: http.StatusBadRequest,
-		Code:     apiErrCodeUserNotFound,
+		Code:     ErrCodeUserNotFound,
 		Message:  "invalid request: user does not exist",
 	}
 }
 
 // AddUser adds a user with a bcrypt password hash. Tier and role may be empty; the role can
 // only be set over the admin socket.
-func (c *serverClient) AddUser(username, hash, tier, role string) error {
+func (c *Client) AddUser(username, hash, tier, role string) error {
 	return c.do(http.MethodPost, apiPathUsers, map[string]string{
 		"username": username,
 		"hash":     hash,
@@ -206,15 +211,15 @@ func (c *serverClient) AddUser(username, hash, tier, role string) error {
 }
 
 // ChangePassword sets a user's password to the given bcrypt hash
-func (c *serverClient) ChangePassword(username, hash string) error {
+func (c *Client) ChangePassword(username, hash string) error {
 	return c.do(http.MethodPut, apiPathUsers, map[string]string{
 		"username": username,
 		"hash":     hash,
 	}, nil)
 }
 
-// ChangeTier changes a user's tier; tierReset removes it
-func (c *serverClient) ChangeTier(username, tier string) error {
+// ChangeTier changes a user's tier; TierReset removes it
+func (c *Client) ChangeTier(username, tier string) error {
 	return c.do(http.MethodPut, apiPathUsers, map[string]string{
 		"username": username,
 		"tier":     tier,
@@ -222,7 +227,7 @@ func (c *serverClient) ChangeTier(username, tier string) error {
 }
 
 // ChangeRole changes a user's role (only over the admin socket)
-func (c *serverClient) ChangeRole(username, role string) error {
+func (c *Client) ChangeRole(username, role string) error {
 	return c.do(http.MethodPut, apiPathUsers, map[string]string{
 		"username": username,
 		"role":     role,
@@ -230,15 +235,15 @@ func (c *serverClient) ChangeRole(username, role string) error {
 }
 
 // RemoveUser removes a user
-func (c *serverClient) RemoveUser(username string) error {
+func (c *Client) RemoveUser(username string) error {
 	return c.do(http.MethodDelete, apiPathUsers, map[string]string{
 		"username": username,
 	}, nil)
 }
 
 // ResetPassword creates a password reset link for a user, and optionally emails it to the user's primary email
-func (c *serverClient) ResetPassword(username string, sendEmail bool) (*apiPasswordReset, error) {
-	var reset apiPasswordReset
+func (c *Client) ResetPassword(username string, sendEmail bool) (*PasswordReset, error) {
+	var reset PasswordReset
 	req := map[string]any{
 		"username":   username,
 		"send_email": sendEmail,
@@ -250,7 +255,7 @@ func (c *serverClient) ResetPassword(username string, sendEmail bool) (*apiPassw
 }
 
 // AllowAccess grants a user (or "*") a permission on a topic or topic pattern
-func (c *serverClient) AllowAccess(username, topic, permission string) error {
+func (c *Client) AllowAccess(username, topic, permission string) error {
 	return c.do(http.MethodPut, apiPathAccess, map[string]string{
 		"username":   username,
 		"topic":      topic,
@@ -259,7 +264,7 @@ func (c *serverClient) AllowAccess(username, topic, permission string) error {
 }
 
 // ResetAccess removes access control entries: of a user for a topic, of a user ("" topic), or all ("" username)
-func (c *serverClient) ResetAccess(username, topic string) error {
+func (c *Client) ResetAccess(username, topic string) error {
 	return c.do(http.MethodDelete, apiPathAccess, map[string]string{
 		"username": username,
 		"topic":    topic,
@@ -267,12 +272,12 @@ func (c *serverClient) ResetAccess(username, topic string) error {
 }
 
 // Tokens returns the tokens of a user, or of all users if username is empty
-func (c *serverClient) Tokens(username string) ([]*apiToken, error) {
+func (c *Client) Tokens(username string) ([]*Token, error) {
 	path := apiPathTokens
 	if username != "" {
 		path += "?username=" + url.QueryEscape(username)
 	}
-	var tokens []*apiToken
+	var tokens []*Token
 	if err := c.do(http.MethodGet, path, nil, &tokens); err != nil {
 		return nil, err
 	}
@@ -280,7 +285,7 @@ func (c *serverClient) Tokens(username string) ([]*apiToken, error) {
 }
 
 // AddToken creates a token for a user. A zero expires (or the Unix epoch) means it never expires.
-func (c *serverClient) AddToken(username, label string, expires time.Time) (*apiToken, error) {
+func (c *Client) AddToken(username, label string, expires time.Time) (*Token, error) {
 	var expiresUnix int64
 	if !expires.IsZero() {
 		expiresUnix = expires.Unix()
@@ -290,7 +295,7 @@ func (c *serverClient) AddToken(username, label string, expires time.Time) (*api
 		"label":    label,
 		"expires":  expiresUnix,
 	}
-	var token apiToken
+	var token Token
 	if err := c.do(http.MethodPost, apiPathTokens, req, &token); err != nil {
 		return nil, err
 	}
@@ -298,7 +303,7 @@ func (c *serverClient) AddToken(username, label string, expires time.Time) (*api
 }
 
 // RemoveToken removes a user's token
-func (c *serverClient) RemoveToken(username, token string) error {
+func (c *Client) RemoveToken(username, token string) error {
 	return c.do(http.MethodDelete, apiPathTokens, map[string]string{
 		"username": username,
 		"token":    token,
@@ -306,17 +311,17 @@ func (c *serverClient) RemoveToken(username, token string) error {
 }
 
 // Tiers returns all tiers, sorted by code
-func (c *serverClient) Tiers() ([]*apiTier, error) {
-	var tiers []*apiTier
+func (c *Client) Tiers() ([]*Tier, error) {
+	var tiers []*Tier
 	if err := c.do(http.MethodGet, apiPathTiers, nil, &tiers); err != nil {
 		return nil, err
 	}
 	for _, t := range tiers {
 		if t.ID == "" {
 			// Non-admins get the price list for the upgrade dialog here instead (until 2026-11-22)
-			return nil, &apiError{
+			return nil, &Error{
 				HTTPCode: http.StatusUnauthorized,
-				Code:     apiErrCodeUnauthorized,
+				Code:     ErrCodeUnauthorized,
 				Message:  "unauthorized: the server returned the public price list, the token must belong to an admin user",
 			}
 		}
@@ -324,8 +329,8 @@ func (c *serverClient) Tiers() ([]*apiTier, error) {
 	return tiers, nil
 }
 
-// Tier returns a single tier, or an apiError with apiErrCodeTierNotFound
-func (c *serverClient) Tier(code string) (*apiTier, error) {
+// Tier returns a single tier, or an Error with ErrCodeTierNotFound
+func (c *Client) Tier(code string) (*Tier, error) {
 	tiers, err := c.Tiers()
 	if err != nil {
 		return nil, err
@@ -335,32 +340,32 @@ func (c *serverClient) Tier(code string) (*apiTier, error) {
 			return t, nil
 		}
 	}
-	return nil, &apiError{
+	return nil, &Error{
 		HTTPCode: http.StatusBadRequest,
-		Code:     apiErrCodeTierNotFound,
+		Code:     ErrCodeTierNotFound,
 		Message:  "invalid request: tier does not exist",
 	}
 }
 
 // AddTier adds a tier
-func (c *serverClient) AddTier(t *apiTier) error {
+func (c *Client) AddTier(t *Tier) error {
 	return c.do(http.MethodPost, apiPathTiers, t, nil)
 }
 
 // UpdateTier updates the tier with the code t.Code
-func (c *serverClient) UpdateTier(t *apiTier) error {
+func (c *Client) UpdateTier(t *Tier) error {
 	return c.do(http.MethodPut, apiPathTiers, t, nil)
 }
 
 // RemoveTier removes a tier that no user is on
-func (c *serverClient) RemoveTier(code string) error {
+func (c *Client) RemoveTier(code string) error {
 	return c.do(http.MethodDelete, apiPathTiers, map[string]string{
 		"code": code,
 	}, nil)
 }
 
 // Close closes the client's idle (kept-alive) connections
-func (c *serverClient) Close() error {
+func (c *Client) Close() error {
 	c.httpClient.CloseIdleConnections()
 	return nil
 }
@@ -372,7 +377,7 @@ func noRedirects(_ *http.Request, _ []*http.Request) error {
 }
 
 // do sends a JSON request and decodes the JSON response into out (if not nil)
-func (c *serverClient) do(method, path string, body any, out any) error {
+func (c *Client) do(method, path string, body any, out any) error {
 	var reqBody io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -391,17 +396,17 @@ func (c *serverClient) do(method, path string, body any, out any) error {
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errServerUnreachable, err)
+		return fmt.Errorf("%w: %w", ErrUnreachable, err)
 	}
 	defer resp.Body.Close()
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, serverClientMaxResponseBytes))
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return fmt.Errorf("%w: %w", errServerUnreachable, err)
+		return fmt.Errorf("%w: %w", ErrUnreachable, err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		var apiErr apiError
+		var apiErr Error
 		if err := json.Unmarshal(respBody, &apiErr); err != nil || apiErr.Code == 0 {
-			return &apiError{
+			return &Error{
 				HTTPCode: resp.StatusCode,
 				Message:  fmt.Sprintf("unexpected response %s", resp.Status),
 			}

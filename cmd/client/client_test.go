@@ -1,6 +1,4 @@
-//go:build !noserver
-
-package cmd
+package client
 
 import (
 	"encoding/json"
@@ -31,7 +29,7 @@ type recordedRequest struct {
 	Body   map[string]any
 }
 
-func TestServerClient_RequestsAndResponses(t *testing.T) {
+func TestClient_RequestsAndResponses(t *testing.T) {
 	var requests []*recordedRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &recordedRequest{Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery, Auth: r.Header.Get("Authorization")}
@@ -55,7 +53,7 @@ func TestServerClient_RequestsAndResponses(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	sc := newServerClient(server.URL+"/", "tk_admin")
+	sc := New(server.URL+"/", "tk_admin")
 
 	// Users
 	users, err := sc.Users()
@@ -69,15 +67,15 @@ func TestServerClient_RequestsAndResponses(t *testing.T) {
 	require.Equal(t, "pro", u.Tier)
 	require.Equal(t, "username=ben", requests[len(requests)-1].Query) // Servers before v2.36.0 ignore it and return all users
 	_, err = sc.User("nobody")
-	var apiErr *apiError
+	var apiErr *Error
 	require.True(t, errors.As(err, &apiErr))
-	require.Equal(t, apiErrCodeUserNotFound, apiErr.Code)
+	require.Equal(t, ErrCodeUserNotFound, apiErr.Code)
 
 	// Mutations send the right method, path and body, with the token
 	requests = nil
 	require.Nil(t, sc.AddUser("ben", "$2a$10$hash", "pro", "admin"))
 	require.Nil(t, sc.ChangePassword("ben", "$2a$10$other"))
-	require.Nil(t, sc.ChangeTier("ben", tierReset))
+	require.Nil(t, sc.ChangeTier("ben", TierReset))
 	require.Nil(t, sc.ChangeRole("ben", "user"))
 	require.Nil(t, sc.RemoveUser("ben"))
 	require.Nil(t, sc.AllowAccess("*", "up*", "write-only"))
@@ -123,10 +121,10 @@ func TestServerClient_RequestsAndResponses(t *testing.T) {
 	require.Equal(t, int64(2), tier.Users)
 	_, err = sc.Tier("nope")
 	require.True(t, errors.As(err, &apiErr))
-	require.Equal(t, apiErrCodeTierNotFound, apiErr.Code)
+	require.Equal(t, ErrCodeTierNotFound, apiErr.Code)
 }
 
-func TestServerClient_Errors(t *testing.T) {
+func TestClient_Errors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/users" {
 			w.WriteHeader(http.StatusConflict)
@@ -136,14 +134,14 @@ func TestServerClient_Errors(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 		w.Write([]byte(`<html>bad gateway</html>`))
 	}))
-	sc := newServerClient(server.URL, "")
+	sc := New(server.URL, "")
 
 	// ntfy error
 	err := sc.AddUser("ben", "hash", "", "")
-	var apiErr *apiError
+	var apiErr *Error
 	require.True(t, errors.As(err, &apiErr))
 	require.Equal(t, 409, apiErr.HTTPCode)
-	require.Equal(t, apiErrCodeUserExists, apiErr.Code)
+	require.Equal(t, ErrCodeUserExists, apiErr.Code)
 	require.Equal(t, "conflict: user already exists (error 40901)", apiErr.Error())
 
 	// Not a ntfy error (e.g. a proxy in between)
@@ -155,17 +153,17 @@ func TestServerClient_Errors(t *testing.T) {
 	// Unreachable
 	server.Close()
 	err = sc.Ping()
-	require.ErrorIs(t, err, errServerUnreachable)
+	require.ErrorIs(t, err, ErrUnreachable)
 }
 
-func TestServerClient_Socket(t *testing.T) {
+func TestClient_Socket(t *testing.T) {
 	dir, err := os.MkdirTemp("", "ntfy-client")
 	require.Nil(t, err)
 	defer os.RemoveAll(dir)
 	socket := filepath.Join(dir, "admin.sock")
 
 	// Missing socket is unreachable
-	require.ErrorIs(t, newServerSocketClient(socket).Ping(), errServerUnreachable)
+	require.ErrorIs(t, NewSocket(socket).Ping(), ErrUnreachable)
 
 	// Requests over the socket carry no Authorization header
 	listener, err := net.Listen("unix", socket)
@@ -177,11 +175,11 @@ func TestServerClient_Socket(t *testing.T) {
 	})}
 	go server.Serve(listener)
 	defer server.Close()
-	require.Nil(t, newServerSocketClient(socket).Ping())
+	require.Nil(t, NewSocket(socket).Ping())
 	require.Equal(t, "", auth)
 }
 
-func TestServerClient_SocketPermissionDenied(t *testing.T) {
+func TestClient_SocketPermissionDenied(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root can open any socket")
 	}
@@ -195,25 +193,25 @@ func TestServerClient_SocketPermissionDenied(t *testing.T) {
 	require.Nil(t, os.Chmod(socket, 0))
 
 	// The cause stays in the error chain, so callers can tell "no permission" from "no server"
-	err = newServerSocketClient(socket).Ping()
-	require.ErrorIs(t, err, errServerUnreachable)
+	err = NewSocket(socket).Ping()
+	require.ErrorIs(t, err, ErrUnreachable)
 	require.ErrorIs(t, err, fs.ErrPermission)
 }
 
-func TestServerClient_TiersNotAdmin(t *testing.T) {
+func TestClient_TiersNotAdmin(t *testing.T) {
 	// For non-admins, the server answers GET /v1/tiers with the public price list (deprecated);
 	// its entries have no ID, which the client must not mistake for tiers
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`[{"limits":{"basis":"ip","messages":250}},{"code":"pro","name":"Pro","prices":{"month":500,"year":5000},"limits":{"basis":"tier"}}]`))
 	}))
 	defer server.Close()
-	_, err := newServerClient(server.URL, "tk_user").Tiers()
-	var apiErr *apiError
+	_, err := New(server.URL, "tk_user").Tiers()
+	var apiErr *Error
 	require.ErrorAs(t, err, &apiErr)
-	require.Equal(t, apiErrCodeUnauthorized, apiErr.Code)
+	require.Equal(t, ErrCodeUnauthorized, apiErr.Code)
 }
 
-func TestServerClient_NoRedirects(t *testing.T) {
+func TestClient_NoRedirects(t *testing.T) {
 	// A redirect could resend the token over plain HTTP, and turn a DELETE into a GET that succeeds
 	var deletes int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -225,15 +223,15 @@ func TestServerClient_NoRedirects(t *testing.T) {
 		w.Write([]byte(`[]`))
 	}))
 	defer server.Close()
-	err := newServerClient(server.URL, "tk_admin").RemoveUser("ben")
+	err := New(server.URL, "tk_admin").RemoveUser("ben")
 	require.Error(t, err)
 	require.Equal(t, 1, deletes)
-	var apiErr *apiError
+	var apiErr *Error
 	require.True(t, errors.As(err, &apiErr))
 	require.Equal(t, http.StatusMovedPermanently, apiErr.HTTPCode)
 }
 
-func TestServerClient_CloseClosesIdleConnections(t *testing.T) {
+func TestClient_CloseClosesIdleConnections(t *testing.T) {
 	var conns atomic.Int32
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"version":"1.0.0"}`))
@@ -245,37 +243,37 @@ func TestServerClient_CloseClosesIdleConnections(t *testing.T) {
 	}
 	server.Start()
 	defer server.Close()
-	sc := newServerClient(server.URL, "tk_admin")
+	sc := New(server.URL, "tk_admin")
 	require.Nil(t, sc.Ping())
 	require.Nil(t, sc.Close())
 	require.Eventually(t, func() bool { return conns.Load() == 1 }, 2*time.Second, 10*time.Millisecond)
 }
 
-func TestServerClient_ErrorCodesMatchServer(t *testing.T) {
-	// The server's errHTTP values are unexported, and server cannot import cmd, so read them from the source
+func TestClient_ErrorCodesMatchServer(t *testing.T) {
+	// The server's errHTTP values are unexported, so read them from the source
 	codes := map[string]int{
-		"errHTTPNotFound":                        apiErrCodeNotFound,
-		"errHTTPUnauthorized":                    apiErrCodeUnauthorized,
-		"errHTTPForbidden":                       apiErrCodeForbidden,
-		"errHTTPForbiddenAdminSocketOnly":        apiErrCodeAdminSocketOnly,
-		"errHTTPBadRequestUserNotFound":          apiErrCodeUserNotFound,
-		"errHTTPConflictUserExists":              apiErrCodeUserExists,
-		"errHTTPBadRequestTierInvalid":           apiErrCodeTierNotFound,
-		"errHTTPConflictTierExists":              apiErrCodeTierExists,
-		"errHTTPConflictTierInUse":               apiErrCodeTierInUse,
-		"errHTTPBadRequestTierCodeInvalid":       apiErrCodeTierCodeInvalid,
-		"errHTTPBadRequestTierReservationsLimit": apiErrCodeTierReservationsLimit,
-		"errHTTPBadRequestAccessAdminUser":       apiErrCodeAccessAdminUser,
-		"errHTTPBadRequestTokenNotFound":         apiErrCodeTokenNotFound,
-		"errHTTPBadRequestRoleInvalid":           apiErrCodeRoleInvalid,
-		"errHTTPBadRequestUserNoPrimaryEmail":    apiErrCodeUserNoPrimaryEmail,
-		"errHTTPBadRequestBaseURLNotConfigured":  apiErrCodeBaseURLNotConfigured,
-		"errHTTPBadRequestPasswordHashInvalid":   apiErrCodePasswordHashInvalid,
-		"errHTTPBadRequestPermissionInvalid":     apiErrCodePermissionInvalid,
-		"errHTTPConflictProvisionedUserChange":   apiErrCodeProvisionedUserChange,
-		"errHTTPConflictProvisionedTokenChange":  apiErrCodeProvisionedTokenChange,
+		"errHTTPNotFound":                        ErrCodeNotFound,
+		"errHTTPUnauthorized":                    ErrCodeUnauthorized,
+		"errHTTPForbidden":                       ErrCodeForbidden,
+		"errHTTPForbiddenAdminSocketOnly":        ErrCodeAdminSocketOnly,
+		"errHTTPBadRequestUserNotFound":          ErrCodeUserNotFound,
+		"errHTTPConflictUserExists":              ErrCodeUserExists,
+		"errHTTPBadRequestTierInvalid":           ErrCodeTierNotFound,
+		"errHTTPConflictTierExists":              ErrCodeTierExists,
+		"errHTTPConflictTierInUse":               ErrCodeTierInUse,
+		"errHTTPBadRequestTierCodeInvalid":       ErrCodeTierCodeInvalid,
+		"errHTTPBadRequestTierReservationsLimit": ErrCodeTierReservationsLimit,
+		"errHTTPBadRequestAccessAdminUser":       ErrCodeAccessAdminUser,
+		"errHTTPBadRequestTokenNotFound":         ErrCodeTokenNotFound,
+		"errHTTPBadRequestRoleInvalid":           ErrCodeRoleInvalid,
+		"errHTTPBadRequestUserNoPrimaryEmail":    ErrCodeUserNoPrimaryEmail,
+		"errHTTPBadRequestBaseURLNotConfigured":  ErrCodeBaseURLNotConfigured,
+		"errHTTPBadRequestPasswordHashInvalid":   ErrCodePasswordHashInvalid,
+		"errHTTPBadRequestPermissionInvalid":     ErrCodePermissionInvalid,
+		"errHTTPConflictProvisionedUserChange":   ErrCodeProvisionedUserChange,
+		"errHTTPConflictProvisionedTokenChange":  ErrCodeProvisionedTokenChange,
 	}
-	serverCodes := readServerErrorCodes(t, "../server/errors.go")
+	serverCodes := readServerErrorCodes(t, "../../server/errors.go")
 	for name, code := range codes {
 		require.Contains(t, serverCodes, name)
 		require.Equal(t, serverCodes[name], code, name)

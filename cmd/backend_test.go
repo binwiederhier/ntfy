@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/server"
 	"heckel.io/ntfy/v2/test"
 	"heckel.io/ntfy/v2/user"
@@ -213,7 +214,7 @@ func shortTempDir(t *testing.T) string {
 
 func waitForAdminSocket(t *testing.T, socket string) {
 	for i := 0; i < 100; i++ {
-		if newServerSocketClient(socket).Ping() == nil {
+		if client.NewSocket(socket).Ping() == nil {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)

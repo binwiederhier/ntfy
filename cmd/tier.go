@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"time"
@@ -222,10 +223,10 @@ func execTierAdd(c *cli.Context) error {
 			return nil
 		}
 		return fmt.Errorf("tier %s already exists", code)
-	} else if !isAPIErrorCode(err, apiErrCodeTierNotFound) {
+	} else if !isAPIErrorCode(err, client.ErrCodeTierNotFound) {
 		return mapAPIError(err, "", code, "")
 	}
-	tier := &apiTier{
+	tier := &client.Tier{
 		Code:                     code,
 		Name:                     name,
 		MessagesLimit:            c.Int64("message-limit"),
@@ -367,7 +368,7 @@ func execTierList(c *cli.Context) error {
 	return nil
 }
 
-func printTier(c *cli.Context, tier *apiTier) {
+func printTier(c *cli.Context, tier *client.Tier) {
 	prices := "(none)"
 	if tier.StripeMonthlyPriceID != "" && tier.StripeYearlyPriceID != "" {
 		prices = fmt.Sprintf("%s / %s", tier.StripeMonthlyPriceID, tier.StripeYearlyPriceID)

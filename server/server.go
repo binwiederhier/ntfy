@@ -383,13 +383,14 @@ func New(conf *Config) (*Server, error) {
 	return s, nil
 }
 
-// dbPoolStats reports the database connection pools for the ntfy_db_pool_* metrics
+// dbPoolStats reports the database connection pools for the ntfy_db_* metrics
 func (s *Server) dbPoolStats() []*metrics.DBPool {
 	pools := make([]*metrics.DBPool, 0)
 	for _, p := range s.db.Stats() {
 		pools = append(pools, &metrics.DBPool{
 			Role:  p.Role,
 			Addr:  p.Addr,
+			Up:    p.Healthy,
 			Stats: p.Stats,
 		})
 	}
@@ -613,6 +614,9 @@ func (s *Server) stop() {
 	}
 	if s.tail != nil {
 		s.tail.Close() // Before the databases close under it
+	}
+	if s.cluster != nil {
+		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
 	}
 	s.closeDatabases()
 	if s.ban != nil {

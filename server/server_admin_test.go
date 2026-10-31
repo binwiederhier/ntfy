@@ -1651,8 +1651,8 @@ func (b *syncBuffer) String() string {
 }
 
 func captureLog(t *testing.T, f func()) string {
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
+	buf := &syncBuffer{} // Background goroutines of other tests' servers may log meanwhile, too
+	log.SetOutput(buf)
 	log.SetLevel(log.InfoLevel)
 	defer func() {
 		log.SetLevel(log.ErrorLevel)                  // As in TestMain

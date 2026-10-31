@@ -2295,6 +2295,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` talk to the running server over its admin socket, so changes apply immediately (deleted users are disconnected, new tiers and ACL entries apply right away, also with `auth-access-cache` enabled); without a running server they edit the database directly, as before, with a warning; this fallback is deprecated and will be removed after 2026-12-30 (see [deprecations](deprecations.md)). `--server` and `--token` manage a remote server over HTTPS (see [access control](config.md#access-control))
 * Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working as before (see [admin socket](config.md#admin-socket))
 * Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
+* Export `ntfy_db_up` (1 if the last health check of a PostgreSQL pool's database succeeded, per pool) and health-check the primary like the replicas, to alert on a server that is cut off from its database (see [PostgreSQL](config.md#postgresql))
 
 **Bug fixes + maintenance:**
 

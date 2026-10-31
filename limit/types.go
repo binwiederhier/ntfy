@@ -1,6 +1,7 @@
 package limit
 
 import (
+	"sync"
 	"time"
 )
 
@@ -65,6 +66,12 @@ type counter struct {
 	promoted    bool            // Written to the store: reached the threshold here, or has a row
 }
 
+// counterShard is one independently locked part of the daily counters
+type counterShard struct {
+	counters map[string]*counter
+	mu       sync.Mutex // Protects counters and everything inside them
+}
+
 // bucketEntry is one key's token buckets
 type bucketEntry struct {
 	buckets     [numKinds]bucket
@@ -72,6 +79,12 @@ type bucketEntry struct {
 	periodStart int64           // The period of counts (see periodStart)
 	seen        int64           // Last use, unix nanoseconds
 	full        int64           // When every bucket is full again, unix nanoseconds
+}
+
+// bucketShard is one independently locked part of the token buckets
+type bucketShard struct {
+	entries map[string]*bucketEntry
+	mu      sync.Mutex // Protects entries and everything inside them
 }
 
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens

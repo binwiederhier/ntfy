@@ -74,18 +74,6 @@ type Service struct {
 	wg        sync.WaitGroup
 }
 
-// counterShard is one independently locked part of the daily counters
-type counterShard struct {
-	counters map[string]*counter
-	mu       sync.Mutex // Protects counters and everything inside them
-}
-
-// bucketShard is one independently locked part of the token buckets
-type bucketShard struct {
-	entries map[string]*bucketEntry
-	mu      sync.Mutex // Protects entries and everything inside them
-}
-
 // New creates the service
 func New(conf *Config) *Service {
 	return newService(conf, time.Now)

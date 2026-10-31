@@ -1953,18 +1953,8 @@ For instance, if the request limit allows for 15,000 requests per day, and all o
 to publish messages, then that is the daily message limit.
 
 To limit the number of daily messages per visitor, you can set `visitor-message-daily-limit`. This defines the number 
-of messages a visitor can send in a day. The day is a rolling 24-hour period per visitor (per account, or per IP address
-for anonymous visitors), not the calendar day: each visitor's period starts at its own time of day, derived from the
-visitor, so not every count resets at once. The account page shows when a visitor's counts reset next.
-
-The daily counts (messages, e-mails and phone calls) are kept in the user database if `auth-file` (SQLite) or
-`database-url` (PostgreSQL) is set, so they survive a restart. With PostgreSQL, all ntfy servers sharing the database
-also share the counts: each server writes what it counted every 5 seconds and reads what the others counted, so a visitor
-gets one daily allowance in total, not one per server. Counts reach the other servers within about 10 seconds (two
-rounds), so a visitor may overshoot by about that much traffic. An anonymous visitor's message count is only written once
-it reaches 10% of its daily limit on a server, so the many visitors that publish a few messages never touch the database;
-a restart forgets those few, and N servers may admit up to N times that much before the count is shared. Without a user
-database, the counts are kept in memory only and start over with every restart.
+of messages a visitor can send in a day. The day is a rolling 24-hour period per visitor, not the calendar day; the
+account page shows when the counts reset next.
 
 !!! info
     The servers sharing a database must keep their clocks in sync (e.g. with `systemd-timesyncd` or `chrony`, which most

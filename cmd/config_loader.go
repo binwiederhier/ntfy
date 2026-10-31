@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"gopkg.in/yaml.v2"
 	"heckel.io/ntfy/v2/util"
+	"os"
 )
 
 // initConfigFileInputSourceFunc is like altsrc.InitInputSourceWithContext and altsrc.NewYamlSourceFromFlagFunc, but checks

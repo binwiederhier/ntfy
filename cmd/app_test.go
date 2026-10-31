@@ -3,13 +3,12 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"os"
-	"strings"
-	"testing"
-
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/log"
+	"os"
+	"strings"
+	"testing"
 )
 
 // This only contains helpers so far

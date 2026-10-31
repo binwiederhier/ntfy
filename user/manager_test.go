@@ -33,7 +33,7 @@ func forEachBackend(t *testing.T, f func(t *testing.T, newManager newManagerFunc
 	t.Run("sqlite", func(t *testing.T) {
 		dir := t.TempDir()
 		f(t, func(config *Config) *Manager {
-			a, err := NewSQLiteManager(filepath.Join(dir, "user.db"), "", config)
+			a, err := newTestSQLiteManager(filepath.Join(dir, "user.db"), "", config)
 			require.Nil(t, err)
 			return a
 		})
@@ -1918,7 +1918,7 @@ func newTestManager(t *testing.T, newManager newManagerFunc, defaultAccess Permi
 }
 
 func newTestManagerFromFile(t *testing.T, filename, startupQueries string, defaultAccess Permission, bcryptCost int, statsWriterInterval time.Duration) *Manager {
-	a, err := NewSQLiteManager(filename, startupQueries, &Config{
+	a, err := newTestSQLiteManager(filename, startupQueries, &Config{
 		DefaultAccess:       defaultAccess,
 		BcryptCost:          bcryptCost,
 		QueueWriterInterval: statsWriterInterval,
@@ -1939,7 +1939,7 @@ func testDB(a *Manager) *db.DB {
 
 func forEachStoreBackend(t *testing.T, f func(t *testing.T, manager *Manager)) {
 	t.Run("sqlite", func(t *testing.T) {
-		manager, err := NewSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &Config{})
+		manager, err := newTestSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &Config{})
 		require.Nil(t, err)
 		t.Cleanup(func() { manager.Close() })
 		f(t, manager)
@@ -2658,7 +2658,7 @@ func TestManager_AccessWritesTellPeers(t *testing.T) {
 // topic matching being case-insensitive. SQLite's LIKE is case-insensitive for
 // ASCII by default, which would let a request for "SECRET" match an ACL rule
 // for "secret" -- a security hole. PostgreSQL's LIKE is already case-sensitive.
-// NewSQLiteManager opens the database with case_sensitive_like enabled to close
+// OpenSQLite opens the database with case_sensitive_like enabled to close
 // this gap. This exercises the direct-DB path (cache disabled), which is the
 // path that runs the LIKE query; the in-memory cache is independently
 // case-sensitive (Go map keys / case-sensitive regex).
@@ -3640,11 +3640,11 @@ func TestMigrationFrom9To10Postgres(t *testing.T) {
 func testMigrationFrom9To10(t *testing.T, a *Manager, setVersionQuery, setStatsQuery string) {
 	t.Helper()
 	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
-	_, err := a.DB().Exec(`DROP TABLE IF EXISTS usage`)
+	_, err := a.db.Exec(`DROP TABLE IF EXISTS usage`)
 	require.Nil(t, err)
-	_, err = a.DB().Exec(setVersionQuery)
+	_, err = a.db.Exec(setVersionQuery)
 	require.Nil(t, err)
-	_, err = a.DB().Exec(setStatsQuery)
+	_, err = a.db.Exec(setStatsQuery)
 	require.Nil(t, err)
 	require.Nil(t, a.Close())
 }
@@ -3653,14 +3653,23 @@ func testMigrationFrom9To10(t *testing.T, a *Manager, setVersionQuery, setStatsQ
 func checkMigrated9To10(t *testing.T, a *Manager, selectVersionQuery, selectStatsQuery string) {
 	t.Helper()
 	var version int
-	require.Nil(t, a.DB().QueryRow(selectVersionQuery).Scan(&version))
+	require.Nil(t, a.db.QueryRow(selectVersionQuery).Scan(&version))
 	require.Equal(t, 10, version)
 	var messages, emails, calls int64
-	require.Nil(t, a.DB().QueryRow(selectStatsQuery).Scan(&messages, &emails, &calls))
+	require.Nil(t, a.db.QueryRow(selectStatsQuery).Scan(&messages, &emails, &calls))
 	require.Equal(t, []int64{0, 0, 0}, []int64{messages, emails, calls})
-	_, err := a.DB().Exec(`INSERT INTO usage (key, period_start, messages, emails, calls, updated_at) VALUES ('ip:1.2.3.4', 1793344380, 37, 0, 0, 1793380805)`)
+	_, err := a.db.Exec(`INSERT INTO usage (key, period_start, messages, emails, calls, updated_at) VALUES ('ip:1.2.3.4', 1793344380, 37, 0, 0, 1793380805)`)
 	require.Nil(t, err)
 	var count int64
-	require.Nil(t, a.DB().QueryRow(`SELECT messages FROM usage WHERE key = 'ip:1.2.3.4' AND updated_at >= 1793380805`).Scan(&count))
+	require.Nil(t, a.db.QueryRow(`SELECT messages FROM usage WHERE key = 'ip:1.2.3.4' AND updated_at >= 1793380805`).Scan(&count))
 	require.Equal(t, int64(37), count)
+}
+
+// newTestSQLiteManager opens the SQLite user database and creates a manager on it
+func newTestSQLiteManager(filename, startupQueries string, config *Config) (*Manager, error) {
+	d, err := OpenSQLite(filename)
+	if err != nil {
+		return nil, err
+	}
+	return NewSQLiteManager(d, startupQueries, config)
 }

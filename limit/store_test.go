@@ -36,12 +36,14 @@ func forEachBackend(t *testing.T, f func(t *testing.T, newStore func() *Store)) 
 
 // newTestUserDB returns a fresh SQLite user database, which holds the usage table
 func newTestUserDB(t testing.TB) *db.DB {
-	manager, err := user.NewSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &user.Config{})
+	d, err := user.OpenSQLite(filepath.Join(t.TempDir(), "user.db"))
+	require.Nil(t, err)
+	manager, err := user.NewSQLiteManager(d, "", &user.Config{})
 	require.Nil(t, err)
 	t.Cleanup(func() {
 		manager.Close()
 	})
-	return manager.DB()
+	return d
 }
 
 // readAll returns the rows written at or after since, by key

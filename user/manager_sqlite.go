@@ -322,8 +322,9 @@ var sqliteQueries = queries{
 	updateBilling:                  sqliteUpdateBillingQuery,
 }
 
-// NewSQLiteManager creates a new Manager backed by a SQLite database
-func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager, error) {
+// OpenSQLite opens the SQLite user database (auth-file), to pass to NewSQLiteManager and to the
+// other stores whose tables are part of the user schema (the usage table, see package limit)
+func OpenSQLite(filename string) (*db.DB, error) {
 	parentDir := filepath.Dir(filename)
 	if !util.FileExists(parentDir) {
 		return nil, fmt.Errorf("user database directory %s does not exist or is not accessible", parentDir)
@@ -338,14 +339,20 @@ func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager
 	if err != nil {
 		return nil, err
 	}
+	return db.New(&db.Host{DB: d}, nil), nil
+}
+
+// NewSQLiteManager creates a new Manager on the SQLite user database (see OpenSQLite), creating
+// or migrating its schema
+func NewSQLiteManager(d *db.DB, startupQueries string, config *Config) (*Manager, error) {
 	// Migrations must run before the startup queries: the 5 -> 6 table rebuilds rely on
 	// foreign keys being OFF, which is only guaranteed on fresh connections (the foreign_keys
 	// pragma is enabled as part of the builtin startup queries below)
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations); err != nil {
 		return nil, err
 	}
-	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {
+	if err := runSQLiteStartupQueries(d.Primary(), startupQueries); err != nil {
 		return nil, err
 	}
-	return newManager(db.New(&db.Host{DB: d}, nil), sqliteQueries, config)
+	return newManager(d, sqliteQueries, config)
 }

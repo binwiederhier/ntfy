@@ -306,6 +306,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager
+	var userDB *db.DB // The shared pool on Postgres, the auth-file on SQLite; also holds the usage table
 	if conf.AuthFile != "" || pool != nil {
 		authConfig := &user.Config{
 			Filename:                  conf.AuthFile,
@@ -324,9 +325,13 @@ func New(conf *Config) (*Server, error) {
 			AccessWrittenFunc:         s.broadcastAccessChanged,
 		}
 		if pool != nil {
-			userManager, err = user.NewPostgresManager(pool, authConfig)
+			userDB = pool
+			userManager, err = user.NewPostgresManager(userDB, authConfig)
 		} else {
-			userManager, err = user.NewSQLiteManager(conf.AuthFile, conf.AuthStartupQueries, authConfig)
+			if userDB, err = user.OpenSQLite(conf.AuthFile); err != nil {
+				return nil, err
+			}
+			userManager, err = user.NewSQLiteManager(userDB, conf.AuthStartupQueries, authConfig)
 		}
 		if err != nil {
 			return nil, err
@@ -348,7 +353,7 @@ func New(conf *Config) (*Server, error) {
 	}
 	s.userManager = userManager
 	s.limiter = limit.New(&limit.Config{
-		Store: createUsageStore(pool, userManager),
+		Store: createUsageStore(pool, userDB),
 	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.firebaseClient = firebaseClient
@@ -397,14 +402,14 @@ func (s *Server) dbPoolStats() []*metrics.DBPool {
 	return pools
 }
 
-// createUsageStore returns the store of the usage table, which is part of the user database: the
-// shared pool on Postgres, the auth-file on SQLite. Without a user database, the daily counts are
-// kept in memory only.
-func createUsageStore(pool *db.DB, userManager *user.Manager) *limit.Store {
+// createUsageStore returns the store of the usage table, which is part of the user schema (the
+// user manager creates and migrates it): on the shared pool on Postgres, in the auth-file on
+// SQLite. Without a user database, the daily counts are kept in memory only.
+func createUsageStore(pool, userDB *db.DB) *limit.Store {
 	if pool != nil {
 		return limit.NewPostgresStore(pool)
-	} else if userManager != nil {
-		return limit.NewSQLiteStore(userManager.DB())
+	} else if userDB != nil {
+		return limit.NewSQLiteStore(userDB)
 	}
 	return nil
 }

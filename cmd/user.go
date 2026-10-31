@@ -439,7 +439,11 @@ func createUserManager(c *cli.Context) (*user.Manager, error) {
 		} else if err != nil {
 			return nil, errors.New("auth-file does not exist; please start the server at least once to create it")
 		}
-		return user.NewSQLiteManager(authFile, authStartupQueries, authConfig)
+		userDB, err := user.OpenSQLite(authFile)
+		if err != nil {
+			return nil, err
+		}
+		return user.NewSQLiteManager(userDB, authStartupQueries, authConfig)
 	}
 	return nil, errors.New("option database-url or auth-file not set; auth is unconfigured for this server")
 }

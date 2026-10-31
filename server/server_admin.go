@@ -42,7 +42,6 @@ var (
 		ID:      "u_admin_socket",
 		Name:    "(admin socket)",
 		Role:    user.RoleAdmin,
-		Stats:   &user.Stats{},   // Read by newVisitor
 		Billing: &user.Billing{}, // Read by the visitor's log context
 	}
 

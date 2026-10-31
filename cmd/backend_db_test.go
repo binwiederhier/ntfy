@@ -155,7 +155,9 @@ func TestDBBackend_ResetPassword(t *testing.T) {
 }
 
 func newTestDBBackend(t *testing.T) *dbBackend {
-	manager, err := user.NewSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &user.Config{
+	userDB, err := user.OpenSQLite(filepath.Join(t.TempDir(), "user.db"))
+	require.Nil(t, err)
+	manager, err := user.NewSQLiteManager(userDB, "", &user.Config{
 		DefaultAccess: user.PermissionDenyAll,
 		BcryptCost:    user.DefaultUserPasswordBcryptCost,
 	})

@@ -15,7 +15,7 @@ import (
 const (
 	// User queries
 	sqliteSelectUsersQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stats_messages, u.stats_emails, u.stats_calls, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		ORDER BY
@@ -26,19 +26,19 @@ const (
 			END, u.user
 	`
 	sqliteSelectUserByIDQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stats_messages, u.stats_emails, u.stats_calls, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.id = ?
 	`
 	sqliteSelectUserByNameQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stats_messages, u.stats_emails, u.stats_calls, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE user = ?
 	`
 	sqliteSelectUserByNameOrPrimaryEmailQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stats_messages, u.stats_emails, u.stats_calls, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.user = ?
@@ -47,14 +47,14 @@ const (
 		LIMIT 1
 	`
 	sqliteSelectUserByTokenQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stats_messages, u.stats_emails, u.stats_calls, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		JOIN user_token tk on u.id = tk.user_id
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE tk.token = ? AND (tk.expires = 0 OR tk.expires >= ?)
 	`
 	sqliteSelectUserByStripeCustomerIDQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stats_messages, u.stats_emails, u.stats_calls, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
+		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.stripe_customer_id = ?
@@ -76,8 +76,6 @@ const (
 	sqliteUpdateUserRoleQuery           = `UPDATE user SET role = ? WHERE user = ?`
 	sqliteUpdateUserProvisionedQuery    = `UPDATE user SET provisioned = ? WHERE user = ?`
 	sqliteUpdateUserPrefsQuery          = `UPDATE user SET prefs = ? WHERE id = ?`
-	sqliteUpdateUserStatsQuery          = `UPDATE user SET stats_messages = stats_messages + ?, stats_emails = stats_emails + ?, stats_calls = stats_calls + ? WHERE id = ?`
-	sqliteUpdateUserStatsResetAllQuery  = `UPDATE user SET stats_messages = 0, stats_emails = 0, stats_calls = 0`
 	sqliteUpdateUserTierQuery           = `UPDATE user SET tier_id = (SELECT id FROM tier WHERE code = ?) WHERE user = ?`
 	sqliteUpdateUserDeletedQuery        = `UPDATE user SET deleted = ? WHERE id = ?`
 	sqliteDeleteUserQuery               = `DELETE FROM user WHERE user = ?`
@@ -270,8 +268,6 @@ var sqliteQueries = queries{
 	updateUserRole:                 sqliteUpdateUserRoleQuery,
 	updateUserProvisioned:          sqliteUpdateUserProvisionedQuery,
 	updateUserPrefs:                sqliteUpdateUserPrefsQuery,
-	updateUserStats:                sqliteUpdateUserStatsQuery,
-	updateUserStatsResetAll:        sqliteUpdateUserStatsResetAllQuery,
 	updateUserTier:                 sqliteUpdateUserTierQuery,
 	updateUserDeleted:              sqliteUpdateUserDeletedQuery,
 	deleteUser:                     sqliteDeleteUserQuery,
@@ -333,8 +329,9 @@ var sqliteQueries = queries{
 	updateBilling:                  sqliteUpdateBillingQuery,
 }
 
-// NewSQLiteManager creates a new Manager backed by a SQLite database
-func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager, error) {
+// OpenSQLite opens the SQLite user database (auth-file), to pass to NewSQLiteManager and to the
+// other stores whose tables are part of the user schema (the usage table, see package limit)
+func OpenSQLite(filename string) (*db.DB, error) {
 	parentDir := filepath.Dir(filename)
 	if !util.FileExists(parentDir) {
 		return nil, fmt.Errorf("user database directory %s does not exist or is not accessible", parentDir)
@@ -349,14 +346,20 @@ func NewSQLiteManager(filename, startupQueries string, config *Config) (*Manager
 	if err != nil {
 		return nil, err
 	}
+	return db.New(&db.Host{DB: d}, nil), nil
+}
+
+// NewSQLiteManager creates a new Manager on the SQLite user database (see OpenSQLite), creating
+// or migrating its schema
+func NewSQLiteManager(d *db.DB, startupQueries string, config *Config) (*Manager, error) {
 	// Migrations must run before the startup queries: the 5 -> 6 table rebuilds rely on
 	// foreign keys being OFF, which is only guaranteed on fresh connections (the foreign_keys
 	// pragma is enabled as part of the builtin startup queries below)
-	if err := schema.Migrate(d, schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations); err != nil {
+	if err := schema.Migrate(d.Primary(), schema.SQLite, schemaStore, sqliteCreateTables, sqliteMigrations); err != nil {
 		return nil, err
 	}
-	if err := runSQLiteStartupQueries(d, startupQueries); err != nil {
+	if err := runSQLiteStartupQueries(d.Primary(), startupQueries); err != nil {
 		return nil, err
 	}
-	return newManager(db.New(&db.Host{DB: d}, nil), sqliteQueries, config)
+	return newManager(d, sqliteQueries, config)
 }

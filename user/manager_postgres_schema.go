@@ -123,14 +123,38 @@ const (
 	`
 )
 
+// The usage table holds the daily usage counts, one row per key, reused across the key's 24h
+// periods (see package limit, which reads and writes it). It lives in the user schema so it shares
+// its migrations; in a cluster, every node uses it.
+const (
+	postgresCreateUsageTableQuery = `
+		CREATE TABLE IF NOT EXISTS usage (
+			key TEXT NOT NULL PRIMARY KEY,
+			period_start BIGINT NOT NULL,
+			messages BIGINT NOT NULL DEFAULT 0,
+			emails BIGINT NOT NULL DEFAULT 0,
+			calls BIGINT NOT NULL DEFAULT 0,
+			updated_at BIGINT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_usage_updated_at ON usage (updated_at);
+	`
+
+	// 9 -> 10: The usage table replaces the stats_* columns, which stay in the schema but are
+	// zeroed, so nothing reads their stale numbers
+	postgresMigrate9To10UpdateQueries = postgresCreateUsageTableQuery + `
+		UPDATE "user" SET stats_messages = 0, stats_emails = 0, stats_calls = 0;
+	`
+)
+
 var (
-	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries)
+	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries + postgresCreateUsageTableQuery)
 
 	// postgresMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
 	postgresMigrations = schema.Migrations{
-		{From: 6, To: 7}: schema.Query(postgresMigrate6To7UpdateQueries),
-		{From: 7, To: 8}: schema.Query(postgresMigrate7To8UpdateQueries),
-		{From: 8, To: 9}: schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
+		{From: 6, To: 7}:  schema.Query(postgresMigrate6To7UpdateQueries),
+		{From: 7, To: 8}:  schema.Query(postgresMigrate7To8UpdateQueries),
+		{From: 8, To: 9}:  schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
+		{From: 9, To: 10}: schema.Query(postgresMigrate9To10UpdateQueries),
 	}
 )

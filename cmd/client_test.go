@@ -12,13 +12,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/server"
 	"heckel.io/ntfy/v2/test"
 	"heckel.io/ntfy/v2/user"
 )
 
-func TestCLI_Backend_SocketDoesNotTouchDatabase(t *testing.T) {
+func TestCLI_Client_SocketDoesNotTouchDatabase(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, true)
 	defer test.StopServer(t, s, port)
 
@@ -31,7 +30,7 @@ func TestCLI_Backend_SocketDoesNotTouchDatabase(t *testing.T) {
 	require.NotContains(t, stderr.String(), "warning")
 }
 
-func TestCLI_Backend_FallbackWarning(t *testing.T) {
+func TestCLI_Client_FallbackWarning(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
@@ -52,7 +51,7 @@ func TestCLI_Backend_FallbackWarning(t *testing.T) {
 	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket+" (connection refused)")
 }
 
-func TestCLI_Backend_SocketDisabled(t *testing.T) {
+func TestCLI_Client_SocketDisabled(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
@@ -65,7 +64,7 @@ func TestCLI_Backend_SocketDisabled(t *testing.T) {
 	}
 }
 
-func TestCLI_Backend_FallbackWarningBanner(t *testing.T) {
+func TestCLI_Client_FallbackWarningBanner(t *testing.T) {
 	var buf bytes.Buffer
 	printAdminFallbackWarning(&buf, "No ntfy server answered on the admin socket\n/run/ntfy/admin.sock (no such file or directory)")
 	require.Equal(t, `**********************************************************************
@@ -80,7 +79,7 @@ See https://docs.ntfy.sh/deprecations/ for details.
 `, buf.String())
 }
 
-func TestCLI_Backend_SocketErrorNoFallback(t *testing.T) {
+func TestCLI_Client_SocketErrorNoFallback(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
@@ -101,7 +100,7 @@ func TestCLI_Backend_SocketErrorNoFallback(t *testing.T) {
 	require.Empty(t, stdout.String())
 }
 
-func TestCLI_Backend_SocketPermissionDenied(t *testing.T) {
+func TestCLI_Client_SocketPermissionDenied(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root can open any socket")
 	}
@@ -170,7 +169,7 @@ func shortTempDir(t *testing.T) string {
 
 func waitForAdminSocket(t *testing.T, socket string) {
 	for i := 0; i < 100; i++ {
-		if client.New(socket).Ping() == nil {
+		if newSocketClient(socket).Ping() == nil {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)

@@ -12,7 +12,6 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/mail"
@@ -22,7 +21,7 @@ import (
 )
 
 const (
-	tierReset = client.TierReset
+	tierReset = "-"
 )
 
 func init() {

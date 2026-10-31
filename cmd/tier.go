@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"time"
@@ -208,7 +207,7 @@ func execTierAdd(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	api, err := newBackend(c)
+	api, err := newAdminClient(c)
 	if err != nil {
 		return err
 	}
@@ -219,10 +218,10 @@ func execTierAdd(c *cli.Context) error {
 			return nil
 		}
 		return fmt.Errorf("tier %s already exists", code)
-	} else if !isAPIErrorCode(err, client.ErrCodeTierNotFound) {
+	} else if !isAPIErrorCode(err, apiErrCodeTierNotFound) {
 		return mapAPIError(err, "", code, "")
 	}
-	tier := &client.Tier{
+	tier := &apiTier{
 		Code:                     code,
 		Name:                     name,
 		MessagesLimit:            c.Int64("message-limit"),
@@ -256,7 +255,7 @@ func execTierChange(c *cli.Context) error {
 	} else if !user.AllowedTier(code) {
 		return errors.New("tier code must consist only of numbers and letters")
 	}
-	api, err := newBackend(c)
+	api, err := newAdminClient(c)
 	if err != nil {
 		return err
 	}
@@ -336,7 +335,7 @@ func execTierDel(c *cli.Context) error {
 	if code == "" {
 		return errors.New("tier code expected, type 'ntfy tier del --help' for help")
 	}
-	api, err := newBackend(c)
+	api, err := newAdminClient(c)
 	if err != nil {
 		return err
 	}
@@ -349,7 +348,7 @@ func execTierDel(c *cli.Context) error {
 }
 
 func execTierList(c *cli.Context) error {
-	api, err := newBackend(c)
+	api, err := newAdminClient(c)
 	if err != nil {
 		return err
 	}
@@ -364,7 +363,7 @@ func execTierList(c *cli.Context) error {
 	return nil
 }
 
-func printTier(c *cli.Context, tier *client.Tier) {
+func printTier(c *cli.Context, tier *apiTier) {
 	prices := "(none)"
 	if tier.StripeMonthlyPriceID != "" && tier.StripeYearlyPriceID != "" {
 		prices = fmt.Sprintf("%s / %s", tier.StripeMonthlyPriceID, tier.StripeYearlyPriceID)

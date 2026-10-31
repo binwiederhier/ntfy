@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/mail"
 	"heckel.io/ntfy/v2/user"
 )
@@ -21,25 +20,25 @@ const (
 	directPasswordResetPath   = "/account/password/reset/"
 )
 
-// dbBackend implements backend against the user database, without a server. It is the
+// databaseClient implements adminClient against the user database, without a server. It is the
 // fallback when no admin socket answers (server not running, Docker without a shared socket,
 // custom systemd unit without RuntimeDirectory, Windows). It must behave like the server's
 // handlers over the admin socket, including the error codes, so the commands cannot tell the
 // difference. Direct access is at least as privileged as the socket, so admins may be changed.
-type dbBackend struct {
+type databaseClient struct {
 	manager  *user.Manager
 	baseURL  string
 	smtpConf *mail.Config
 }
 
-var _ backend = (*dbBackend)(nil)
+var _ adminClient = (*databaseClient)(nil)
 
-func newDBBackend(c *cli.Context) (*dbBackend, error) {
+func newDatabaseClient(c *cli.Context) (*databaseClient, error) {
 	manager, err := createUserManager(c)
 	if err != nil {
 		return nil, err
 	}
-	return &dbBackend{
+	return &databaseClient{
 		manager: manager,
 		baseURL: strings.TrimSuffix(c.String("base-url"), "/"),
 		smtpConf: &mail.Config{
@@ -51,7 +50,7 @@ func newDBBackend(c *cli.Context) (*dbBackend, error) {
 	}, nil
 }
 
-func (d *dbBackend) Users() ([]*client.User, error) {
+func (d *databaseClient) Users() ([]*apiUser, error) {
 	users, err := d.manager.Users()
 	if err != nil {
 		return nil, err
@@ -60,14 +59,14 @@ func (d *dbBackend) Users() ([]*client.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	adminUsers := make([]*client.User, len(users))
+	adminUsers := make([]*apiUser, len(users))
 	for i, u := range users {
 		adminUsers[i] = d.toAdminUser(u, grants[u.ID])
 	}
 	return adminUsers, nil
 }
 
-func (d *dbBackend) User(username string) (*client.User, error) {
+func (d *databaseClient) User(username string) (*apiUser, error) {
 	u, err := d.manager.User(username)
 	if err != nil {
 		return nil, directError(err)
@@ -79,14 +78,14 @@ func (d *dbBackend) User(username string) (*client.User, error) {
 	return d.toAdminUser(u, grants), nil
 }
 
-func (d *dbBackend) AddUser(username, hash, tier, role string) error {
+func (d *databaseClient) AddUser(username, hash, tier, role string) error {
 	if role == "" {
 		role = string(user.RoleUser)
 	} else if !user.AllowedRole(user.Role(role)) {
-		return directErrorCode(client.ErrCodeRoleInvalid)
+		return directErrorCode(apiErrCodeRoleInvalid)
 	}
 	if _, err := d.manager.User(username); err == nil {
-		return directErrorCode(client.ErrCodeUserExists)
+		return directErrorCode(apiErrCodeUserExists)
 	} else if !errors.Is(err, user.ErrUserNotFound) {
 		return err
 	}
@@ -104,14 +103,14 @@ func (d *dbBackend) AddUser(username, hash, tier, role string) error {
 	return nil
 }
 
-func (d *dbBackend) ChangePassword(username, hash string) error {
+func (d *databaseClient) ChangePassword(username, hash string) error {
 	if _, err := d.manager.User(username); err != nil {
 		return directError(err)
 	}
 	return directError(d.manager.ChangePassword(username, hash, true))
 }
 
-func (d *dbBackend) ChangeTier(username, tier string) error {
+func (d *databaseClient) ChangeTier(username, tier string) error {
 	if _, err := d.manager.User(username); err != nil {
 		return directError(err)
 	}
@@ -124,9 +123,9 @@ func (d *dbBackend) ChangeTier(username, tier string) error {
 	return directError(d.manager.ChangeTier(username, tier))
 }
 
-func (d *dbBackend) ChangeRole(username, role string) error {
+func (d *databaseClient) ChangeRole(username, role string) error {
 	if !user.AllowedRole(user.Role(role)) {
-		return directErrorCode(client.ErrCodeRoleInvalid)
+		return directErrorCode(apiErrCodeRoleInvalid)
 	}
 	if _, err := d.manager.User(username); err != nil {
 		return directError(err)
@@ -134,9 +133,9 @@ func (d *dbBackend) ChangeRole(username, role string) error {
 	return directError(d.manager.ChangeRole(username, user.Role(role)))
 }
 
-func (d *dbBackend) RemoveUser(username string) error {
+func (d *databaseClient) RemoveUser(username string) error {
 	if username == user.Everyone {
-		return &client.Error{HTTPCode: http.StatusBadRequest, Message: "invalid request: cannot remove the everyone user"}
+		return &apiError{HTTPCode: http.StatusBadRequest, Message: "invalid request: cannot remove the everyone user"}
 	}
 	if _, err := d.manager.User(username); err != nil {
 		return directError(err)
@@ -144,26 +143,26 @@ func (d *dbBackend) RemoveUser(username string) error {
 	return directError(d.manager.RemoveUser(username))
 }
 
-func (d *dbBackend) ResetPassword(username string, sendEmail bool) (*client.PasswordReset, error) {
+func (d *databaseClient) ResetPassword(username string, sendEmail bool) (*apiPasswordReset, error) {
 	if d.baseURL == "" {
-		return nil, directErrorCode(client.ErrCodeBaseURLNotConfigured)
+		return nil, directErrorCode(apiErrCodeBaseURLNotConfigured)
 	}
 	u, err := d.manager.User(username)
 	if err != nil {
 		return nil, directError(err)
 	} else if u.Provisioned {
-		return nil, directErrorCode(client.ErrCodeProvisionedUserChange)
+		return nil, directErrorCode(apiErrCodeProvisionedUserChange)
 	}
 	// Resolve the primary email up front if we need to send -- fail before creating a token
 	var email string
 	if sendEmail {
 		if d.smtpConf.SMTPAddr == "" {
-			return nil, &client.Error{HTTPCode: http.StatusBadRequest, Message: "smtp-sender-addr is not configured"}
+			return nil, &apiError{HTTPCode: http.StatusBadRequest, Message: "smtp-sender-addr is not configured"}
 		}
 		if email, err = d.manager.PrimaryEmail(u.ID); err != nil {
 			return nil, err
 		} else if email == "" {
-			return nil, directErrorCode(client.ErrCodeUserNoPrimaryEmail)
+			return nil, directErrorCode(apiErrCodeUserNoPrimaryEmail)
 		}
 	}
 	// The reset token is bound to the user, not an email -- so this works even with no SMTP
@@ -177,27 +176,27 @@ func (d *dbBackend) ResetPassword(username string, sendEmail bool) (*client.Pass
 			return nil, err
 		}
 	}
-	return &client.PasswordReset{
+	return &apiPasswordReset{
 		Link:  link,
 		Email: email,
 	}, nil
 }
 
-func (d *dbBackend) AllowAccess(username, topic, permission string) error {
+func (d *databaseClient) AllowAccess(username, topic, permission string) error {
 	u, err := d.manager.User(username)
 	if err != nil {
 		return directError(err)
 	} else if u.IsAdmin() {
-		return directErrorCode(client.ErrCodeAccessAdminUser)
+		return directErrorCode(apiErrCodeAccessAdminUser)
 	}
 	p, err := user.ParsePermission(permission)
 	if err != nil {
-		return directErrorCode(client.ErrCodePermissionInvalid)
+		return directErrorCode(apiErrCodePermissionInvalid)
 	}
 	return directError(d.manager.AllowAccess(username, topic, p))
 }
 
-func (d *dbBackend) ResetAccess(username, topic string) error {
+func (d *databaseClient) ResetAccess(username, topic string) error {
 	if username != "" {
 		if _, err := d.manager.User(username); err != nil {
 			return directError(err)
@@ -206,7 +205,7 @@ func (d *dbBackend) ResetAccess(username, topic string) error {
 	return directError(d.manager.ResetAccess(username, topic))
 }
 
-func (d *dbBackend) Tokens(username string) ([]*client.Token, error) {
+func (d *databaseClient) Tokens(username string) ([]*apiToken, error) {
 	var users []*user.User
 	if username != "" {
 		u, err := d.manager.User(username)
@@ -220,7 +219,7 @@ func (d *dbBackend) Tokens(username string) ([]*client.Token, error) {
 			return nil, err
 		}
 	}
-	adminTokens := make([]*client.Token, 0)
+	adminTokens := make([]*apiToken, 0)
 	for _, u := range users {
 		tokens, err := d.manager.Tokens(u.ID)
 		if err != nil {
@@ -233,7 +232,7 @@ func (d *dbBackend) Tokens(username string) ([]*client.Token, error) {
 	return adminTokens, nil
 }
 
-func (d *dbBackend) AddToken(username, label string, expires time.Time) (*client.Token, error) {
+func (d *databaseClient) AddToken(username, label string, expires time.Time) (*apiToken, error) {
 	u, err := d.manager.User(username)
 	if err != nil {
 		return nil, directError(err)
@@ -248,7 +247,7 @@ func (d *dbBackend) AddToken(username, label string, expires time.Time) (*client
 	return toAdminToken(u.Name, token), nil
 }
 
-func (d *dbBackend) RemoveToken(username, token string) error {
+func (d *databaseClient) RemoveToken(username, token string) error {
 	u, err := d.manager.User(username)
 	if err != nil {
 		return directError(err)
@@ -256,7 +255,7 @@ func (d *dbBackend) RemoveToken(username, token string) error {
 	return directError(d.manager.RemoveToken(u.ID, token))
 }
 
-func (d *dbBackend) Tiers() ([]*client.Tier, error) {
+func (d *databaseClient) Tiers() ([]*apiTier, error) {
 	tiers, err := d.manager.Tiers()
 	if err != nil {
 		return nil, err
@@ -268,14 +267,14 @@ func (d *dbBackend) Tiers() ([]*client.Tier, error) {
 	slices.SortFunc(tiers, func(a, b *user.Tier) int {
 		return strings.Compare(a.Code, b.Code)
 	})
-	adminTiers := make([]*client.Tier, len(tiers))
+	adminTiers := make([]*apiTier, len(tiers))
 	for i, t := range tiers {
 		adminTiers[i] = toAdminTier(t, counts[t.Code])
 	}
 	return adminTiers, nil
 }
 
-func (d *dbBackend) Tier(code string) (*client.Tier, error) {
+func (d *databaseClient) Tier(code string) (*apiTier, error) {
 	t, err := d.manager.Tier(code)
 	if err != nil {
 		return nil, directError(err)
@@ -287,21 +286,21 @@ func (d *dbBackend) Tier(code string) (*client.Tier, error) {
 	return toAdminTier(t, counts[t.Code]), nil
 }
 
-func (d *dbBackend) AddTier(t *client.Tier) error {
+func (d *databaseClient) AddTier(t *apiTier) error {
 	if !user.AllowedTier(t.Code) || strings.TrimSpace(t.Name) == "" {
-		return directErrorCode(client.ErrCodeTierCodeInvalid)
+		return directErrorCode(apiErrCodeTierCodeInvalid)
 	}
 	if _, err := d.manager.Tier(t.Code); err == nil {
-		return directErrorCode(client.ErrCodeTierExists)
+		return directErrorCode(apiErrCodeTierExists)
 	} else if !errors.Is(err, user.ErrTierNotFound) {
 		return err
 	}
 	return directError(d.manager.AddTier(fromAdminTier(t)))
 }
 
-func (d *dbBackend) UpdateTier(t *client.Tier) error {
+func (d *databaseClient) UpdateTier(t *apiTier) error {
 	if !user.AllowedTier(t.Code) || strings.TrimSpace(t.Name) == "" {
-		return directErrorCode(client.ErrCodeTierCodeInvalid)
+		return directErrorCode(apiErrCodeTierCodeInvalid)
 	}
 	if _, err := d.manager.Tier(t.Code); err != nil {
 		return directError(err)
@@ -309,7 +308,7 @@ func (d *dbBackend) UpdateTier(t *client.Tier) error {
 	return directError(d.manager.UpdateTier(fromAdminTier(t)))
 }
 
-func (d *dbBackend) RemoveTier(code string) error {
+func (d *databaseClient) RemoveTier(code string) error {
 	if _, err := d.manager.Tier(code); err != nil {
 		return directError(err)
 	}
@@ -317,17 +316,17 @@ func (d *dbBackend) RemoveTier(code string) error {
 	if err != nil {
 		return err
 	} else if counts[code] > 0 {
-		return directErrorCode(client.ErrCodeTierInUse)
+		return directErrorCode(apiErrCodeTierInUse)
 	}
 	return directError(d.manager.RemoveTier(code))
 }
 
-func (d *dbBackend) Close() error {
+func (d *databaseClient) Close() error {
 	return d.manager.Close()
 }
 
-func (d *dbBackend) toAdminUser(u *user.User, grants []user.Grant) *client.User {
-	adminUser := &client.User{
+func (d *databaseClient) toAdminUser(u *user.User, grants []user.Grant) *apiUser {
+	adminUser := &apiUser{
 		Username:    u.Name,
 		Role:        string(u.Role),
 		Provisioned: u.Provisioned,
@@ -340,7 +339,7 @@ func (d *dbBackend) toAdminUser(u *user.User, grants []user.Grant) *client.User 
 		adminUser.DefaultAccess = d.manager.DefaultAccess().String()
 	}
 	for _, g := range grants {
-		adminUser.Grants = append(adminUser.Grants, &client.Grant{
+		adminUser.Grants = append(adminUser.Grants, &apiGrant{
 			Topic:       g.TopicPattern,
 			Permission:  g.Permission.String(),
 			Provisioned: g.Provisioned,
@@ -349,8 +348,8 @@ func (d *dbBackend) toAdminUser(u *user.User, grants []user.Grant) *client.User 
 	return adminUser
 }
 
-func toAdminToken(username string, t *user.Token) *client.Token {
-	token := &client.Token{
+func toAdminToken(username string, t *user.Token) *apiToken {
+	token := &apiToken{
 		Username:    username,
 		Token:       t.Value,
 		Label:       t.Label,
@@ -364,8 +363,8 @@ func toAdminToken(username string, t *user.Token) *client.Token {
 	return token
 }
 
-func toAdminTier(t *user.Tier, users int64) *client.Tier {
-	return &client.Tier{
+func toAdminTier(t *user.Tier, users int64) *apiTier {
+	return &apiTier{
 		ID:                       t.ID,
 		Code:                     t.Code,
 		Name:                     t.Name,
@@ -384,7 +383,7 @@ func toAdminTier(t *user.Tier, users int64) *client.Tier {
 	}
 }
 
-func fromAdminTier(t *client.Tier) *user.Tier {
+func fromAdminTier(t *apiTier) *user.Tier {
 	return &user.Tier{
 		Code:                     t.Code,
 		Name:                     strings.TrimSpace(t.Name),
@@ -409,21 +408,21 @@ func directError(err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, user.ErrUserNotFound):
-		return directErrorCode(client.ErrCodeUserNotFound)
+		return directErrorCode(apiErrCodeUserNotFound)
 	case errors.Is(err, user.ErrUserExists):
-		return directErrorCode(client.ErrCodeUserExists)
+		return directErrorCode(apiErrCodeUserExists)
 	case errors.Is(err, user.ErrTierNotFound):
-		return directErrorCode(client.ErrCodeTierNotFound)
+		return directErrorCode(apiErrCodeTierNotFound)
 	case errors.Is(err, user.ErrTokenNotFound):
-		return directErrorCode(client.ErrCodeTokenNotFound)
+		return directErrorCode(apiErrCodeTokenNotFound)
 	case errors.Is(err, user.ErrProvisionedUserChange):
-		return directErrorCode(client.ErrCodeProvisionedUserChange)
+		return directErrorCode(apiErrCodeProvisionedUserChange)
 	case errors.Is(err, user.ErrProvisionedTokenChange):
-		return directErrorCode(client.ErrCodeProvisionedTokenChange)
+		return directErrorCode(apiErrCodeProvisionedTokenChange)
 	case errors.Is(err, user.ErrTooManyReservations):
-		return directErrorCode(client.ErrCodeTierReservationsLimit)
+		return directErrorCode(apiErrCodeTierReservationsLimit)
 	case errors.Is(err, user.ErrPasswordHashInvalid), errors.Is(err, user.ErrPasswordHashWeak):
-		return directErrorCode(client.ErrCodePasswordHashInvalid)
+		return directErrorCode(apiErrCodePasswordHashInvalid)
 	}
 	return err
 }
@@ -431,7 +430,7 @@ func directError(err error) error {
 // directErrorCode returns an admin API error with the given code. The message is never shown:
 // adminError replaces it with the CLI's own wording for every code used here.
 func directErrorCode(code int) error {
-	return &client.Error{
+	return &apiError{
 		HTTPCode: http.StatusBadRequest,
 		Code:     code,
 		Message:  "invalid request",

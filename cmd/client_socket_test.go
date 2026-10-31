@@ -1,4 +1,6 @@
-package client
+//go:build !noserver
+
+package cmd
 
 import (
 	"encoding/json"
@@ -28,7 +30,7 @@ type recordedRequest struct {
 	Body   map[string]any
 }
 
-func TestClient_RequestsAndResponses(t *testing.T) {
+func TestSocketClient_RequestsAndResponses(t *testing.T) {
 	var requests []*recordedRequest
 	server, socket := newSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &recordedRequest{Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery}
@@ -58,7 +60,7 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 	}))
 	server.Start()
 	defer server.Close()
-	sc := New(socket)
+	sc := newSocketClient(socket)
 
 	// Users
 	users, err := sc.Users()
@@ -72,15 +74,15 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 	require.Equal(t, "pro", u.Tier)
 	require.Equal(t, "username=ben", requests[len(requests)-1].Query)
 	_, err = sc.User("nobody")
-	var apiErr *Error
+	var apiErr *apiError
 	require.True(t, errors.As(err, &apiErr))
-	require.Equal(t, ErrCodeUserNotFound, apiErr.Code)
+	require.Equal(t, apiErrCodeUserNotFound, apiErr.Code)
 
 	// Mutations send the right method, path and body
 	requests = nil
 	require.Nil(t, sc.AddUser("ben", "$2a$10$hash", "pro", "admin"))
 	require.Nil(t, sc.ChangePassword("ben", "$2a$10$other"))
-	require.Nil(t, sc.ChangeTier("ben", TierReset))
+	require.Nil(t, sc.ChangeTier("ben", tierReset))
 	require.Nil(t, sc.ChangeRole("ben", "user"))
 	require.Nil(t, sc.RemoveUser("ben"))
 	require.Nil(t, sc.AllowAccess("*", "up*", "write-only"))
@@ -126,10 +128,10 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 	require.Equal(t, int64(2), tier.Users)
 	_, err = sc.Tier("nope")
 	require.True(t, errors.As(err, &apiErr))
-	require.Equal(t, ErrCodeTierNotFound, apiErr.Code)
+	require.Equal(t, apiErrCodeTierNotFound, apiErr.Code)
 }
 
-func TestClient_Errors(t *testing.T) {
+func TestSocketClient_Errors(t *testing.T) {
 	server, socket := newSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/users" {
 			w.WriteHeader(http.StatusConflict)
@@ -140,14 +142,14 @@ func TestClient_Errors(t *testing.T) {
 		w.Write([]byte(`<html>bad gateway</html>`))
 	}))
 	server.Start()
-	sc := New(socket)
+	sc := newSocketClient(socket)
 
 	// ntfy error
 	err := sc.AddUser("ben", "hash", "", "")
-	var apiErr *Error
+	var apiErr *apiError
 	require.True(t, errors.As(err, &apiErr))
 	require.Equal(t, 409, apiErr.HTTPCode)
-	require.Equal(t, ErrCodeUserExists, apiErr.Code)
+	require.Equal(t, apiErrCodeUserExists, apiErr.Code)
 	require.Equal(t, "conflict: user already exists (error 40901)", apiErr.Error())
 
 	// Not a ntfy error (e.g. a proxy in between)
@@ -159,17 +161,14 @@ func TestClient_Errors(t *testing.T) {
 	// Unreachable
 	server.Close()
 	err = sc.Ping()
-	require.ErrorIs(t, err, ErrUnreachable)
+	require.ErrorIs(t, err, errSocketUnreachable)
 }
 
-func TestClient_Socket(t *testing.T) {
-	dir, err := os.MkdirTemp("", "ntfy-client")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
-	socket := filepath.Join(dir, "admin.sock")
+func TestSocketClient_Socket(t *testing.T) {
+	socket := filepath.Join(shortTempDir(t), "admin.sock")
 
 	// Missing socket is unreachable
-	require.ErrorIs(t, New(socket).Ping(), ErrUnreachable)
+	require.ErrorIs(t, newSocketClient(socket).Ping(), errSocketUnreachable)
 
 	// Present socket answers
 	listener, err := net.Listen("unix", socket)
@@ -179,29 +178,26 @@ func TestClient_Socket(t *testing.T) {
 	})}
 	go server.Serve(listener)
 	defer server.Close()
-	require.Nil(t, New(socket).Ping())
+	require.Nil(t, newSocketClient(socket).Ping())
 }
 
-func TestClient_SocketPermissionDenied(t *testing.T) {
+func TestSocketClient_SocketPermissionDenied(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root can open any socket")
 	}
-	dir, err := os.MkdirTemp("", "ntfy-client")
-	require.Nil(t, err)
-	defer os.RemoveAll(dir)
-	socket := filepath.Join(dir, "admin.sock")
+	socket := filepath.Join(shortTempDir(t), "admin.sock")
 	listener, err := net.Listen("unix", socket)
 	require.Nil(t, err)
 	defer listener.Close()
 	require.Nil(t, os.Chmod(socket, 0))
 
 	// The cause stays in the error chain, so callers can tell "no permission" from "no server"
-	err = New(socket).Ping()
-	require.ErrorIs(t, err, ErrUnreachable)
+	err = newSocketClient(socket).Ping()
+	require.ErrorIs(t, err, errSocketUnreachable)
 	require.ErrorIs(t, err, fs.ErrPermission)
 }
 
-func TestClient_CloseClosesIdleConnections(t *testing.T) {
+func TestSocketClient_CloseClosesIdleConnections(t *testing.T) {
 	var conns atomic.Int32
 	server, socket := newSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"version":"1.0.0"}`))
@@ -213,47 +209,43 @@ func TestClient_CloseClosesIdleConnections(t *testing.T) {
 	}
 	server.Start()
 	defer server.Close()
-	sc := New(socket)
+	sc := newSocketClient(socket)
 	require.Nil(t, sc.Ping())
 	require.Nil(t, sc.Close())
 	require.Eventually(t, func() bool { return conns.Load() == 1 }, 2*time.Second, 10*time.Millisecond)
 }
 
-func TestClient_ErrorCodesMatchServer(t *testing.T) {
+func TestSocketClient_ErrorCodesMatchServer(t *testing.T) {
 	// The server's errHTTP values are unexported, so read them from the source
 	codes := map[string]int{
-		"errHTTPNotFound":                        ErrCodeNotFound,
-		"errHTTPBadRequestUserNotFound":          ErrCodeUserNotFound,
-		"errHTTPConflictUserExists":              ErrCodeUserExists,
-		"errHTTPBadRequestTierInvalid":           ErrCodeTierNotFound,
-		"errHTTPConflictTierExists":              ErrCodeTierExists,
-		"errHTTPConflictTierInUse":               ErrCodeTierInUse,
-		"errHTTPBadRequestTierCodeInvalid":       ErrCodeTierCodeInvalid,
-		"errHTTPBadRequestTierReservationsLimit": ErrCodeTierReservationsLimit,
-		"errHTTPBadRequestAccessAdminUser":       ErrCodeAccessAdminUser,
-		"errHTTPBadRequestTokenNotFound":         ErrCodeTokenNotFound,
-		"errHTTPBadRequestRoleInvalid":           ErrCodeRoleInvalid,
-		"errHTTPBadRequestUserNoPrimaryEmail":    ErrCodeUserNoPrimaryEmail,
-		"errHTTPBadRequestBaseURLNotConfigured":  ErrCodeBaseURLNotConfigured,
-		"errHTTPBadRequestPasswordHashInvalid":   ErrCodePasswordHashInvalid,
-		"errHTTPBadRequestPermissionInvalid":     ErrCodePermissionInvalid,
-		"errHTTPConflictProvisionedUserChange":   ErrCodeProvisionedUserChange,
-		"errHTTPConflictProvisionedTokenChange":  ErrCodeProvisionedTokenChange,
+		"errHTTPNotFound":                        apiErrCodeNotFound,
+		"errHTTPBadRequestUserNotFound":          apiErrCodeUserNotFound,
+		"errHTTPConflictUserExists":              apiErrCodeUserExists,
+		"errHTTPBadRequestTierInvalid":           apiErrCodeTierNotFound,
+		"errHTTPConflictTierExists":              apiErrCodeTierExists,
+		"errHTTPConflictTierInUse":               apiErrCodeTierInUse,
+		"errHTTPBadRequestTierCodeInvalid":       apiErrCodeTierCodeInvalid,
+		"errHTTPBadRequestTierReservationsLimit": apiErrCodeTierReservationsLimit,
+		"errHTTPBadRequestAccessAdminUser":       apiErrCodeAccessAdminUser,
+		"errHTTPBadRequestTokenNotFound":         apiErrCodeTokenNotFound,
+		"errHTTPBadRequestRoleInvalid":           apiErrCodeRoleInvalid,
+		"errHTTPBadRequestUserNoPrimaryEmail":    apiErrCodeUserNoPrimaryEmail,
+		"errHTTPBadRequestBaseURLNotConfigured":  apiErrCodeBaseURLNotConfigured,
+		"errHTTPBadRequestPasswordHashInvalid":   apiErrCodePasswordHashInvalid,
+		"errHTTPBadRequestPermissionInvalid":     apiErrCodePermissionInvalid,
+		"errHTTPConflictProvisionedUserChange":   apiErrCodeProvisionedUserChange,
+		"errHTTPConflictProvisionedTokenChange":  apiErrCodeProvisionedTokenChange,
 	}
-	serverCodes := readServerErrorCodes(t, "../../server/errors.go")
+	serverCodes := readServerErrorCodes(t, "../server/errors.go")
 	for name, code := range codes {
 		require.Contains(t, serverCodes, name)
 		require.Equal(t, serverCodes[name], code, name)
 	}
 }
 
-// newSocketServer returns an unstarted test server for handler on a unix socket, in a short temp dir
-// since socket paths are limited to ~104 bytes
+// newSocketServer returns an unstarted test server for handler on a unix socket
 func newSocketServer(t *testing.T, handler http.Handler) (server *httptest.Server, socket string) {
-	dir, err := os.MkdirTemp("", "ntfy-client")
-	require.Nil(t, err)
-	t.Cleanup(func() { os.RemoveAll(dir) })
-	socket = filepath.Join(dir, "admin.sock")
+	socket = filepath.Join(shortTempDir(t), "admin.sock")
 	listener, err := net.Listen("unix", socket)
 	require.Nil(t, err)
 	server = httptest.NewUnstartedServer(handler)

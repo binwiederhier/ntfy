@@ -143,7 +143,7 @@ const NavList = (props) => {
     showNotificationContextNotSupportedBox;
 
   return (
-    <>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Toolbar sx={{ display: { xs: "none", sm: "block" } }} />
       {/* The list scrolls on its own, so the upgrade banner below it never covers the last items */}
       <List component="nav" sx={{ paddingTop: { xs: 0, sm: alertVisible ? 0 : "" }, flexGrow: 1, overflowY: "auto" }}>
@@ -208,11 +208,6 @@ const NavList = (props) => {
           <ListItemText primary={t("nav_button_subscribe")} />
         </ListItemButton>
       </List>
-      {showUpgradeBanner && (
-        // The text background gradient didn't seem to do well with switching between light/dark mode,
-        // So adding a `key` forces React to replace the entire component when the theme changes
-        <UpgradeBanner key={`upgrade-banner-${theme.palette.mode}`} mode={theme.palette.mode} />
-      )}
       <SubscribeDialog
         key={`subscribeDialog${subscribeDialogKey}`} // Resets dialog when canceled/closed
         open={subscribeDialogOpen}
@@ -220,7 +215,61 @@ const NavList = (props) => {
         onCancel={handleSubscribeReset}
         onSuccess={handleSubscribeSubmit}
       />
-    </>
+      {showUpgradeBanner && (
+        // The text background gradient didn't seem to do well with switching between light/dark mode,
+        // So adding a `key` forces React to replace the entire component when the theme changes
+        <UpgradeBanner key={`upgrade-banner-${theme.palette.mode}`} mode={theme.palette.mode} />
+      )}
+
+      {(config.legal_name || config.legal_email || config.legal_notice_url || config.privacy_policy_url) && (
+        <Box sx={{ mt: "auto", p: 2, borderTop: "1px solid rgba(128,128,128,0.3)" }}>
+          {(config.legal_name || config.legal_email) && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
+                {t("prefs_legal_contact_title")}
+              </Typography>
+
+              {config.legal_name && (
+                <Typography variant="caption" sx={{ display: "block" }}>
+                  <strong>{t("prefs_legal_name")}:</strong> {config.legal_name}
+                </Typography>
+              )}
+
+              {config.legal_email && (
+                <Typography variant="caption" sx={{ display: "block" }}>
+                  <strong>{t("prefs_legal_email")}:</strong>{" "}
+                  <a href={`mailto:${config.legal_email}`} style={{ color: "#90caf9", textDecoration: "underline" }}>
+                    {config.legal_email}
+                  </a>
+                </Typography>
+              )}
+            </Box>
+          )}
+
+          {config.legal_notice_url && (
+            <Typography variant="caption" sx={{ display: "block" }}>
+              <a
+                href={config.legal_notice_url.startsWith("http") ? config.legal_notice_url : `https://${config.legal_notice_url}`}
+                style={{ color: "#90caf9", textDecoration: "underline" }}
+                target="_blank" rel="noopener noreferrer">
+                {t("prefs_legal_notice")}
+              </a>
+            </Typography>
+          )}
+
+          {config.privacy_policy_url && (
+            <Typography variant="caption" sx={{ display: "block" }}>
+              <a
+                href={config.privacy_policy_url.startsWith("http") ? config.privacy_policy_url : `https://${config.privacy_policy_url}`}
+                style={{ color: "#90caf9", textDecoration: "underline" }}
+                target="_blank" rel="noopener noreferrer">
+                {t("prefs_privacy_policy")}
+              </a>
+            </Typography>
+          )}
+        </Box>
+      )}
+    </Box>
   );
 };
 

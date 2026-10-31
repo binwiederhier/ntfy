@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "已啟用",
     "account_usage_emails_none": "此帳號無法傳送電子郵件通知",
     "prefs_users_dialog_base_url_invalid": "URL 格式無效。必須以 http:// 或 https:// 開頭",
-    "prefs_users_dialog_base_url_exists": "此服務 URL 的使用者已存在"
+    "prefs_users_dialog_base_url_exists": "此服務 URL 的使用者已存在",
+    "prefs_legal_contact_title": "聯絡方式：",
+    "prefs_legal_name": "名稱",
+    "prefs_legal_email": "電子郵件",
+    "prefs_legal_notice": "法律聲明",
+    "prefs_privacy_policy": "隱私權政策"
 }

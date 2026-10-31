@@ -465,5 +465,10 @@
     "account_usage_emails_none": "Za pomocą tego konta nie można wysyłać powiadomień e-mail",
     "account_tokens_table_cannot_delete_or_edit_provisioned_token": "Nie można edytować ani usunąć dostarczonego tokenu",
     "prefs_users_dialog_base_url_invalid": "Nieprawidłowy format adresu URL. Musi zaczynać się od http:// lub https://",
-    "prefs_users_dialog_base_url_exists": "Użytkownik tego adresu URL usługi już istnieje"
+    "prefs_users_dialog_base_url_exists": "Użytkownik tego adresu URL usługi już istnieje",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Nazwa",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Nota prawna",
+    "prefs_privacy_policy": "Polityka prywatności"
 }

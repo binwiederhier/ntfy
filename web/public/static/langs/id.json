@@ -460,5 +460,10 @@
     "account_basics_tier_provisioned": "Telah disediakan",
     "account_usage_emails_none": "Tidak ada pemberitahuan email yang dapat dikirim melalui akun ini",
     "prefs_users_dialog_base_url_invalid": "Format URL tidak sah. Harus diawali dengan http:// atau https://",
-    "prefs_users_dialog_base_url_exists": "Pengguna dengan URL layanan ini sudah ada"
+    "prefs_users_dialog_base_url_exists": "Pengguna dengan URL layanan ini sudah ada",
+    "prefs_legal_contact_title": "Kontak:",
+    "prefs_legal_name": "Nama",
+    "prefs_legal_email": "Email",
+    "prefs_legal_notice": "Pemberitahuan Hukum",
+    "prefs_privacy_policy": "Kebijakan Privasi"
 }

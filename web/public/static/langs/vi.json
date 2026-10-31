@@ -457,5 +457,10 @@
     "account_basics_tier_provisioned": "Provisioned",
     "account_usage_emails_none": "Không Email thông báo can be sent with this tài khoản",
     "prefs_users_dialog_base_url_invalid": "Invalid URL format. Must start with http:// or https://",
-    "prefs_users_dialog_base_url_exists": "A người dùng for this dịch vụ URL already exists"
+    "prefs_users_dialog_base_url_exists": "A người dùng for this dịch vụ URL already exists",
+    "prefs_legal_contact_title": "Liên hệ:",
+    "prefs_legal_name": "Tên",
+    "prefs_legal_email": "Email",
+    "prefs_legal_notice": "Thông báo pháp lý",
+    "prefs_privacy_policy": "Chính sách quyền riêng tư"
 }

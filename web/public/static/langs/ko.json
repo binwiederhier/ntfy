@@ -263,5 +263,10 @@
     "publish_dialog_call_reset": "전화 통화 제거",
     "publish_dialog_chip_call_label": "전화 통화",
     "publish_dialog_chip_call_no_verified_numbers_tooltip": "인증된 전화번호 없음",
-    "publish_dialog_checkbox_markdown": "마크다운으로 작성"
+    "publish_dialog_checkbox_markdown": "마크다운으로 작성",
+    "prefs_legal_contact_title": "연락처:",
+    "prefs_legal_name": "이름",
+    "prefs_legal_email": "이메일",
+    "prefs_legal_notice": "법적 고지",
+    "prefs_privacy_policy": "개인정보 처리방침"
 }

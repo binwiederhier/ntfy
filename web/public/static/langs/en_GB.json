@@ -2,5 +2,10 @@
     "common_cancel": "Cancel",
     "common_save": "Save",
     "common_add": "Add",
-    "common_back": "Back"
+    "common_back": "Back",
+    "prefs_legal_contact_title": "Contact:",
+    "prefs_legal_name": "Name",
+    "prefs_legal_email": "Email",
+    "prefs_legal_notice": "Legal Notice",
+    "prefs_privacy_policy": "Privacy Policy"
 }

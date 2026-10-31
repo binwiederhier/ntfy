@@ -1,5 +1,10 @@
 {
     "common_cancel": "Nuligi",
     "common_save": "Konservi",
-    "common_add": "Aldoni"
+    "common_add": "Aldoni",
+    "prefs_legal_contact_title": "Kontakto:",
+    "prefs_legal_name": "Nomo",
+    "prefs_legal_email": "Retpoŝto",
+    "prefs_legal_notice": "Jura avizo",
+    "prefs_privacy_policy": "Privateca politiko"
 }

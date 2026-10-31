@@ -2296,12 +2296,15 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working as before (see [admin socket](config.md#admin-socket))
 * Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
 * Export `ntfy_db_up` (1 if the last health check of a PostgreSQL pool's database succeeded, per pool) and health-check the primary like the replicas, to alert on a server that is cut off from its database (see [PostgreSQL](config.md#postgresql))
+* With `visitor-subscriber-rate-limiting`, the subscriber of a UnifiedPush topic (who pays for its pushes) is kept in the user database and shared by all servers, so a push to any server is billed to the subscriber instead of answered with 507 (see [subscriber-based rate limiting](config.md#subscriber-based-rate-limiting))
 
 **Behavior changes:**
 
 * Daily limits now reset on a rolling 24-hour period per account or IP address instead of for everyone at midnight UTC: each visitor's period starts at its own time of day, which spreads the resets over the day. The account page and the `/v1/account` API (`stats.reset_at`) show when the visitor's counts reset
 * Visitors without a tier have a daily e-mail limit again (24h / `visitor-email-limit-replenish`), now that it is shared between servers and survives restarts
 * The daily reset job is gone; the `stats_*` columns of the user table are zeroed by the upgrade and no longer read or written
+* With `visitor-subscriber-rate-limiting`, a UnifiedPush push to a topic that has had no subscriber (subscribe, poll or open stream) for 7 days is answered with `404` (error code 40402) instead of `507`, so app servers like Mastodon remove the expired subscription ([#664](https://github.com/binwiederhier/ntfy/issues/664)); a Matrix push to such a topic gets its pushkey rejected
+* With `visitor-subscriber-rate-limiting`, a deleted user no longer pays for the pushes to its UnifiedPush topics, and a tier change applies to them within a minute
 
 **Bug fixes + maintenance:**
 

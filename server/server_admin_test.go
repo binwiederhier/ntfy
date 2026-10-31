@@ -1483,9 +1483,8 @@ func TestAdminSocket_InsecureDirectoryWarning(t *testing.T) {
 		conf := newTestConfigWithAuthFile(t, "")
 		conf.ListenAdminUnix = filepath.Join(dir, "admin.sock")
 		s := newTestServer(t, conf)
-		output := captureLog(t, func() {
-			runTestServer(t, s)
-			waitFor(t, func() bool { return adminSocketListening(s) }) // Warned before it listens
+		output := captureLogUntil(t, "Admin socket listening", func() {
+			runTestServer(t, s) // The warning comes before it listens
 		})
 		if tt.warn {
 			require.Contains(t, output, "Admin socket directory "+dir+" is writable by all users", tt.mode)

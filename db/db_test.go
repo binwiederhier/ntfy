@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
@@ -73,4 +74,22 @@ func TestDB_Stats(t *testing.T) {
 	require.Equal(t, "replica:5432", stats[1].Addr)
 	require.Equal(t, 3, stats[1].Stats.MaxOpenConnections)
 	require.Equal(t, 0, stats[1].Stats.InUse)
+}
+
+func TestDB_HealthCheck(t *testing.T) {
+	// The primary is checked like the replicas, so a node cut off from it shows as unhealthy
+	// (ntfy_db_up), and healthy again once it is back
+	path := filepath.Join(t.TempDir(), "primary.db")
+	primary, err := sql.Open("sqlite3", path)
+	require.Nil(t, err)
+	d := db.New(&db.Host{
+		Addr: "primary:5432",
+		DB:   primary,
+	}, nil)
+	defer d.Close()
+	require.True(t, d.Stats()[0].Healthy) // Just opened: healthy until a check says otherwise
+	require.Nil(t, primary.Close())
+	require.Eventually(t, func() bool {
+		return !d.Stats()[0].Healthy
+	}, 15*time.Second, 50*time.Millisecond)
 }

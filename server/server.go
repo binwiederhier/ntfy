@@ -383,13 +383,14 @@ func New(conf *Config) (*Server, error) {
 	return s, nil
 }
 
-// dbPoolStats reports the database connection pools for the ntfy_db_pool_* metrics
+// dbPoolStats reports the database connection pools for the ntfy_db_* metrics
 func (s *Server) dbPoolStats() []*metrics.DBPool {
 	pools := make([]*metrics.DBPool, 0)
 	for _, p := range s.db.Stats() {
 		pools = append(pools, &metrics.DBPool{
 			Role:  p.Role,
 			Addr:  p.Addr,
+			Up:    p.Healthy,
 			Stats: p.Stats,
 		})
 	}

@@ -15,6 +15,9 @@
 // current rows. Store failures never reach the request path: counts stay unflushed and are
 // written once the store is back (fail open, per-node limits meanwhile).
 //
+// The service also keeps the payers of the UnifiedPush topics (see SetPayer), synced through the
+// topic_payer table by the same worker, so a push on any node is billed to the topic's subscriber.
+//
 // Periods, updated_at and the read-back watermark use the node's clock, so the nodes must
 // keep their clocks in sync (NTP); a skew below a second or so is harmless, a skew beyond
 // readOverlap may skip rows in the read-back. The database's clock is never used.
@@ -64,6 +67,7 @@ type Service struct {
 	now       func() time.Time          // Injectable clock, for tests
 	counters  [shardCount]*counterShard // Daily counts, kept until their period ends
 	buckets   [shardCount]*bucketShard  // Token buckets, per node, evicted when idle and full
+	payers    *payerTable               // Payers of the UnifiedPush topics, kept for payerPruneAfter
 	store     *Store                    // Nil: memory only
 	watermark int64                     // Time of the last read, unix seconds; the sync worker's only
 	prunedAt  int64                     // Time of the last prune, unix seconds; the sync worker's only
@@ -85,6 +89,9 @@ func newService(conf *Config, now func() time.Time) *Service {
 		now:      now,
 		store:    conf.Store,
 		interval: syncInterval,
+		payers: &payerTable{
+			entries: make(map[string]*payerEntry),
+		},
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	for i := 0; i < shardCount; i++ {
@@ -165,6 +172,7 @@ func (s *Service) Close() {
 		ctx, cancel := context.WithTimeout(context.Background(), statementTimeout)
 		defer cancel()
 		s.write(ctx)
+		s.writePayers(ctx)
 	})
 }
 
@@ -263,6 +271,7 @@ func (s *Service) Prune(idle time.Duration) int {
 		}
 		cs.mu.Unlock()
 	}
+	s.prunePayers(now)
 	return pruned
 }
 
@@ -344,24 +353,38 @@ func (s *Service) load() bool {
 		log.Tag(tag).Err(err).Warn("Cannot load usage; retrying in %v", s.interval)
 		return false
 	}
+	payers, err := s.readPayers(ctx, now-int64(payerPruneAfter/time.Second))
+	if err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot load payers; retrying in %v", s.interval)
+		return false
+	}
 	s.watermark, s.prunedAt = now, now
-	log.Tag(tag).Info("Loaded usage of %d key(s) in %v", n, time.Since(started).Round(time.Millisecond))
+	log.Tag(tag).Info("Loaded usage of %d key(s) and %d payer(s) in %v", n, payers, time.Since(started).Round(time.Millisecond))
 	return true
 }
 
-// sync is one round of the sync worker: write the unflushed counts of the promoted keys, read
-// back the rows changed since the last round, and prune once in a while. Every error is logged
-// and leaves the state as it was, for the next round.
+// sync is one round of the sync worker: write the unflushed counts of the promoted keys and the
+// changed payers, read back the rows changed since the last round, and prune once in a while.
+// Every error is logged and leaves the state as it was, for the next round.
 func (s *Service) sync() {
 	now := s.now().Unix()
 	ctx, cancel := context.WithTimeout(s.ctx, statementTimeout)
 	s.write(ctx)
 	cancel()
 	ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
-	_, err := s.read(ctx, s.watermark-int64(readOverlap/time.Second))
+	s.writePayers(ctx)
 	cancel()
+	since := s.watermark - int64(readOverlap/time.Second)
+	ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
+	_, err := s.read(ctx, since)
+	cancel()
+	if err == nil {
+		ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
+		_, err = s.readPayers(ctx, since)
+		cancel()
+	}
 	if err != nil {
-		log.Tag(tag).Err(err).Warn("Cannot read usage; counts of other nodes are stale until the next round")
+		log.Tag(tag).Err(err).Warn("Cannot read usage or payers; those of other nodes are stale until the next round")
 	} else {
 		s.watermark = now
 	}
@@ -374,6 +397,14 @@ func (s *Service) sync() {
 			log.Tag(tag).Err(err).Warn("Cannot prune usage")
 		} else {
 			log.Tag(tag).Debug("Pruned %d usage row(s)", deleted)
+		}
+		ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
+		deleted, err = s.store.prunePayers(ctx, now-int64(payerPruneAfter/time.Second))
+		cancel()
+		if err != nil {
+			log.Tag(tag).Err(err).Warn("Cannot prune payers")
+		} else {
+			log.Tag(tag).Debug("Pruned %d payer row(s)", deleted)
 		}
 	}
 }

@@ -53,6 +53,14 @@ type Usage struct {
 	counts [numKinds]int64
 }
 
+// Payer is who pays for the pushes to a UnifiedPush topic (its subscriber), and when the topic last
+// had subscriber activity (see Service.SetPayer)
+type Payer struct {
+	Key    string    // The subscriber's limiter key; empty for a topic with subscriber activity or a refused push, but no payer
+	UserID string    // The subscriber's user ID, empty if anonymous
+	SeenAt time.Time // Last subscribe, poll or open stream, or the refused push that made the topic known; node clock
+}
+
 // Config configures the service
 type Config struct {
 	Store *Store // Where the daily counts are shared and kept across restarts; nil for memory only
@@ -84,6 +92,29 @@ type bucketEntry struct {
 // bucketShard is one independently locked part of the token buckets
 type bucketShard struct {
 	entries map[string]*bucketEntry
+	mu      sync.Mutex // Protects entries and everything inside them
+}
+
+// payerWrite is what a payer entry still has to write to the store; a set outranks a touch
+type payerWrite uint8
+
+const (
+	payerWriteNone  payerWrite = iota
+	payerWriteTouch            // Only seen_at: keep the stored payer (TouchPayer, NoteTopic)
+	payerWriteSet              // Payer and seen_at (SetPayer)
+)
+
+// payerEntry is one topic's payer, as last set here or read from the store
+type payerEntry struct {
+	key    string
+	userID string
+	seenAt int64      // Unix seconds
+	write  payerWrite // Unwritten change; the read-back leaves an entry with one alone
+}
+
+// payerTable is the payers of the UnifiedPush topics, by topic
+type payerTable struct {
+	entries map[string]*payerEntry
 	mu      sync.Mutex // Protects entries and everything inside them
 }
 

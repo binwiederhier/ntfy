@@ -32,7 +32,8 @@ const (
 
 // PoolStats is one connection pool's statistics: the primary's or a replica's
 type PoolStats struct {
-	Role  string // PoolRolePrimary or PoolRoleReplica
-	Addr  string // "host:port"
-	Stats sql.DBStats
+	Role    string // PoolRolePrimary or PoolRoleReplica
+	Addr    string // "host:port"
+	Healthy bool   // The last health check (a ping) succeeded
+	Stats   sql.DBStats
 }

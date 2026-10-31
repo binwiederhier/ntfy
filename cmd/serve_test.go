@@ -491,6 +491,23 @@ func TestCLI_Serve_Unix_Curl(t *testing.T) {
 	require.Equal(t, "this is a message", m.Message)
 }
 
+func TestCLI_Serve_ListenAdminUnixDisabled(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir) // A relative "-" socket would land here
+	sockFile := filepath.Join(dir, "ntfy.sock")
+	configFile := newEmptyFile(t)
+	go func() {
+		app, _, _, _ := newTestApp()
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile, "--auth-file=" + filepath.Join(dir, "user.db"), "--listen-admin-unix=-"})
+		require.Nil(t, err)
+	}()
+	for i := 0; i < 40 && !util.FileExists(sockFile); i++ {
+		time.Sleep(50 * time.Millisecond)
+	}
+	require.True(t, util.FileExists(sockFile))
+	require.False(t, util.FileExists(filepath.Join(dir, "-")))
+}
+
 func TestCLI_Serve_WebSocket(t *testing.T) {
 	port := 10000 + rand.Intn(20000)
 	go func() {
@@ -689,6 +706,19 @@ func TestCLI_Serve_AttachmentExpiryLongerThanCacheDurationWarning(t *testing.T) 
 	runServe("--cache-duration=12h", "--attachment-expiry-duration=3h")
 	runServe("--cache-duration=0", "--attachment-expiry-duration=24h")
 	require.NotContains(t, buf.String(), "attachment-expiry-duration")
+}
+
+func TestCLI_Serve_ValidationAfterBaseURLAndMessageSizeLimit(t *testing.T) {
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
+	// A valid base-url used to end the checks, so the ones after it never ran; an invalid
+	// auth-default-access fails right after the checks, so the server never starts
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--auth-default-access=invalid", "--base-url=https://ntfy.example.com", "--upstream-base-url=https://ntfy.example.com"})
+	require.ErrorContains(t, err, "base-url and upstream-base-url cannot be identical")
+	// The same for a message-size-limit above 4K
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--auth-default-access=invalid", "--message-size-limit=8k", "--visitor-prefix-bits-ipv4=0"})
+	require.ErrorContains(t, err, "visitor-prefix-bits-ipv4 must be between 1 and 32")
 }
 
 func newEmptyFile(t *testing.T) string {

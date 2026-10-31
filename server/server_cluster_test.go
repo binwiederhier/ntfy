@@ -237,6 +237,27 @@ func TestServer_Cluster_Role(t *testing.T) {
 	require.Equal(t, cluster.RolePassive, members[0].Role)
 }
 
+func TestServer_Cluster_StopClosesCluster(t *testing.T) {
+	// Stopping the server must stop the cluster: it deregisters the node, so a node starting
+	// after it no longer sees it, and its heartbeat does not outlive the server's database
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = "127.0.0.1:1" // Enables clustering; not bound since Run() is not called
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		return newTestServer(t, conf)
+	}
+	sA := newNode("node-a")
+	require.Len(t, sA.cluster.Members(), 1)
+	sA.Stop()
+	sB := newNode("node-b")
+	members := sB.cluster.Members()
+	require.Len(t, members, 1)
+	require.Equal(t, cluster.NodeID("node-b"), members[0].NodeID)
+}
+
 func TestServer_Cluster_ActiveWithPassivePeer(t *testing.T) {
 	// The setup for trying clustering beside production: the production server is the only
 	// active node, a second one runs passive. The active one leads right away, both deliver

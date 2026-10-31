@@ -36,6 +36,7 @@ var expectedMetricNames = []string{
 	"ntfy_db_pool_connections_open",
 	"ntfy_db_pool_wait_seconds_total",
 	"ntfy_db_pool_waits_total",
+	"ntfy_db_up",
 	"ntfy_emails_received_failure",
 	"ntfy_emails_received_success",
 	"ntfy_emails_sent_failure",
@@ -101,6 +102,7 @@ func TestDBPoolMetrics(t *testing.T) {
 			{
 				Role: db.PoolRolePrimary,
 				Addr: "db:5432",
+				Up:   true,
 				Stats: sql.DBStats{
 					MaxOpenConnections: 30,
 					OpenConnections:    12,
@@ -140,9 +142,13 @@ ntfy_db_pool_wait_seconds_total{host="replica:5432",role="%[2]s"} 0
 # TYPE ntfy_db_pool_waits_total counter
 ntfy_db_pool_waits_total{host="db:5432",role="%[1]s"} 3
 ntfy_db_pool_waits_total{host="replica:5432",role="%[2]s"} 0
+# HELP ntfy_db_up 1 if the last health check of the pool's database (a ping every 30s) succeeded, 0 if not, per pool
+# TYPE ntfy_db_up gauge
+ntfy_db_up{host="db:5432",role="%[1]s"} 1
+ntfy_db_up{host="replica:5432",role="%[2]s"} 0
 `, db.PoolRolePrimary, db.PoolRoleReplica)
 	require.Nil(t, testutil.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expected),
-		"ntfy_db_pool_connections_in_use", "ntfy_db_pool_connections_max", "ntfy_db_pool_waits_total", "ntfy_db_pool_wait_seconds_total"))
+		"ntfy_db_pool_connections_in_use", "ntfy_db_pool_connections_max", "ntfy_db_pool_waits_total", "ntfy_db_pool_wait_seconds_total", "ntfy_db_up"))
 	open, err := testutil.GatherAndCount(prometheus.DefaultGatherer, "ntfy_db_pool_connections_open", "ntfy_db_pool_connections_idle")
 	require.Nil(t, err)
 	require.Equal(t, 4, open)

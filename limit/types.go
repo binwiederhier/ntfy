@@ -53,14 +53,6 @@ type Usage struct {
 	counts [numKinds]int64
 }
 
-// RateVisitor is who pays for the pushes to a UnifiedPush topic (its subscriber), and when the topic last
-// had subscriber activity (see Service.SetRateVisitor)
-type RateVisitor struct {
-	Key    string    // The subscriber's limiter key; empty for a topic with subscriber activity or a refused push, but no rate visitor
-	UserID string    // The subscriber's user ID, empty if anonymous
-	SeenAt time.Time // Last subscribe, poll or open stream, or the refused push that made the topic known; node clock
-}
-
 // Config configures the service
 type Config struct {
 	Store *Store // Where the daily counts are shared and kept across restarts; nil for memory only
@@ -92,29 +84,6 @@ type bucketEntry struct {
 // bucketShard is one independently locked part of the token buckets
 type bucketShard struct {
 	entries map[string]*bucketEntry
-	mu      sync.Mutex // Protects entries and everything inside them
-}
-
-// rateVisitorWrite is what a rate visitor entry still has to write to the store; a set outranks a touch
-type rateVisitorWrite uint8
-
-const (
-	rateVisitorWriteNone  rateVisitorWrite = iota
-	rateVisitorWriteTouch                  // Only seen_at: keep the stored rate visitor (TouchRateVisitor, NoteTopic)
-	rateVisitorWriteSet                    // RateVisitor and seen_at (SetRateVisitor)
-)
-
-// rateVisitorEntry is one topic's rate visitor, as last set here or read from the store
-type rateVisitorEntry struct {
-	key    string
-	userID string
-	seenAt int64            // Unix seconds
-	write  rateVisitorWrite // Unwritten change; the read-back leaves an entry with one alone
-}
-
-// rateVisitorTable is the rate visitors of the UnifiedPush topics, by topic
-type rateVisitorTable struct {
-	entries map[string]*rateVisitorEntry
 	mu      sync.Mutex // Protects entries and everything inside them
 }
 

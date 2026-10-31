@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -213,84 +212,4 @@ func keysOf(rows map[string]usageRow) []string {
 	}
 	slices.Sort(keys)
 	return keys
-}
-
-func TestStore_WriteRateVisitors_SetReplacesTouchKeeps(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
-		s := newStore()
-		write := func(topic, key string, seenAt, now int64) {
-			require.Nil(t, s.writeRateVisitors(context.Background(), []rateVisitorRow{newRateVisitorRow(topic, key, seenAt)}, now))
-		}
-		write("up1", "ip:1.2.3.4", 100, 101)
-		write("up1", "", 200, 201) // A touch keeps the rate visitor
-		require.Equal(t, newRateVisitorRow("up1", "ip:1.2.3.4", 200), readAllRateVisitors(t, s, 0)["up1"])
-		write("up1", "", 150, 202) // An older touch does not move seen_at back
-		require.Equal(t, newRateVisitorRow("up1", "ip:1.2.3.4", 200), readAllRateVisitors(t, s, 0)["up1"])
-		write("up1", "user:u_1", 50, 203) // A set replaces both
-		require.Equal(t, newRateVisitorRow("up1", "user:u_1", 50), readAllRateVisitors(t, s, 0)["up1"])
-		write("up2", "", 300, 301) // A touch of an unknown topic: no rate visitor
-		require.Equal(t, newRateVisitorRow("up2", "", 300), readAllRateVisitors(t, s, 0)["up2"])
-
-		// The read-back is by write time
-		require.Equal(t, []string{"up2"}, rateVisitorTopicsOf(readAllRateVisitors(t, s, 301)))
-	})
-}
-
-func TestStore_WriteRateVisitors_Chunked(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
-		s := newStore()
-		rows := make([]rateVisitorRow, 0)
-		for i := 0; i < writeChunkRows+5; i++ {
-			rows = append(rows, newRateVisitorRow(fmt.Sprintf("up%012d", i), "ip:1.2.3.4", 100))
-		}
-		require.Nil(t, s.writeRateVisitors(context.Background(), rows, 100))
-		require.Len(t, readAllRateVisitors(t, s, 0), writeChunkRows+5)
-	})
-}
-
-func TestStore_PruneRateVisitors(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
-		s := newStore()
-		for i := 0; i < 5; i++ {
-			require.Nil(t, s.writeRateVisitors(context.Background(), []rateVisitorRow{newRateVisitorRow(fmt.Sprintf("up%d", i), "", 1)}, int64(100+i)))
-		}
-		deleted, err := s.pruneRateVisitors(context.Background(), 103)
-		require.Nil(t, err)
-		require.Equal(t, int64(3), deleted)
-		require.Equal(t, []string{"up3", "up4"}, rateVisitorTopicsOf(readAllRateVisitors(t, s, 0)))
-	})
-}
-
-// readAllRateVisitors returns the rate visitor rows written at or after since, by topic
-func readAllRateVisitors(t *testing.T, s *Store, since int64) map[string]rateVisitorRow {
-	t.Helper()
-	rows := make(map[string]rateVisitorRow)
-	require.Nil(t, s.readRateVisitorsSince(context.Background(), since, func(r *rateVisitorRow) {
-		rows[r.topic] = *r
-	}))
-	return rows
-}
-
-// rateVisitorTopicsOf returns the map's topics, sorted
-func rateVisitorTopicsOf(rows map[string]rateVisitorRow) []string {
-	topics := make([]string, 0, len(rows))
-	for topic := range rows {
-		topics = append(topics, topic)
-	}
-	slices.Sort(topics)
-	return topics
-}
-
-// newRateVisitorRow returns a rate visitor row; a user key ("user:<id>") has its user ID
-func newRateVisitorRow(topic, key string, seenAt int64) rateVisitorRow {
-	userID, _ := strings.CutPrefix(key, "user:")
-	if userID == key {
-		userID = ""
-	}
-	return rateVisitorRow{
-		topic:  topic,
-		key:    key,
-		userID: userID,
-		seenAt: seenAt,
-	}
 }

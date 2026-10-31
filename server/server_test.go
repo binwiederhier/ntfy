@@ -1966,6 +1966,8 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
 }
 
 func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.T) {
+	// A topic nobody subscribed to is a 507 for however long this node has known it: the pushkey is
+	// only rejected after unifiedPushAbandonedAfter, see TestServer_MatrixGateway_AbandonedTopicRejectsPushKey
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfig(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
@@ -1976,15 +1978,12 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 507, response.Code)
 		require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
-		require.Nil(t, s.limiter.RateVisitor("mytopic"))
+		require.Nil(t, s.topicService.Get("mytopic"))
 
 		// Fake: This topic has been around for 13 hours without a rate visitor
 		s.topics["mytopic"].lastAccess = time.Now().Add(-13 * time.Hour)
-
-		// Same request should now return HTTP 200 with a rejected pushkey
 		response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
-		require.Equal(t, 200, response.Code)
-		require.Equal(t, `{"rejected":["http://127.0.0.1:12345/mytopic?up=1"]}`, strings.TrimSpace(response.Body.String()))
+		require.Equal(t, 507, response.Code)
 
 		// Slightly unrelated: Test that topic is pruned after 16 hours
 		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
@@ -3446,7 +3445,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 
 		// Expire visitor: its subscriber has been gone for a day, and its key is pruned after a day without use
-		ageRateVisitor(s, "upAAAAAAAAAAAA", 25*time.Hour)
+		ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
 		s.limiter.Prune(-time.Hour) // Everything is idle for longer than -1h
 
 		// Publish message again, observe that the rate visitor is not used anymore
@@ -3483,7 +3482,7 @@ func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T
 	require.Equal(t, 200, rr.Code)
 
 	// A day later, the stream is still there and keeps the topic's rate visitor
-	ageRateVisitor(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 }
@@ -3500,10 +3499,10 @@ func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testin
 	require.Equal(t, 200, rr.Code)
 
 	// Polled 23 hours ago; polling again keeps it the rate visitor for another day
-	ageRateVisitor(s, "upAAAAAAAAAAAA", 23*time.Hour)
+	ageTopic(s, "upAAAAAAAAAAAA", 23*time.Hour)
 	rr = request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
-	require.WithinDuration(t, time.Now(), s.limiter.RateVisitor("upAAAAAAAAAAAA").SeenAt, time.Minute)
+	require.WithinDuration(t, time.Now(), s.topicService.Get("upAAAAAAAAAAAA").SubscribedAt, time.Minute)
 }
 
 func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testing.T) {
@@ -3543,7 +3542,7 @@ func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testi
 	<-doneB
 
 	// A day later, stream A is still there
-	ageRateVisitor(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 }
@@ -3572,7 +3571,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsPollerAsRateVisitor(t *tes
 	require.Equal(t, 200, rr.Code)
 
 	// A day later, only the stream is still there; the publish is billed to the poller's key
-	ageRateVisitor(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
@@ -3611,9 +3610,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	rateVisitor, err := s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"))
-	require.Nil(t, err)
-	require.True(t, rateVisitor.MessageAllowed())
+	require.True(t, s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA")).MessageAllowed())
 	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionRead))
 
 	// Bob takes the topic with a poll, and is gone a day later
@@ -3621,7 +3618,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 		r.RemoteAddr = "2.2.2.2:1234"
 	})
 	require.Equal(t, 200, response.Code)
-	ageRateVisitor(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
 
 	// Alice's open stream keeps the topic alive, but it is still billed to Bob
 	response = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", bobHeaders, func(r *http.Request) {
@@ -3649,7 +3646,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalive
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	ageRateVisitor(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
@@ -3675,14 +3672,14 @@ func TestServer_SubscriberRateLimiting_ClosedStreamIsLastSeen(t *testing.T) {
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	ageRateVisitor(s, "upAAAAAAAAAAAA", 25*time.Hour) // Subscribed more than a day ago
+	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour) // Subscribed more than a day ago
 	cancel()
 	<-done
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 
 	// A day after the stream closed, the subscriber is gone
-	ageRateVisitor(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
 	response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 507, response.Code)
 }

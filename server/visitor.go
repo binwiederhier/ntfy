@@ -17,9 +17,8 @@ const (
 	oneDay = 24 * time.Hour
 
 	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
-	// forgotten (see Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber is
-	// gone (see Server.rateVisitor). This number has to be very high to prevent e-mail abuse, but it
-	// doesn't really affect the other limits anyway, since they are replenished faster (typically).
+	// forgotten (see Server.pruneVisitors). This number has to be very high to prevent e-mail abuse,
+	// but it doesn't really affect the other limits anyway, since they are replenished faster (typically).
 	visitorExpungeAfter = oneDay
 
 	// promoteRate is the divisor of the daily message cap (cap / promoteRate, i.e. 10%) from which
@@ -93,35 +92,21 @@ func newVisitorEnv(conf *Config, limiter *limit.Service, messageCache *message.C
 }
 
 func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
-	v := newVisitorWithKey(env, vis.Key(ip, u, env.limitsConfig), u)
-	v.ip = ip
-	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is
-	return v
-}
-
-// newRateVisitor returns the visitor of a UnifiedPush topic's rate visitor (see Server.rateVisitor):
-// the subscriber's key, with its user's current limits. A user with a tier now is keyed by the
-// user, as vis.Key would, even if it had none when it subscribed. Its IP is unknown.
-func newRateVisitor(env *visitorEnv, key string, u *user.User) *visitor {
-	if u != nil && u.Tier != nil {
-		key = vis.Key(netip.Addr{}, u, env.limitsConfig)
-	}
-	return newVisitorWithKey(env, key, u)
-}
-
-// newVisitorWithKey returns a visitor with the given key, and the limits of the user's tier, or
-// the config's without one
-func newVisitorWithKey(env *visitorEnv, key string, u *user.User) *visitor {
 	limits := env.ipLimits
+	var tier *user.Tier
 	if u != nil && u.Tier != nil {
-		limits = vis.LimitsFor(env.limitsConfig, u.Tier) // Resolved per request: the tier's fields may change at any time
+		tier = u.Tier
+		limits = vis.LimitsFor(env.limitsConfig, tier) // Resolved per request: the tier's fields may change at any time
 	}
-	return &visitor{
+	v := &visitor{
 		env:    env,
-		key:    key,
+		key:    vis.Key(ip, u, env.limitsConfig),
+		ip:     ip,
 		user:   u,
 		limits: limits,
 	}
+	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is
+	return v
 }
 
 func (v *visitor) Context() log.Context {

@@ -902,8 +902,8 @@ func TestService_Persist_LeftoverAfterRollover(t *testing.T) {
 		}, usageRowOf(t, store, "a"))
 		require.Equal(t, int64(2), s.Usage("a").Count(KindMessages))
 
-		// Another node rolled first: a leftover of the old period lands in the new one, and the
-		// row keeps the new period
+		// Another node rolled first: a leftover of the old period is dropped, and the row keeps the
+		// new period and its counts
 		start = periodStart("b", time.Unix(dbNow, 0))
 		require.True(t, s.Allow("b", rule, 3).OK)
 		_, err = store.write(context.Background(), []usageRow{
@@ -918,7 +918,7 @@ func TestService_Persist_LeftoverAfterRollover(t *testing.T) {
 		require.Equal(t, usageRow{
 			key:         "b",
 			periodStart: start + daySeconds,
-			counts:      [numDaily]int64{7, 0, 0},
+			counts:      [numDaily]int64{4, 0, 0},
 		}, usageRowOf(t, store, "b"))
 	})
 }

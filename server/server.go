@@ -305,12 +305,12 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime}),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager
+	var userDB *db.DB // The shared pool on Postgres, the auth-file on SQLite; also holds the usage table
 	if conf.AuthFile != "" || pool != nil {
 		authConfig := &user.Config{
 			Filename:                  conf.AuthFile,
@@ -329,9 +329,13 @@ func New(conf *Config) (*Server, error) {
 			AccessWrittenFunc:         s.broadcastAccessChanged,
 		}
 		if pool != nil {
-			userManager, err = user.NewPostgresManager(pool, authConfig)
+			userDB = pool
+			userManager, err = user.NewPostgresManager(userDB, authConfig)
 		} else {
-			userManager, err = user.NewSQLiteManager(conf.AuthFile, conf.AuthStartupQueries, authConfig)
+			if userDB, err = user.OpenSQLite(conf.AuthFile); err != nil {
+				return nil, err
+			}
+			userManager, err = user.NewSQLiteManager(userDB, conf.AuthStartupQueries, authConfig)
 		}
 		if err != nil {
 			return nil, err
@@ -352,6 +356,9 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
+	s.limiter = limit.New(&limit.Config{
+		Store: createUsageStore(pool, userDB),
+	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.firebaseClient = firebaseClient
 	if pool != nil {
@@ -380,6 +387,9 @@ func New(conf *Config) (*Server, error) {
 		s.tail = tail
 		go s.runTail()
 	}
+	if err := s.limiter.Start(context.Background()); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -395,6 +405,18 @@ func (s *Server) dbPoolStats() []*metrics.DBPool {
 		})
 	}
 	return pools
+}
+
+// createUsageStore returns the store of the usage table, which is part of the user schema (the
+// user manager creates and migrates it): on the shared pool on Postgres, in the auth-file on
+// SQLite. Without a user database, the daily counts are kept in memory only.
+func createUsageStore(pool, userDB *db.DB) *limit.Store {
+	if pool != nil {
+		return limit.NewPostgresStore(pool)
+	} else if userDB != nil {
+		return limit.NewSQLiteStore(userDB)
+	}
+	return nil
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -561,7 +583,6 @@ func (s *Server) Run() error {
 	}
 	s.mu.Unlock()
 	go s.runManager()
-	go s.runStatsResetter()
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
 
@@ -620,6 +641,7 @@ func (s *Server) stop() {
 	if s.cluster != nil {
 		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
 	}
+	s.limiter.Close() // Writes the unflushed daily counts, before the databases close under it
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -2185,37 +2207,6 @@ func (s *Server) runManager() {
 				Debug("Manager finished")
 		case <-s.closeChan:
 			return
-		}
-	}
-}
-
-// runStatsResetter runs once a day (usually midnight UTC) to reset all the visitor's message and
-// email counters. The stats are used to display the counters in the web app, as well as for rate limiting.
-func (s *Server) runStatsResetter() {
-	for {
-		runAt := util.NextOccurrenceUTC(s.config.VisitorStatsResetTime, time.Now())
-		timer := time.NewTimer(time.Until(runAt))
-		log.Tag(tagResetter).Debug("Waiting until %v to reset visitor stats", runAt)
-		select {
-		case <-timer.C:
-			log.Tag(tagResetter).Debug("Running stats resetter")
-			s.resetStats()
-		case <-s.closeChan:
-			log.Tag(tagResetter).Debug("Stopping stats resetter")
-			timer.Stop()
-			return
-		}
-	}
-}
-
-func (s *Server) resetStats() {
-	log.Info("Resetting all visitor stats (daily task)")
-	s.mu.Lock()
-	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
-	s.limiter.ResetUsage()
-	if s.userManager != nil {
-		if err := s.userManager.ResetStats(); err != nil {
-			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
 		}
 	}
 }

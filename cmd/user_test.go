@@ -170,7 +170,9 @@ func TestCLI_User_ResetPass_ProvisionedRejected(t *testing.T) {
 	defer test.StopServer(t, s, port)
 
 	// Seed a provisioned user into the auth database via config provisioning
-	m, err := user.NewSQLiteManager(conf.AuthFile, "", &user.Config{
+	d, err := user.OpenSQLite(conf.AuthFile)
+	require.Nil(t, err)
+	m, err := user.NewSQLiteManager(d, "", &user.Config{
 		ProvisionEnabled: true,
 		Users: []*user.User{
 			{Name: "provuser", Hash: "$2a$10$YLiO8U21sX1uhZamTLJXHuxgVC0Z/GKISibrKCLohPgtG7yIxSk4C", Role: user.RoleUser},

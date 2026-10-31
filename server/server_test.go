@@ -1204,196 +1204,6 @@ func TestServer_Auth_NonBasicHeader(t *testing.T) {
 	})
 }
 
-func TestServer_StatsResetter(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		t.Parallel()
-		// This tests the stats resetter for
-		// - an anonymous user
-		// - a user without a tier (treated like the same as the anonymous user)
-		// - a user with a tier
-
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.VisitorStatsResetTime = time.Now().Add(2 * time.Second)
-		s := newTestServer(t, c)
-		go s.runStatsResetter()
-
-		// Create user with tier (tieruser) and user without tier (phil)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{
-			Code:                  "test",
-			MessageLimit:          5,
-			MessageExpiryDuration: -5 * time.Second, // Second, what a hack!
-		}))
-		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-		require.Nil(t, s.userManager.AddUser("tieruser", "tieruser", user.RoleUser, false))
-		require.Nil(t, s.userManager.ChangeTier("tieruser", "test"))
-
-		// Send an anonymous message
-		response := request(t, s, "PUT", "/mytopic", "test", nil)
-		require.Equal(t, 200, response.Code)
-
-		// Send messages from user without tier (phil)
-		for i := 0; i < 5; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-		}
-
-		// Send messages from user with tier
-		for i := 0; i < 2; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-				"Authorization": util.BasicAuth("tieruser", "tieruser"),
-			})
-			require.Equal(t, 200, response.Code)
-		}
-
-		// User stats show 6 messages (for user without tier)
-		response = request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("phil", "phil"),
-		})
-		require.Equal(t, 200, response.Code)
-		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(6), account.Stats.Messages)
-
-		// User stats show 6 messages (for anonymous visitor)
-		response = request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(6), account.Stats.Messages)
-
-		// User stats show 2 messages (for user with tier)
-		response = request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("tieruser", "tieruser"),
-		})
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(2), account.Stats.Messages)
-
-		// Wait for stats resetter to run
-		waitFor(t, func() bool {
-			response = request(t, s, "GET", "/v1/account", "", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-			account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-			require.Nil(t, err)
-			return account.Stats.Messages == 0
-		})
-
-		// User stats show 0 messages now!
-		response = request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("phil", "phil"),
-		})
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-
-		// Since this is a user without a tier, the anonymous user should have the same stats
-		response = request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-
-		// User stats show 0 messages (for user with tier)
-		response = request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("tieruser", "tieruser"),
-		})
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-	})
-}
-
-func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		// This tests that the messageLimiter (the only fixed limiter) and the emailsLimiter (token bucket)
-		// is reset by the stats resetter
-
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		s := newTestServer(t, c)
-		s.mailer = &testMailer{}
-
-		// Publish some messages, and check stats
-		for i := 0; i < 3; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", nil)
-			require.Equal(t, 200, response.Code)
-		}
-		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-			"Email": "test@email.com",
-		})
-		require.Equal(t, 200, response.Code)
-
-		rr := request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, rr.Code)
-		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(4), account.Stats.Messages)
-		require.Equal(t, int64(1), account.Stats.Emails)
-		v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-		require.Equal(t, int64(4), v.Stats().Messages)
-		require.Equal(t, int64(1), v.Stats().Emails)
-
-		// Reset stats and check again
-		s.resetStats()
-		rr = request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, rr.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-		require.Equal(t, int64(0), account.Stats.Emails)
-		v = s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-		require.Equal(t, int64(0), v.Stats().Messages)
-		require.Equal(t, int64(0), v.Stats().Emails)
-	})
-}
-
-func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		t.Parallel()
-
-		// This tests that the daily message quota is prefilled originally from the database,
-		// if the visitor is unknown
-
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
-		s := newTestServer(t, c)
-
-		// Create user, and update it with some message and email stats
-		require.Nil(t, s.userManager.AddTier(&user.Tier{
-			Code: "test",
-		}))
-		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
-
-		u, err := s.userManager.User("phil")
-		require.Nil(t, err)
-		s.userManager.EnqueueUserStats(u.ID, &user.Stats{
-			Messages: 123456,
-			Emails:   999,
-		})
-		time.Sleep(400 * time.Millisecond)
-
-		// Get account and verify stats are read from the DB, and that the visitor also has these stats
-		rr := request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("phil", "phil"),
-		})
-		require.Equal(t, 200, rr.Code)
-		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(123456), account.Stats.Messages)
-		require.Equal(t, int64(999), account.Stats.Emails)
-		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		require.Equal(t, int64(123456), v.Stats().Messages)
-		require.Equal(t, int64(999), v.Stats().Emails)
-	})
-}
-
 type testMailer struct {
 	count       int
 	lastTo      string
@@ -3646,7 +3456,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 		require.Equal(t, int64(1), publisher.Stats().Messages)
 		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
-		require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
+		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages) // Daily counts outlive pruning until their period ends
 	})
 }
 
@@ -6235,7 +6045,7 @@ func subscribeStream(t *testing.T, s *Server, topic string, headers map[string]s
 
 // Fails if message/email daily rules are bypassed; account remaining values must match HTTP admissions through reset.
 func TestServer_Account_RemainingMatchesAdmissions(t *testing.T) {
-	// A tier user's account page counts down exactly what is admitted, through the daily reset
+	// A tier user's account page counts down exactly what is admitted
 	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorRequestLimitBurst = 100
 	c.VisitorEmailLimitBurst = 10
@@ -6260,31 +6070,28 @@ func TestServer_Account_RemainingMatchesAdmissions(t *testing.T) {
 		require.NoError(t, err)
 		return account
 	}
-	for day := 0; day < 2; day++ {
-		before := account()
-		require.Equal(t, int64(4), before.Stats.MessagesRemaining)
-		require.Equal(t, int64(2), before.Stats.EmailsRemaining)
-		for i := int64(0); i < before.Stats.EmailsRemaining; i++ {
-			response := request(t, s, "PUT", "/quota", "test", authEmail)
-			require.Equal(t, 200, response.Code)
-			after := account()
-			require.Equal(t, before.Stats.EmailsRemaining-i-1, after.Stats.EmailsRemaining)
-			require.Equal(t, before.Stats.MessagesRemaining-i-1, after.Stats.MessagesRemaining)
-		}
+	before := account()
+	require.Equal(t, int64(4), before.Stats.MessagesRemaining)
+	require.Equal(t, int64(2), before.Stats.EmailsRemaining)
+	for i := int64(0); i < before.Stats.EmailsRemaining; i++ {
 		response := request(t, s, "PUT", "/quota", "test", authEmail)
-		require.Equal(t, 429, response.Code)
-		require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
-		remaining := account().Stats.MessagesRemaining
-		for i := int64(0); i < remaining; i++ {
-			response = request(t, s, "PUT", "/quota", "test", auth)
-			require.Equal(t, 200, response.Code)
-			require.Equal(t, remaining-i-1, account().Stats.MessagesRemaining)
-		}
-		response = request(t, s, "PUT", "/quota", "test", auth)
-		require.Equal(t, 429, response.Code)
-		require.Zero(t, account().Stats.MessagesRemaining)
-		s.resetStats()
+		require.Equal(t, 200, response.Code)
+		after := account()
+		require.Equal(t, before.Stats.EmailsRemaining-i-1, after.Stats.EmailsRemaining)
+		require.Equal(t, before.Stats.MessagesRemaining-i-1, after.Stats.MessagesRemaining)
 	}
+	response := request(t, s, "PUT", "/quota", "test", authEmail)
+	require.Equal(t, 429, response.Code)
+	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
+	remaining := account().Stats.MessagesRemaining
+	for i := int64(0); i < remaining; i++ {
+		response = request(t, s, "PUT", "/quota", "test", auth)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, remaining-i-1, account().Stats.MessagesRemaining)
+	}
+	response = request(t, s, "PUT", "/quota", "test", auth)
+	require.Equal(t, 429, response.Code)
+	require.Zero(t, account().Stats.MessagesRemaining)
 }
 
 func TestServer_SubscriptionLimit_ReleasedWhenStreamCloses(t *testing.T) {
@@ -6316,4 +6123,71 @@ func TestServer_SubscriptionLimit_ReleasedWhenStreamCloses(t *testing.T) {
 	rr = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 200, rr.Code)
 	require.Empty(t, s.visitors.subscriptions.counts)
+}
+
+func TestServer_UsageSurvivesRestart(t *testing.T) {
+	// Daily counts are kept in the usage table of the auth-file: a restart continues where the old
+	// server stopped, except for keys without a user below the threshold (10% of the cap)
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorMessageDailyLimit = 100 // Threshold 10
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 50,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	publish := func(s *Server, n int, headers map[string]string, ip string) {
+		for i := 0; i < n; i++ {
+			response := request(t, s, "PUT", "/mytopic", "test", headers, func(r *http.Request) {
+				r.RemoteAddr = ip + ":1234"
+			})
+			require.Equal(t, 200, response.Code)
+		}
+	}
+	auth := map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	}
+	publish(s, 3, auth, "9.9.9.9")
+	publish(s, 12, nil, "1.1.1.1")
+	publish(s, 5, nil, "2.2.2.2")
+	s.Stop()
+
+	s = newTestServer(t, c)
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, int64(3), s.visitor(netip.MustParseAddr("9.9.9.9"), u).Stats().Messages)
+	require.Equal(t, int64(12), s.visitor(netip.MustParseAddr("1.1.1.1"), nil).Stats().Messages)
+	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("2.2.2.2"), nil).Stats().Messages)
+}
+
+func TestServer_AnonymousEmailDailyCapShared(t *testing.T) {
+	// Anonymous emails have a daily cap (24h / visitor-email-limit-replenish) shared by all nodes
+	// on one usage table, not one per node
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.VisitorEmailLimitBurst = 10
+		c.VisitorEmailLimitReplenish = 24 * time.Hour / 5 // Daily cap 5
+		a := newTestServer(t, c)
+		a.mailer = &testMailer{}
+		bConf := *c
+		bConf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
+		b := newTestServer(t, &bConf)
+		b.mailer = &testMailer{}
+		email := map[string]string{
+			"Email": "test@email.com",
+		}
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, a, "PUT", "/mytopic", "test", email).Code)
+		}
+		waitForWithMaxWait(t, 15*time.Second, func() bool {
+			return b.visitor(netip.MustParseAddr("9.9.9.9"), nil).Stats().Emails == 3
+		})
+		for i := 0; i < 2; i++ {
+			require.Equal(t, 200, request(t, b, "PUT", "/mytopic", "test", email).Code)
+		}
+		response := request(t, b, "PUT", "/mytopic", "test", email)
+		require.Equal(t, 429, response.Code)
+		require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
+	})
 }

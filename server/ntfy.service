@@ -5,6 +5,8 @@ After=network.target
 [Service]
 User=ntfy
 Group=ntfy
+RuntimeDirectory=ntfy
+RuntimeDirectoryMode=0750
 ExecStart=/usr/bin/ntfy serve --no-log-dates
 ExecReload=/bin/kill --signal HUP $MAINPID
 Restart=on-failure

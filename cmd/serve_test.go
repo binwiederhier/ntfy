@@ -491,6 +491,23 @@ func TestCLI_Serve_Unix_Curl(t *testing.T) {
 	require.Equal(t, "this is a message", m.Message)
 }
 
+func TestCLI_Serve_ListenAdminUnixDisabled(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir) // A relative "-" socket would land here
+	sockFile := filepath.Join(dir, "ntfy.sock")
+	configFile := newEmptyFile(t)
+	go func() {
+		app, _, _, _ := newTestApp()
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile, "--auth-file=" + filepath.Join(dir, "user.db"), "--listen-admin-unix=-"})
+		require.Nil(t, err)
+	}()
+	for i := 0; i < 40 && !util.FileExists(sockFile); i++ {
+		time.Sleep(50 * time.Millisecond)
+	}
+	require.True(t, util.FileExists(sockFile))
+	require.False(t, util.FileExists(filepath.Join(dir, "-")))
+}
+
 func TestCLI_Serve_WebSocket(t *testing.T) {
 	port := 10000 + rand.Intn(20000)
 	go func() {

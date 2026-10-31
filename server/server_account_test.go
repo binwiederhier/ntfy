@@ -223,7 +223,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 		require.Equal(t, int64(0), account.Stats.Messages)
 		require.Equal(t, int64(1004), account.Stats.MessagesRemaining)
 		require.Equal(t, int64(0), account.Stats.Emails)
-		require.Equal(t, int64(16), account.Stats.EmailsRemaining) // What the bucket holds now (burst 16), below the day's 24
+		require.Equal(t, int64(24), account.Stats.EmailsRemaining)
 		require.Equal(t, int64(0), account.Stats.Calls)
 		require.Equal(t, int64(0), account.Stats.CallsRemaining)
 
@@ -240,7 +240,7 @@ func TestAccount_Get_Anonymous(t *testing.T) {
 		require.Equal(t, int64(2), account.Stats.Messages)
 		require.Equal(t, int64(1002), account.Stats.MessagesRemaining)
 		require.Equal(t, int64(1), account.Stats.Emails)
-		require.Equal(t, int64(15), account.Stats.EmailsRemaining) // 16 - 1 in the bucket
+		require.Equal(t, int64(23), account.Stats.EmailsRemaining)
 	})
 }
 
@@ -1112,4 +1112,18 @@ func TestAccount_PhoneNumberAdd_WrongCode(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, []string{"+12223334444"}, phoneNumbers)
 	})
+}
+
+func TestServer_AccountStatsResetAt(t *testing.T) {
+	// The account reports when the visitor's daily counts start over: the end of its key's own
+	// 24h period, not midnight UTC
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	response := request(t, s, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, response.Code)
+	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
+	resetAt := s.limiter.ResetAt(s.visitor(netip.MustParseAddr("9.9.9.9"), nil).key)
+	require.Equal(t, resetAt.Unix(), account.Stats.ResetAt)
+	require.Greater(t, account.Stats.ResetAt, time.Now().Unix())
+	require.LessOrEqual(t, account.Stats.ResetAt, time.Now().Add(24*time.Hour).Unix()+1)
 }

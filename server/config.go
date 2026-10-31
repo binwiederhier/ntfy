@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/netip"
 	"reflect"
+	"runtime"
 	"text/template"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 
 // Defines default config settings (excluding limits, see below)
 const (
+	DefaultListenAdminUnixMode                  = fs.FileMode(0660) // Owner (the ntfy user) and the ntfy group; root bypasses anyway
 	DefaultListenHTTP                           = ":80"
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultCacheBatchTimeout                    = time.Duration(0)
@@ -116,9 +118,6 @@ const (
 )
 
 var (
-	// DefaultVisitorStatsResetTime defines the time at which visitor stats are reset (wall clock only)
-	DefaultVisitorStatsResetTime = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-
 	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
 	// extended using the server.yml config. If updated, also update in Android and web app.
 	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "metrics", "account", "settings", "signup", "login", "v1"}
@@ -132,6 +131,7 @@ type Config struct {
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
+	ListenAdminUnix                      string // Path of the local admin socket (CLI access without credentials); empty disables it
 	KeyFile                              string
 	CertFile                             string
 	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
@@ -215,7 +215,6 @@ type Config struct {
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
-	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
@@ -248,6 +247,18 @@ type Config struct {
 	BuildCommit                          string        // Injected by App
 }
 
+// DefaultListenAdminUnix returns the default admin socket path. On Windows there is none: unix socket
+// file permissions do not protect it there, so the CLI uses the database or --server instead.
+func DefaultListenAdminUnix() string {
+	switch runtime.GOOS {
+	case "windows":
+		return ""
+	case "darwin":
+		return "/var/run/ntfy/admin.sock"
+	}
+	return "/run/ntfy/admin.sock"
+}
+
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
@@ -257,6 +268,7 @@ func NewConfig() *Config {
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,
+		ListenAdminUnix:                      DefaultListenAdminUnix(),
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",
@@ -335,7 +347,6 @@ func NewConfig() *Config {
 		VisitorAccountCreationLimitReplenish: DefaultVisitorAccountCreationLimitReplenish,
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
-		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address

@@ -154,9 +154,18 @@ var (
 	errHTTPBadRequestTimezoneInvalid                 = &errHTTP{40059, http.StatusBadRequest, "invalid request: invalid timezone", "https://ntfy.sh/docs/publish/#scheduled-delivery", nil}
 	errHTTPBadRequestPhoneVerificationCodeInvalid    = &errHTTP{40060, http.StatusBadRequest, "invalid request: phone number verification code invalid", "", nil}
 	errHTTPBadRequestTooManyTopics                   = &errHTTP{40061, http.StatusBadRequest, "invalid request: too many topics", "https://ntfy.sh/docs/subscribe/api/#subscribe-to-multiple-topics", nil}
+	errHTTPBadRequestTierCodeInvalid                 = &errHTTP{40062, http.StatusBadRequest, "invalid request: tier code invalid, or tier name missing", "", nil}
+	errHTTPBadRequestTierReservationsLimit           = &errHTTP{40063, http.StatusBadRequest, "invalid request: user has more topic reservations than the tier allows, remove reservations first", "", nil}
+	errHTTPBadRequestAccessAdminUser                 = &errHTTP{40064, http.StatusBadRequest, "invalid request: admins can access all topics, access control entries are not allowed", "", nil}
+	errHTTPBadRequestTokenNotFound                   = &errHTTP{40065, http.StatusBadRequest, "invalid request: token does not exist", "", nil}
+	errHTTPBadRequestRoleInvalid                     = &errHTTP{40066, http.StatusBadRequest, "invalid request: role must be user or admin", "", nil}
+	errHTTPBadRequestUserNoPrimaryEmail              = &errHTTP{40067, http.StatusBadRequest, "invalid request: user has no primary email, cannot send reset link", "", nil}
+	errHTTPBadRequestBaseURLNotConfigured            = &errHTTP{40068, http.StatusBadRequest, "invalid request: base-url must be configured on the server to generate links", "https://ntfy.sh/docs/config/", nil}
+	errHTTPBadRequestPasswordHashInvalid             = &errHTTP{40069, http.StatusBadRequest, "invalid request: password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate", "", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}
+	errHTTPForbiddenAdminSocketOnly                  = &errHTTP{40302, http.StatusForbidden, "forbidden: this operation is only allowed over the local admin socket", "https://ntfy.sh/docs/config/#admin-socket", nil}
 	errHTTPConflictUserExists                        = &errHTTP{40901, http.StatusConflict, "conflict: user already exists", "", nil}
 	errHTTPConflictTopicReserved                     = &errHTTP{40902, http.StatusConflict, "conflict: access control entry for topic or topic pattern already exists", "", nil}
 	errHTTPConflictSubscriptionExists                = &errHTTP{40903, http.StatusConflict, "conflict: topic subscription already exists", "", nil}
@@ -165,6 +174,8 @@ var (
 	errHTTPConflictProvisionedTokenChange            = &errHTTP{40906, http.StatusConflict, "conflict: cannot change or delete provisioned token", "", nil}
 	errHTTPConflictEmailExists                       = &errHTTP{40907, http.StatusConflict, "conflict: email address already exists", "", nil}
 	errHTTPConflictEmailPrimaryElsewhere             = &errHTTP{40908, http.StatusConflict, "conflict: email address is the primary email on another account", "", nil}
+	errHTTPConflictTierExists                        = &errHTTP{40909, http.StatusConflict, "conflict: tier already exists", "", nil}
+	errHTTPConflictTierInUse                         = &errHTTP{40910, http.StatusConflict, "conflict: tier is still assigned to users", "", nil}
 	errHTTPGonePhoneVerificationExpired              = &errHTTP{41001, http.StatusGone, "phone number verification expired or does not exist", "", nil}
 	errHTTPEntityTooLargeAttachment                  = &errHTTP{41301, http.StatusRequestEntityTooLarge, "attachment too large, or bandwidth limit reached", "https://ntfy.sh/docs/publish/#limitations", nil}
 	errHTTPEntityTooLargeMatrixRequest               = &errHTTP{41302, http.StatusRequestEntityTooLarge, "Matrix request is larger than the max allowed length", "", nil}

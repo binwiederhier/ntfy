@@ -60,6 +60,7 @@ type Server struct {
 	httpProfileServer *http.Server
 	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	unixListener      net.Listener
+	adminUnixListener net.Listener // Serves the admin API on the local admin socket, see handleAdminSocket
 	smtpServer        *smtp.Server
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
@@ -126,6 +127,8 @@ var (
 	apiTiersPath                                         = "/v1/tiers"
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
+	apiUsersTokensPath                                   = "/v1/users/tokens"
+	apiUsersPasswordResetPath                            = "/v1/users/password/reset"
 	apiAccountPath                                       = "/v1/account"
 	apiAccountLoginPath                                  = "/v1/account/login"
 	apiAccountTokenPath                                  = "/v1/account/token"
@@ -141,6 +144,7 @@ var (
 	apiAccountEmailResendPath                            = "/v1/account/email/resend"
 	apiAccountPasswordResetRequestPath                   = "/v1/account/password/reset/request"
 	apiAccountPasswordResetPath                          = "/v1/account/password/reset"
+	apiAccountBillingTiersPath                           = "/v1/account/billing/tiers"
 	apiAccountBillingPortalPath                          = "/v1/account/billing/portal"
 	apiAccountBillingWebhookPath                         = "/v1/account/billing/webhook"
 	apiAccountBillingSubscriptionPath                    = "/v1/account/billing/subscription"
@@ -301,12 +305,12 @@ func New(conf *Config) (*Server, error) {
 		messages:        messages,
 		messagesHistory: []int64{messages},
 		messagesFlushed: messages, // The loaded total is already persisted; only new publishes are deltas
-		limiter:         limit.New(&limit.Config{ResetTime: conf.VisitorStatsResetTime}),
 		stripe:          stripe,
 		streams:         newStreamRegistry(),
 	}
 	s.priceCache = util.NewLookupCache(s.fetchStripePrices, conf.StripePriceCacheDuration)
 	var userManager *user.Manager
+	var userDB *db.DB // The shared pool on Postgres, the auth-file on SQLite; also holds the usage table
 	if conf.AuthFile != "" || pool != nil {
 		authConfig := &user.Config{
 			Filename:                  conf.AuthFile,
@@ -325,9 +329,13 @@ func New(conf *Config) (*Server, error) {
 			AccessWrittenFunc:         s.broadcastAccessChanged,
 		}
 		if pool != nil {
-			userManager, err = user.NewPostgresManager(pool, authConfig)
+			userDB = pool
+			userManager, err = user.NewPostgresManager(userDB, authConfig)
 		} else {
-			userManager, err = user.NewSQLiteManager(conf.AuthFile, conf.AuthStartupQueries, authConfig)
+			if userDB, err = user.OpenSQLite(conf.AuthFile); err != nil {
+				return nil, err
+			}
+			userManager, err = user.NewSQLiteManager(userDB, conf.AuthStartupQueries, authConfig)
 		}
 		if err != nil {
 			return nil, err
@@ -348,6 +356,9 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
+	s.limiter = limit.New(&limit.Config{
+		Store: createUsageStore(pool, userDB),
+	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.firebaseClient = firebaseClient
 	if pool != nil {
@@ -376,20 +387,36 @@ func New(conf *Config) (*Server, error) {
 		s.tail = tail
 		go s.runTail()
 	}
+	if err := s.limiter.Start(context.Background()); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
-// dbPoolStats reports the database connection pools for the ntfy_db_pool_* metrics
+// dbPoolStats reports the database connection pools for the ntfy_db_* metrics
 func (s *Server) dbPoolStats() []*metrics.DBPool {
 	pools := make([]*metrics.DBPool, 0)
 	for _, p := range s.db.Stats() {
 		pools = append(pools, &metrics.DBPool{
 			Role:  p.Role,
 			Addr:  p.Addr,
+			Up:    p.Healthy,
 			Stats: p.Stats,
 		})
 	}
 	return pools
+}
+
+// createUsageStore returns the store of the usage table, which is part of the user schema (the
+// user manager creates and migrates it): on the shared pool on Postgres, in the auth-file on
+// SQLite. Without a user database, the daily counts are kept in memory only.
+func createUsageStore(pool, userDB *db.DB) *limit.Store {
+	if pool != nil {
+		return limit.NewPostgresStore(pool)
+	} else if userDB != nil {
+		return limit.NewSQLiteStore(userDB)
+	}
+	return nil
 }
 
 func createMessageCache(conf *Config, pool *db.DB) (*message.Cache, error) {
@@ -429,6 +456,9 @@ func (s *Server) Run() error {
 	}
 	if s.config.ListenUnix != "" {
 		listenStr += fmt.Sprintf(" %s[unix]", s.config.ListenUnix)
+	}
+	if s.config.ListenAdminUnix != "" && s.userManager != nil {
+		listenStr += fmt.Sprintf(" %s[admin]", s.config.ListenAdminUnix)
 	}
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
@@ -497,6 +527,27 @@ func (s *Server) Run() error {
 			errChan <- httpServer.Serve(s.unixListener)
 		}()
 	}
+	if s.config.ListenAdminUnix != "" && s.userManager != nil { // Without auth, there is nothing to administer
+		go func() {
+			var err error
+			s.mu.Lock()
+			if s.stopped.Load() {
+				s.mu.Unlock()
+				return // Nobody would close this listener anymore
+			}
+			s.adminUnixListener, err = s.listenAdminSocket()
+			if err != nil {
+				s.mu.Unlock()
+				// Not fatal, unlike the other listeners: the CLI falls back to writing to the database (deprecated)
+				log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/", s.config.ListenAdminUnix)
+				return
+			}
+			defer s.adminUnixListener.Close()
+			s.mu.Unlock()
+			httpServer := &http.Server{Handler: http.HandlerFunc(s.handleAdminSocket)}
+			errChan <- httpServer.Serve(s.adminUnixListener)
+		}()
+	}
 	if s.config.MetricsListenHTTP != "" {
 		s.httpMetricsServer = &http.Server{Addr: s.config.MetricsListenHTTP, Handler: promhttp.Handler()}
 		go func() {
@@ -532,7 +583,6 @@ func (s *Server) Run() error {
 	}
 	s.mu.Unlock()
 	go s.runManager()
-	go s.runStatsResetter()
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
 
@@ -573,6 +623,9 @@ func (s *Server) stop() {
 	if s.unixListener != nil {
 		s.unixListener.Close()
 	}
+	if s.adminUnixListener != nil {
+		s.adminUnixListener.Close()
+	}
 	if s.smtpServer != nil {
 		s.smtpServer.Close()
 	}
@@ -585,6 +638,10 @@ func (s *Server) stop() {
 	if s.tail != nil {
 		s.tail.Close() // Before the databases close under it
 	}
+	if s.cluster != nil {
+		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
+	}
+	s.limiter.Close() // Writes the unflushed daily counts, before the databases close under it
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -712,6 +769,22 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureAdmin(s.handleAccessAllow)(w, r, v)
 	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersAccessPath {
 		return s.ensureAdmin(s.handleAccessReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensGet)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensAdd)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiUsersTokensPath {
+		return s.ensureAdmin(s.handleUsersTokensDelete)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPasswordResetPath {
+		return s.ensureAdmin(s.handleUsersPasswordReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath && v.User().IsAdmin() {
+		return s.ensureAdmin(s.handleAdminTiersGet)(w, r, v) // Non-admins get the billing tiers, see below
+	} else if r.Method == http.MethodPost && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersAdd)(w, r, v)
+	} else if r.Method == http.MethodPut && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersUpdate)(w, r, v)
+	} else if r.Method == http.MethodDelete && r.URL.Path == apiTiersPath {
+		return s.ensureAdmin(s.handleAdminTiersDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiAccountPath {
 		return s.ensureUserManager(s.handleAccountCreate)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountPath {
@@ -778,8 +851,10 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebPushEnabled(s.limitRequests(s.handleWebPushDelete))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiStatsPath {
 		return s.handleStats(w, r, v)
-	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
+	} else if r.Method == http.MethodGet && r.URL.Path == apiAccountBillingTiersPath {
 		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath {
+		return s.ensurePaymentsEnabled(s.handleBillingTiersGet)(w, r, v) // Non-admins: web apps before v2.36.0, remove after 2026-11-22
 	} else if r.Method == http.MethodGet && r.URL.Path == matrixPushPath {
 		return s.handleMatrixDiscovery(w)
 	} else if r.Method == http.MethodGet && r.URL.Path == metricsPath && s.metricsHandler != nil {
@@ -2132,37 +2207,6 @@ func (s *Server) runManager() {
 				Debug("Manager finished")
 		case <-s.closeChan:
 			return
-		}
-	}
-}
-
-// runStatsResetter runs once a day (usually midnight UTC) to reset all the visitor's message and
-// email counters. The stats are used to display the counters in the web app, as well as for rate limiting.
-func (s *Server) runStatsResetter() {
-	for {
-		runAt := util.NextOccurrenceUTC(s.config.VisitorStatsResetTime, time.Now())
-		timer := time.NewTimer(time.Until(runAt))
-		log.Tag(tagResetter).Debug("Waiting until %v to reset visitor stats", runAt)
-		select {
-		case <-timer.C:
-			log.Tag(tagResetter).Debug("Running stats resetter")
-			s.resetStats()
-		case <-s.closeChan:
-			log.Tag(tagResetter).Debug("Stopping stats resetter")
-			timer.Stop()
-			return
-		}
-	}
-}
-
-func (s *Server) resetStats() {
-	log.Info("Resetting all visitor stats (daily task)")
-	s.mu.Lock()
-	defer s.mu.Unlock() // Includes the database query to avoid races with other processes
-	s.limiter.ResetUsage()
-	if s.userManager != nil {
-		if err := s.userManager.ResetStats(); err != nil {
-			log.Tag(tagResetter).Warn("Failed to write to database: %s", err.Error())
 		}
 	}
 }

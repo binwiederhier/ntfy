@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/netip"
-	"sync/atomic"
 	"time"
 
 	"heckel.io/ntfy/v2/limit"
@@ -17,10 +16,17 @@ const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter is how long a topic keeps a rate visitor whose subscriber is gone, and the
-	// backstop for limiter keys that never settle (see limit.Service.Prune): a settled key, whose
-	// buckets are full again and whose capped counts are zero, is forgotten after a minute unused.
+	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
+	// forgotten (see Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber
+	// is gone. This number has to be very high to prevent e-mail abuse, but it doesn't really affect
+	// the other limits anyway, since they are replenished faster (typically).
 	visitorExpungeAfter = oneDay
+
+	// promoteRate is the divisor of the daily message cap (cap / promoteRate, i.e. 10%) from which
+	// the count of a visitor without a user is written to the usage table; below it, a restart
+	// forgets it, and N nodes may admit up to N x (threshold - 1) without a row. A larger
+	// divisor writes more keys.
+	promoteRate = 10
 )
 
 // visitor represents one request's API user: its identity (the IP, or the user) and the limits that
@@ -29,11 +35,10 @@ const (
 // key, so two visitors with the same key share one set of buckets and counts.
 type visitor struct {
 	env    *visitorEnv
-	key    string       // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
-	ip     netip.Addr   // Visitor IP address
-	user   *user.User   // Only set if authenticated user, otherwise nil
-	limits *vis.Limits  // Resolved from the config or the user's tier
-	seen   atomic.Int64 // Unix nanos of the last keepalive: the liveness of a subscriber kept as a topic's rate visitor (see Stale)
+	key    string      // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
+	ip     netip.Addr  // Visitor IP address
+	user   *user.User  // Only set if authenticated user, otherwise nil
+	limits *vis.Limits // Resolved from the config or the user's tier
 }
 
 // visitorEnv is what every visitor of a server shares; it is built once, so building a visitor per
@@ -53,6 +58,13 @@ type visitorInfo struct {
 	Stats  *visitorStats
 }
 
+// visitorUsage is a key's daily counts (see visitor.Stats)
+type visitorUsage struct {
+	Messages int64
+	Emails   int64
+	Calls    int64
+}
+
 type visitorStats struct {
 	Messages                     int64
 	MessagesRemaining            int64
@@ -64,6 +76,7 @@ type visitorStats struct {
 	ReservationsRemaining        int64
 	AttachmentTotalSize          int64
 	AttachmentTotalSizeRemaining int64
+	ResetAt                      time.Time // When the daily counts start over
 }
 
 func newVisitorEnv(conf *Config, limiter *limit.Service, messageCache *message.Cache, userManager *user.Manager) *visitorEnv {
@@ -93,16 +106,7 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 		user:   u,
 		limits: limits,
 	}
-	if tier != nil {
-		// Carry the persisted stats into the key's daily counts, if the key is new to the limiter
-		var usage limit.Usage
-		usage.Set(limit.KindMessages, u.Stats.Messages)
-		usage.Set(limit.KindEmails, u.Stats.Emails)
-		usage.Set(limit.KindCalls, u.Stats.Calls)
-		env.limiter.Seed(v.key, usage)
-	}
-	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is (after Seed, which only fills unknown keys)
-	v.seen.Store(time.Now().UnixNano())
+	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is
 	return v
 }
 
@@ -111,7 +115,6 @@ func (v *visitor) Context() log.Context {
 	fields := log.Context{
 		"visitor_id":                 v.key,
 		"visitor_ip":                 v.ip.String(),
-		"visitor_seen":               util.FormatTime(time.Unix(0, v.seen.Load())),
 		"visitor_messages":           info.Stats.Messages,
 		"visitor_messages_limit":     info.Limits.MessageLimit,
 		"visitor_messages_remaining": info.Stats.MessagesRemaining,
@@ -192,48 +195,23 @@ func (v *visitor) MessageAllowed() bool {
 	if v.limits.MessageLimit <= 0 {
 		return false // A daily limit of zero admits nothing; the limit service reads it as "no cap"
 	}
-	allowed := v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Messages: 1,
-		})
-	}
-	return allowed
+	return v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
 }
 
 func (v *visitor) EmailAllowed() bool {
-	if v.limits.EmailLimitBurst <= 0 || v.limits.EmailLimit <= 0 {
-		return false // No email bucket, or no emails on the tier: the limit service reads a daily limit of zero as "no cap"
+	if v.limits.EmailLimitBurst <= 0 {
+		return false // No email bucket
+	} else if v.limits.Basis == vis.BasisTier && v.limits.EmailLimit <= 0 {
+		return false // No emails on the tier: the limit service reads a daily limit of zero as "no cap"
 	}
-	allowed := v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Emails: 1,
-		})
-	}
-	return allowed
+	return v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
 }
 
 func (v *visitor) CallAllowed() bool {
 	if v.limits.CallLimit <= 0 {
 		return false // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
 	}
-	allowed := v.env.limiter.Allow(v.key, v.callRule(), 1).OK
-	if allowed {
-		v.enqueueUserStats(&user.Stats{
-			Calls: 1,
-		})
-	}
-	return allowed
-}
-
-// enqueueUserStats hands what a tier user's request admitted to the user manager's write queue, which
-// adds it to the persisted stats (deltas add up across requests and cluster nodes)
-func (v *visitor) enqueueUserStats(delta *user.Stats) {
-	if v.env.userManager == nil || v.user == nil || v.user.Tier == nil {
-		return
-	}
-	v.env.userManager.EnqueueUserStats(v.user.ID, delta)
+	return v.env.limiter.Allow(v.key, v.callRule(), 1).OK
 }
 
 // SubscriptionAllowed takes one of the visitor key's subscription slots on this node, if one is free.
@@ -285,10 +263,8 @@ func (v *visitor) RemoveSubscription() {
 	v.env.subscriptions.Release(v.key)
 }
 
-// Keepalive marks the visitor and its key as seen. The subscribe handlers call it on the visitor a
-// topic keeps as its rate visitor; nothing else does, so Stale is the subscriber's liveness.
+// Keepalive marks the visitor's key as seen, so the limiter keeps the key of a long-lived subscription
 func (v *visitor) Keepalive() {
-	v.seen.Store(time.Now().UnixNano())
 	v.env.limiter.Touch(v.key)
 }
 
@@ -301,16 +277,10 @@ func (v *visitor) BandwidthLimiter() util.Limiter {
 	return v.env.limiter.Limiter(v.key, v.bandwidthRule())
 }
 
-// Stale is true when the visitor has not been kept alive for visitorExpungeAfter. It reads the
-// visitor's own keepalive, not the limiter key's last use: publishers charging a topic's rate
-// visitor must not keep a vanished subscriber's limits on the topic.
-func (v *visitor) Stale() bool {
-	return time.Since(time.Unix(0, v.seen.Load())) > visitorExpungeAfter
-}
-
-func (v *visitor) Stats() *user.Stats {
+// Stats returns the key's daily counts in its current period
+func (v *visitor) Stats() *visitorUsage {
 	usage := v.env.limiter.Usage(v.key)
-	return &user.Stats{
+	return &visitorUsage{
 		Messages: usage.Count(limit.KindMessages),
 		Emails:   usage.Count(limit.KindEmails),
 		Calls:    usage.Count(limit.KindCalls),
@@ -356,13 +326,23 @@ func (v *visitor) requestRule() limit.Rule {
 	}
 }
 
+// messageRule is the daily message limit. The count of a visitor without a user is written to the
+// usage table only from a tenth of the cap on (most keys never get there, so their rows are
+// saved); a logged-in user's from the first message. A user without a tier is keyed by the IP
+// (see vis.Key), so that persists the IP key's count, shared with the IP's anonymous visitors.
 func (v *visitor) messageRule() limit.Rule {
-	return limit.Rule{
+	rule := limit.Rule{
 		Kind:  limit.KindMessages,
 		Daily: v.limits.MessageLimit,
 	}
+	if v.user == nil {
+		rule.Threshold = v.limits.MessageLimit / promoteRate
+	}
+	return rule
 }
 
+// emailRule is the email bucket and the daily email limit; without a tier, the daily limit is
+// derived from the refill (24h / visitor-email-limit-replenish)
 func (v *visitor) emailRule() limit.Rule {
 	return limit.Rule{
 		Kind:   limit.KindEmails,
@@ -469,21 +449,12 @@ func (v *visitor) infoLight() *visitorInfo {
 			Messages:          stats.Messages,
 			MessagesRemaining: zeroIfNegative(limits.MessageLimit - stats.Messages),
 			Emails:            stats.Emails,
-			EmailsRemaining:   v.emailsRemaining(stats.Emails),
+			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - stats.Emails),
 			Calls:             stats.Calls,
 			CallsRemaining:    zeroIfNegative(limits.CallLimit - stats.Calls),
+			ResetAt:           v.env.limiter.ResetAt(v.key),
 		},
 	}
-}
-
-// emailsRemaining returns what the visitor can send now: the day's remaining emails, but no
-// more than the email bucket holds (it may be empty while the day has room, e.g. after the reset)
-func (v *visitor) emailsRemaining(emails int64) int64 {
-	remaining := zeroIfNegative(v.limits.EmailLimit - emails)
-	if rule := v.emailRule(); rule.Burst > 0 {
-		remaining = min(remaining, v.env.limiter.Tokens(v.key, rule))
-	}
-	return remaining
 }
 
 func zeroIfNegative(value int64) int64 {

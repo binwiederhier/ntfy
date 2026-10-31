@@ -15,40 +15,10 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-func TestVisitor_UserStatsDeltaFlush(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 300 * time.Millisecond
-		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{
-			Code:         "test",
-			MessageLimit: 100,
-		}))
-		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
-
-		// Publish 3 messages; the visitor enqueues a stats delta after each publish
-		for i := 0; i < 3; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-		}
-
-		// After two flush intervals, the persisted count must be exactly 3: per-publish
-		// enqueues must be deltas, not absolute snapshots (snapshots would add up to 1+2+3=6)
-		time.Sleep(time.Second)
-		u, err := s.userManager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(3), u.Stats.Messages)
-	})
-}
-
 func TestVisitor_TierUserDoesNotGetAnonymousUsage(t *testing.T) {
 	// What a user's IP counted anonymously must not land on the account once the user (with a
 	// tier) shows up from that IP.
 	c := newTestConfigWithAuthFile(t, "")
-	c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
 	require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "test", MessageLimit: 100}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
@@ -59,12 +29,10 @@ func TestVisitor_TierUserDoesNotGetAnonymousUsage(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		require.True(t, v.MessageAllowed())
 	}
-
-	require.True(t, s.visitor(netip.MustParseAddr("9.9.9.9"), u).RequestAllowed())
-	time.Sleep(500 * time.Millisecond)
-	u, err = s.userManager.User("phil")
-	require.Nil(t, err)
-	require.Equal(t, int64(0), u.Stats.Messages)
+	vu := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+	require.True(t, vu.RequestAllowed())
+	require.Equal(t, int64(0), vu.Stats().Messages)
+	require.Equal(t, int64(3), v.Stats().Messages)
 }
 
 func TestVisitor_BandwidthRefund(t *testing.T) {
@@ -124,9 +92,9 @@ func TestVisitor_TierChangeKeepsBuckets(t *testing.T) {
 	})
 }
 
-func TestVisitor_AccountEmailsRemainingFollowsBucket(t *testing.T) {
-	// The account page shows what the user can send now: no more than the email bucket holds,
-	// even when the daily limit has room left (e.g. right after the daily reset)
+func TestVisitor_AccountEmailsRemainingCountsTheDay(t *testing.T) {
+	// The account shows the day's remaining emails, like it does for messages. The email bucket
+	// may still refuse a send while the day has room left.
 	c := newTestConfig(t, "")
 	c.VisitorEmailLimitBurst = 2
 	c.VisitorEmailLimitReplenish = time.Hour // Daily limit 24
@@ -143,7 +111,7 @@ func TestVisitor_AccountEmailsRemainingFollowsBucket(t *testing.T) {
 	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
 	require.Nil(t, err)
 	require.Equal(t, int64(2), account.Stats.Emails)
-	require.Equal(t, int64(0), account.Stats.EmailsRemaining)
+	require.Equal(t, int64(22), account.Stats.EmailsRemaining)
 	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
 		"Email": "test@email.com",
 	})
@@ -188,22 +156,30 @@ func TestVisitor_TierFieldChangeAppliesAtOnce(t *testing.T) {
 }
 
 func TestVisitor_EmailDailyLimitCapsBelowBurst(t *testing.T) {
-	// The daily email limit (what the account page shows) is enforced, not only the bucket: with
-	// a burst of 16 and a refill every 12 hours, the day's limit is 2, and the third email is
-	// denied even though the bucket has tokens
-	c := newTestConfig(t, "")
+	// A tier's daily email limit (what the account page shows) is enforced, not only the bucket:
+	// with a daily limit of 2 and a burst of 16, the third email is denied even though the bucket
+	// has tokens
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorEmailLimitBurst = 16
-	c.VisitorEmailLimitReplenish = 12 * time.Hour
 	s := newTestServer(t, c)
 	s.mailer = &testMailer{}
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 10,
+		EmailLimit:   2,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
 	for i := 0; i < 2; i++ {
 		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-			"Email": "test@email.com",
+			"Authorization": util.BasicAuth("phil", "phil"),
+			"Email":         "test@email.com",
 		})
 		require.Equal(t, 200, response.Code)
 	}
 	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-		"Email": "test@email.com",
+		"Authorization": util.BasicAuth("phil", "phil"),
+		"Email":         "test@email.com",
 	})
 	require.Equal(t, 429, response.Code)
 	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
@@ -337,16 +313,9 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 	require.True(t, vip.AccountActionAllowed())
 }
 
-func TestVisitor_NewVisitorIsNotStale(t *testing.T) {
-	// A visitor is seen when it is built for a request, like it was when visitors were shared
-	s := newTestServer(t, newTestConfig(t, ""))
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	require.False(t, v.Stale())
-}
-
 func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
 	// A subscriber from a request-limit-exempt prefix spends nothing before it becomes a topic's
-	// rate visitor; the topic must still keep it. Fails if a new visitor counts as stale.
+	// rate visitor; the topic must still keep it. Fails if a new rate visitor counts as stale.
 	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.0/24")}
@@ -356,7 +325,7 @@ func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
-	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
+	s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics)
 	require.NotNil(t, topics[0].RateVisitor())
 }
 
@@ -378,10 +347,9 @@ func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
 
 func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 	// Two visitors with the same user key (the user from two addresses) share one count in the
-	// limiter, and each admitted unit is persisted once, so the user's stats are not double counted
+	// limiter, so the user's usage is not double counted
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
 		s := newTestServer(t, c)
 		require.Nil(t, s.userManager.AddTier(&user.Tier{
 			Code:         "test",
@@ -403,17 +371,6 @@ func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 		require.Equal(t, int64(5), v1.Stats().Messages)
 		require.Equal(t, int64(5), v2.Stats().Messages)
 
-		// Persisted once: 3 + 2, not 5 + 5
-		waitFor(t, func() bool {
-			u, err := s.userManager.User("phil")
-			require.Nil(t, err)
-			return u.Stats.Messages > 0
-		})
-		time.Sleep(300 * time.Millisecond) // Any double counting would have been flushed by now
-		u, err = s.userManager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(5), u.Stats.Messages)
-
 		// The account sees the shared count, and the day's remaining messages are shared too
 		response := request(t, s, "GET", "/v1/account", "", map[string]string{
 			"Authorization": util.BasicAuth("phil", "phil"),
@@ -428,44 +385,6 @@ func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 		}
 		require.False(t, v1.MessageAllowed())
 	})
-}
-
-func TestVisitor_DailyResetKeepsEmailBucket(t *testing.T) {
-	// The daily reset starts the day's counts over, but it does not refill the email bucket: a
-	// visitor who emptied it right before the reset still has to wait for the refill
-	c := newTestConfig(t, "")
-	c.VisitorMessageDailyLimit = 2
-	c.VisitorEmailLimitBurst = 2
-	c.VisitorEmailLimitReplenish = time.Hour // Daily limit 24
-	s := newTestServer(t, c)
-	s.mailer = &testMailer{}
-	for i := 0; i < 2; i++ {
-		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-			"Email": "test@email.com",
-		})
-		require.Equal(t, 200, response.Code)
-	}
-	response := request(t, s, "PUT", "/mytopic", "test", nil)
-	require.Equal(t, 429, response.Code)
-	require.Equal(t, 42908, toHTTPError(t, response.Body.String()).Code)
-
-	// After the reset: messages are back, emails are not
-	s.resetStats()
-	response = request(t, s, "GET", "/v1/account", "", nil)
-	require.Equal(t, 200, response.Code)
-	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-	require.Nil(t, err)
-	require.Equal(t, int64(0), account.Stats.Messages)
-	require.Equal(t, int64(2), account.Stats.MessagesRemaining)
-	require.Equal(t, int64(0), account.Stats.Emails)
-	require.Equal(t, int64(0), account.Stats.EmailsRemaining)
-	response = request(t, s, "PUT", "/mytopic", "test", nil)
-	require.Equal(t, 200, response.Code)
-	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
-		"Email": "test@email.com",
-	})
-	require.Equal(t, 429, response.Code)
-	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
 }
 
 func TestVisitor_RequestLimiterZeroBurstAdmitsNothing(t *testing.T) {
@@ -508,12 +427,10 @@ func TestVisitor_TopicCreationLimiterDisabledByZero(t *testing.T) {
 }
 
 func TestVisitor_TierChangeDoesNotReseedCounts(t *testing.T) {
-	// The persisted stats seed a key only on its first sight. On a tier change (and for a new
-	// visitor object of a known key), the live counts win over the user's stale database row,
-	// which lags behind by whatever the stats queue has not flushed yet.
+	// On a tier change (and for a new visitor object of a known key), the key keeps its live
+	// counts; nothing is seeded from the user's row.
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = time.Hour // Never flushed during the test: the row stays stale
 		s := newTestServer(t, c)
 		require.Nil(t, s.userManager.AddTier(&user.Tier{
 			Code:         "small",
@@ -535,8 +452,7 @@ func TestVisitor_TierChangeDoesNotReseedCounts(t *testing.T) {
 		require.Nil(t, s.userManager.ChangeTier("phil", "large"))
 		u, err = s.userManager.User("phil")
 		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages) // Stale
-		v = s.visitor(ip, u)                         // The next request carries the new tier
+		v = s.visitor(ip, u) // The next request carries the new tier
 		require.Equal(t, int64(4), v.Stats().Messages)
 		for i := 0; i < 6; i++ {
 			require.True(t, v.MessageAllowed())
@@ -730,10 +646,54 @@ func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
-	require.Nil(t, s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics))
+	s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics)
 	s.limiter.Prune(0) // The key is gone, the subscriber is not
 	require.NotNil(t, topics[0].RateVisitor())
-	v.seen.Store(time.Now().Add(-2 * visitorExpungeAfter).UnixNano()) // The subscriber is gone
-	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK)    // A publisher charges the key
+	ageRateVisitor(topics[0], 2*visitorExpungeAfter)               // The subscriber is gone
+	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK) // A publisher charges the key
 	require.Nil(t, topics[0].RateVisitor())
+}
+
+func TestVisitor_EmailsWithoutTierHaveDailyCap(t *testing.T) {
+	// Without a tier, the daily limit derived from the refill (24 with a refill of an hour) is a
+	// cap, as for tiers: a burst of 30 is cut at 24
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 30
+	c.VisitorEmailLimitReplenish = time.Hour
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	for i := 0; i < 24; i++ {
+		require.True(t, v.EmailAllowed(), "email %d", i)
+	}
+	require.False(t, v.EmailAllowed())
+}
+
+func TestVisitor_EmailsWithoutTierAllowedWithSlowRefill(t *testing.T) {
+	// A refill slower than a day derives a daily limit of zero, which must not turn off email
+	// without a tier: the bucket alone limits it
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 2
+	c.VisitorEmailLimitReplenish = 48 * time.Hour
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.True(t, v.EmailAllowed())
+	require.True(t, v.EmailAllowed())
+	require.False(t, v.EmailAllowed())
+}
+
+func TestVisitor_LoggedInUserWrittenFromFirstMessage(t *testing.T) {
+	// A logged-in user's messages are written from the first one, even without a tier (on the IP
+	// key), so the account page agrees across nodes and restarts; anonymous ones only from the
+	// threshold on
+	c := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+	u, err := s.userManager.User("ben")
+	require.Nil(t, err)
+	require.True(t, s.visitor(netip.MustParseAddr("1.1.1.1"), u).MessageAllowed())
+	require.True(t, s.visitor(netip.MustParseAddr("2.2.2.2"), nil).MessageAllowed())
+	s.Stop()
+	s = newTestServer(t, c)
+	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.1.1.1"), u).Stats().Messages)
+	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("2.2.2.2"), nil).Stats().Messages)
 }

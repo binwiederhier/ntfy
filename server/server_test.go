@@ -1204,196 +1204,6 @@ func TestServer_Auth_NonBasicHeader(t *testing.T) {
 	})
 }
 
-func TestServer_StatsResetter(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		t.Parallel()
-		// This tests the stats resetter for
-		// - an anonymous user
-		// - a user without a tier (treated like the same as the anonymous user)
-		// - a user with a tier
-
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.VisitorStatsResetTime = time.Now().Add(2 * time.Second)
-		s := newTestServer(t, c)
-		go s.runStatsResetter()
-
-		// Create user with tier (tieruser) and user without tier (phil)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{
-			Code:                  "test",
-			MessageLimit:          5,
-			MessageExpiryDuration: -5 * time.Second, // Second, what a hack!
-		}))
-		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-		require.Nil(t, s.userManager.AddUser("tieruser", "tieruser", user.RoleUser, false))
-		require.Nil(t, s.userManager.ChangeTier("tieruser", "test"))
-
-		// Send an anonymous message
-		response := request(t, s, "PUT", "/mytopic", "test", nil)
-		require.Equal(t, 200, response.Code)
-
-		// Send messages from user without tier (phil)
-		for i := 0; i < 5; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-		}
-
-		// Send messages from user with tier
-		for i := 0; i < 2; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-				"Authorization": util.BasicAuth("tieruser", "tieruser"),
-			})
-			require.Equal(t, 200, response.Code)
-		}
-
-		// User stats show 6 messages (for user without tier)
-		response = request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("phil", "phil"),
-		})
-		require.Equal(t, 200, response.Code)
-		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(6), account.Stats.Messages)
-
-		// User stats show 6 messages (for anonymous visitor)
-		response = request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(6), account.Stats.Messages)
-
-		// User stats show 2 messages (for user with tier)
-		response = request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("tieruser", "tieruser"),
-		})
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(2), account.Stats.Messages)
-
-		// Wait for stats resetter to run
-		waitFor(t, func() bool {
-			response = request(t, s, "GET", "/v1/account", "", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-			account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-			require.Nil(t, err)
-			return account.Stats.Messages == 0
-		})
-
-		// User stats show 0 messages now!
-		response = request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("phil", "phil"),
-		})
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-
-		// Since this is a user without a tier, the anonymous user should have the same stats
-		response = request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-
-		// User stats show 0 messages (for user with tier)
-		response = request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("tieruser", "tieruser"),
-		})
-		require.Equal(t, 200, response.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-	})
-}
-
-func TestServer_StatsResetter_MessageLimiter_EmailsLimiter(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		// This tests that the messageLimiter (the only fixed limiter) and the emailsLimiter (token bucket)
-		// is reset by the stats resetter
-
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		s := newTestServer(t, c)
-		s.mailer = &testMailer{}
-
-		// Publish some messages, and check stats
-		for i := 0; i < 3; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", nil)
-			require.Equal(t, 200, response.Code)
-		}
-		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-			"Email": "test@email.com",
-		})
-		require.Equal(t, 200, response.Code)
-
-		rr := request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, rr.Code)
-		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(4), account.Stats.Messages)
-		require.Equal(t, int64(1), account.Stats.Emails)
-		v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-		require.Equal(t, int64(4), v.Stats().Messages)
-		require.Equal(t, int64(1), v.Stats().Emails)
-
-		// Reset stats and check again
-		s.resetStats()
-		rr = request(t, s, "GET", "/v1/account", "", nil)
-		require.Equal(t, 200, rr.Code)
-		account, err = util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(0), account.Stats.Messages)
-		require.Equal(t, int64(0), account.Stats.Emails)
-		v = s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-		require.Equal(t, int64(0), v.Stats().Messages)
-		require.Equal(t, int64(0), v.Stats().Emails)
-	})
-}
-
-func TestServer_DailyMessageQuotaFromDatabase(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		t.Parallel()
-
-		// This tests that the daily message quota is prefilled originally from the database,
-		// if the visitor is unknown
-
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
-		s := newTestServer(t, c)
-
-		// Create user, and update it with some message and email stats
-		require.Nil(t, s.userManager.AddTier(&user.Tier{
-			Code: "test",
-		}))
-		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
-
-		u, err := s.userManager.User("phil")
-		require.Nil(t, err)
-		s.userManager.EnqueueUserStats(u.ID, &user.Stats{
-			Messages: 123456,
-			Emails:   999,
-		})
-		time.Sleep(400 * time.Millisecond)
-
-		// Get account and verify stats are read from the DB, and that the visitor also has these stats
-		rr := request(t, s, "GET", "/v1/account", "", map[string]string{
-			"Authorization": util.BasicAuth("phil", "phil"),
-		})
-		require.Equal(t, 200, rr.Code)
-		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(rr.Body))
-		require.Nil(t, err)
-		require.Equal(t, int64(123456), account.Stats.Messages)
-		require.Equal(t, int64(999), account.Stats.Emails)
-		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		require.Equal(t, int64(123456), v.Stats().Messages)
-		require.Equal(t, int64(999), v.Stats().Emails)
-	})
-}
-
 type testMailer struct {
 	count       int
 	lastTo      string
@@ -3637,17 +3447,265 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
 
 		// Expire visitor: its subscriber has been gone for a day, and its key is pruned after a day without use
-		s.topics["upAAAAAAAAAAAA"].rateVisitor.seen.Store(time.Now().Add(-25 * time.Hour).UnixNano())
+		ageRateVisitor(s.topics["upAAAAAAAAAAAA"], 25*time.Hour)
 		s.limiter.Prune(-time.Hour) // Everything is idle for longer than -1h
-		require.True(t, s.topics["upAAAAAAAAAAAA"].rateVisitor.Stale())
+		require.True(t, s.topics["upAAAAAAAAAAAA"].rateVisitorStaleNoLock())
 
 		// Publish message again, observe that rateVisitor is not used anymore and is reset
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
 		require.Equal(t, int64(1), publisher.Stats().Messages)
 		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
-		require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
+		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages) // Daily counts outlive pruning until their period ends
 	})
+}
+
+func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T) {
+	// A poll from the subscriber of an open stream sets its own visitor on the topic; the open stream
+	// must keep that one alive too, or UnifiedPush publishes fail a day after the poll
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	subscriberFn := func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	}
+
+	// Stream, then poll from the same subscriber
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, subscriberFn, func(r *http.Request) {
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+
+	// A day later, the stream is still there and keeps the topic's rate visitor
+	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testing.T) {
+	// A subscriber that only polls stays the topic's rate visitor for as long as it keeps polling
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	subscriberFn := func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	}
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+
+	// Polled 23 hours ago; polling again keeps it the rate visitor for another day
+	to := lockedTopic(s, "upAAAAAAAAAAAA")
+	ageRateVisitor(to, 23*time.Hour)
+	rr = request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
+	require.Equal(t, 200, rr.Code)
+	to.mu.Lock()
+	seen := to.rateSeen
+	to.mu.Unlock()
+	require.WithinDuration(t, time.Now(), seen, time.Minute)
+}
+
+func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testing.T) {
+	// Two streams from the same subscriber overlap (e.g. a reconnect), and the newer one closes: the
+	// older one must keep the topic's rate visitor alive, though the topic holds the newer one
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	subscriberFn := func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	}
+
+	// Stream A, then stream B, then B closes
+	ctxA, cancelA := context.WithCancel(context.Background())
+	defer cancelA()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, subscriberFn, func(r *http.Request) {
+			*r = *r.WithContext(ctxA)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	ctxB, cancelB := context.WithCancel(context.Background())
+	doneB := make(chan struct{})
+	go func() {
+		defer close(doneB)
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, subscriberFn, func(r *http.Request) {
+			*r = *r.WithContext(ctxB)
+		})
+	}()
+	waitFor(t, func() bool {
+		return lockedTopic(s, "upAAAAAAAAAAAA").SubscribersCount() == 2
+	})
+	cancelB()
+	<-doneB
+
+	// A day later, stream A is still there
+	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_SubscriberRateLimiting_OpenStreamKeepsPollerAsRateVisitor(t *testing.T) {
+	// A poll from another key (e.g. the same device over IPv4) takes the topic from an open stream
+	// (IPv6). While the stream is open, the topic keeps billing the poller, even a day later.
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	s := newTestServer(t, c)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, func(r *http.Request) {
+			r.RemoteAddr = "[2001:db8::1]:1234"
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, func(r *http.Request) {
+		r.RemoteAddr = "1.2.3.4:1234"
+	})
+	require.Equal(t, 200, rr.Code)
+
+	// A day later, only the stream is still there; the publish is billed to the poller's key
+	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
+}
+
+func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoked(t *testing.T) {
+	// A stream whose write access was revoked while it is open must not become the topic's rate
+	// visitor again: publishes would be charged to (and rejected by) the quota of a subscriber who
+	// may no longer write
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.VisitorMessageDailyLimit = 1
+	c.AuthDefault = user.PermissionDenyAll
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
+	require.Nil(t, s.userManager.AddUser("bob", "bob", user.RoleUser, false))
+	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionReadWrite))
+	require.Nil(t, s.userManager.AllowAccess("bob", "upAAAAAAAAAAAA", user.PermissionReadWrite))
+	aliceHeaders := map[string]string{
+		"Authorization": util.BasicAuth("alice", "alice"),
+	}
+	bobHeaders := map[string]string{
+		"Authorization": util.BasicAuth("bob", "bob"),
+	}
+
+	// Alice streams and uses up her quota, then may only read
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", aliceHeaders, func(r *http.Request) {
+			r.RemoteAddr = "1.1.1.1:1234"
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	to := lockedTopic(s, "upAAAAAAAAAAAA")
+	require.True(t, to.RateVisitor().MessageAllowed())
+	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionRead))
+
+	// Bob takes the topic with a poll, and is gone a day later
+	response := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", bobHeaders, func(r *http.Request) {
+		r.RemoteAddr = "2.2.2.2:1234"
+	})
+	require.Equal(t, 200, response.Code)
+	ageRateVisitor(to, 25*time.Hour)
+
+	// Alice's open stream keeps the topic alive, but it is still billed to Bob
+	response = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", bobHeaders, func(r *http.Request) {
+		r.RemoteAddr = "2.2.2.2:1234"
+	})
+	require.Equal(t, 200, response.Code)
+}
+
+func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalives(t *testing.T) {
+	// A topic is billed to its subscriber for as long as a stream is open on it, however long ago
+	// the subscriber was last seen otherwise
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.KeepaliveInterval = time.Hour // No keepalives during the test
+	s := newTestServer(t, c)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, func(r *http.Request) {
+			r.RemoteAddr = "1.2.3.4:1234"
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
+}
+
+func TestServer_SubscriberRateLimiting_ClosedStreamIsLastSeen(t *testing.T) {
+	// When the last stream closes, the subscriber counts as seen then: the topic keeps billing it
+	// for another day, and not longer
+	c := newTestConfig(t, "")
+	c.VisitorSubscriberRateLimiting = true
+	c.KeepaliveInterval = time.Hour // No keepalives during the test
+	s := newTestServer(t, c)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		request(t, s, "GET", "/upAAAAAAAAAAAA/json", "", nil, func(r *http.Request) {
+			r.RemoteAddr = "1.2.3.4:1234"
+			*r = *r.WithContext(ctx)
+		})
+	}()
+	waitFor(t, func() bool {
+		to := lockedTopic(s, "upAAAAAAAAAAAA")
+		return to != nil && to.SubscribersCount() == 1
+	})
+	to := lockedTopic(s, "upAAAAAAAAAAAA")
+	ageRateVisitor(to, 25*time.Hour) // Subscribed more than a day ago
+	cancel()
+	<-done
+	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 200, response.Code)
+
+	// A day after the stream closed, the subscriber is gone
+	ageRateVisitor(to, 25*time.Hour)
+	response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
+	require.Equal(t, 507, response.Code)
+}
+
+// ageRateVisitor makes the topic's rate visitor look as if it was last seen d ago
+func ageRateVisitor(t *topic, d time.Duration) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.rateSeen = time.Now().Add(-d)
+}
+
+// lockedTopic returns the topic with the given ID, or nil, reading the topics map under the server's lock
+func lockedTopic(s *Server, id string) *topic {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.topics[id]
 }
 
 func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *testing.T) {
@@ -5314,6 +5372,7 @@ func forEachBackend(t *testing.T, f func(t *testing.T, databaseURL string)) {
 func newTestConfig(t *testing.T, databaseURL string) *Config {
 	conf := NewConfig()
 	conf.BaseURL = "http://127.0.0.1:12345"
+	conf.ListenAdminUnix = "" // Tests that need it use newTestServerWithAdminSocket
 	if databaseURL != "" {
 		conf.DatabaseURL = databaseURL
 	} else {
@@ -5986,45 +6045,53 @@ func subscribeStream(t *testing.T, s *Server, topic string, headers map[string]s
 
 // Fails if message/email daily rules are bypassed; account remaining values must match HTTP admissions through reset.
 func TestServer_Account_RemainingMatchesAdmissions(t *testing.T) {
-	c := newTestConfig(t, "")
-	c.VisitorMessageDailyLimit = 4
+	// A tier user's account page counts down exactly what is admitted
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorRequestLimitBurst = 100
 	c.VisitorEmailLimitBurst = 10
-	c.VisitorEmailLimitReplenish = 12 * time.Hour
 	s := newTestServer(t, c)
 	s.mailer = &testMailer{}
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 4,
+		EmailLimit:   2,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
+	authEmail := map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+		"Email":         "test@email.com",
+	}
 	account := func() *apiAccountResponse {
-		response := request(t, s, "GET", "/v1/account", "", nil)
+		response := request(t, s, "GET", "/v1/account", "", auth)
 		require.Equal(t, 200, response.Code)
 		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
 		require.NoError(t, err)
 		return account
 	}
-	for day := 0; day < 2; day++ {
-		before := account()
-		require.Equal(t, int64(4), before.Stats.MessagesRemaining)
-		require.Equal(t, int64(2), before.Stats.EmailsRemaining)
-		for i := int64(0); i < before.Stats.EmailsRemaining; i++ {
-			response := request(t, s, "PUT", "/quota", "test", map[string]string{"Email": "test@email.com"})
-			require.Equal(t, 200, response.Code)
-			after := account()
-			require.Equal(t, before.Stats.EmailsRemaining-i-1, after.Stats.EmailsRemaining)
-			require.Equal(t, before.Stats.MessagesRemaining-i-1, after.Stats.MessagesRemaining)
-		}
-		response := request(t, s, "PUT", "/quota", "test", map[string]string{"Email": "test@email.com"})
-		require.Equal(t, 429, response.Code)
-		require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
-		remaining := account().Stats.MessagesRemaining
-		for i := int64(0); i < remaining; i++ {
-			response = request(t, s, "PUT", "/quota", "test", nil)
-			require.Equal(t, 200, response.Code)
-			require.Equal(t, remaining-i-1, account().Stats.MessagesRemaining)
-		}
-		response = request(t, s, "PUT", "/quota", "test", nil)
-		require.Equal(t, 429, response.Code)
-		require.Zero(t, account().Stats.MessagesRemaining)
-		s.resetStats()
+	before := account()
+	require.Equal(t, int64(4), before.Stats.MessagesRemaining)
+	require.Equal(t, int64(2), before.Stats.EmailsRemaining)
+	for i := int64(0); i < before.Stats.EmailsRemaining; i++ {
+		response := request(t, s, "PUT", "/quota", "test", authEmail)
+		require.Equal(t, 200, response.Code)
+		after := account()
+		require.Equal(t, before.Stats.EmailsRemaining-i-1, after.Stats.EmailsRemaining)
+		require.Equal(t, before.Stats.MessagesRemaining-i-1, after.Stats.MessagesRemaining)
 	}
+	response := request(t, s, "PUT", "/quota", "test", authEmail)
+	require.Equal(t, 429, response.Code)
+	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
+	remaining := account().Stats.MessagesRemaining
+	for i := int64(0); i < remaining; i++ {
+		response = request(t, s, "PUT", "/quota", "test", auth)
+		require.Equal(t, 200, response.Code)
+		require.Equal(t, remaining-i-1, account().Stats.MessagesRemaining)
+	}
+	response = request(t, s, "PUT", "/quota", "test", auth)
+	require.Equal(t, 429, response.Code)
+	require.Zero(t, account().Stats.MessagesRemaining)
 }
 
 func TestServer_SubscriptionLimit_ReleasedWhenStreamCloses(t *testing.T) {
@@ -6056,4 +6123,71 @@ func TestServer_SubscriptionLimit_ReleasedWhenStreamCloses(t *testing.T) {
 	rr = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
 	require.Equal(t, 200, rr.Code)
 	require.Empty(t, s.visitors.subscriptions.counts)
+}
+
+func TestServer_UsageSurvivesRestart(t *testing.T) {
+	// Daily counts are kept in the usage table of the auth-file: a restart continues where the old
+	// server stopped, except for keys without a user below the threshold (10% of the cap)
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorMessageDailyLimit = 100 // Threshold 10
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 50,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	publish := func(s *Server, n int, headers map[string]string, ip string) {
+		for i := 0; i < n; i++ {
+			response := request(t, s, "PUT", "/mytopic", "test", headers, func(r *http.Request) {
+				r.RemoteAddr = ip + ":1234"
+			})
+			require.Equal(t, 200, response.Code)
+		}
+	}
+	auth := map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+	}
+	publish(s, 3, auth, "9.9.9.9")
+	publish(s, 12, nil, "1.1.1.1")
+	publish(s, 5, nil, "2.2.2.2")
+	s.Stop()
+
+	s = newTestServer(t, c)
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	require.Equal(t, int64(3), s.visitor(netip.MustParseAddr("9.9.9.9"), u).Stats().Messages)
+	require.Equal(t, int64(12), s.visitor(netip.MustParseAddr("1.1.1.1"), nil).Stats().Messages)
+	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("2.2.2.2"), nil).Stats().Messages)
+}
+
+func TestServer_AnonymousEmailDailyCapShared(t *testing.T) {
+	// Anonymous emails have a daily cap (24h / visitor-email-limit-replenish) shared by all nodes
+	// on one usage table, not one per node
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.VisitorEmailLimitBurst = 10
+		c.VisitorEmailLimitReplenish = 24 * time.Hour / 5 // Daily cap 5
+		a := newTestServer(t, c)
+		a.mailer = &testMailer{}
+		bConf := *c
+		bConf.CacheFile = filepath.Join(t.TempDir(), "cache.db")
+		b := newTestServer(t, &bConf)
+		b.mailer = &testMailer{}
+		email := map[string]string{
+			"Email": "test@email.com",
+		}
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, a, "PUT", "/mytopic", "test", email).Code)
+		}
+		waitForWithMaxWait(t, 15*time.Second, func() bool {
+			return b.visitor(netip.MustParseAddr("9.9.9.9"), nil).Stats().Emails == 3
+		})
+		for i := 0; i < 2; i++ {
+			require.Equal(t, 200, request(t, b, "PUT", "/mytopic", "test", email).Code)
+		}
+		response := request(t, b, "PUT", "/mytopic", "test", email)
+		require.Equal(t, 429, response.Code)
+		require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
+	})
 }

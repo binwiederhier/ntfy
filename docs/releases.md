@@ -6,11 +6,35 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.34.0 | Oct 24, 2026  |
+| ntfy server      | v2.35.0 | Oct 30, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.35.0
+Released October 30, 2026
+
+This release keeps what a user already spent when their tier changes, and makes a tier's daily email limit a hard
+cap. It also fixes intermittent 403s under concurrent requests from the same IP, and the Matrix push gateway storing
+messages under a protected topic on SQLite.
+
+**Security:**
+
+* Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied; thanks to [Efe Çam](https://github.com/the-arma-of-owl) for reporting)
+
+**Features:**
+
+* A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the user's next request and keeps what was already spent; before, it refilled the request, email and attachment bandwidth limits ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
+* A tier's daily email limit is a hard cap; before, the tier's email burst came on top of it, so a user could send more emails a day than the tier allows
+
+**Bug fixes + maintenance:**
+
+* Fix intermittent 403s and panics in the account handlers under concurrent requests from the same IP: a login or logout could change the user under another request, so a request with valid credentials was treated as anonymous, or the other way around. Every request now gets its own visitor ([#1051](https://github.com/binwiederhier/ntfy/issues/1051), [#2113](https://github.com/binwiederhier/ntfy/issues/2113), [#2118](https://github.com/binwiederhier/ntfy/pull/2118), thanks to [@ivanetinajero](https://github.com/ivanetinajero) for reporting)
+* A tier with a daily email limit of zero sends no emails; before, it could still send the server's email burst (`visitor-email-limit-burst`)
+* An attachment upload rejected at a size limit is no longer charged to the attachment bandwidth limit for the part that went over
+* Rate limits live in one shared limit service, keyed by `ip:<prefix>` or `user:<id>`, instead of in each visitor, which uses less memory per visitor and takes a global lock off the request path
+* Accept terabyte units (e.g. `1T`) in size settings such as attachment and tier limits, matching how sizes are displayed ([#2078](https://github.com/binwiederhier/ntfy/pull/2078), thanks to [@cangen185-sudo](https://github.com/cangen185-sudo) for the contribution)
 
 ## ntfy server v2.34.0
 Released October 24, 2026
@@ -2264,26 +2288,28 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-### ntfy server v2.35.0 (UNRELEASED)
+### ntfy server v2.36.0 (UNRELEASED)
 
 **Features:**
 
-* Rate limits are tracked per visitor key (`ip:<prefix>` or `user:<id>`) in one sharded limit service instead of in each in-memory visitor. A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the next request and keeps what was already spent instead of handing out full buckets; the daily email limit shown on the account page is a hard cap; and a failed attachment upload hands its bandwidth back ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
-* Rate limit state of a visitor that has fully recovered (all buckets refilled, nothing counted today against a daily limit) is forgotten after a minute instead of after a day, which frees the memory of one-off visitors such as floods of new IPs ([#2126](https://github.com/binwiederhier/ntfy/pull/2126))
+* Daily limits (messages, e-mails, phone calls) are kept in the user database (`auth-file` for SQLite, or `database-url` for PostgreSQL) and survive restarts; with PostgreSQL, all servers share them, so a visitor gets one daily allowance in total, not one per server (see [message limits](config.md#message-limits))
+* Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working as before (see [admin socket](config.md#admin-socket))
+* Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
+* Export `ntfy_db_up` (1 if the last health check of a PostgreSQL pool's database succeeded, per pool) and health-check the primary like the replicas, to alert on a server that is cut off from its database (see [PostgreSQL](config.md#postgresql))
+
+**Behavior changes:**
+
+* Daily limits now reset on a rolling 24-hour period per account or IP address instead of for everyone at midnight UTC: each visitor's period starts at its own time of day, which spreads the resets over the day. The account page and the `/v1/account` API (`stats.reset_at`) show when the visitor's counts reset
+* Visitors without a tier have a daily e-mail limit again (24h / `visitor-email-limit-replenish`), now that it is shared between servers and survives restarts
+* The daily reset job is gone; the `stats_*` columns of the user table are zeroed by the upgrade and no longer read or written
 
 **Bug fixes + maintenance:**
 
-* A user without a tier shares its rate limits with anonymous requests from the same IP, and a login from that IP could switch off the auth failure and account action limits for a concurrent request ([#2119](https://github.com/binwiederhier/ntfy/pull/2119))
-* A tier with a daily email limit of zero sends no emails, a tier edited in place no longer loses pending user stats, and a clock that goes back no longer takes tokens away
-* Every request gets its own visitor instead of sharing one per IP, so a login or logout from the same IP can no longer change the user under a concurrent request, which could panic the account handlers or treat an anonymous request as the logged-in user ([#1051](https://github.com/binwiederhier/ntfy/issues/1051), [#2118](https://github.com/binwiederhier/ntfy/pull/2118))
-
-**Security:**
-
-* Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied)
-
-**Bug fixes + maintenance:**
-
-* Accept terabyte units (e.g. `1T`) in size settings such as attachment and tier limits, matching how sizes are displayed ([#2078](https://github.com/binwiederhier/ntfy/pull/2078), thanks to [@cangen185-sudo](https://github.com/cangen185-sudo) for the contribution)
+* Admin API: return 4xx errors instead of a 500 for invalid input, and remove a deleted user's web push subscriptions
+* Web app: Deleted notifications no longer come back when a poll replays messages published in the same second as the last one ([#2098](https://github.com/binwiederhier/ntfy/issues/2098), thanks to [@mattford63](https://github.com/mattford63) and [@arminus](https://github.com/arminus) for reporting)
+* Web app: A message replayed after a reconnect keeps its read state and no longer notifies again, and an older version of a sequence no longer replaces a newer one ([#2090](https://github.com/binwiederhier/ntfy/issues/2090), thanks to [@tobykaspar79](https://github.com/tobykaspar79) for reporting)
+* Check the whole server config again when `base-url` or a `message-size-limit` above 4K is set; most checks after them were skipped, so an invalid config (e.g. `upstream-base-url` equal to `base-url`) now fails to start ([#1969](https://github.com/binwiederhier/ntfy/pull/1969), thanks to [@mikejgray](https://github.com/mikejgray) for the contribution)
+* CLI: `ntfy pub --wait-pid` now waits for processes owned by other users instead of failing with "not running" ([#1710](https://github.com/binwiederhier/ntfy/pull/1710), thanks to [@bekoeppel](https://github.com/bekoeppel) for the contribution)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

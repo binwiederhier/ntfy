@@ -129,6 +129,26 @@ func TestPayments_Tiers(t *testing.T) {
 		require.Equal(t, int64(999111), tier.Limits.AttachmentFileSize)
 		require.Equal(t, int64(888111), tier.Limits.AttachmentTotalSize)
 		require.Equal(t, int64(3600), tier.Limits.AttachmentExpiryDuration)
+
+		// The billing list moved to /v1/account/billing/tiers; /v1/tiers still returns it to non-admins, for older web apps
+		require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+		billing := request(t, s, "GET", "/v1/account/billing/tiers", "", nil)
+		require.Equal(t, 200, billing.Code)
+		legacy := request(t, s, "GET", "/v1/tiers", "", nil)
+		require.Equal(t, billing.Body.String(), legacy.Body.String())
+		legacy = request(t, s, "GET", "/v1/tiers", "", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
+		require.Equal(t, billing.Body.String(), legacy.Body.String())
+
+		// Admins get all tiers, as stored
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+		admin := request(t, s, "GET", "/v1/tiers", "", map[string]string{"Authorization": util.BasicAuth("phil", "phil")})
+		require.Equal(t, 200, admin.Code)
+		var adminTiers []apiAdminTier
+		require.Nil(t, json.NewDecoder(admin.Body).Decode(&adminTiers))
+		require.Equal(t, 3, len(adminTiers))
+		require.Equal(t, "ti_1", adminTiers[0].ID)
+		require.Equal(t, "admin", adminTiers[0].Code)
+		require.Equal(t, "price_123", adminTiers[2].StripeMonthlyPriceID)
 	})
 }
 
@@ -361,8 +381,6 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits(t *testing.T) {
 		require.Equal(t, payments.PriceRecurringInterval(""), u.Billing.StripeSubscriptionInterval)
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionPaidUntil.Unix())
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
-		require.Equal(t, int64(0), u.Stats.Messages) // Messages and emails are not persisted for no-tier users!
-		require.Equal(t, int64(0), u.Stats.Emails)
 
 		// Simulate Stripe success return URL call (no user context)
 		rr = request(t, s, "GET", "/v1/account/billing/subscription/success/SOMETOKEN", "", nil)
@@ -378,8 +396,6 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits(t *testing.T) {
 		require.Equal(t, payments.PriceRecurringInterval(stripe.PriceRecurringIntervalMonth), u.Billing.StripeSubscriptionInterval)
 		require.Equal(t, int64(123456789), u.Billing.StripeSubscriptionPaidUntil.Unix())
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
 
 		// Now for the fun part: Verify that new rate limits are immediately applied
 		// This only tests the request limiter, which kicks in before the message limiter.

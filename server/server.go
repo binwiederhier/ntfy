@@ -617,6 +617,9 @@ func (s *Server) stop() {
 	if s.tail != nil {
 		s.tail.Close() // Before the databases close under it
 	}
+	if s.cluster != nil {
+		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
+	}
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()

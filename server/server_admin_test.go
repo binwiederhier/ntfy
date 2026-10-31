@@ -1387,7 +1387,7 @@ func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 		runTestServer(t, s)
 	})
 	require.Contains(t, output, "Admin socket")
-	require.Contains(t, output, "which is deprecated and stops working after 2026-12-30, see https://ntfy.sh/docs/deprecations/")
+	require.Contains(t, output, "directly, which is deprecated, see https://ntfy.sh/docs/deprecations/")
 	require.False(t, adminSocketListening(s))
 }
 

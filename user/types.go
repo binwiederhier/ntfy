@@ -356,6 +356,7 @@ var (
 type queries struct {
 	// User queries
 	selectUserByID                 string
+	selectUsersByIDs               string
 	selectUserByName               string
 	selectUserByNameOrPrimaryEmail string
 	selectUserByToken              string

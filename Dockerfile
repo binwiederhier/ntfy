@@ -15,5 +15,9 @@ LABEL org.opencontainers.image.version="$VERSION"
 RUN apk add --no-cache tzdata
 COPY ntfy /usr/bin
 
+# Admin socket directory, writable by any uid (sticky, like /tmp), so the admin socket also works
+# when the container runs as a non-root user (-u UID:GID); the socket itself is created with mode 0660
+RUN mkdir -p /run/ntfy && chmod 1777 /run/ntfy
+
 EXPOSE 80/tcp
 ENTRYPOINT ["ntfy"]

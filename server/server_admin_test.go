@@ -340,6 +340,7 @@ func TestUser_DontChangeAdminPassword(t *testing.T) {
 			"Authorization": util.BasicAuth("phil", "phil"),
 		})
 		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 	})
 }
 
@@ -691,6 +692,30 @@ func TestAccess_RevokeBetweenAuthorizeAndSubscribe(t *testing.T) {
 	}
 }
 
+func TestUser_GetOne(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfigWithAuthFile(t, databaseURL))
+		defer s.closeDatabases()
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+		require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+		require.Nil(t, s.userManager.AllowAccess("ben", "bens-topic", user.PermissionRead))
+		auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
+
+		// Only the requested user, so the CLI does not download all users to look up one
+		rr := request(t, s, "GET", "/v1/users?username=ben", "", auth)
+		require.Equal(t, 200, rr.Code)
+		var users []*apiUserResponse
+		require.Nil(t, json.NewDecoder(rr.Body).Decode(&users))
+		require.Len(t, users, 1)
+		require.Equal(t, "ben", users[0].Username)
+		require.Equal(t, []*apiUserGrantResponse{{Topic: "bens-topic", Permission: "read-only"}}, users[0].Grants)
+
+		// Unknown user
+		rr = request(t, s, "GET", "/v1/users?username=nobody", "", auth)
+		require.Equal(t, 40031, toHTTPError(t, rr.Body.String()).Code)
+	})
+}
+
 func TestUser_GetWithDetails(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		conf := newTestConfigWithAuthFile(t, databaseURL)
@@ -893,7 +918,8 @@ func TestUser_DeleteAdmin(t *testing.T) {
 		rr := request(t, s, "DELETE", "/v1/users", `{"username": "admin"}`, map[string]string{
 			"Authorization": util.BasicAuth("phil", "phil"),
 		})
-		require.Equal(t, 401, rr.Code)
+		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 
 		// Allowed over the socket
 		rr = requestAdminSocket(t, s, "DELETE", "/v1/users", `{"username": "admin"}`)
@@ -1187,6 +1213,7 @@ func TestPasswordReset_Failures(t *testing.T) {
 		require.Equal(t, 40905, toHTTPError(t, rr.Body.String()).Code)
 		rr = request(t, s, "POST", "/v1/users/password/reset", `{"username":"phil"}`, auth)
 		require.Equal(t, 403, rr.Code)
+		require.Equal(t, 40302, toHTTPError(t, rr.Body.String()).Code)
 
 		// No base URL
 		s.config.BaseURL = ""
@@ -1282,6 +1309,14 @@ func TestTiers_Failures(t *testing.T) {
 	})
 }
 
+func TestAdminSocket_DefaultPath(t *testing.T) {
+	require.Equal(t, "/run/ntfy/admin.sock", defaultListenAdminUnixFor("linux"))
+	require.Equal(t, "/var/run/ntfy/admin.sock", defaultListenAdminUnixFor("darwin"))
+	require.Equal(t, "/var/run/ntfy/admin.sock", defaultListenAdminUnixFor("freebsd"))
+	require.Equal(t, "/var/run/ntfy/admin.sock", defaultListenAdminUnixFor("openbsd"))
+	require.Equal(t, "", defaultListenAdminUnixFor("windows"))
+}
+
 func TestAdminSocket_ListenAndRemove(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s, socket := newTestServerWithAdminSocket(t, newTestConfigWithAuthFile(t, databaseURL))
@@ -1345,14 +1380,35 @@ func TestAdminSocket_NonAdminRoutes(t *testing.T) {
 func TestAdminSocket_StaleSocketFile(t *testing.T) {
 	conf := newTestConfigWithAuthFile(t, "")
 	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
-	require.Nil(t, os.WriteFile(conf.ListenAdminUnix, []byte("stale"), 0600))
+	stale, err := net.Listen("unix", conf.ListenAdminUnix)
+	require.Nil(t, err)
+	stale.(*net.UnixListener).SetUnlinkOnClose(false)
+	stale.Close() // Socket file stays behind, nobody listening (e.g. after a crash)
 	s := newTestServer(t, conf)
-	runTestServer(t, s)
-	waitFor(t, func() bool { return adminSocketListening(s) })
+	output := captureLogUntil(t, "Admin socket listening on "+conf.ListenAdminUnix, func() {
+		runTestServer(t, s)
+	})
+	require.Contains(t, output, "Admin socket listening on "+conf.ListenAdminUnix)
 	resp, err := adminSocketClient(conf.ListenAdminUnix).Get("http://ntfy/v1/users")
 	require.Nil(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 	resp.Body.Close()
+}
+
+func TestAdminSocket_RegularFileNotRemoved(t *testing.T) {
+	// A misconfigured path (e.g. pointing at the database) must never be deleted
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "user.db")
+	require.Nil(t, os.WriteFile(conf.ListenAdminUnix, []byte("precious"), 0600))
+	s := newTestServer(t, conf)
+	output := captureLogUntil(t, "not a socket", func() {
+		runTestServer(t, s)
+	})
+	require.Contains(t, output, "not a socket")
+	require.False(t, adminSocketListening(s))
+	data, err := os.ReadFile(conf.ListenAdminUnix)
+	require.Nil(t, err)
+	require.Equal(t, "precious", string(data))
 }
 
 func TestAdminSocket_AnotherServerListening(t *testing.T) {
@@ -1373,6 +1429,24 @@ func TestAdminSocket_AnotherServerListening(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestAdminSocket_OtherUsersSocket(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can open any socket")
+	}
+	conf := newTestConfigWithAuthFile(t, "")
+	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
+	other, err := net.Listen("unix", conf.ListenAdminUnix)
+	require.Nil(t, err)
+	defer other.Close()
+	require.Nil(t, os.Chmod(conf.ListenAdminUnix, 0)) // As seen by a user who may not open it
+	s := newTestServer(t, conf)
+	output := captureLogUntil(t, "belongs to a server of another user", func() {
+		runTestServer(t, s)
+	})
+	require.Contains(t, output, "belongs to a server of another user")
+	require.False(t, adminSocketListening(s))
+}
+
 func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root can write anywhere")
@@ -1387,6 +1461,7 @@ func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 		runTestServer(t, s)
 	})
 	require.Contains(t, output, "Admin socket")
+	require.NotContains(t, output, "listening")
 	require.Contains(t, output, "directly, which is deprecated, see https://ntfy.sh/docs/deprecations/")
 	require.False(t, adminSocketListening(s))
 }
@@ -1408,9 +1483,8 @@ func TestAdminSocket_InsecureDirectoryWarning(t *testing.T) {
 		conf := newTestConfigWithAuthFile(t, "")
 		conf.ListenAdminUnix = filepath.Join(dir, "admin.sock")
 		s := newTestServer(t, conf)
-		output := captureLog(t, func() {
-			runTestServer(t, s)
-			waitFor(t, func() bool { return adminSocketListening(s) }) // Warned before it listens
+		output := captureLogUntil(t, "Admin socket listening", func() {
+			runTestServer(t, s) // The warning comes before it listens
 		})
 		if tt.warn {
 			require.Contains(t, output, "Admin socket directory "+dir+" is writable by all users", tt.mode)

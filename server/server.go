@@ -435,9 +435,6 @@ func (s *Server) Run() error {
 	if s.config.ListenUnix != "" {
 		listenStr += fmt.Sprintf(" %s[unix]", s.config.ListenUnix)
 	}
-	if s.config.ListenAdminUnix != "" && s.userManager != nil {
-		listenStr += fmt.Sprintf(" %s[admin]", s.config.ListenAdminUnix)
-	}
 	if s.config.SMTPServerListen != "" {
 		listenStr += fmt.Sprintf(" %s[smtp]", s.config.SMTPServerListen)
 	}
@@ -522,6 +519,7 @@ func (s *Server) Run() error {
 			}
 			defer s.adminUnixListener.Close()
 			s.mu.Unlock()
+			log.Tag(tagStartup).Info("Admin socket listening on %s", s.config.ListenAdminUnix)
 			httpServer := &http.Server{Handler: http.HandlerFunc(s.handleAdminSocket)}
 			errChan <- httpServer.Serve(s.adminUnixListener)
 		}()

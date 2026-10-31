@@ -1,5 +1,5 @@
-// Package client is the CLI's client for the ntfy admin API (over the admin socket or HTTP with an admin
-// token). Not to be confused with heckel.io/ntfy/v2/client, which publishes and subscribes.
+// Package client is the CLI's client for the ntfy admin API, over the server's local admin socket.
+// Not to be confused with heckel.io/ntfy/v2/client, which publishes and subscribes.
 package client
 
 import (
@@ -12,16 +12,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 )
 
 // Error codes of the admin API, mirrored from server/errors.go. TestClient_ErrorCodesMatchServer asserts they match.
 const (
 	ErrCodeNotFound               = 40401
-	ErrCodeUnauthorized           = 40101
-	ErrCodeForbidden              = 40301
-	ErrCodeAdminSocketOnly        = 40302
 	ErrCodeUserNotFound           = 40031
 	ErrCodeUserExists             = 40901
 	ErrCodeTierNotFound           = 40030
@@ -129,34 +125,17 @@ type PasswordReset struct {
 	Email string `json:"email,omitempty"`
 }
 
-// Client talks to the ntfy admin API, either over HTTP(S) with an admin token (New) or over
-// the server's local admin socket (NewSocket). Every method returns *Error for API
-// errors and a wrapped ErrUnreachable for transport errors.
+// Client talks to the ntfy admin API over the server's local admin socket. Every method returns
+// *Error for API errors and a wrapped ErrUnreachable for transport errors.
 type Client struct {
-	baseURL    string
-	token      string
 	httpClient *http.Client
 }
 
-// New creates an admin API client for a server's HTTP(S) API, authenticating with an admin's access token
-func New(baseURL, token string) *Client {
+// New creates an admin API client for the server's local admin socket (no credentials needed)
+func New(socketPath string) *Client {
 	return &Client{
-		baseURL: strings.TrimSuffix(baseURL, "/"),
-		token:   token,
 		httpClient: &http.Client{
-			Timeout:       requestTimeout,
-			CheckRedirect: noRedirects,
-		},
-	}
-}
-
-// NewSocket creates an admin API client for the server's local admin socket (no credentials needed)
-func NewSocket(socketPath string) *Client {
-	return &Client{
-		baseURL: socketBaseURL,
-		httpClient: &http.Client{
-			Timeout:       requestTimeout,
-			CheckRedirect: noRedirects,
+			Timeout: requestTimeout,
 			Transport: &http.Transport{
 				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 					var d net.Dialer
@@ -316,16 +295,6 @@ func (c *Client) Tiers() ([]*Tier, error) {
 	if err := c.do(http.MethodGet, apiPathTiers, nil, &tiers); err != nil {
 		return nil, err
 	}
-	for _, t := range tiers {
-		if t.ID == "" {
-			// Non-admins get the price list for the upgrade dialog here instead (until 2026-11-22)
-			return nil, &Error{
-				HTTPCode: http.StatusUnauthorized,
-				Code:     ErrCodeUnauthorized,
-				Message:  "unauthorized: the server returned the public price list, the token must belong to an admin user",
-			}
-		}
-	}
 	return tiers, nil
 }
 
@@ -370,12 +339,6 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// noRedirects makes the client return a redirect as the response. Following it could send the token
-// over plain HTTP (https -> http), or turn a DELETE into a GET that succeeds.
-func noRedirects(_ *http.Request, _ []*http.Request) error {
-	return http.ErrUseLastResponse
-}
-
 // do sends a JSON request and decodes the JSON response into out (if not nil)
 func (c *Client) do(method, path string, body any, out any) error {
 	var reqBody io.Reader
@@ -386,14 +349,11 @@ func (c *Client) do(method, path string, body any, out any) error {
 		}
 		reqBody = bytes.NewReader(b)
 	}
-	req, err := http.NewRequest(method, c.baseURL+path, reqBody)
+	req, err := http.NewRequest(method, socketBaseURL+path, reqBody)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrUnreachable, err)

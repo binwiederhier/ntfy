@@ -69,7 +69,7 @@ make it possible for users to reserve topics.
 This is a server-only command. It talks to the running ntfy server over its local admin socket
 (listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
-directly. With --server and --token, it manages a remote server over HTTPS instead.
+directly.
 
 Examples:
   ntfy tier add pro                     # Add tier with code "pro", using the defaults
@@ -114,7 +114,7 @@ to all visitors.
 This is a server-only command. It talks to the running ntfy server over its local admin socket
 (listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
-directly. With --server and --token, it manages a remote server over HTTPS instead.
+directly.
 
 Examples:
   ntfy tier change --name="Pro" pro        # Update the name of an existing tier
@@ -139,7 +139,7 @@ to remove or switch their tier first.
 This is a server-only command. It talks to the running ntfy server over its local admin socket
 (listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
-directly. With --server and --token, it manages a remote server over HTTPS instead.
+directly.
 
 Example:
   ntfy tier del pro
@@ -155,7 +155,7 @@ Example:
 This is a server-only command. It talks to the running ntfy server over its local admin socket
 (listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
-directly. With --server and --token, it manages a remote server over HTTPS instead.
+directly.
 `,
 		},
 	},
@@ -168,7 +168,7 @@ possible for users to reserve topics.
 This is a server-only command. It talks to the running ntfy server over its local admin socket
 (listen-admin-unix in server.yml, default /run/ntfy/admin.sock), so changes apply immediately. If no
 server is running, it reads/writes the database defined in server.yml (auth-file or database-url)
-directly. With --server and --token, it manages a remote server over HTTPS instead.
+directly.
 
 Examples:
   ntfy tier add pro                     # Add tier with code "pro", using the defaults

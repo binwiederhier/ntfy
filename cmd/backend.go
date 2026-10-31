@@ -7,10 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/netip"
-	"net/url"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -38,16 +35,11 @@ var (
 	// flagsBackend are the flags of the commands that use newBackend
 	flagsBackend = []cli.Flag{
 		altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-admin-unix", Aliases: []string{"listen_admin_unix"}, EnvVars: []string{"NTFY_LISTEN_ADMIN_UNIX"}, Value: server.DefaultListenAdminUnix(), DefaultText: "/run/ntfy/admin.sock on Linux, /var/run/ntfy/admin.sock on macOS/BSD", Usage: "admin socket of the local ntfy server; \"-\" disables it (then the database is used directly, which is deprecated)"}),
-		&cli.StringFlag{Name: "server", Aliases: []string{"S"}, EnvVars: []string{"NTFY_ADMIN_SERVER"}, Usage: "manage a remote server over HTTPS instead (base URL, e.g. https://ntfy.example.com); requires --token of an admin user"},
-		&cli.StringFlag{Name: "token", Aliases: []string{"k"}, EnvVars: []string{"NTFY_ADMIN_TOKEN"}, Usage: "admin access token for --server (better: NTFY_ADMIN_TOKEN, other users can see command line arguments)"},
 	}
-
-	// adminTargetFlags are the flags that choose which server a command talks to, see newBackend
-	adminTargetFlags = []string{"--server", "-S", "--token", "-k", "--listen-admin-unix", "--listen_admin_unix", "--config", "-c"}
 )
 
 // backend is what the user, access, token and tier commands need. client.Client implements it
-// over the admin socket or HTTP; dbBackend implements it against the database (the fallback).
+// over the admin socket; dbBackend implements it against the database (the fallback).
 type backend interface {
 	Users() ([]*client.User, error)
 	User(username string) (*client.User, error)
@@ -70,27 +62,10 @@ type backend interface {
 	Close() error
 }
 
-// newBackend picks the transport: an explicit --server (never falls back), else the admin
-// socket when a server answers on it, else the database directly, with a warning. A socket file
-// that nobody answers on is treated as absent (stale file after a crash).
+// newBackend picks the transport: the admin socket when a server answers on it, else the database
+// directly, with a warning. A socket file that nobody answers on is treated as absent (stale file
+// after a crash).
 func newBackend(c *cli.Context) (backend, error) {
-	for _, arg := range c.Args().Slice() {
-		if slices.Contains(adminTargetFlags, strings.SplitN(arg, "=", 2)[0]) {
-			// The CLI stops parsing flags at the first argument, so this one would be silently ignored,
-			// and the command would go to the local server instead of the one the user meant
-			return nil, fmt.Errorf("%s must come before the command and its arguments, e.g. 'ntfy user --server=URL --token=TOKEN list'", arg)
-		}
-	}
-	if server := c.String("server"); server != "" {
-		token := c.String("token")
-		if token == "" {
-			return nil, errors.New("--token is required with --server")
-		}
-		if u, err := url.Parse(server); err == nil && u.Scheme == "http" && !isLoopbackHost(u.Hostname()) {
-			fmt.Fprintf(c.App.ErrWriter, "warning: --server %s is not HTTPS, the token is sent unencrypted\n", server)
-		}
-		return client.New(server, token), nil
-	}
 	authConfigured := c.String("auth-file") != "" || c.String("database-url") != ""
 	socket := c.String("listen-admin-unix")
 	if !authConfigured {
@@ -102,7 +77,7 @@ func newBackend(c *cli.Context) (backend, error) {
 	if err := checkAdminSocketOwner(socket, c.String("auth-file")); err != nil {
 		return nil, err
 	}
-	sc := client.NewSocket(socket)
+	sc := client.New(socket)
 	err := sc.Ping()
 	var apiErr *client.Error
 	switch {
@@ -132,16 +107,7 @@ func withBackendFlags(flags []cli.Flag) []cli.Flag {
 	return append(append([]cli.Flag{}, flags...), flagsBackend...)
 }
 
-// isLoopbackHost reports whether host is this machine, so plain HTTP never leaves it
-func isLoopbackHost(host string) bool {
-	if host == "localhost" {
-		return true
-	}
-	ip, err := netip.ParseAddr(host)
-	return err == nil && ip.IsLoopback()
-}
-
-// adminError turns an admin API error into the message the CLI printed before it talked to the
+// mapAPIError turns an admin API error into the message the CLI printed before it talked to the
 // server, so scripts and tests see the same text no matter how the command reached the database.
 // The wording lives only here.
 func mapAPIError(err error, username, tier, token string) error {
@@ -182,12 +148,8 @@ func mapAPIError(err error, username, tier, token string) error {
 		return errors.New("permission must be one of: read-write, read-only, write-only, or deny (or the aliases: read, ro, write, wo, none)")
 	case client.ErrCodePasswordHashInvalid:
 		return errors.New("password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate")
-	case client.ErrCodeAdminSocketOnly:
-		return errors.New("only possible over the admin socket or directly in the database, not over --server: setting roles, changing admin users or their tokens, listing all users' tokens, and resetting the whole access control list")
 	case client.ErrCodeNotFound:
 		return errors.New("the server does not support this command, upgrade the server or use direct database access")
-	case client.ErrCodeUnauthorized:
-		return errors.New("unauthorized: --token must belong to an admin user")
 	}
 	return apiErr
 }

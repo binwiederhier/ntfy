@@ -25,14 +25,13 @@ type recordedRequest struct {
 	Method string
 	Path   string
 	Query  string
-	Auth   string
 	Body   map[string]any
 }
 
 func TestClient_RequestsAndResponses(t *testing.T) {
 	var requests []*recordedRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rec := &recordedRequest{Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery, Auth: r.Header.Get("Authorization")}
+	server, socket := newSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rec := &recordedRequest{Method: r.Method, Path: r.URL.Path, Query: r.URL.RawQuery}
 		if b, _ := io.ReadAll(r.Body); len(b) > 0 {
 			require.Nil(t, json.Unmarshal(b, &rec.Body))
 		}
@@ -52,8 +51,9 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 			w.Write([]byte(`{"success":true}`))
 		}
 	}))
+	server.Start()
 	defer server.Close()
-	sc := New(server.URL+"/", "tk_admin")
+	sc := New(socket)
 
 	// Users
 	users, err := sc.Users()
@@ -71,7 +71,7 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 	require.True(t, errors.As(err, &apiErr))
 	require.Equal(t, ErrCodeUserNotFound, apiErr.Code)
 
-	// Mutations send the right method, path and body, with the token
+	// Mutations send the right method, path and body
 	requests = nil
 	require.Nil(t, sc.AddUser("ben", "$2a$10$hash", "pro", "admin"))
 	require.Nil(t, sc.ChangePassword("ben", "$2a$10$other"))
@@ -83,15 +83,15 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 	require.Nil(t, sc.RemoveToken("ben", "tk_abc"))
 	require.Nil(t, sc.RemoveTier("pro"))
 	require.Equal(t, []*recordedRequest{
-		{Method: "POST", Path: "/v1/users", Auth: "Bearer tk_admin", Body: map[string]any{"username": "ben", "hash": "$2a$10$hash", "tier": "pro", "role": "admin"}},
-		{Method: "PUT", Path: "/v1/users", Auth: "Bearer tk_admin", Body: map[string]any{"username": "ben", "hash": "$2a$10$other"}},
-		{Method: "PUT", Path: "/v1/users", Auth: "Bearer tk_admin", Body: map[string]any{"username": "ben", "tier": "-"}},
-		{Method: "PUT", Path: "/v1/users", Auth: "Bearer tk_admin", Body: map[string]any{"username": "ben", "role": "user"}},
-		{Method: "DELETE", Path: "/v1/users", Auth: "Bearer tk_admin", Body: map[string]any{"username": "ben"}},
-		{Method: "PUT", Path: "/v1/users/access", Auth: "Bearer tk_admin", Body: map[string]any{"username": "*", "topic": "up*", "permission": "write-only"}},
-		{Method: "DELETE", Path: "/v1/users/access", Auth: "Bearer tk_admin", Body: map[string]any{"username": "", "topic": ""}},
-		{Method: "DELETE", Path: "/v1/users/tokens", Auth: "Bearer tk_admin", Body: map[string]any{"username": "ben", "token": "tk_abc"}},
-		{Method: "DELETE", Path: "/v1/tiers", Auth: "Bearer tk_admin", Body: map[string]any{"code": "pro"}},
+		{Method: "POST", Path: "/v1/users", Body: map[string]any{"username": "ben", "hash": "$2a$10$hash", "tier": "pro", "role": "admin"}},
+		{Method: "PUT", Path: "/v1/users", Body: map[string]any{"username": "ben", "hash": "$2a$10$other"}},
+		{Method: "PUT", Path: "/v1/users", Body: map[string]any{"username": "ben", "tier": "-"}},
+		{Method: "PUT", Path: "/v1/users", Body: map[string]any{"username": "ben", "role": "user"}},
+		{Method: "DELETE", Path: "/v1/users", Body: map[string]any{"username": "ben"}},
+		{Method: "PUT", Path: "/v1/users/access", Body: map[string]any{"username": "*", "topic": "up*", "permission": "write-only"}},
+		{Method: "DELETE", Path: "/v1/users/access", Body: map[string]any{"username": "", "topic": ""}},
+		{Method: "DELETE", Path: "/v1/users/tokens", Body: map[string]any{"username": "ben", "token": "tk_abc"}},
+		{Method: "DELETE", Path: "/v1/tiers", Body: map[string]any{"code": "pro"}},
 	}, requests)
 
 	// Tokens
@@ -125,7 +125,7 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 }
 
 func TestClient_Errors(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server, socket := newSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/users" {
 			w.WriteHeader(http.StatusConflict)
 			w.Write([]byte(`{"code":40901,"http":409,"error":"conflict: user already exists"}` + "\n"))
@@ -134,7 +134,8 @@ func TestClient_Errors(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 		w.Write([]byte(`<html>bad gateway</html>`))
 	}))
-	sc := New(server.URL, "")
+	server.Start()
+	sc := New(socket)
 
 	// ntfy error
 	err := sc.AddUser("ben", "hash", "", "")
@@ -163,20 +164,17 @@ func TestClient_Socket(t *testing.T) {
 	socket := filepath.Join(dir, "admin.sock")
 
 	// Missing socket is unreachable
-	require.ErrorIs(t, NewSocket(socket).Ping(), ErrUnreachable)
+	require.ErrorIs(t, New(socket).Ping(), ErrUnreachable)
 
-	// Requests over the socket carry no Authorization header
+	// Present socket answers
 	listener, err := net.Listen("unix", socket)
 	require.Nil(t, err)
-	var auth string
 	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth = r.Header.Get("Authorization")
 		w.Write([]byte(`{"version":"1.2.3"}`))
 	})}
 	go server.Serve(listener)
 	defer server.Close()
-	require.Nil(t, NewSocket(socket).Ping())
-	require.Equal(t, "", auth)
+	require.Nil(t, New(socket).Ping())
 }
 
 func TestClient_SocketPermissionDenied(t *testing.T) {
@@ -193,47 +191,14 @@ func TestClient_SocketPermissionDenied(t *testing.T) {
 	require.Nil(t, os.Chmod(socket, 0))
 
 	// The cause stays in the error chain, so callers can tell "no permission" from "no server"
-	err = NewSocket(socket).Ping()
+	err = New(socket).Ping()
 	require.ErrorIs(t, err, ErrUnreachable)
 	require.ErrorIs(t, err, fs.ErrPermission)
 }
 
-func TestClient_TiersNotAdmin(t *testing.T) {
-	// For non-admins, the server answers GET /v1/tiers with the public price list (deprecated);
-	// its entries have no ID, which the client must not mistake for tiers
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`[{"limits":{"basis":"ip","messages":250}},{"code":"pro","name":"Pro","prices":{"month":500,"year":5000},"limits":{"basis":"tier"}}]`))
-	}))
-	defer server.Close()
-	_, err := New(server.URL, "tk_user").Tiers()
-	var apiErr *Error
-	require.ErrorAs(t, err, &apiErr)
-	require.Equal(t, ErrCodeUnauthorized, apiErr.Code)
-}
-
-func TestClient_NoRedirects(t *testing.T) {
-	// A redirect could resend the token over plain HTTP, and turn a DELETE into a GET that succeeds
-	var deletes int
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete {
-			deletes++
-			http.Redirect(w, r, "/v1/users", http.StatusMovedPermanently)
-			return
-		}
-		w.Write([]byte(`[]`))
-	}))
-	defer server.Close()
-	err := New(server.URL, "tk_admin").RemoveUser("ben")
-	require.Error(t, err)
-	require.Equal(t, 1, deletes)
-	var apiErr *Error
-	require.True(t, errors.As(err, &apiErr))
-	require.Equal(t, http.StatusMovedPermanently, apiErr.HTTPCode)
-}
-
 func TestClient_CloseClosesIdleConnections(t *testing.T) {
 	var conns atomic.Int32
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server, socket := newSocketServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"version":"1.0.0"}`))
 	}))
 	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
@@ -243,7 +208,7 @@ func TestClient_CloseClosesIdleConnections(t *testing.T) {
 	}
 	server.Start()
 	defer server.Close()
-	sc := New(server.URL, "tk_admin")
+	sc := New(socket)
 	require.Nil(t, sc.Ping())
 	require.Nil(t, sc.Close())
 	require.Eventually(t, func() bool { return conns.Load() == 1 }, 2*time.Second, 10*time.Millisecond)
@@ -253,9 +218,6 @@ func TestClient_ErrorCodesMatchServer(t *testing.T) {
 	// The server's errHTTP values are unexported, so read them from the source
 	codes := map[string]int{
 		"errHTTPNotFound":                        ErrCodeNotFound,
-		"errHTTPUnauthorized":                    ErrCodeUnauthorized,
-		"errHTTPForbidden":                       ErrCodeForbidden,
-		"errHTTPForbiddenAdminSocketOnly":        ErrCodeAdminSocketOnly,
 		"errHTTPBadRequestUserNotFound":          ErrCodeUserNotFound,
 		"errHTTPConflictUserExists":              ErrCodeUserExists,
 		"errHTTPBadRequestTierInvalid":           ErrCodeTierNotFound,
@@ -278,6 +240,21 @@ func TestClient_ErrorCodesMatchServer(t *testing.T) {
 		require.Contains(t, serverCodes, name)
 		require.Equal(t, serverCodes[name], code, name)
 	}
+}
+
+// newSocketServer returns an unstarted test server for handler on a unix socket, in a short temp dir
+// since socket paths are limited to ~104 bytes
+func newSocketServer(t *testing.T, handler http.Handler) (server *httptest.Server, socket string) {
+	dir, err := os.MkdirTemp("", "ntfy-client")
+	require.Nil(t, err)
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	socket = filepath.Join(dir, "admin.sock")
+	listener, err := net.Listen("unix", socket)
+	require.Nil(t, err)
+	server = httptest.NewUnstartedServer(handler)
+	server.Listener.Close()
+	server.Listener = listener
+	return server, socket
 }
 
 // readServerErrorCodes returns the ntfy error code of every "errHTTP... = &errHTTP{code, ...}" in the file

@@ -692,6 +692,30 @@ func TestAccess_RevokeBetweenAuthorizeAndSubscribe(t *testing.T) {
 	}
 }
 
+func TestUser_GetOne(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfigWithAuthFile(t, databaseURL))
+		defer s.closeDatabases()
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+		require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+		require.Nil(t, s.userManager.AllowAccess("ben", "bens-topic", user.PermissionRead))
+		auth := map[string]string{"Authorization": util.BasicAuth("phil", "phil")}
+
+		// Only the requested user, so the CLI does not download all users to look up one
+		rr := request(t, s, "GET", "/v1/users?username=ben", "", auth)
+		require.Equal(t, 200, rr.Code)
+		var users []*apiUserResponse
+		require.Nil(t, json.NewDecoder(rr.Body).Decode(&users))
+		require.Len(t, users, 1)
+		require.Equal(t, "ben", users[0].Username)
+		require.Equal(t, []*apiUserGrantResponse{{Topic: "bens-topic", Permission: "read-only"}}, users[0].Grants)
+
+		// Unknown user
+		rr = request(t, s, "GET", "/v1/users?username=nobody", "", auth)
+		require.Equal(t, 40031, toHTTPError(t, rr.Body.String()).Code)
+	})
+}
+
 func TestUser_GetWithDetails(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		conf := newTestConfigWithAuthFile(t, databaseURL)

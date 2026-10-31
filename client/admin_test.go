@@ -61,6 +61,7 @@ func TestAdmin_RequestsAndResponses(t *testing.T) {
 	u, err := admin.User("ben")
 	require.Nil(t, err)
 	require.Equal(t, "pro", u.Tier)
+	require.Equal(t, "username=ben", requests[len(requests)-1].Query) // Servers before v2.36.0 ignore it and return all users
 	_, err = admin.User("nobody")
 	var apiErr *AdminError
 	require.True(t, errors.As(err, &apiErr))

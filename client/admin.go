@@ -179,11 +179,11 @@ func (a *Admin) Users() ([]*AdminUser, error) {
 
 // User returns a single user, or an AdminError with AdminErrCodeUserNotFound
 func (a *Admin) User(username string) (*AdminUser, error) {
-	users, err := a.Users()
-	if err != nil {
+	var users []*AdminUser
+	if err := a.do(http.MethodGet, adminPathUsers+"?username="+url.QueryEscape(username), nil, &users); err != nil {
 		return nil, err
 	}
-	for _, u := range users {
+	for _, u := range users { // Servers before v2.36.0 ignore the username and return all users
 		if u.Username == username {
 			return u, nil
 		}

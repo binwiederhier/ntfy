@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -112,6 +113,20 @@ func TestService_Allow_BucketAndDaily(t *testing.T) {
 	require.False(t, d.OK)
 	require.Equal(t, 14*time.Hour+47*time.Minute+26*time.Second, d.RetryAfter) // The daily cap is what denies now, until 03:48:26 UTC
 	require.Equal(t, int64(3), s.Usage("k").Count(KindEmails))
+}
+
+func TestService_Allow_DailyDenialKeepsTokens(t *testing.T) {
+	// A call the daily cap denies does not spend the bucket's tokens
+	s, _ := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindEmails,
+		Burst:  5,
+		Refill: time.Hour,
+		Daily:  2,
+	}
+	require.True(t, s.Allow("k", rule, 2).OK)
+	require.False(t, s.Allow("k", rule, 1).OK)
+	require.Equal(t, int64(3), s.Tokens("k", rule))
 }
 
 func TestService_Allow_N(t *testing.T) {
@@ -741,6 +756,31 @@ func TestService_Persist_ReadBackPromotes(t *testing.T) {
 	})
 }
 
+func TestService_Persist_ReadBackKeyIsNotUsedHere(t *testing.T) {
+	// A key known only from another node's row has its count here, but no buckets in use: it is
+	// not a visitor of this node (Size, Seen), and it is forgotten once its period ends
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		clock := &testClock{t: time.Now()}
+		a := startTestService(t, newStore(), clock.now)
+		b := startTestService(t, newStore(), clock.now)
+		require.True(t, a.Allow("user:u_1", Rule{Kind: KindMessages}, 3).OK)
+		a.sync()
+		b.sync()
+		require.Equal(t, int64(3), b.Usage("user:u_1").Count(KindMessages))
+		require.Equal(t, 0, b.Size())
+		require.Equal(t, time.Time{}, b.Seen("user:u_1"))
+		require.Equal(t, benchRequestRule.Burst, b.Tokens("user:u_1", benchRequestRule))
+		require.True(t, b.Allow("user:u_1", benchRequestRule, 1).OK)
+		require.Equal(t, 1, b.Size())
+
+		// Once the period ended and the buckets are idle and full, the key is gone
+		clock.advance(25 * time.Hour)
+		b.Prune(time.Hour)
+		require.Equal(t, 0, b.Size())
+		require.Equal(t, Usage{}, b.Usage("user:u_1"))
+	})
+}
+
 func TestService_Persist_WriteFailureRetries(t *testing.T) {
 	// A failed write keeps the counts unflushed for the next round: nothing lost, nothing twice
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
@@ -908,5 +948,87 @@ func TestService_Close_CancelsStalledLoad(t *testing.T) {
 	case <-closed:
 	case <-time.After(time.Second):
 		t.Fatal("Close waits for the stalled load")
+	}
+}
+
+// Benchmarks of a node at production scale: 400k keys that only made requests (subscribers,
+// polls) and 50k that published, 5k of them past the threshold. One op of BenchmarkService_Publish
+// is what a publish costs: the request bucket and the daily message count.
+const (
+	benchIdleKeys      = 400_000
+	benchPublisherKeys = 50_000
+	benchPromotedKeys  = 5_000
+)
+
+var (
+	benchRequestRule = Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	benchMessageRule = Rule{
+		Kind:      KindMessages,
+		Daily:     1_000_000,
+		Threshold: 25,
+	}
+)
+
+func newBenchService(b *testing.B) *Service {
+	b.Helper()
+	s := newService(&Config{}, time.Now)
+	for i := 0; i < benchIdleKeys; i++ {
+		s.Allow(fmt.Sprintf("ip:10.%d.%d.%d", i>>16, (i>>8)&255, i&255), benchRequestRule, 1)
+	}
+	for i := 0; i < benchPublisherKeys; i++ {
+		key := fmt.Sprintf("ip:172.%d.%d.%d", i>>16, (i>>8)&255, i&255)
+		s.Allow(key, benchRequestRule, 1)
+		n := int64(1)
+		if i < benchPromotedKeys {
+			n = 30
+		}
+		s.Allow(key, benchMessageRule, n)
+	}
+	return s
+}
+
+func BenchmarkService_Publish(b *testing.B) {
+	s := newBenchService(b)
+	keys := make([]string, benchPublisherKeys)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("ip:172.%d.%d.%d", i>>16, (i>>8)&255, i&255)
+	}
+	var next atomic.Int64
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			key := keys[next.Add(1)%int64(len(keys))]
+			s.Allow(key, benchRequestRule, 1)
+			s.Allow(key, benchMessageRule, 1)
+		}
+	})
+}
+
+func BenchmarkService_SyncScan(b *testing.B) {
+	s := newBenchService(b)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if rows := s.unflushedRows(); len(rows) != benchPromotedKeys {
+			b.Fatalf("expected %d rows, got %d", benchPromotedKeys, len(rows))
+		}
+	}
+}
+
+func BenchmarkService_Memory(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+		s := newBenchService(b)
+		runtime.GC()
+		runtime.ReadMemStats(&after)
+		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc)/float64(benchIdleKeys+benchPublisherKeys), "B/key")
+		runtime.KeepAlive(s)
 	}
 }

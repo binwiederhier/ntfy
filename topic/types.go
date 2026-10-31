@@ -17,8 +17,8 @@ type RateVisitor struct {
 	IP     string // The masked IP, never empty
 }
 
-// Topic is a topic's cluster-wide state as this node knows it (see Service.Get)
-type Topic struct {
+// State is a topic's cluster-wide state as this node knows it (see Service.State)
+type State struct {
 	FirstSeenAt  time.Time    // Earliest observation on any node: a refused push, or the first subscribe
 	SubscribedAt time.Time    // Last subscriber activity on any node; zero if there was none yet (the topic was only pushed to)
 	RateVisitor  *RateVisitor // Who pays for the pushes; nil if nobody who may pay subscribed yet

@@ -52,7 +52,7 @@ func startTestService(t *testing.T, store *Store, now func() time.Time) *Service
 
 func TestService_SetTouchNote(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	require.Nil(t, s.Get("upA"))
+	require.Nil(t, s.State("upA"))
 
 	// A refused push makes the topic known: first seen now, never subscribed, no rate visitor; a
 	// second one changes nothing
@@ -60,30 +60,30 @@ func TestService_SetTouchNote(t *testing.T) {
 	noted := clock.now()
 	clock.advance(time.Hour)
 	s.Note("upA")
-	require.Equal(t, &Topic{FirstSeenAt: noted}, s.Get("upA"))
+	require.Equal(t, &State{FirstSeenAt: noted}, s.State("upA"))
 
 	// A subscriber becomes the rate visitor, and counts as subscriber activity; the latest one wins
 	s.SetRateVisitor("upA", &RateVisitor{IP: "1.2.3.4"})
 	s.SetRateVisitor("upA", &RateVisitor{UserID: "u_1", IP: "1.2.3.4"})
 	set := clock.now()
-	require.Equal(t, &Topic{FirstSeenAt: noted, SubscribedAt: set, RateVisitor: userRateVisitor()}, s.Get("upA"))
+	require.Equal(t, &State{FirstSeenAt: noted, SubscribedAt: set, RateVisitor: userRateVisitor()}, s.State("upA"))
 
 	// A touch keeps the rate visitor and moves the subscriber activity
 	clock.advance(time.Minute)
 	s.Touch("upA")
 	touched := clock.now()
-	require.Equal(t, &Topic{FirstSeenAt: noted, SubscribedAt: touched, RateVisitor: userRateVisitor()}, s.Get("upA"))
+	require.Equal(t, &State{FirstSeenAt: noted, SubscribedAt: touched, RateVisitor: userRateVisitor()}, s.State("upA"))
 
 	// A refused push to a known topic changes nothing, however old its subscriber activity
 	clock.advance(48 * time.Hour)
 	s.Note("upA")
-	require.Equal(t, &Topic{FirstSeenAt: noted, SubscribedAt: touched, RateVisitor: userRateVisitor()}, s.Get("upA"))
+	require.Equal(t, &State{FirstSeenAt: noted, SubscribedAt: touched, RateVisitor: userRateVisitor()}, s.State("upA"))
 
 	// A touch or a subscribe of an unknown topic makes it known, first seen and subscribed now
 	s.Touch("upB")
-	require.Equal(t, &Topic{FirstSeenAt: clock.now(), SubscribedAt: clock.now()}, s.Get("upB"))
+	require.Equal(t, &State{FirstSeenAt: clock.now(), SubscribedAt: clock.now()}, s.State("upB"))
 	s.SetRateVisitor("upC", &RateVisitor{IP: "1.2.3.4"})
-	require.Equal(t, &Topic{FirstSeenAt: clock.now(), SubscribedAt: clock.now(), RateVisitor: ipRateVisitor()}, s.Get("upC"))
+	require.Equal(t, &State{FirstSeenAt: clock.now(), SubscribedAt: clock.now(), RateVisitor: ipRateVisitor()}, s.State("upC"))
 	require.Equal(t, 3, s.Size())
 }
 
@@ -93,15 +93,15 @@ func TestService_Keepalive_Throttled(t *testing.T) {
 	set := clock.now()
 	clock.advance(keepaliveInterval - time.Second)
 	s.Keepalive("upA")
-	require.Equal(t, set, s.Get("upA").SubscribedAt)
+	require.Equal(t, set, s.State("upA").SubscribedAt)
 	clock.advance(time.Second)
 	s.Keepalive("upA")
-	require.Equal(t, clock.now(), s.Get("upA").SubscribedAt)
-	require.Equal(t, ipRateVisitor(), s.Get("upA").RateVisitor)
+	require.Equal(t, clock.now(), s.State("upA").SubscribedAt)
+	require.Equal(t, ipRateVisitor(), s.State("upA").RateVisitor)
 
 	// A keepalive of an unknown topic is a touch
 	s.Keepalive("upB")
-	require.Equal(t, &Topic{FirstSeenAt: clock.now(), SubscribedAt: clock.now()}, s.Get("upB"))
+	require.Equal(t, &State{FirstSeenAt: clock.now(), SubscribedAt: clock.now()}, s.State("upB"))
 }
 
 func TestService_Note_Bounded(t *testing.T) {
@@ -112,12 +112,12 @@ func TestService_Note_Bounded(t *testing.T) {
 	}
 	require.Equal(t, maxNoted, s.Size())
 	s.Note("upOneTooMany")
-	require.Nil(t, s.Get("upOneTooMany"))
+	require.Nil(t, s.State("upOneTooMany"))
 	s.Touch("up000000000000")
 	s.Note("upOneTooMany")
-	require.NotNil(t, s.Get("upOneTooMany"))
+	require.NotNil(t, s.State("upOneTooMany"))
 	s.Note("upTwoTooMany")
-	require.Nil(t, s.Get("upTwoTooMany"))
+	require.Nil(t, s.State("upTwoTooMany"))
 }
 
 func TestService_Prune(t *testing.T) {
@@ -128,19 +128,19 @@ func TestService_Prune(t *testing.T) {
 	s.Touch("upB")
 	clock.advance(pruneAfter - 30*time.Minute)
 	s.prune(clock.now().Unix() - int64(pruneAfter/time.Second))
-	require.Nil(t, s.Get("upA"))
-	require.NotNil(t, s.Get("upB"))
+	require.Nil(t, s.State("upA"))
+	require.NotNil(t, s.State("upB"))
 
 	// A pruned topic may be noted again
 	for i := 0; i < maxNoted; i++ {
 		s.Note(fmt.Sprintf("up%012d", i))
 	}
 	s.Note("upOneTooMany")
-	require.Nil(t, s.Get("upOneTooMany"))
+	require.Nil(t, s.State("upOneTooMany"))
 	clock.advance(pruneAfter + time.Hour)
 	s.prune(clock.now().Unix() - int64(pruneAfter/time.Second))
 	s.Note("upOneTooMany")
-	require.NotNil(t, s.Get("upOneTooMany"))
+	require.NotNil(t, s.State("upOneTooMany"))
 }
 
 func TestService_RateVisitorUserIDs(t *testing.T) {
@@ -159,15 +159,15 @@ func TestService_RateVisitorUserIDs(t *testing.T) {
 func TestService_SetForTest(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
 	s.SetRateVisitor("upA", ipRateVisitor())
-	aged := &Topic{
+	aged := &State{
 		FirstSeenAt:  clock.now().Add(-48 * time.Hour),
 		SubscribedAt: clock.now().Add(-25 * time.Hour),
 		RateVisitor:  ipRateVisitor(),
 	}
 	s.SetForTest("upA", aged)
-	require.Equal(t, aged, s.Get("upA"))
-	s.SetForTest("upB", &Topic{FirstSeenAt: clock.now().Add(-8 * 24 * time.Hour)})
-	require.Equal(t, &Topic{FirstSeenAt: clock.now().Add(-8 * 24 * time.Hour)}, s.Get("upB"))
+	require.Equal(t, aged, s.State("upA"))
+	s.SetForTest("upB", &State{FirstSeenAt: clock.now().Add(-8 * 24 * time.Hour)})
+	require.Equal(t, &State{FirstSeenAt: clock.now().Add(-8 * 24 * time.Hour)}, s.State("upB"))
 }
 
 func TestService_Persist_SharedAcrossNodes(t *testing.T) {
@@ -181,13 +181,13 @@ func TestService_Persist_SharedAcrossNodes(t *testing.T) {
 		set := clock.now()
 		a.sync()
 		b.sync()
-		require.Equal(t, &Topic{FirstSeenAt: set, SubscribedAt: set, RateVisitor: userRateVisitor()}, b.Get("upA"))
+		require.Equal(t, &State{FirstSeenAt: set, SubscribedAt: set, RateVisitor: userRateVisitor()}, b.State("upA"))
 		clock.advance(time.Hour)
 		b.Touch("upA")
 		b.sync()
 		a.sync()
-		require.Equal(t, &Topic{FirstSeenAt: set, SubscribedAt: clock.now(), RateVisitor: userRateVisitor()}, a.Get("upA"))
-		require.Equal(t, a.Get("upA"), b.Get("upA"))
+		require.Equal(t, &State{FirstSeenAt: set, SubscribedAt: clock.now(), RateVisitor: userRateVisitor()}, a.State("upA"))
+		require.Equal(t, a.State("upA"), b.State("upA"))
 	})
 }
 
@@ -200,8 +200,8 @@ func TestService_Persist_SurvivesRestart(t *testing.T) {
 		s.Note("upB")
 		s.Close()
 		s = startTestService(t, newStore(), clock.now)
-		require.Equal(t, &Topic{FirstSeenAt: clock.now(), SubscribedAt: clock.now(), RateVisitor: ipRateVisitor()}, s.Get("upA"))
-		require.Equal(t, &Topic{FirstSeenAt: clock.now()}, s.Get("upB"))
+		require.Equal(t, &State{FirstSeenAt: clock.now(), SubscribedAt: clock.now(), RateVisitor: ipRateVisitor()}, s.State("upA"))
+		require.Equal(t, &State{FirstSeenAt: clock.now()}, s.State("upB"))
 		require.Equal(t, 2, s.Size())
 	})
 }
@@ -222,7 +222,7 @@ func TestService_Persist_NoteDoesNotReviveRateVisitor(t *testing.T) {
 		a.sync()
 		b.sync()
 		for _, s := range []*Service{a, b} {
-			require.Equal(t, &Topic{FirstSeenAt: set, SubscribedAt: set, RateVisitor: userRateVisitor()}, s.Get("upA"))
+			require.Equal(t, &State{FirstSeenAt: set, SubscribedAt: set, RateVisitor: userRateVisitor()}, s.State("upA"))
 		}
 	})
 }
@@ -259,10 +259,10 @@ func TestService_Persist_ReadBackKeepsUnwrittenRateVisitor(t *testing.T) {
 		b.SetRateVisitor("upA", &RateVisitor{IP: "5.6.7.8"})
 		_, err := b.read(context.Background(), 0)
 		require.Nil(t, err)
-		require.Equal(t, &RateVisitor{IP: "5.6.7.8"}, b.Get("upA").RateVisitor)
+		require.Equal(t, &RateVisitor{IP: "5.6.7.8"}, b.State("upA").RateVisitor)
 		b.sync()
 		a.sync()
-		require.Equal(t, &RateVisitor{IP: "5.6.7.8"}, a.Get("upA").RateVisitor)
+		require.Equal(t, &RateVisitor{IP: "5.6.7.8"}, a.State("upA").RateVisitor)
 	})
 }
 
@@ -282,7 +282,7 @@ func TestService_Persist_MergesFirstSeenAndSubscribed(t *testing.T) {
 		a.sync()
 		b.sync()
 		for _, s := range []*Service{a, b} {
-			require.Equal(t, &Topic{FirstSeenAt: noted, SubscribedAt: touched}, s.Get("upA"))
+			require.Equal(t, &State{FirstSeenAt: noted, SubscribedAt: touched}, s.State("upA"))
 		}
 	})
 }
@@ -297,11 +297,11 @@ func TestService_Persist_Refresh(t *testing.T) {
 		a.SetRateVisitor("upA", ipRateVisitor())
 		set := clock.now()
 		a.sync()
-		require.Nil(t, b.Get("upA"))
+		require.Nil(t, b.State("upA"))
 		topic, err := b.Refresh(context.Background(), "upA")
 		require.Nil(t, err)
-		require.Equal(t, &Topic{FirstSeenAt: set, SubscribedAt: set, RateVisitor: ipRateVisitor()}, topic)
-		require.Equal(t, topic, b.Get("upA"))
+		require.Equal(t, &State{FirstSeenAt: set, SubscribedAt: set, RateVisitor: ipRateVisitor()}, topic)
+		require.Equal(t, topic, b.State("upA"))
 
 		// A fresher row replaces what b knows
 		clock.advance(time.Hour)
@@ -310,7 +310,7 @@ func TestService_Persist_Refresh(t *testing.T) {
 		topic, err = b.Refresh(context.Background(), "upA")
 		require.Nil(t, err)
 		require.Equal(t, clock.now(), topic.SubscribedAt)
-		require.Equal(t, clock.now(), b.Get("upA").SubscribedAt)
+		require.Equal(t, clock.now(), b.State("upA").SubscribedAt)
 
 		// An unknown topic stays unknown; a failed read is an error
 		topic, err = b.Refresh(context.Background(), "upB")
@@ -351,8 +351,8 @@ func TestService_Persist_PrunesTableAndMemory(t *testing.T) {
 		clock.advance(pruneAfter + 2*time.Hour)
 		s.Note("upB")
 		s.sync() // Prunes: an hour has passed since the last one
-		require.Nil(t, s.Get("upA"))
-		require.NotNil(t, s.Get("upB"))
+		require.Nil(t, s.State("upA"))
+		require.NotNil(t, s.State("upB"))
 		require.Equal(t, []string{"upB"}, topicsOf(readAll(t, store, 0)))
 
 		// A topic with an unwritten change is never pruned from memory, however old its last write
@@ -366,7 +366,7 @@ func TestService_Persist_PrunesTableAndMemory(t *testing.T) {
 		s.mu.Unlock()
 		clock.advance(pruneInterval)
 		s.sync()
-		require.NotNil(t, s.Get("upC"))
+		require.NotNil(t, s.State("upC"))
 	})
 }
 
@@ -376,7 +376,7 @@ func TestService_WithoutStore(t *testing.T) {
 	s.Note("upA")
 	topic, err := s.Refresh(context.Background(), "upA")
 	require.Nil(t, err)
-	require.Equal(t, s.Get("upA"), topic)
+	require.Equal(t, s.State("upA"), topic)
 	s.Close()
 }
 

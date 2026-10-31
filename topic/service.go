@@ -7,13 +7,18 @@
 // With a store, a sync worker writes the topics changed here (a dirty set, so a round costs
 // what changed, not the table) every syncInterval and reads back the rows changed since the last
 // round, applying the same merge rules in memory; at startup it loads every row. A publish
-// never reads the database (Get is memory only); Refresh is the one cold-path read, for a
+// never reads the database (State is memory only); Refresh is the one cold-path read, for a
 // decision too final to make from a stale row. Rows not written for pruneAfter are pruned from
 // the table and from memory alike.
 //
 // The worker is the service's own, not the usage counters' (package limit): a stuck topic sync
 // must not stall the daily limits. Timestamps are the node's clock (unix seconds), so the nodes
 // must keep their clocks in sync (NTP); a skew beyond readOverlap may skip rows in the read-back.
+//
+// The live topics of a node (its subscribers and the delivery to them, server.topic and the
+// server's topics map today) are meant to move into this package too, as topic.Topic and
+// topic.Subscriber, with Subscribe and Unsubscribe calling SetRateVisitor, Touch and Keepalive
+// themselves. Until then, put new per-topic state here rather than in the server.
 package topic
 
 import (
@@ -185,19 +190,19 @@ func (s *Service) Note(topic string) {
 	s.noted++
 }
 
-// Get returns the topic's state as this node knows it, from memory, or nil if it is unknown
-func (s *Service) Get(topic string) *Topic {
+// State returns the topic's state as this node knows it, from memory, or nil if it is unknown
+func (s *Service) State(topic string) *State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.getNoLock(topic)
+	return s.stateNoLock(topic)
 }
 
 // Refresh reads the topic's row from the store (a primary key read, with the caller's context),
-// merges it into memory, and returns the topic's state like Get. It is for a decision too final
-// to make from a stale row, on a cold path only. Without a store it is Get.
-func (s *Service) Refresh(ctx context.Context, topic string) (*Topic, error) {
+// merges it into memory, and returns the topic's state like State. It is for a decision too final
+// to make from a stale row, on a cold path only. Without a store it is State.
+func (s *Service) Refresh(ctx context.Context, topic string) (*State, error) {
 	if s.store == nil {
-		return s.Get(topic), nil
+		return s.State(topic), nil
 	}
 	r, err := s.store.readOne(ctx, topic)
 	if err != nil {
@@ -208,7 +213,7 @@ func (s *Service) Refresh(ctx context.Context, topic string) (*Topic, error) {
 	if r != nil {
 		s.applyNoLock(r)
 	}
-	return s.getNoLock(topic), nil
+	return s.stateNoLock(topic), nil
 }
 
 // RateVisitorUserIDs returns the distinct user IDs of the rate visitors of the topics with
@@ -240,7 +245,7 @@ func (s *Service) Size() int {
 
 // SetForTest replaces the topic's state with the given one, as if it had been observed here, and
 // has it written. It exists so tests can age a topic; it is not used in production code.
-func (s *Service) SetForTest(topic string, t *Topic) {
+func (s *Service) SetForTest(topic string, t *State) {
 	now := s.now().Unix()
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -488,13 +493,13 @@ func (s *Service) entryNoLock(topic string, now int64) *entry {
 	return e
 }
 
-// getNoLock returns the topic's state, or nil if it is unknown. The caller must hold s.mu.
-func (s *Service) getNoLock(topic string) *Topic {
+// stateNoLock returns the topic's state, or nil if it is unknown. The caller must hold s.mu.
+func (s *Service) stateNoLock(topic string) *State {
 	e, ok := s.entries[topic]
 	if !ok {
 		return nil
 	}
-	t := &Topic{
+	t := &State{
 		FirstSeenAt: time.Unix(e.firstSeenAt, 0).UTC(),
 	}
 	if e.subscribedAt != 0 {

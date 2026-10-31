@@ -53,7 +53,7 @@ func (s *Server) rateVisitor(t *topic) *visitor {
 	if !s.config.VisitorSubscriberRateLimiting || !isUnifiedPushTopic(t.ID) {
 		return nil
 	}
-	state := s.topicService.Get(t.ID)
+	state := s.topicService.State(t.ID)
 	if state == nil || state.RateVisitor == nil {
 		return nil
 	} else if t.SubscribersCount() == 0 && time.Since(state.SubscribedAt) > rateVisitorLiveFor {
@@ -79,7 +79,7 @@ func (s *Server) unifiedPushTopicAbandoned(r *http.Request, t *topic) bool {
 	if !isUnifiedPushTopic(t.ID) || t.SubscribersCount() > 0 {
 		return false
 	}
-	state := s.topicService.Get(t.ID)
+	state := s.topicService.State(t.ID)
 	if state == nil || !topicAbandoned(state) {
 		return false
 	}
@@ -168,7 +168,7 @@ func (c *rateVisitorUserCache) Refresh(ids []string) error {
 
 // topicAbandoned returns true if the topic's newest observation (a subscriber, or its first
 // refused push) is older than unifiedPushAbandonedAfter
-func topicAbandoned(state *tp.Topic) bool {
+func topicAbandoned(state *tp.State) bool {
 	newest := state.FirstSeenAt
 	if state.SubscribedAt.After(newest) {
 		newest = state.SubscribedAt

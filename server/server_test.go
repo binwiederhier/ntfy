@@ -1978,7 +1978,7 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 507, response.Code)
 		require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
-		require.Nil(t, s.topicService.Get("mytopic"))
+		require.Nil(t, s.topicService.State("mytopic"))
 
 		// Fake: This topic has been around for 13 hours without a rate visitor
 		s.topics["mytopic"].lastAccess = time.Now().Add(-13 * time.Hour)
@@ -3502,7 +3502,7 @@ func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testin
 	ageTopic(s, "upAAAAAAAAAAAA", 23*time.Hour)
 	rr = request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
-	require.WithinDuration(t, time.Now(), s.topicService.Get("upAAAAAAAAAAAA").SubscribedAt, time.Minute)
+	require.WithinDuration(t, time.Now(), s.topicService.State("upAAAAAAAAAAAA").SubscribedAt, time.Minute)
 }
 
 func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testing.T) {

@@ -90,6 +90,9 @@ func newAdminAPI(c *cli.Context) (adminAPI, error) {
 		printAdminFallbackWarning(c.App.ErrWriter, adminSocketDisabledCause)
 		return newDirectAdminAPI(c)
 	}
+	if err := checkAdminSocketOwner(socket, c.String("auth-file")); err != nil {
+		return nil, err
+	}
 	admin := client.NewAdminSocket(socket)
 	err := admin.Ping()
 	var apiErr *client.AdminError

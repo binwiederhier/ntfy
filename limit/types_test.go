@@ -30,10 +30,16 @@ func TestUsage_Count(t *testing.T) {
 		Burst:  100,
 		Refill: time.Second,
 	}, 42).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindRequests,
+		Burst:  100,
+		Refill: time.Second,
+	}, 1).OK)
 	u := s.Usage("k")
 	require.Equal(t, int64(3), u.Count(KindMessages))
 	require.Equal(t, int64(42), u.Count(KindBandwidth)) // In memory only, but counted
 	require.Equal(t, int64(0), u.Count(KindEmails))
+	require.Equal(t, int64(0), u.Count(KindRequests)) // Not tallied, so that it does not hold the key (see Prune)
 }
 
 func TestLimiter_Value_Bandwidth(t *testing.T) {

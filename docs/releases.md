@@ -2302,6 +2302,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Daily limits now reset on a rolling 24-hour period per account or IP address instead of for everyone at midnight UTC: each visitor's period starts at its own time of day, which spreads the resets over the day. The account page and the `/v1/account` API (`stats.reset_at`) show when the visitor's counts reset
 * Visitors without a tier have a daily e-mail limit again (24h / `visitor-email-limit-replenish`), now that it is shared between servers and survives restarts
 * The daily reset job is gone; the `stats_*` columns of the user table are zeroed by the upgrade and no longer read or written
+* The rate limit state of a visitor is forgotten about a minute after it has fully recovered (all buckets refilled, no attachment bandwidth used in its current daily period) instead of after a day without use, which frees the memory of one-off visitors such as floods of new IPs. The `visitors` stat and the `ntfy_visitors_total` metric therefore count the visitors of roughly the last minute, not of the last day ([#2126](https://github.com/binwiederhier/ntfy/pull/2126))
 
 **Bug fixes + maintenance:**
 

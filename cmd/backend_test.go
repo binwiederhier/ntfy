@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/server"
 	"heckel.io/ntfy/v2/test"
 	"heckel.io/ntfy/v2/user"
 )
@@ -202,4 +203,56 @@ func TestCLI_Backend_SocketPermissionDenied(t *testing.T) {
 	require.Nil(t, runUserCommand(app, conf, "list"))
 	require.Contains(t, stdout.String(), "user * (role: anonymous")
 	require.Contains(t, stderr.String(), "(permission denied), writing to the database\ndirectly")
+}
+
+// forEachAdminMode runs a CLI test twice: once with the commands talking to the test server over
+// its admin socket, and once with the socket disabled, i.e. writing to the database directly.
+// Both must produce the same output.
+func forEachAdminMode(t *testing.T, f func(t *testing.T, socket bool)) {
+	t.Run("socket", func(t *testing.T) {
+		f(t, true)
+	})
+	t.Run("direct", func(t *testing.T) {
+		f(t, false)
+	})
+}
+
+func newTestServerWithAuth(t *testing.T, socket bool, options ...func(conf *server.Config)) (s *server.Server, conf *server.Config, port int) {
+	configFile := filepath.Join(t.TempDir(), "server-dummy.yml")
+	require.Nil(t, os.WriteFile(configFile, []byte(""), 0600)) // Dummy config file to avoid lookup of real server.yml
+	conf = server.NewConfig()
+	conf.File = configFile
+	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
+	conf.AuthDefault = user.PermissionDenyAll
+	conf.AuthAccessCacheEnabled = false
+	conf.ListenAdminUnix = "" // Never the real default path, a server on this machine may be listening there
+	if socket {
+		conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
+	}
+	for _, option := range options {
+		option(conf)
+	}
+	s, port = test.StartServerWithConfig(t, conf)
+	if socket {
+		waitForAdminSocket(t, conf.ListenAdminUnix)
+	}
+	return
+}
+
+// shortTempDir returns a temp dir with a short path, since unix socket paths are limited to ~104 bytes
+func shortTempDir(t *testing.T) string {
+	dir, err := os.MkdirTemp("", "ntfy-cli")
+	require.Nil(t, err)
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return dir
+}
+
+func waitForAdminSocket(t *testing.T, socket string) {
+	for i := 0; i < 100; i++ {
+		if newServerSocketClient(socket).Ping() == nil {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("admin socket %s did not come up", socket)
 }

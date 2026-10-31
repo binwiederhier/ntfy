@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
@@ -227,18 +226,6 @@ func TestCLI_User_AuthFileNotReadable(t *testing.T) {
 	require.NotContains(t, err.Error(), "does not exist")
 }
 
-// forEachAdminMode runs a CLI test twice: once with the commands talking to the test server over
-// its admin socket, and once with the socket disabled, i.e. writing to the database directly.
-// Both must produce the same output.
-func forEachAdminMode(t *testing.T, f func(t *testing.T, socket bool)) {
-	t.Run("socket", func(t *testing.T) {
-		f(t, true)
-	})
-	t.Run("direct", func(t *testing.T) {
-		f(t, false)
-	})
-}
-
 func TestCLI_User_ChangeTier_Reset(t *testing.T) {
 	forEachAdminMode(t, func(t *testing.T, socket bool) {
 		s, conf, port := newTestServerWithAuth(t, socket)
@@ -294,28 +281,6 @@ func withSMTP(conf *server.Config) {
 	conf.SMTPSenderFrom = "ntfy@example.com"
 }
 
-func newTestServerWithAuth(t *testing.T, socket bool, options ...func(conf *server.Config)) (s *server.Server, conf *server.Config, port int) {
-	configFile := filepath.Join(t.TempDir(), "server-dummy.yml")
-	require.Nil(t, os.WriteFile(configFile, []byte(""), 0600)) // Dummy config file to avoid lookup of real server.yml
-	conf = server.NewConfig()
-	conf.File = configFile
-	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	conf.AuthDefault = user.PermissionDenyAll
-	conf.AuthAccessCacheEnabled = false
-	conf.ListenAdminUnix = "" // Never the real default path, a server on this machine may be listening there
-	if socket {
-		conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "admin.sock")
-	}
-	for _, option := range options {
-		option(conf)
-	}
-	s, port = test.StartServerWithConfig(t, conf)
-	if socket {
-		waitForAdminSocket(t, conf.ListenAdminUnix)
-	}
-	return
-}
-
 func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {
 	userArgs := []string{
 		"ntfy",
@@ -327,22 +292,4 @@ func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {
 		"--listen-admin-unix=" + conf.ListenAdminUnix,
 	}
 	return app.Run(append(userArgs, args...))
-}
-
-// shortTempDir returns a temp dir with a short path, since unix socket paths are limited to ~104 bytes
-func shortTempDir(t *testing.T) string {
-	dir, err := os.MkdirTemp("", "ntfy-cli")
-	require.Nil(t, err)
-	t.Cleanup(func() { os.RemoveAll(dir) })
-	return dir
-}
-
-func waitForAdminSocket(t *testing.T, socket string) {
-	for i := 0; i < 100; i++ {
-		if newServerSocketClient(socket).Ping() == nil {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("admin socket %s did not come up", socket)
 }

@@ -177,6 +177,12 @@ func mapAPIError(err error, username, tier, token string) error {
 	return apiErr
 }
 
+// isAPIErrorCode reports whether err is an admin API error with the given ntfy error code
+func isAPIErrorCode(err error, code int) bool {
+	var apiErr *apiError
+	return errors.As(err, &apiErr) && apiErr.Code == code
+}
+
 // adminUnreachableCause is the start of the fallback warning when no server answered on the socket
 func adminUnreachableCause(socket string, err error) string {
 	return fmt.Sprintf("No ntfy server answered on the admin socket\n%s (%s)", socket, adminUnreachableReason(err))

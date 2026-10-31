@@ -480,9 +480,3 @@ func readPasswordHash(c *cli.Context) (string, error) {
 	}
 	return user.HashPassword(password, user.DefaultUserPasswordBcryptCost)
 }
-
-// isAPIErrorCode reports whether err is an admin API error with the given ntfy error code
-func isAPIErrorCode(err error, code int) bool {
-	var apiErr *apiError
-	return errors.As(err, &apiErr) && apiErr.Code == code
-}

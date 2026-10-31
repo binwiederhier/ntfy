@@ -900,3 +900,141 @@ const subscriptionDeletedEventJSON = `
 		}
 	}
 }`
+
+func TestPayments_Webhook_Subscription_Updated_Incomplete_Does_Not_Grant_Tier(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+
+		// A customer.subscription.updated event with a non-paying status (e.g. "incomplete", from a
+		// delayed-payment checkout that never clears) must NOT grant the paid tier. The status is still
+		// recorded, but the tier is only granted once the subscription is actually paying.
+
+		stripeMock := &testStripeAPI{}
+		defer stripeMock.AssertExpectations(t)
+
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.StripeSecretKey = "secret key"
+		c.StripeWebhookKey = "webhook key"
+		s := newTestServer(t, c)
+		s.stripe = stripeMock
+
+		stripeMock.
+			On("ConstructWebhookEvent", mock.Anything, "stripe signature", "webhook key").
+			Return(jsonToStripeEvent(t, subscriptionUpdatedIncompleteEventJSON), nil)
+
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			ID:                   "ti_1",
+			Code:                 "pro",
+			StripeMonthlyPriceID: "price_1234",
+			ReservationLimit:     3,
+		}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		require.Nil(t, s.userManager.ChangeBilling(u.Name, &user.Billing{StripeCustomerID: "acct_5555"}))
+
+		rr := request(t, s, "POST", "/v1/account/billing/webhook", "dummy", map[string]string{
+			"Stripe-Signature": "stripe signature",
+		})
+		require.Equal(t, 200, rr.Code)
+
+		u, err = s.userManager.User("phil")
+		require.Nil(t, err)
+		require.Nil(t, u.Tier) // "incomplete" must not grant the paid tier
+		require.Equal(t, payments.SubscriptionStatus(stripe.SubscriptionStatusIncomplete), u.Billing.StripeSubscriptionStatus)
+	})
+}
+
+func TestPayments_Webhook_Subscription_Deleted_Stale_Subscription_Ignored(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+
+		// A customer.subscription.deleted event whose subscription ID does not match the user's current
+		// subscription (a stale or replayed event for an old subscription of the same customer) must not
+		// purge the user's current subscription, tier or reservations.
+
+		stripeMock := &testStripeAPI{}
+		defer stripeMock.AssertExpectations(t)
+
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.StripeSecretKey = "secret key"
+		c.StripeWebhookKey = "webhook key"
+		s := newTestServer(t, c)
+		s.stripe = stripeMock
+
+		stripeMock.
+			On("ConstructWebhookEvent", mock.Anything, "stripe signature", "webhook key").
+			Return(jsonToStripeEvent(t, subscriptionDeletedStaleEventJSON), nil)
+
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			ID:                   "ti_1",
+			Code:                 "pro",
+			StripeMonthlyPriceID: "price_1234",
+			ReservationLimit:     1,
+		}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+		require.Nil(t, s.userManager.AddReservation("phil", "atopic", user.PermissionDenyAll, 0))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		require.Nil(t, s.userManager.ChangeBilling(u.Name, &user.Billing{
+			StripeCustomerID:            "acct_5555",
+			StripeSubscriptionID:        "sub_current",
+			StripeSubscriptionStatus:    payments.SubscriptionStatus(stripe.SubscriptionStatusActive),
+			StripeSubscriptionInterval:  payments.PriceRecurringInterval(stripe.PriceRecurringIntervalMonth),
+			StripeSubscriptionPaidUntil: time.Unix(123, 0),
+		}))
+
+		rr := request(t, s, "POST", "/v1/account/billing/webhook", "dummy", map[string]string{
+			"Stripe-Signature": "stripe signature",
+		})
+		require.Equal(t, 200, rr.Code)
+
+		u, err = s.userManager.User("phil")
+		require.Nil(t, err)
+		require.NotNil(t, u.Tier) // stale delete must not downgrade
+		require.Equal(t, "pro", u.Tier.Code)
+		require.Equal(t, "sub_current", u.Billing.StripeSubscriptionID)
+		r, err := s.userManager.Reservations("phil")
+		require.Nil(t, err)
+		require.Equal(t, 1, len(r)) // reservation must not be purged
+	})
+}
+
+const subscriptionUpdatedIncompleteEventJSON = `
+{
+	"type": "customer.subscription.updated",
+	"data": {
+		"object": {
+			"id": "sub_1234",
+			"customer": "acct_5555",
+			"status": "incomplete",
+			"current_period_end": 1674268231,
+			"cancel_at": 1674299999,
+			"items": {
+				"data": [
+					{
+						"price": {
+							"id": "price_1234",
+							"recurring": {
+								"interval": "month"
+							}
+						}
+					}
+				]
+			}
+		}
+	}
+}`
+
+const subscriptionDeletedStaleEventJSON = `
+{
+	"type": "customer.subscription.deleted",
+	"data": {
+		"object": {
+			"id": "sub_old",
+			"customer": "acct_5555",
+			"status": "canceled"
+		}
+	}
+}`

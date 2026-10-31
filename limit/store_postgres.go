@@ -2,6 +2,9 @@ package limit
 
 import (
 	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"heckel.io/ntfy/v2/db"
 )
@@ -36,6 +39,7 @@ func NewPostgresStore(d *db.DB) *Store {
 		},
 	}
 	s.writeChunk = s.writePostgres
+	s.mayHaveCommitted = mayHaveCommittedPostgres
 	return s
 }
 
@@ -55,4 +59,15 @@ func (s *Store) writePostgres(ctx context.Context, rows []usageRow, now int64) e
 	}
 	_, err := s.db.ExecContext(ctx, s.queries.upsert, keys, periodStarts, counts[0], counts[1], counts[2], now)
 	return err
+}
+
+// mayHaveCommittedPostgres reports whether a failed write may have committed anyway: a timeout
+// after the statement was sent, e.g. a commit acknowledged after the deadline. An error from the
+// server, or one before the statement was sent, means nothing was written.
+func mayHaveCommittedPostgres(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) || pgconn.SafeToRetry(err) {
+		return false
+	}
+	return errors.Is(err, context.DeadlineExceeded) || pgconn.Timeout(err)
 }

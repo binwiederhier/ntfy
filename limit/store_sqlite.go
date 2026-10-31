@@ -36,6 +36,7 @@ func NewSQLiteStore(d *db.DB) *Store {
 		},
 	}
 	s.writeChunk = s.writeSQLite
+	s.mayHaveCommitted = mayHaveCommittedSQLite
 	return s
 }
 
@@ -54,4 +55,10 @@ func (s *Store) writeSQLite(ctx context.Context, rows []usageRow, now int64) err
 		}
 		return nil
 	})
+}
+
+// mayHaveCommittedSQLite reports false: a chunk is written in one local transaction, which is
+// rolled back on any error, so a failed chunk was never written
+func mayHaveCommittedSQLite(_ error) bool {
+	return false
 }

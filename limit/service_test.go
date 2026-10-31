@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/user"
 )
 
 // testClock is a clock the tests move by hand
@@ -805,6 +807,30 @@ func TestService_Persist_WriteFailureRetries(t *testing.T) {
 		require.Equal(t, int64(31), s.Usage("k").Count(KindEmails))
 		require.Equal(t, int64(31), usageRowOf(t, store, "k").counts[1])
 	})
+}
+
+func TestService_Persist_TimeoutAfterCommitIsNotCountedTwice(t *testing.T) {
+	// On Postgres, a write that times out may have committed (e.g. the commit was acknowledged
+	// after the deadline): it is counted as written, so a retry does not count it twice. If it
+	// did not commit, its counts are lost, which fails open like a store outage.
+	d := dbtest.CreateTestPostgres(t)
+	_, err := user.NewPostgresManager(d, &user.Config{}) // Creates the usage table
+	require.Nil(t, err)
+	store := NewPostgresStore(d)
+	writeChunk := store.writeChunk
+	store.writeChunk = func(ctx context.Context, rows []usageRow, now int64) error {
+		if err := writeChunk(ctx, rows, now); err != nil {
+			return err
+		}
+		return context.DeadlineExceeded // Committed, but the answer came too late
+	}
+	s := startTestService(t, store, time.Now)
+	require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages}, 26).OK)
+	s.sync()
+	store.writeChunk = writeChunk
+	s.sync()
+	require.Equal(t, int64(26), usageRowOf(t, store, "user:u_1").counts[0])
+	require.Equal(t, int64(26), s.Usage("user:u_1").Count(KindMessages))
 }
 
 func TestService_Persist_StartupWithoutStore(t *testing.T) {

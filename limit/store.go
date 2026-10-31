@@ -29,9 +29,10 @@ type usageRow struct {
 // stamped (updated_at) with the writing node's clock, like the reader's watermark, so the
 // database's clock does not matter. Only the service's sync worker calls it.
 type Store struct {
-	db         *db.DB
-	queries    *queries
-	writeChunk func(ctx context.Context, rows []usageRow, now int64) error // Dialect specific: unnest on Postgres, a prepared statement per row on SQLite
+	db               *db.DB
+	queries          *queries
+	writeChunk       func(ctx context.Context, rows []usageRow, now int64) error // Dialect specific: unnest on Postgres, a prepared statement per row on SQLite
+	mayHaveCommitted func(err error) bool                                        // Dialect specific: whether a failed chunk may have been written anyway
 }
 
 // queries are the dialect's SQL statements

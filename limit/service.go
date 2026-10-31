@@ -392,18 +392,23 @@ func (s *Service) sync() {
 
 // write writes the unflushed counts of the promoted keys. A written row moves its counts from
 // unflushed to base, so the total does not change and nothing is written twice; the counts of a
-// failed chunk stay unflushed for the next round.
+// failed chunk stay unflushed for the next round. A failed chunk that may have been written anyway
+// (a timeout after the commit) counts as written: if it was not, its counts are lost, which fails
+// open like an outage, rather than counting them twice.
 func (s *Service) write(ctx context.Context) {
 	rows := s.unflushedRows()
 	if len(rows) == 0 {
 		return
 	}
 	written, err := s.store.write(ctx, rows, s.now().Unix())
+	if err != nil && s.store.mayHaveCommitted(err) {
+		written = min(written+writeChunkRows, len(rows))
+	}
 	for i := range rows[:written] {
 		s.retire(&rows[i])
 	}
 	if err != nil {
-		log.Tag(tag).Err(err).Warn("Cannot write usage, %d of %d key(s) written; the rest is retried", written, len(rows))
+		log.Tag(tag).Err(err).Warn("Cannot write usage, %d of %d key(s) written or maybe written; the rest is retried", written, len(rows))
 	}
 }
 

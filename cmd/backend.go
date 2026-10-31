@@ -17,6 +17,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
 	"golang.org/x/term"
+	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/server"
 )
 
@@ -45,26 +46,26 @@ var (
 	adminTargetFlags = []string{"--server", "-S", "--token", "-k", "--listen-admin-unix", "--listen_admin_unix", "--config", "-c"}
 )
 
-// backend is what the user, access, token and tier commands need. serverClient implements it
+// backend is what the user, access, token and tier commands need. client.Client implements it
 // over the admin socket or HTTP; dbBackend implements it against the database (the fallback).
 type backend interface {
-	Users() ([]*apiUser, error)
-	User(username string) (*apiUser, error)
+	Users() ([]*client.User, error)
+	User(username string) (*client.User, error)
 	AddUser(username, hash, tier, role string) error
 	ChangePassword(username, hash string) error
 	ChangeTier(username, tier string) error
 	ChangeRole(username, role string) error
 	RemoveUser(username string) error
-	ResetPassword(username string, sendEmail bool) (*apiPasswordReset, error)
+	ResetPassword(username string, sendEmail bool) (*client.PasswordReset, error)
 	AllowAccess(username, topic, permission string) error
 	ResetAccess(username, topic string) error
-	Tokens(username string) ([]*apiToken, error)
-	AddToken(username, label string, expires time.Time) (*apiToken, error)
+	Tokens(username string) ([]*client.Token, error)
+	AddToken(username, label string, expires time.Time) (*client.Token, error)
 	RemoveToken(username, token string) error
-	Tiers() ([]*apiTier, error)
-	Tier(code string) (*apiTier, error)
-	AddTier(t *apiTier) error
-	UpdateTier(t *apiTier) error
+	Tiers() ([]*client.Tier, error)
+	Tier(code string) (*client.Tier, error)
+	AddTier(t *client.Tier) error
+	UpdateTier(t *client.Tier) error
 	RemoveTier(code string) error
 	Close() error
 }
@@ -88,7 +89,7 @@ func newBackend(c *cli.Context) (backend, error) {
 		if u, err := url.Parse(server); err == nil && u.Scheme == "http" && !isLoopbackHost(u.Hostname()) {
 			fmt.Fprintf(c.App.ErrWriter, "warning: --server %s is not HTTPS, the token is sent unencrypted\n", server)
 		}
-		return newServerClient(server, token), nil
+		return client.New(server, token), nil
 	}
 	authConfigured := c.String("auth-file") != "" || c.String("database-url") != ""
 	socket := c.String("listen-admin-unix")
@@ -101,13 +102,13 @@ func newBackend(c *cli.Context) (backend, error) {
 	if err := checkAdminSocketOwner(socket, c.String("auth-file")); err != nil {
 		return nil, err
 	}
-	sc := newServerSocketClient(socket)
+	sc := client.NewSocket(socket)
 	err := sc.Ping()
-	var apiErr *apiError
+	var apiErr *client.Error
 	switch {
 	case err == nil:
 		return sc, nil
-	case errors.As(err, &apiErr) && apiErr.Code == apiErrCodeNotFound:
+	case errors.As(err, &apiErr) && apiErr.Code == client.ErrCodeNotFound:
 		// The server runs without auth, i.e. it does not use this database; createUserManager decides
 	case errors.Is(err, fs.ErrPermission):
 		// Either this user may not manage the server, or the socket is some other server's (e.g. the
@@ -118,7 +119,7 @@ func newBackend(c *cli.Context) (backend, error) {
 		}
 		printAdminFallbackWarning(c.App.ErrWriter, adminUnreachableCause(socket, err))
 		return direct, nil
-	case errors.Is(err, errServerUnreachable):
+	case errors.Is(err, client.ErrUnreachable):
 		printAdminFallbackWarning(c.App.ErrWriter, adminUnreachableCause(socket, err))
 	default:
 		return nil, err // The server answered with some other error; do not hide it behind a fallback
@@ -144,48 +145,48 @@ func isLoopbackHost(host string) bool {
 // server, so scripts and tests see the same text no matter how the command reached the database.
 // The wording lives only here.
 func mapAPIError(err error, username, tier, token string) error {
-	var apiErr *apiError
+	var apiErr *client.Error
 	if !errors.As(err, &apiErr) {
 		return err
 	}
 	switch apiErr.Code {
-	case apiErrCodeUserNotFound:
+	case client.ErrCodeUserNotFound:
 		return fmt.Errorf("user %s does not exist", username)
-	case apiErrCodeUserExists:
+	case client.ErrCodeUserExists:
 		return fmt.Errorf("user %s already exists", username)
-	case apiErrCodeTierNotFound:
+	case client.ErrCodeTierNotFound:
 		return fmt.Errorf("tier %s does not exist", tier)
-	case apiErrCodeTierExists:
+	case client.ErrCodeTierExists:
 		return fmt.Errorf("tier %s already exists", tier)
-	case apiErrCodeTierInUse:
+	case client.ErrCodeTierInUse:
 		return fmt.Errorf("tier %s is still assigned to users", tier)
-	case apiErrCodeTierReservationsLimit:
+	case client.ErrCodeTierReservationsLimit:
 		return fmt.Errorf("user %s has more topic reservations than tier %s allows, remove reservations first", username, tier)
-	case apiErrCodeTokenNotFound:
+	case client.ErrCodeTokenNotFound:
 		return fmt.Errorf("token %s for user %s does not exist", token, username)
-	case apiErrCodeAccessAdminUser:
+	case client.ErrCodeAccessAdminUser:
 		return fmt.Errorf("user %s is an admin user, access control entries have no effect", username)
-	case apiErrCodeProvisionedUserChange:
+	case client.ErrCodeProvisionedUserChange:
 		return fmt.Errorf("user %s is provisioned in the config file and cannot be changed", username)
-	case apiErrCodeProvisionedTokenChange:
+	case client.ErrCodeProvisionedTokenChange:
 		return fmt.Errorf("token %s is provisioned in the config file and cannot be changed", token)
-	case apiErrCodeUserNoPrimaryEmail:
+	case client.ErrCodeUserNoPrimaryEmail:
 		return fmt.Errorf("user %s has no primary email; cannot send reset link (omit --send-email to just print it)", username)
-	case apiErrCodeBaseURLNotConfigured:
+	case client.ErrCodeBaseURLNotConfigured:
 		return errors.New("base-url must be configured to generate a reset link")
-	case apiErrCodeRoleInvalid:
+	case client.ErrCodeRoleInvalid:
 		return errors.New("role must be either 'user' or 'admin'")
-	case apiErrCodeTierCodeInvalid:
+	case client.ErrCodeTierCodeInvalid:
 		return errors.New("tier code must consist only of numbers and letters, and the tier needs a name")
-	case apiErrCodePermissionInvalid:
+	case client.ErrCodePermissionInvalid:
 		return errors.New("permission must be one of: read-write, read-only, write-only, or deny (or the aliases: read, ro, write, wo, none)")
-	case apiErrCodePasswordHashInvalid:
+	case client.ErrCodePasswordHashInvalid:
 		return errors.New("password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate")
-	case apiErrCodeAdminSocketOnly:
+	case client.ErrCodeAdminSocketOnly:
 		return errors.New("only possible over the admin socket or directly in the database, not over --server: setting roles, changing admin users or their tokens, listing all users' tokens, and resetting the whole access control list")
-	case apiErrCodeNotFound:
+	case client.ErrCodeNotFound:
 		return errors.New("the server does not support this command, upgrade the server or use direct database access")
-	case apiErrCodeUnauthorized:
+	case client.ErrCodeUnauthorized:
 		return errors.New("unauthorized: --token must belong to an admin user")
 	}
 	return apiErr
@@ -193,7 +194,7 @@ func mapAPIError(err error, username, tier, token string) error {
 
 // isAPIErrorCode reports whether err is an admin API error with the given ntfy error code
 func isAPIErrorCode(err error, code int) bool {
-	var apiErr *apiError
+	var apiErr *client.Error
 	return errors.As(err, &apiErr) && apiErr.Code == code
 }
 
@@ -202,10 +203,10 @@ func adminUnreachableCause(socket string, err error) string {
 	return fmt.Sprintf("No ntfy server answered on the admin socket\n%s (%s)", socket, adminUnreachableReason(err))
 }
 
-// adminUnreachableReason extracts the cause from a wrapped errServerUnreachable, e.g.
+// adminUnreachableReason extracts the cause from a wrapped client.ErrUnreachable, e.g.
 // "no such file or directory", for the fallback warning
 func adminUnreachableReason(err error) string {
-	reason := strings.TrimPrefix(err.Error(), errServerUnreachable.Error()+": ")
+	reason := strings.TrimPrefix(err.Error(), client.ErrUnreachable.Error()+": ")
 	if i := strings.LastIndex(reason, ": "); i >= 0 {
 		reason = reason[i+2:]
 	}

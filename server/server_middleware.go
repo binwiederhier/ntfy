@@ -36,7 +36,7 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 			return err
 		}
 		vrate := v
-		if rateVisitor := t.RateVisitor(); rateVisitor != nil {
+		if rateVisitor := s.rateVisitor(t); rateVisitor != nil { // Once per request, so the publish handler sees the same rate visitor
 			vrate = rateVisitor
 		}
 		r = withContext(r, map[contextKey]any{

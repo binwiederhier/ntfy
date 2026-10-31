@@ -14,6 +14,7 @@ func (s *Server) execManager() {
 	// database (and the web push job, which also sends expiry warnings) run on the cluster
 	// leader only. Without clustering, IsLeader is always true.
 	s.pruneVisitors()
+	s.refreshRateVisitorUsers()
 	if s.cluster.IsLeader() {
 		s.pruneTokens()
 		s.pruneAttachments()
@@ -48,6 +49,9 @@ func (s *Server) execManager() {
 						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, util.FormatTime(lastAccess))
 					}
 					t.ExpireDelivered()
+					if subs > 0 {
+						s.keepaliveTopics([]*topic{t}) // An open stream keeps the rate visitor live on the other nodes too
+					}
 					subscribers += subs
 				}
 			}

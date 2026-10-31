@@ -21,7 +21,10 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-const minBcryptTimingMillis = int64(40) // Ideally should be >100ms, but this should also run on a Raspberry Pi without massive resources
+const (
+	minBcryptTimingMillis = int64(40) // Ideally should be >100ms, but this should also run on a Raspberry Pi without massive resources
+	latestSchemaVersion   = 11        // The user schema's version after all migrations; bump with every migration
+)
 
 // newManagerFunc creates a Manager with the given config. Calling it multiple
 // times within the same test returns a new Manager pointing at the same
@@ -1877,7 +1880,7 @@ func TestMigrationFrom6Postgres(t *testing.T) {
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'user'`).Scan(&version))
-	require.Equal(t, 10, version)
+	require.Equal(t, latestSchemaVersion, version)
 	// The manager works against the migrated schema
 	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
 	u, err := a.User("phil")
@@ -1919,7 +1922,7 @@ func checkSchemaVersion(t *testing.T, d *db.DB) {
 
 	var schemaVersion int
 	require.Nil(t, rows.Scan(&schemaVersion))
-	require.Equal(t, 10, schemaVersion)
+	require.Equal(t, latestSchemaVersion, schemaVersion)
 	require.Nil(t, rows.Close())
 }
 
@@ -2011,6 +2014,58 @@ func TestStoreUserByID(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, u.Name, u2.Name)
 		require.Equal(t, u.ID, u2.ID)
+	})
+}
+
+func TestStoreUsersByIDs(t *testing.T) {
+	// Users are looked up in bulk, with their tiers; unknown IDs are skipped, deleted users are
+	// returned as deleted, and more IDs than fit one statement are looked up in chunks
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		manager := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, manager.AddTier(&Tier{
+			Code:         "pro",
+			MessageLimit: 123,
+		}))
+		require.Nil(t, manager.AddUser("phil", "mypass", RoleAdmin, false))
+		require.Nil(t, manager.AddUser("ben", "mypass", RoleUser, false))
+		require.Nil(t, manager.AddUser("emma", "mypass", RoleUser, false))
+		require.Nil(t, manager.ChangeTier("phil", "pro"))
+		phil, err := manager.User("phil")
+		require.Nil(t, err)
+		ben, err := manager.User("ben")
+		require.Nil(t, err)
+		emma, err := manager.User("emma")
+		require.Nil(t, err)
+		require.Nil(t, manager.MarkUserRemoved(emma))
+		users, err := manager.UsersByIDs([]string{phil.ID, ben.ID, emma.ID, "u_doesnotexist"})
+		require.Nil(t, err)
+		require.Len(t, users, 3)
+		byID := make(map[string]*User)
+		for _, u := range users {
+			byID[u.ID] = u
+		}
+		require.Equal(t, "phil", byID[phil.ID].Name)
+		require.Equal(t, "pro", byID[phil.ID].Tier.Code)
+		require.Equal(t, int64(123), byID[phil.ID].Tier.MessageLimit)
+		require.Equal(t, "ben", byID[ben.ID].Name)
+		require.Nil(t, byID[ben.ID].Tier)
+		require.True(t, byID[emma.ID].Deleted)
+		users, err = manager.UsersByIDs(nil)
+		require.Nil(t, err)
+		require.Empty(t, users)
+
+		// More IDs than one statement takes
+		ids := make([]string, 0)
+		for i := 0; i < usersByIDsChunk+5; i++ {
+			name := fmt.Sprintf("user%d", i)
+			require.Nil(t, manager.AddUser(name, "mypass", RoleUser, false))
+			u, err := manager.User(name)
+			require.Nil(t, err)
+			ids = append(ids, u.ID)
+		}
+		users, err = manager.UsersByIDs(append(ids, "u_doesnotexist"))
+		require.Nil(t, err)
+		require.Len(t, users, usersByIDsChunk+5)
 	})
 }
 
@@ -3670,7 +3725,7 @@ func checkMigrated9To10(t *testing.T, a *Manager, selectVersionQuery, selectStat
 	t.Helper()
 	var version int
 	require.Nil(t, a.db.QueryRow(selectVersionQuery).Scan(&version))
-	require.Equal(t, 10, version)
+	require.Equal(t, latestSchemaVersion, version)
 	var messages, emails, calls int64
 	require.Nil(t, a.db.QueryRow(selectStatsQuery).Scan(&messages, &emails, &calls))
 	require.Equal(t, []int64{0, 0, 0}, []int64{messages, emails, calls})
@@ -3679,6 +3734,52 @@ func checkMigrated9To10(t *testing.T, a *Manager, selectVersionQuery, selectStat
 	var count int64
 	require.Nil(t, a.db.QueryRow(`SELECT messages FROM usage WHERE key = 'ip:1.2.3.4' AND updated_at >= 1793380805`).Scan(&count))
 	require.Equal(t, int64(37), count)
+}
+
+func TestMigrationFrom10To11SQLite(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "user.db")
+	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	testMigrationFrom10To11(t, a, `UPDATE schemaVersion SET version = 10 WHERE id = 1`)
+	a = newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	checkMigrated10To11(t, a, `SELECT version FROM schemaVersion WHERE id = 1`)
+	checkMigratedSqliteSchema(t, filename)
+}
+
+func TestMigrationFrom10To11Postgres(t *testing.T) {
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	open := func() *Manager {
+		host, err := pg.Open(schemaDSN)
+		require.Nil(t, err)
+		a, err := NewPostgresManager(db.New(host, nil), &Config{DefaultAccess: PermissionDenyAll, BcryptCost: bcrypt.MinCost, QueueWriterInterval: DefaultUserStatsQueueWriterInterval})
+		require.Nil(t, err)
+		t.Cleanup(func() { a.Close() })
+		return a
+	}
+	testMigrationFrom10To11(t, open(), `UPDATE schema_version SET version = 10 WHERE store = 'user'`)
+	checkMigrated10To11(t, open(), `SELECT version FROM schema_version WHERE store = 'user'`)
+}
+
+// testMigrationFrom10To11 turns the manager's database back into a version 10 one, and closes it
+func testMigrationFrom10To11(t *testing.T, a *Manager, setVersionQuery string) {
+	t.Helper()
+	_, err := a.db.Exec(`DROP TABLE IF EXISTS topic`)
+	require.Nil(t, err)
+	_, err = a.db.Exec(setVersionQuery)
+	require.Nil(t, err)
+	require.Nil(t, a.Close())
+}
+
+// checkMigrated10To11 checks that the migration created the topic table
+func checkMigrated10To11(t *testing.T, a *Manager, selectVersionQuery string) {
+	t.Helper()
+	var version int
+	require.Nil(t, a.db.QueryRow(selectVersionQuery).Scan(&version))
+	require.Equal(t, latestSchemaVersion, version)
+	_, err := a.db.Exec(`INSERT INTO topic (topic, first_seen_at, subscribed_at, rate_visitor_user_id, rate_visitor_ip, updated_at) VALUES ('upAAAAAAAAAAAA', 1793380700, 1793380800, 'u_1', '1.2.3.4', 1793380805)`)
+	require.Nil(t, err)
+	var userID, ip string
+	require.Nil(t, a.db.QueryRow(`SELECT rate_visitor_user_id, rate_visitor_ip FROM topic WHERE topic = 'upAAAAAAAAAAAA' AND updated_at >= 1793380805`).Scan(&userID, &ip))
+	require.Equal(t, []string{"u_1", "1.2.3.4"}, []string{userID, ip})
 }
 
 // newTestSQLiteManager opens the SQLite user database and creates a manager on it

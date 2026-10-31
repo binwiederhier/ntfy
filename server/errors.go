@@ -163,6 +163,7 @@ var (
 	errHTTPBadRequestBaseURLNotConfigured            = &errHTTP{40068, http.StatusBadRequest, "invalid request: base-url must be configured on the server to generate links", "https://ntfy.sh/docs/config/", nil}
 	errHTTPBadRequestPasswordHashInvalid             = &errHTTP{40069, http.StatusBadRequest, "invalid request: password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate", "", nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil}
+	errHTTPNotFoundUnifiedPushTopicAbandoned         = &errHTTP{40402, http.StatusNotFound, "UnifiedPush topic has had no subscriber for too long, subscription expired", "", nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil}
 	errHTTPForbiddenAdminSocketOnly                  = &errHTTP{40302, http.StatusForbidden, "forbidden: this operation is only allowed over the local admin socket", "https://ntfy.sh/docs/config/#admin-socket", nil}

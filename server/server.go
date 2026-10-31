@@ -43,6 +43,7 @@ import (
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/payments"
+	tp "heckel.io/ntfy/v2/topic"
 	"heckel.io/ntfy/v2/twilio"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -65,9 +66,11 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
-	visitors          *visitorEnv    // Shared by all visitors, which are built per request
-	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	limiter           *limit.Service        // Decides on and counts the visitors' usage, keyed by visitor key
+	visitors          *visitorEnv           // Shared by all visitors, which are built per request
+	topicService      *tp.Service           // Cluster-wide topic state: subscriber activity and rate visitors of the UnifiedPush topics
+	rateVisitorUsers  *rateVisitorUserCache // Users of the live rate visitors, by ID, refreshed by the manager
+	ban               *ban.Service          // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
@@ -360,6 +363,13 @@ func New(conf *Config) (*Server, error) {
 		Store: createUsageStore(pool, userDB),
 	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
+	s.topicService = tp.New(&tp.Config{
+		Store: createTopicStore(pool, userDB),
+	})
+	s.rateVisitorUsers = newRateVisitorUserCache(nil)
+	if userManager != nil {
+		s.rateVisitorUsers.lookup = userManager.UsersByIDs
+	}
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
@@ -390,6 +400,10 @@ func New(conf *Config) (*Server, error) {
 	if err := s.limiter.Start(context.Background()); err != nil {
 		return nil, err
 	}
+	if err := s.topicService.Start(context.Background()); err != nil {
+		return nil, err
+	}
+	s.refreshRateVisitorUsers() // The loaded rate visitors' tiers apply from the start, not from the first manager run
 	return s, nil
 }
 
@@ -415,6 +429,17 @@ func createUsageStore(pool, userDB *db.DB) *limit.Store {
 		return limit.NewPostgresStore(pool)
 	} else if userDB != nil {
 		return limit.NewSQLiteStore(userDB)
+	}
+	return nil
+}
+
+// createTopicStore returns the store of the topic table, which is part of the user schema like
+// the usage table (see createUsageStore). Without a user database, the topics are kept in memory only.
+func createTopicStore(pool, userDB *db.DB) *tp.Store {
+	if pool != nil {
+		return tp.NewPostgresStore(pool)
+	} else if userDB != nil {
+		return tp.NewSQLiteStore(userDB)
 	}
 	return nil
 }
@@ -641,7 +666,8 @@ func (s *Server) stop() {
 	if s.cluster != nil {
 		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
 	}
-	s.limiter.Close() // Writes the unflushed daily counts, before the databases close under it
+	s.limiter.Close()      // Writes the unflushed daily counts, before the databases close under it
+	s.topicService.Close() // Likewise, the changed topics
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -1099,11 +1125,17 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && vrate == v { // No rate visitor, see limitRequestsWithTopic
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
+		// That is what a topic abandoned for unifiedPushAbandonedAfter gets: a 404, so the subscription is removed.
+		if s.unifiedPushTopicAbandoned(r, t) {
+			return nil, errHTTPNotFoundUnifiedPushTopicAbandoned.With(t)
+		} else if isUnifiedPushTopic(t.ID) {
+			s.topicService.Note(t.ID) // Starts the countdown to the 404 of a topic nobody ever subscribed to
+		}
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
@@ -1216,18 +1248,15 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		metrics.MessagesPublishedFailure.Inc()
 		metrics.MatrixPublishedFailure.Inc()
-		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
-			topic, err := fromContext[*topic](r, contextTopic)
-			if err != nil {
-				return err
-			}
+		// An abandoned topic (see unifiedPushTopicAbandoned) gets its pushkey rejected, so the Matrix
+		// server stops sending to it; everything else, including a topic nobody subscribed to yet, is
+		// the error as it is (a 507 is transient to the Matrix server)
+		if e, ok := err.(*errHTTP); ok && e.Code == errHTTPNotFoundUnifiedPushTopicAbandoned.Code {
 			pushKey, err := fromContext[string](r, contextMatrixPushKey)
 			if err != nil {
 				return err
 			}
-			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
-				return writeMatrixResponse(w, pushKey)
-			}
+			return writeMatrixResponse(w, pushKey)
 		}
 		return err
 	}
@@ -1738,6 +1767,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
+		s.touchTopics(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1897,6 +1927,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
+		s.touchTopics(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1932,7 +1963,7 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 	return
 }
 
-// maybeSetRateVisitors sets the rate visitor on a topic (v.SetRateVisitor), indicating that all messages published
+// maybeSetRateVisitors makes v the rate visitor of a topic (topic.Service.SetRateVisitor), indicating that all messages published
 // to that topic will be rate limited against the rate visitor instead of the publishing visitor.
 //
 // Setting the rate visitor is ony allowed if the `visitor-subscriber-rate-limiting` setting is enabled, AND
@@ -1947,16 +1978,17 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 		return nil
 	}
 
-	// Make a list of topics that we'll actually set the RateVisitor on
+	// Make a list of topics that we'll actually set the rate visitor on; the others count as subscriber activity only
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
+		if isUnifiedPushTopic(t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
 	if len(eligibleRateTopics) == 0 {
 		return nil
 	}
+	s.touchTopics(eligibleRateTopics)
 
 	// If access controls are turned off, v has access to everything, and we can set the rate visitor
 	if s.userManager == nil {
@@ -1992,7 +2024,14 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v)
+		s.topicService.SetRateVisitor(t.ID, &tp.RateVisitor{
+			UserID: v.MaybeUserID(),
+			IP:     v.maskedIP(),
+		})
+		if u := v.User(); u != nil {
+			s.rateVisitorUsers.Put(u) // Its tier applies to the pushes right away, not from the next refresh
+		}
+		t.Keepalive()
 	}
 	return nil
 }

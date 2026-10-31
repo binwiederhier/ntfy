@@ -33,7 +33,7 @@ func forEachBackend(t *testing.T, f func(t *testing.T, newManager newManagerFunc
 	t.Run("sqlite", func(t *testing.T) {
 		dir := t.TempDir()
 		f(t, func(config *Config) *Manager {
-			a, err := NewSQLiteManager(filepath.Join(dir, "user.db"), "", config)
+			a, err := newTestSQLiteManager(filepath.Join(dir, "user.db"), "", config)
 			require.Nil(t, err)
 			return a
 		})
@@ -795,54 +795,6 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 		philTokensList, err := a.Tokens(phil.ID)
 		require.Nil(t, err)
 		require.Equal(t, 2, len(philTokensList))
-	})
-}
-
-func TestManager_EnqueueStats_ResetStats(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
-		conf := &Config{
-			DefaultAccess:       PermissionReadWrite,
-			BcryptCost:          bcrypt.MinCost,
-			QueueWriterInterval: 1500 * time.Millisecond,
-		}
-		a := newTestManagerFromConfig(t, newManager, conf)
-		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
-
-		// Baseline: No messages or emails
-		u, err := a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
-		a.EnqueueUserStats(u.ID, &Stats{
-			Messages: 11,
-			Emails:   2,
-		})
-
-		// Still no change, because it's queued asynchronously
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
-
-		// After 2 seconds they should be persisted
-		time.Sleep(2 * time.Second)
-
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(11), u.Stats.Messages)
-		require.Equal(t, int64(2), u.Stats.Emails)
-
-		// Now reset stats (enqueued stats will be thrown out)
-		a.EnqueueUserStats(u.ID, &Stats{
-			Messages: 99,
-			Emails:   23,
-		})
-		require.Nil(t, a.ResetStats())
-
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
 	})
 }
 
@@ -1925,7 +1877,7 @@ func TestMigrationFrom6Postgres(t *testing.T) {
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'user'`).Scan(&version))
-	require.Equal(t, 9, version)
+	require.Equal(t, 10, version)
 	// The manager works against the migrated schema
 	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
 	u, err := a.User("phil")
@@ -1967,7 +1919,7 @@ func checkSchemaVersion(t *testing.T, d *db.DB) {
 
 	var schemaVersion int
 	require.Nil(t, rows.Scan(&schemaVersion))
-	require.Equal(t, 9, schemaVersion)
+	require.Equal(t, 10, schemaVersion)
 	require.Nil(t, rows.Close())
 }
 
@@ -1982,7 +1934,7 @@ func newTestManager(t *testing.T, newManager newManagerFunc, defaultAccess Permi
 }
 
 func newTestManagerFromFile(t *testing.T, filename, startupQueries string, defaultAccess Permission, bcryptCost int, statsWriterInterval time.Duration) *Manager {
-	a, err := NewSQLiteManager(filename, startupQueries, &Config{
+	a, err := newTestSQLiteManager(filename, startupQueries, &Config{
 		DefaultAccess:       defaultAccess,
 		BcryptCost:          bcryptCost,
 		QueueWriterInterval: statsWriterInterval,
@@ -2003,7 +1955,7 @@ func testDB(a *Manager) *db.DB {
 
 func forEachStoreBackend(t *testing.T, f func(t *testing.T, manager *Manager)) {
 	t.Run("sqlite", func(t *testing.T) {
-		manager, err := NewSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &Config{})
+		manager, err := newTestSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &Config{})
 		require.Nil(t, err)
 		t.Cleanup(func() { manager.Close() })
 		f(t, manager)
@@ -2722,7 +2674,7 @@ func TestManager_AccessWritesTellPeers(t *testing.T) {
 // topic matching being case-insensitive. SQLite's LIKE is case-insensitive for
 // ASCII by default, which would let a request for "SECRET" match an ACL rule
 // for "secret" -- a security hole. PostgreSQL's LIKE is already case-sensitive.
-// NewSQLiteManager opens the database with case_sensitive_like enabled to close
+// OpenSQLite opens the database with case_sensitive_like enabled to close
 // this gap. This exercises the direct-DB path (cache disabled), which is the
 // path that runs the LIKE query; the in-memory cache is independently
 // case-sensitive (Go map keys / case-sensitive regex).
@@ -3032,41 +2984,6 @@ func TestStoreChangeBilling(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, "cus_123", u.Billing.StripeCustomerID)
 		require.Equal(t, "sub_456", u.Billing.StripeSubscriptionID)
-	})
-}
-
-func TestStoreUpdateStats(t *testing.T) {
-	forEachStoreBackend(t, func(t *testing.T, manager *Manager) {
-		require.Nil(t, manager.AddUser("phil", "mypass", RoleUser, false))
-		u, err := manager.User("phil")
-		require.Nil(t, err)
-
-		manager.EnqueueUserStats(u.ID, &Stats{Messages: 42, Emails: 3, Calls: 1})
-		require.Nil(t, manager.writeUserStatsQueue())
-
-		u2, err := manager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(42), u2.Stats.Messages)
-		require.Equal(t, int64(3), u2.Stats.Emails)
-		require.Equal(t, int64(1), u2.Stats.Calls)
-	})
-}
-
-func TestStoreResetStats(t *testing.T) {
-	forEachStoreBackend(t, func(t *testing.T, manager *Manager) {
-		require.Nil(t, manager.AddUser("phil", "mypass", RoleUser, false))
-		u, err := manager.User("phil")
-		require.Nil(t, err)
-
-		manager.EnqueueUserStats(u.ID, &Stats{Messages: 42, Emails: 3, Calls: 1})
-		require.Nil(t, manager.writeUserStatsQueue())
-		require.Nil(t, manager.ResetStats())
-
-		u2, err := manager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u2.Stats.Messages)
-		require.Equal(t, int64(0), u2.Stats.Emails)
-		require.Equal(t, int64(0), u2.Stats.Calls)
 	})
 }
 
@@ -3712,39 +3629,63 @@ func TestManager_AccountReadsUsePrimary(t *testing.T) {
 	require.Len(t, pendingEmails, 1)
 }
 
-func TestManager_EnqueueStats_DeltasAccumulate(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
-		conf := &Config{
-			DefaultAccess:       PermissionReadWrite,
-			BcryptCost:          bcrypt.MinCost,
-			QueueWriterInterval: time.Hour, // Flushed manually below
-		}
-		a := newTestManagerFromConfig(t, newManager, conf)
-		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
-		u, err := a.User("ben")
-		require.Nil(t, err)
+func TestMigrationFrom9To10SQLite(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "user.db")
+	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	testMigrationFrom9To10(t, a, `UPDATE schemaVersion SET version = 9 WHERE id = 1`, `UPDATE user SET stats_messages = 5, stats_emails = 2, stats_calls = 1`)
+	a = newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	checkMigrated9To10(t, a, `SELECT version FROM schemaVersion WHERE id = 1`, `SELECT stats_messages, stats_emails, stats_calls FROM user`)
+	checkMigratedSqliteSchema(t, filename)
+}
 
-		// Two enqueues before a flush add up (deltas, not absolute snapshots)
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 3, Emails: 1})
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 2, Calls: 4})
-		require.Nil(t, a.writeUserStatsQueue())
-		u, err = a.User("ben")
+func TestMigrationFrom9To10Postgres(t *testing.T) {
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	open := func() *Manager {
+		host, err := pg.Open(schemaDSN)
 		require.Nil(t, err)
-		require.Equal(t, int64(5), u.Stats.Messages)
-		require.Equal(t, int64(1), u.Stats.Emails)
-		require.Equal(t, int64(4), u.Stats.Calls)
+		a, err := NewPostgresManager(db.New(host, nil), &Config{DefaultAccess: PermissionDenyAll, BcryptCost: bcrypt.MinCost, QueueWriterInterval: DefaultUserStatsQueueWriterInterval})
+		require.Nil(t, err)
+		t.Cleanup(func() { a.Close() })
+		return a
+	}
+	testMigrationFrom9To10(t, open(), `UPDATE schema_version SET version = 9 WHERE store = 'user'`, `UPDATE "user" SET stats_messages = 5, stats_emails = 2, stats_calls = 1`)
+	checkMigrated9To10(t, open(), `SELECT version FROM schema_version WHERE store = 'user'`, `SELECT stats_messages, stats_emails, stats_calls FROM "user"`)
+}
 
-		// A flush from a second manager on the same database (= another cluster node)
-		// adds to the existing stats instead of overwriting them
-		b := newManager(conf)
-		b.EnqueueUserStats(u.ID, &Stats{Messages: 10, Emails: 2})
-		require.Nil(t, b.writeUserStatsQueue())
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 1})
-		require.Nil(t, a.writeUserStatsQueue())
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(16), u.Stats.Messages)
-		require.Equal(t, int64(3), u.Stats.Emails)
-		require.Equal(t, int64(4), u.Stats.Calls)
-	})
+// testMigrationFrom9To10 turns the manager's database back into a version 9 one with stats, and closes it
+func testMigrationFrom9To10(t *testing.T, a *Manager, setVersionQuery, setStatsQuery string) {
+	t.Helper()
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+	_, err := a.db.Exec(`DROP TABLE IF EXISTS usage`)
+	require.Nil(t, err)
+	_, err = a.db.Exec(setVersionQuery)
+	require.Nil(t, err)
+	_, err = a.db.Exec(setStatsQuery)
+	require.Nil(t, err)
+	require.Nil(t, a.Close())
+}
+
+// checkMigrated9To10 checks that the migration zeroed the stats and created the usage table
+func checkMigrated9To10(t *testing.T, a *Manager, selectVersionQuery, selectStatsQuery string) {
+	t.Helper()
+	var version int
+	require.Nil(t, a.db.QueryRow(selectVersionQuery).Scan(&version))
+	require.Equal(t, 10, version)
+	var messages, emails, calls int64
+	require.Nil(t, a.db.QueryRow(selectStatsQuery).Scan(&messages, &emails, &calls))
+	require.Equal(t, []int64{0, 0, 0}, []int64{messages, emails, calls})
+	_, err := a.db.Exec(`INSERT INTO usage (key, period_start, messages, emails, calls, updated_at) VALUES ('ip:1.2.3.4', 1793344380, 37, 0, 0, 1793380805)`)
+	require.Nil(t, err)
+	var count int64
+	require.Nil(t, a.db.QueryRow(`SELECT messages FROM usage WHERE key = 'ip:1.2.3.4' AND updated_at >= 1793380805`).Scan(&count))
+	require.Equal(t, int64(37), count)
+}
+
+// newTestSQLiteManager opens the SQLite user database and creates a manager on it
+func newTestSQLiteManager(filename, startupQueries string, config *Config) (*Manager, error) {
+	d, err := OpenSQLite(filename)
+	if err != nil {
+		return nil, err
+	}
+	return NewSQLiteManager(d, startupQueries, config)
 }

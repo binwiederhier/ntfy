@@ -1113,3 +1113,17 @@ func TestAccount_PhoneNumberAdd_WrongCode(t *testing.T) {
 		require.Equal(t, []string{"+12223334444"}, phoneNumbers)
 	})
 }
+
+func TestServer_AccountStatsResetAt(t *testing.T) {
+	// The account reports when the visitor's daily counts start over: the end of its key's own
+	// 24h period, not midnight UTC
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	response := request(t, s, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, response.Code)
+	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
+	resetAt := s.limiter.ResetAt(s.visitor(netip.MustParseAddr("9.9.9.9"), nil).key)
+	require.Equal(t, resetAt.Unix(), account.Stats.ResetAt)
+	require.Greater(t, account.Stats.ResetAt, time.Now().Unix())
+	require.LessOrEqual(t, account.Stats.ResetAt, time.Now().Add(24*time.Hour).Unix()+1)
+}

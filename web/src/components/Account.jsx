@@ -52,7 +52,7 @@ import ContentCopy from "@mui/icons-material/ContentCopy";
 import Public from "@mui/icons-material/Public";
 import AddIcon from "@mui/icons-material/Add";
 import routes from "./routes";
-import { copyToClipboard, formatBytes, formatDate, formatDateTime, formatShortDuration, openUrl } from "../app/utils";
+import { copyToClipboard, formatBytes, formatDate, formatDateTime, formatResetAt, formatShortDuration, openUrl } from "../app/utils";
 import accountApi, { LimitBasis, Role, SubscriptionInterval, SubscriptionStatus } from "../app/AccountApi";
 import { Pref, PrefGroup } from "./Pref";
 import db from "../app/db";
@@ -840,12 +840,15 @@ const AddPhoneNumberDialog = (props) => {
 const Stats = () => {
   const { t, i18n } = useTranslation();
   const { account } = useContext(AccountContext);
+  const { dateFormat, timeFormat } = usePrefCache();
 
   if (!account) {
     return <></>;
   }
 
   const normalize = (value, max) => Math.min((value / max) * 100, 100);
+  const resetAt = formatResetAt(account.stats.reset_at, dateFormat, timeFormat);
+  const resetDaily = resetAt ? t("account_usage_limits_reset_at", { time: resetAt }) : t("account_usage_limits_reset_rolling");
 
   return (
     <Card sx={{ p: 3 }} aria-label={t("account_usage_title")}>
@@ -881,7 +884,7 @@ const Stats = () => {
           title={
             <>
               {t("account_usage_messages_title")}
-              <Tooltip title={t("account_usage_limits_reset_daily")}>
+              <Tooltip title={resetDaily}>
                 <span>
                   <InfoIcon />
                 </span>
@@ -911,7 +914,7 @@ const Stats = () => {
             title={
               <>
                 {t("account_usage_emails_title")}
-                <Tooltip title={t("account_usage_limits_reset_daily")}>
+                <Tooltip title={resetDaily}>
                   <span>
                     <InfoIcon />
                   </span>
@@ -942,7 +945,7 @@ const Stats = () => {
             title={
               <>
                 {t("account_usage_calls_title")}
-                <Tooltip title={t("account_usage_limits_reset_daily")}>
+                <Tooltip title={resetDaily}>
                   <span>
                     <InfoIcon />
                   </span>
@@ -1018,6 +1021,9 @@ const Stats = () => {
           </Pref>
         )}
       </PrefGroup>
+      <Typography variant="body1" sx={{ pt: 3 }}>
+        {t("account_usage_approximate")}
+      </Typography>
       {account.role === Role.USER && account.limits.basis === LimitBasis.IP && (
         <Typography variant="body1" sx={{ pt: 3 }}>
           {t("account_usage_basis_ip_description")}

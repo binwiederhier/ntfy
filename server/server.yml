@@ -405,9 +405,12 @@
 # visitor-request-limit-replenish: "5s"
 # visitor-request-limit-exempt-hosts: ""
 
-# Rate limiting: Hard daily limit of messages per visitor and day. The limit is reset
-# every day at midnight UTC. If the limit is not set (or set to zero), the request
-# limit (see above) governs the upper limit.
+# Rate limiting: Hard daily limit of messages per visitor and day. The day is a rolling 24-hour
+# period per visitor (account or IP), starting at a time of day of the visitor's own, so not
+# every count resets at once. If the limit is not set (or set to zero), the request
+# limit (see above) governs the upper limit. The daily counts (messages, emails, calls) are
+# kept in the user database ("auth-file", or "database-url"), so they survive a restart and,
+# on PostgreSQL, are shared by all servers; without one, they are counted in memory only.
 #
 # visitor-message-daily-limit: 0
 

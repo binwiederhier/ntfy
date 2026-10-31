@@ -223,6 +223,10 @@ export const formatDateTime = (timestamp, dateFormat = DATE_FORMAT.SYSTEM, timeF
   }).format(new Date(timestamp * 1000));
 };
 
+// formatResetAt formats the account's stats.reset_at (unix seconds), or returns null if the server
+// does not send it (a server from before rolling daily limits)
+export const formatResetAt = (resetAt, dateFormat, timeFormat) => (resetAt ? formatDateTime(resetAt, dateFormat, timeFormat) : null);
+
 export const formatShortDuration = (ms, language) => {
   const seconds = Math.round(ms / 1000);
   const units = [

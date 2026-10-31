@@ -2017,6 +2017,58 @@ func TestStoreUserByID(t *testing.T) {
 	})
 }
 
+func TestStoreUsersByIDs(t *testing.T) {
+	// Users are looked up in bulk, with their tiers; unknown IDs are skipped, deleted users are
+	// returned as deleted, and more IDs than fit one statement are looked up in chunks
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		manager := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, manager.AddTier(&Tier{
+			Code:         "pro",
+			MessageLimit: 123,
+		}))
+		require.Nil(t, manager.AddUser("phil", "mypass", RoleAdmin, false))
+		require.Nil(t, manager.AddUser("ben", "mypass", RoleUser, false))
+		require.Nil(t, manager.AddUser("emma", "mypass", RoleUser, false))
+		require.Nil(t, manager.ChangeTier("phil", "pro"))
+		phil, err := manager.User("phil")
+		require.Nil(t, err)
+		ben, err := manager.User("ben")
+		require.Nil(t, err)
+		emma, err := manager.User("emma")
+		require.Nil(t, err)
+		require.Nil(t, manager.MarkUserRemoved(emma))
+		users, err := manager.UsersByIDs([]string{phil.ID, ben.ID, emma.ID, "u_doesnotexist"})
+		require.Nil(t, err)
+		require.Len(t, users, 3)
+		byID := make(map[string]*User)
+		for _, u := range users {
+			byID[u.ID] = u
+		}
+		require.Equal(t, "phil", byID[phil.ID].Name)
+		require.Equal(t, "pro", byID[phil.ID].Tier.Code)
+		require.Equal(t, int64(123), byID[phil.ID].Tier.MessageLimit)
+		require.Equal(t, "ben", byID[ben.ID].Name)
+		require.Nil(t, byID[ben.ID].Tier)
+		require.True(t, byID[emma.ID].Deleted)
+		users, err = manager.UsersByIDs(nil)
+		require.Nil(t, err)
+		require.Empty(t, users)
+
+		// More IDs than one statement takes
+		ids := make([]string, 0)
+		for i := 0; i < usersByIDsChunk+5; i++ {
+			name := fmt.Sprintf("user%d", i)
+			require.Nil(t, manager.AddUser(name, "mypass", RoleUser, false))
+			u, err := manager.User(name)
+			require.Nil(t, err)
+			ids = append(ids, u.ID)
+		}
+		users, err = manager.UsersByIDs(append(ids, "u_doesnotexist"))
+		require.Nil(t, err)
+		require.Len(t, users, usersByIDsChunk+5)
+	})
+}
+
 func TestStoreUserByToken(t *testing.T) {
 	forEachStoreBackend(t, func(t *testing.T, manager *Manager) {
 		require.Nil(t, manager.AddUser("phil", "mypass", RoleUser, false))
@@ -3723,11 +3775,11 @@ func checkMigrated10To11(t *testing.T, a *Manager, selectVersionQuery string) {
 	var version int
 	require.Nil(t, a.db.QueryRow(selectVersionQuery).Scan(&version))
 	require.Equal(t, latestSchemaVersion, version)
-	_, err := a.db.Exec(`INSERT INTO topic (topic, rate_visitor_key, rate_visitor_user_id, seen_at, updated_at) VALUES ('upAAAAAAAAAAAA', 'ip:1.2.3.4', '', 1793380800, 1793380805)`)
+	_, err := a.db.Exec(`INSERT INTO topic (topic, first_seen_at, subscribed_at, rate_visitor_user_id, rate_visitor_ip, updated_at) VALUES ('upAAAAAAAAAAAA', 1793380700, 1793380800, 'u_1', '1.2.3.4', 1793380805)`)
 	require.Nil(t, err)
-	var rateVisitorKey string
-	require.Nil(t, a.db.QueryRow(`SELECT rate_visitor_key FROM topic WHERE topic = 'upAAAAAAAAAAAA' AND updated_at >= 1793380805`).Scan(&rateVisitorKey))
-	require.Equal(t, "ip:1.2.3.4", rateVisitorKey)
+	var userID, ip string
+	require.Nil(t, a.db.QueryRow(`SELECT rate_visitor_user_id, rate_visitor_ip FROM topic WHERE topic = 'upAAAAAAAAAAAA' AND updated_at >= 1793380805`).Scan(&userID, &ip))
+	require.Equal(t, []string{"u_1", "1.2.3.4"}, []string{userID, ip})
 }
 
 // newTestSQLiteManager opens the SQLite user database and creates a manager on it

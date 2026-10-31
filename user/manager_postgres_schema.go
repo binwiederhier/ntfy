@@ -146,15 +146,17 @@ const (
 	`
 )
 
-// The topic table holds who pays for the pushes to a UnifiedPush topic and when it last had
-// a subscriber, one row per topic (see package limit, which reads and writes it)
+// The topic table is a topic's cluster-wide state: when it was first seen on any node, when a
+// subscriber was last active, and who pays for the pushes to it (see package topic, which reads
+// and writes it)
 const (
 	postgresCreateTopicTableQuery = `
 		CREATE TABLE IF NOT EXISTS topic (
 			topic TEXT NOT NULL PRIMARY KEY,
-			rate_visitor_key TEXT NOT NULL,
+			first_seen_at BIGINT NOT NULL,
+			subscribed_at BIGINT NOT NULL,
 			rate_visitor_user_id TEXT NOT NULL,
-			seen_at BIGINT NOT NULL,
+			rate_visitor_ip TEXT NOT NULL,
 			updated_at BIGINT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_topic_updated_at ON topic (updated_at);

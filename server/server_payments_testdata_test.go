@@ -40,6 +40,7 @@ func TestPayments_RealStripeEventTestdata(t *testing.T) {
 
 	updated := loadStripeEventObjects(t, "testdata/stripe/subscription_updated")
 	require.NotEmpty(t, updated)
+	seenStatuses := make(map[string]bool)
 	for name, raw := range updated {
 		ev, err := util.UnmarshalJSON[apiStripeSubscriptionUpdatedEvent](io.NopCloser(bytes.NewReader(raw)))
 		require.NoError(t, err, name)
@@ -48,7 +49,16 @@ func TestPayments_RealStripeEventTestdata(t *testing.T) {
 		require.NotNil(t, ev.Items, "%s: updated event has no items", name)
 		require.Len(t, ev.Items.Data, 1, "%s: updated event does not have exactly one line item", name)
 		require.NotEmpty(t, ev.Items.Data[0].Price.ID, "%s: updated event has no price ID", name)
+		seenStatuses[ev.Status] = true
 	}
+	// The curated testdata covers a withheld status and two granted ones, so the gate is exercised
+	// against real statuses, not only the synthetic ones in the unit tests above.
+	require.True(t, seenStatuses["incomplete_expired"], "testdata should include an incomplete_expired event (gate withholds the tier)")
+	require.False(t, stripeStatusGrantsPaidTier("incomplete_expired"))
+	require.True(t, seenStatuses["active"], "testdata should include an active event (gate grants the tier)")
+	require.True(t, stripeStatusGrantsPaidTier("active"))
+	require.True(t, seenStatuses["past_due"], "testdata should include a past_due event (gate keeps the tier)")
+	require.True(t, stripeStatusGrantsPaidTier("past_due"))
 }
 
 // loadStripeEventObjects reads each *.json event file in dir and returns the raw bytes of its

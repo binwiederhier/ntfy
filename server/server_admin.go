@@ -9,7 +9,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -50,22 +49,6 @@ var (
 	// adminSocketIP is the visitor IP of every socket request; they all come from this machine
 	adminSocketIP = netip.AddrFrom4([4]byte{127, 0, 0, 1})
 )
-
-// DefaultListenAdminUnix returns the default admin socket path. On Windows there is none: unix socket
-// file permissions do not protect it there, so the CLI uses the database or --server instead.
-func DefaultListenAdminUnix() string {
-	return defaultListenAdminUnixFor(runtime.GOOS)
-}
-
-func defaultListenAdminUnixFor(goos string) string {
-	switch goos {
-	case "windows":
-		return ""
-	case "linux":
-		return "/run/ntfy/admin.sock"
-	}
-	return "/var/run/ntfy/admin.sock" // macOS and the BSDs have no /run
-}
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	return s.writeJSON(w, &apiVersionResponse{

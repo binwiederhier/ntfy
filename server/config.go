@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/netip"
 	"reflect"
+	"runtime"
 	"text/template"
 	"time"
 
@@ -248,6 +249,22 @@ type Config struct {
 	BuildVersion                         string        // Injected by App
 	BuildDate                            string        // Injected by App
 	BuildCommit                          string        // Injected by App
+}
+
+// DefaultListenAdminUnix returns the default admin socket path. On Windows there is none: unix socket
+// file permissions do not protect it there, so the CLI uses the database or --server instead.
+func DefaultListenAdminUnix() string {
+	return defaultListenAdminUnixFor(runtime.GOOS)
+}
+
+func defaultListenAdminUnixFor(goos string) string {
+	switch goos {
+	case "windows":
+		return ""
+	case "linux":
+		return "/run/ntfy/admin.sock"
+	}
+	return "/var/run/ntfy/admin.sock" // macOS and the BSDs have no /run
 }
 
 // NewConfig instantiates a default new server config

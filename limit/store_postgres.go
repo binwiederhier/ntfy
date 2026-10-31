@@ -28,21 +28,21 @@ const (
 	postgresPruneQuery = `DELETE FROM usage WHERE updated_at < $1 AND key IN (SELECT key FROM usage WHERE updated_at < $1 LIMIT $2)` // The outer age check is rechecked on a row updated while the delete waits for it
 )
 
-// The payer upsert, one fixed statement per chunk like the usage upsert. A set (a payer key)
-// replaces the payer and seen_at; a touch (no payer key) keeps the payer and moves seen_at forward.
+// The rate visitor upsert, one fixed statement per chunk like the usage upsert. A set (a rate visitor key)
+// replaces the rate visitor and seen_at; a touch (no rate visitor key) keeps the rate visitor and moves seen_at forward.
 const (
-	postgresSelectPayersSinceQuery = `SELECT topic, payer_key, payer_user_id, seen_at FROM topic_payer WHERE updated_at >= $1`
-	postgresUpsertPayerQuery       = `
-		INSERT INTO topic_payer AS p (topic, payer_key, payer_user_id, seen_at, updated_at)
+	postgresSelectRateVisitorsSinceQuery = `SELECT topic, rate_visitor_key, rate_visitor_user_id, seen_at FROM topic WHERE updated_at >= $1`
+	postgresUpsertRateVisitorQuery       = `
+		INSERT INTO topic AS p (topic, rate_visitor_key, rate_visitor_user_id, seen_at, updated_at)
 		SELECT t, k, u, s, $5::BIGINT
 		FROM unnest($1::TEXT[], $2::TEXT[], $3::TEXT[], $4::BIGINT[]) AS d(t, k, u, s)
 		ON CONFLICT (topic) DO UPDATE SET
-			payer_key = CASE WHEN EXCLUDED.payer_key = '' THEN p.payer_key ELSE EXCLUDED.payer_key END,
-			payer_user_id = CASE WHEN EXCLUDED.payer_key = '' THEN p.payer_user_id ELSE EXCLUDED.payer_user_id END,
-			seen_at = CASE WHEN EXCLUDED.payer_key = '' THEN GREATEST(p.seen_at, EXCLUDED.seen_at) ELSE EXCLUDED.seen_at END,
+			rate_visitor_key = CASE WHEN EXCLUDED.rate_visitor_key = '' THEN p.rate_visitor_key ELSE EXCLUDED.rate_visitor_key END,
+			rate_visitor_user_id = CASE WHEN EXCLUDED.rate_visitor_key = '' THEN p.rate_visitor_user_id ELSE EXCLUDED.rate_visitor_user_id END,
+			seen_at = CASE WHEN EXCLUDED.rate_visitor_key = '' THEN GREATEST(p.seen_at, EXCLUDED.seen_at) ELSE EXCLUDED.seen_at END,
 			updated_at = EXCLUDED.updated_at
 	`
-	postgresPrunePayersQuery = `DELETE FROM topic_payer WHERE updated_at < $1 AND topic IN (SELECT topic FROM topic_payer WHERE updated_at < $1 LIMIT $2)` // As the usage prune
+	postgresPruneRateVisitorsQuery = `DELETE FROM topic WHERE updated_at < $1 AND topic IN (SELECT topic FROM topic WHERE updated_at < $1 LIMIT $2)` // As the usage prune
 )
 
 // NewPostgresStore returns the store on the shared pool; the usage table is the user schema's
@@ -51,16 +51,16 @@ func NewPostgresStore(d *db.DB) *Store {
 	s := &Store{
 		db: d,
 		queries: &queries{
-			selectSince:       postgresSelectSinceQuery,
-			upsert:            postgresUpsertQuery,
-			prune:             postgresPruneQuery,
-			selectPayersSince: postgresSelectPayersSinceQuery,
-			upsertPayer:       postgresUpsertPayerQuery,
-			prunePayers:       postgresPrunePayersQuery,
+			selectSince:             postgresSelectSinceQuery,
+			upsert:                  postgresUpsertQuery,
+			prune:                   postgresPruneQuery,
+			selectRateVisitorsSince: postgresSelectRateVisitorsSinceQuery,
+			upsertRateVisitor:       postgresUpsertRateVisitorQuery,
+			pruneRateVisitors:       postgresPruneRateVisitorsQuery,
 		},
 	}
 	s.writeChunk = s.writePostgres
-	s.writePayerChunk = s.writePayersPostgres
+	s.writeRateVisitorChunk = s.writeRateVisitorsPostgres
 	return s
 }
 
@@ -86,14 +86,14 @@ func (s *Store) writePostgres(ctx context.Context, rows []usageRow, now int64) e
 	return err
 }
 
-// writePayersPostgres writes the payer rows in one statement, as arrays
-func (s *Store) writePayersPostgres(ctx context.Context, rows []payerRow, now int64) error {
+// writeRateVisitorsPostgres writes the rate visitor rows in one statement, as arrays
+func (s *Store) writeRateVisitorsPostgres(ctx context.Context, rows []rateVisitorRow, now int64) error {
 	topics, keys, userIDs := make([]string, len(rows)), make([]string, len(rows)), make([]string, len(rows))
 	seenAts := make([]int64, len(rows))
 	for i, r := range rows {
 		topics[i], keys[i], userIDs[i], seenAts[i] = r.topic, r.key, r.userID, r.seenAt
 	}
-	_, err := s.db.ExecContext(ctx, s.queries.upsertPayer, topics, keys, userIDs, seenAts, now)
+	_, err := s.db.ExecContext(ctx, s.queries.upsertRateVisitor, topics, keys, userIDs, seenAts, now)
 	return err
 }
 

@@ -14,7 +14,7 @@ func (s *Server) execManager() {
 	// database (and the web push job, which also sends expiry warnings) run on the cluster
 	// leader only. Without clustering, IsLeader is always true.
 	s.pruneVisitors()
-	s.payerUsers.Prune()
+	s.rateVisitorUsers.Prune()
 	if s.cluster.IsLeader() {
 		s.pruneTokens()
 		s.pruneAttachments()
@@ -50,7 +50,7 @@ func (s *Server) execManager() {
 					}
 					t.ExpireDelivered()
 					if subs > 0 {
-						s.touchPayers([]*topic{t}) // An open stream keeps the payer live on the other nodes too
+						s.touchRateVisitors([]*topic{t}) // An open stream keeps the rate visitor live on the other nodes too
 					}
 					subscribers += subs
 				}

@@ -387,26 +387,26 @@ const (
 	`
 )
 
-// The topic_payer table holds who pays for the pushes to a UnifiedPush topic and when it last had
+// The topic table holds who pays for the pushes to a UnifiedPush topic and when it last had
 // a subscriber, one row per topic (see package limit, which reads and writes it)
 const (
-	sqliteCreateTopicPayerTableQuery = `
-		CREATE TABLE IF NOT EXISTS topic_payer (
+	sqliteCreateTopicTableQuery = `
+		CREATE TABLE IF NOT EXISTS topic (
 			topic TEXT NOT NULL PRIMARY KEY,
-			payer_key TEXT NOT NULL,
-			payer_user_id TEXT NOT NULL,
+			rate_visitor_key TEXT NOT NULL,
+			rate_visitor_user_id TEXT NOT NULL,
 			seen_at INT NOT NULL,
 			updated_at INT NOT NULL
 		);
-		CREATE INDEX IF NOT EXISTS idx_topic_payer_updated_at ON topic_payer (updated_at);
+		CREATE INDEX IF NOT EXISTS idx_topic_updated_at ON topic (updated_at);
 	`
 
-	// 10 -> 11: The topic_payer table
-	sqliteMigrate10To11UpdateQueries = sqliteCreateTopicPayerTableQuery
+	// 10 -> 11: The topic table
+	sqliteMigrate10To11UpdateQueries = sqliteCreateTopicTableQuery
 )
 
 var (
-	sqliteCreateTables = schema.AsMigrateFunc(sqliteCreateTablesQueries + sqliteCreateUsageTableQuery + sqliteCreateTopicPayerTableQuery)
+	sqliteCreateTables = schema.AsMigrateFunc(sqliteCreateTablesQueries + sqliteCreateUsageTableQuery + sqliteCreateTopicTableQuery)
 
 	// sqliteMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.

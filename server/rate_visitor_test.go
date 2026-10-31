@@ -17,7 +17,7 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-func TestServer_UnifiedPush_PayerOnOtherNode(t *testing.T) {
+func TestServer_UnifiedPush_RateVisitorOnOtherNode(t *testing.T) {
 	// Two nodes on one database: a push on the other node than the subscriber's is billed to the
 	// subscriber once the nodes have synced, not answered with a 507
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
@@ -30,7 +30,7 @@ func TestServer_UnifiedPush_PayerOnOtherNode(t *testing.T) {
 		})
 		require.Equal(t, 200, rr.Code)
 		waitForWithMaxWait(t, 3*syncWait, func() bool {
-			return payerKey(s2, "upAAAAAAAAAAAA") == "ip:1.2.3.4"
+			return rateVisitorKey(s2, "upAAAAAAAAAAAA") == "ip:1.2.3.4"
 		})
 		response := request(t, s2, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 		require.Equal(t, 200, response.Code)
@@ -39,8 +39,8 @@ func TestServer_UnifiedPush_PayerOnOtherNode(t *testing.T) {
 	})
 }
 
-func TestServer_UnifiedPush_StreamOnOtherNodeKeepsPayer(t *testing.T) {
-	// A stream open on one node keeps the topic's payer live on the other nodes too: the manager
+func TestServer_UnifiedPush_StreamOnOtherNodeKeepsRateVisitor(t *testing.T) {
+	// A stream open on one node keeps the topic's rate visitor live on the other nodes too: the manager
 	// touches it, so it does not expire a day after the subscribe
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
@@ -61,10 +61,10 @@ func TestServer_UnifiedPush_StreamOnOtherNodeKeepsPayer(t *testing.T) {
 		})
 
 		// A day later, the stream is still open on s1
-		agePayer(s1, "upAAAAAAAAAAAA", 25*time.Hour)
+		ageRateVisitor(s1, "upAAAAAAAAAAAA", 25*time.Hour)
 		s1.execManager()
 		waitForWithMaxWait(t, 3*syncWait, func() bool {
-			p := s2.limiter.Payer("upAAAAAAAAAAAA")
+			p := s2.limiter.RateVisitor("upAAAAAAAAAAAA")
 			return p != nil && p.Key == "ip:1.2.3.4" && time.Since(p.SeenAt) < time.Hour
 		})
 		response := request(t, s2, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
@@ -88,9 +88,9 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers404(t *testing.T) {
 
 	// Never subscribed: 507 for a week from the first push, then 404
 	require.Equal(t, 50701, push().Code)
-	agePayer(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter-time.Hour)
+	ageRateVisitor(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter-time.Hour)
 	require.Equal(t, 50701, push().Code)
-	agePayer(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
+	ageRateVisitor(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
 	require.Equal(t, 40402, push().Code)
 	require.Equal(t, 404, push().HTTPCode)
 
@@ -100,9 +100,9 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers404(t *testing.T) {
 	})
 	require.Equal(t, 200, rr.Code)
 	require.Nil(t, push())
-	agePayer(s, "upAAAAAAAAAAAA", 2*oneDay)
+	ageRateVisitor(s, "upAAAAAAAAAAAA", 2*oneDay)
 	require.Equal(t, 50701, push().Code)
-	agePayer(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
+	ageRateVisitor(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
 	require.Equal(t, 40402, push().Code)
 
 	// An open stream keeps the topic, however long ago it was seen otherwise
@@ -117,7 +117,7 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers404(t *testing.T) {
 	waitFor(t, func() bool {
 		return lockedTopic(s, "upAAAAAAAAAAAA").SubscribersCount() == 1
 	})
-	agePayer(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
+	ageRateVisitor(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
 	require.Nil(t, push())
 }
 
@@ -131,7 +131,7 @@ func TestServer_UnifiedPush_AbandonedTopicOnOtherNode(t *testing.T) {
 		response := request(t, s1, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 		require.Equal(t, 507, response.Code)
 		s1.Stop() // Writes the topic
-		execUserDB(t, c, fmt.Sprintf(`UPDATE topic_payer SET seen_at = seen_at - %d`, int64((unifiedPushAbandonedAfter+time.Hour)/time.Second)))
+		execUserDB(t, c, fmt.Sprintf(`UPDATE topic SET seen_at = seen_at - %d`, int64((unifiedPushAbandonedAfter+time.Hour)/time.Second)))
 		s2 := newTestServer(t, c)
 		response = request(t, s2, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 		require.Equal(t, 404, response.Code)
@@ -140,13 +140,13 @@ func TestServer_UnifiedPush_AbandonedTopicOnOtherNode(t *testing.T) {
 }
 
 func TestServer_UnifiedPush_NonUnifiedPushTopicIsNotAbandoned(t *testing.T) {
-	// A topic that cannot have a payer (not an "up..." topic) keeps answering 507
+	// A topic that cannot have a rate visitor (not an "up..." topic) keeps answering 507
 	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	response := request(t, s, "PUT", "/mytopic?up=1", "some message", nil)
 	require.Equal(t, 507, response.Code)
-	require.Nil(t, s.limiter.Payer("mytopic"))
+	require.Nil(t, s.limiter.RateVisitor("mytopic"))
 }
 
 func TestServer_MatrixGateway_AbandonedTopicRejectsPushKey(t *testing.T) {
@@ -157,14 +157,14 @@ func TestServer_MatrixGateway_AbandonedTopicRejectsPushKey(t *testing.T) {
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/upAAAAAAAAAAAA?up=1"}]}}`
 	response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 507, response.Code)
-	agePayer(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
+	ageRateVisitor(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
 	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"rejected":["http://127.0.0.1:12345/upAAAAAAAAAAAA?up=1"]}`+"\n", response.Body.String())
 }
 
-func TestServer_UnifiedPush_PayerLivenessIsTheSubscribers(t *testing.T) {
-	// A topic keeps its payer for as long as the subscriber is around, not for as long as its
+func TestServer_UnifiedPush_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
+	// A topic keeps its rate visitor for as long as the subscriber is around, not for as long as its
 	// limiter key is in use: the limiter forgetting the key must not drop it, and publishers
 	// charging the key must not keep it
 	c := newTestConfig(t, "")
@@ -175,14 +175,14 @@ func TestServer_UnifiedPush_PayerLivenessIsTheSubscribers(t *testing.T) {
 	})
 	require.Equal(t, 200, rr.Code)
 	s.limiter.Prune(0) // The key is gone, the subscriber is not
-	payer, err := s.payerVisitor(lockedTopic(s, "upAAAAAAAAAAAA"))
+	rateVisitor, err := s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"))
 	require.Nil(t, err)
-	require.NotNil(t, payer)
-	agePayer(s, "upAAAAAAAAAAAA", 2*visitorExpungeAfter) // The subscriber is gone
-	require.True(t, payer.MessageAllowed())              // A publisher charges the key
-	payer, err = s.payerVisitor(lockedTopic(s, "upAAAAAAAAAAAA"))
+	require.NotNil(t, rateVisitor)
+	ageRateVisitor(s, "upAAAAAAAAAAAA", 2*visitorExpungeAfter) // The subscriber is gone
+	require.True(t, rateVisitor.MessageAllowed())              // A publisher charges the key
+	rateVisitor, err = s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"))
 	require.Nil(t, err)
-	require.Nil(t, payer)
+	require.Nil(t, rateVisitor)
 }
 
 func TestServer_UnifiedPush_TierChangeAppliesAfterUserCache(t *testing.T) {
@@ -214,12 +214,12 @@ func TestServer_UnifiedPush_TierChangeAppliesAfterUserCache(t *testing.T) {
 		// The new tier applies once the cached user expires
 		require.Nil(t, s.userManager.ChangeTier("phil", "large"))
 		require.Equal(t, 429, push())
-		expirePayerUsers(s)
+		expireRateVisitorUsers(s)
 		require.Equal(t, 200, push())
 	})
 }
 
-func TestServer_UnifiedPush_PayerUserIsCached(t *testing.T) {
+func TestServer_UnifiedPush_RateVisitorUserIsCached(t *testing.T) {
 	// Pushes do not read the subscriber's user every time
 	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
@@ -230,7 +230,7 @@ func TestServer_UnifiedPush_PayerUserIsCached(t *testing.T) {
 	})
 	require.Equal(t, 200, rr.Code)
 	lookups := 0
-	s.payerUsers.lookup = func(id string) (*user.User, error) {
+	s.rateVisitorUsers.lookup = func(id string) (*user.User, error) {
 		lookups++
 		return s.userManager.UserByID(id)
 	}
@@ -240,7 +240,7 @@ func TestServer_UnifiedPush_PayerUserIsCached(t *testing.T) {
 	require.Equal(t, 1, lookups)
 }
 
-func TestServer_UnifiedPush_DeletedSubscriberIsNoPayer(t *testing.T) {
+func TestServer_UnifiedPush_DeletedSubscriberIsNoRateVisitor(t *testing.T) {
 	// A deleted subscriber pays for nothing, and its IP does not pay in its place: the push gets
 	// the 507 of a topic without subscriber
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
@@ -271,7 +271,7 @@ func TestServer_UnifiedPush_DeletedSubscriberIsNoPayer(t *testing.T) {
 	})
 }
 
-func TestServer_UnifiedPush_PayerUserLookupErrorIsRetryable(t *testing.T) {
+func TestServer_UnifiedPush_RateVisitorUserLookupErrorIsRetryable(t *testing.T) {
 	// If the subscriber cannot be looked up, the push fails with a 5xx the publisher retries: it is
 	// not a topic without subscriber, which would make the Matrix gateway reject the pushkey
 	c := newTestConfigWithAuthFile(t, "")
@@ -282,41 +282,41 @@ func TestServer_UnifiedPush_PayerUserLookupErrorIsRetryable(t *testing.T) {
 		"Authorization": util.BasicAuth("alice", "alice"),
 	})
 	require.Equal(t, 200, rr.Code)
-	s.payerUsers.lookup = func(id string) (*user.User, error) {
+	s.rateVisitorUsers.lookup = func(id string) (*user.User, error) {
 		return nil, errors.New("database is down")
 	}
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 500, response.Code)
 }
 
-// syncWait is how long a payer takes at most to reach another node in healthy operation: one
+// syncWait is how long a rate visitor takes at most to reach another node in healthy operation: one
 // sync round to be written, one to be read
 const syncWait = 10 * time.Second
 
-// payerKey returns the key of the topic's payer, or "" if it has none
-func payerKey(s *Server, topic string) string {
-	if p := s.limiter.Payer(topic); p != nil {
+// rateVisitorKey returns the key of the topic's rate visitor, or "" if it has none
+func rateVisitorKey(s *Server, topic string) string {
+	if p := s.limiter.RateVisitor(topic); p != nil {
 		return p.Key
 	}
 	return ""
 }
 
-// agePayer makes the topic's payer (or the topic, if it has none) look as if it was last seen d ago
-func agePayer(s *Server, topic string, d time.Duration) {
-	p := s.limiter.Payer(topic)
+// ageRateVisitor makes the topic's rate visitor (or the topic, if it has none) look as if it was last seen d ago
+func ageRateVisitor(s *Server, topic string, d time.Duration) {
+	p := s.limiter.RateVisitor(topic)
 	if p == nil {
-		p = &limit.Payer{} // Unknown: make it known, so the caller's assertion fails, not the helper
+		p = &limit.RateVisitor{} // Unknown: make it known, so the caller's assertion fails, not the helper
 	}
 	p.SeenAt = time.Now().Add(-d)
-	s.limiter.SetPayer(topic, p)
+	s.limiter.SetRateVisitor(topic, p)
 }
 
-// expirePayerUsers makes the cached users of the payers look older than payerUserCacheTTL
-func expirePayerUsers(s *Server) {
-	s.payerUsers.mu.Lock()
-	defer s.payerUsers.mu.Unlock()
-	for _, e := range s.payerUsers.entries {
-		e.fetched = e.fetched.Add(-2 * payerUserCacheTTL)
+// expireRateVisitorUsers makes the cached users of the rate visitors look older than rateVisitorUserCacheTTL
+func expireRateVisitorUsers(s *Server) {
+	s.rateVisitorUsers.mu.Lock()
+	defer s.rateVisitorUsers.mu.Unlock()
+	for _, e := range s.rateVisitorUsers.entries {
+		e.fetched = e.fetched.Add(-2 * rateVisitorUserCacheTTL)
 	}
 }
 

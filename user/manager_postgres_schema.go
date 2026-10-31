@@ -146,26 +146,26 @@ const (
 	`
 )
 
-// The topic_payer table holds who pays for the pushes to a UnifiedPush topic and when it last had
+// The topic table holds who pays for the pushes to a UnifiedPush topic and when it last had
 // a subscriber, one row per topic (see package limit, which reads and writes it)
 const (
-	postgresCreateTopicPayerTableQuery = `
-		CREATE TABLE IF NOT EXISTS topic_payer (
+	postgresCreateTopicTableQuery = `
+		CREATE TABLE IF NOT EXISTS topic (
 			topic TEXT NOT NULL PRIMARY KEY,
-			payer_key TEXT NOT NULL,
-			payer_user_id TEXT NOT NULL,
+			rate_visitor_key TEXT NOT NULL,
+			rate_visitor_user_id TEXT NOT NULL,
 			seen_at BIGINT NOT NULL,
 			updated_at BIGINT NOT NULL
 		);
-		CREATE INDEX IF NOT EXISTS idx_topic_payer_updated_at ON topic_payer (updated_at);
+		CREATE INDEX IF NOT EXISTS idx_topic_updated_at ON topic (updated_at);
 	`
 
-	// 10 -> 11: The topic_payer table
-	postgresMigrate10To11UpdateQueries = postgresCreateTopicPayerTableQuery
+	// 10 -> 11: The topic table
+	postgresMigrate10To11UpdateQueries = postgresCreateTopicTableQuery
 )
 
 var (
-	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries + postgresCreateUsageTableQuery + postgresCreateTopicPayerTableQuery)
+	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries + postgresCreateUsageTableQuery + postgresCreateTopicTableQuery)
 
 	// postgresMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.

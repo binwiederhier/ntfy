@@ -215,64 +215,64 @@ func keysOf(rows map[string]usageRow) []string {
 	return keys
 }
 
-func TestStore_WritePayers_SetReplacesTouchKeeps(t *testing.T) {
+func TestStore_WriteRateVisitors_SetReplacesTouchKeeps(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		s := newStore()
 		write := func(topic, key string, seenAt, now int64) {
-			require.Nil(t, s.writePayers(context.Background(), []payerRow{newPayerRow(topic, key, seenAt)}, now))
+			require.Nil(t, s.writeRateVisitors(context.Background(), []rateVisitorRow{newRateVisitorRow(topic, key, seenAt)}, now))
 		}
 		write("up1", "ip:1.2.3.4", 100, 101)
-		write("up1", "", 200, 201) // A touch keeps the payer
-		require.Equal(t, newPayerRow("up1", "ip:1.2.3.4", 200), readAllPayers(t, s, 0)["up1"])
+		write("up1", "", 200, 201) // A touch keeps the rate visitor
+		require.Equal(t, newRateVisitorRow("up1", "ip:1.2.3.4", 200), readAllRateVisitors(t, s, 0)["up1"])
 		write("up1", "", 150, 202) // An older touch does not move seen_at back
-		require.Equal(t, newPayerRow("up1", "ip:1.2.3.4", 200), readAllPayers(t, s, 0)["up1"])
+		require.Equal(t, newRateVisitorRow("up1", "ip:1.2.3.4", 200), readAllRateVisitors(t, s, 0)["up1"])
 		write("up1", "user:u_1", 50, 203) // A set replaces both
-		require.Equal(t, newPayerRow("up1", "user:u_1", 50), readAllPayers(t, s, 0)["up1"])
-		write("up2", "", 300, 301) // A touch of an unknown topic: no payer
-		require.Equal(t, newPayerRow("up2", "", 300), readAllPayers(t, s, 0)["up2"])
+		require.Equal(t, newRateVisitorRow("up1", "user:u_1", 50), readAllRateVisitors(t, s, 0)["up1"])
+		write("up2", "", 300, 301) // A touch of an unknown topic: no rate visitor
+		require.Equal(t, newRateVisitorRow("up2", "", 300), readAllRateVisitors(t, s, 0)["up2"])
 
 		// The read-back is by write time
-		require.Equal(t, []string{"up2"}, payerTopicsOf(readAllPayers(t, s, 301)))
+		require.Equal(t, []string{"up2"}, rateVisitorTopicsOf(readAllRateVisitors(t, s, 301)))
 	})
 }
 
-func TestStore_WritePayers_Chunked(t *testing.T) {
+func TestStore_WriteRateVisitors_Chunked(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		s := newStore()
-		rows := make([]payerRow, 0)
+		rows := make([]rateVisitorRow, 0)
 		for i := 0; i < writeChunkRows+5; i++ {
-			rows = append(rows, newPayerRow(fmt.Sprintf("up%012d", i), "ip:1.2.3.4", 100))
+			rows = append(rows, newRateVisitorRow(fmt.Sprintf("up%012d", i), "ip:1.2.3.4", 100))
 		}
-		require.Nil(t, s.writePayers(context.Background(), rows, 100))
-		require.Len(t, readAllPayers(t, s, 0), writeChunkRows+5)
+		require.Nil(t, s.writeRateVisitors(context.Background(), rows, 100))
+		require.Len(t, readAllRateVisitors(t, s, 0), writeChunkRows+5)
 	})
 }
 
-func TestStore_PrunePayers(t *testing.T) {
+func TestStore_PruneRateVisitors(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		s := newStore()
 		for i := 0; i < 5; i++ {
-			require.Nil(t, s.writePayers(context.Background(), []payerRow{newPayerRow(fmt.Sprintf("up%d", i), "", 1)}, int64(100+i)))
+			require.Nil(t, s.writeRateVisitors(context.Background(), []rateVisitorRow{newRateVisitorRow(fmt.Sprintf("up%d", i), "", 1)}, int64(100+i)))
 		}
-		deleted, err := s.prunePayers(context.Background(), 103)
+		deleted, err := s.pruneRateVisitors(context.Background(), 103)
 		require.Nil(t, err)
 		require.Equal(t, int64(3), deleted)
-		require.Equal(t, []string{"up3", "up4"}, payerTopicsOf(readAllPayers(t, s, 0)))
+		require.Equal(t, []string{"up3", "up4"}, rateVisitorTopicsOf(readAllRateVisitors(t, s, 0)))
 	})
 }
 
-// readAllPayers returns the payer rows written at or after since, by topic
-func readAllPayers(t *testing.T, s *Store, since int64) map[string]payerRow {
+// readAllRateVisitors returns the rate visitor rows written at or after since, by topic
+func readAllRateVisitors(t *testing.T, s *Store, since int64) map[string]rateVisitorRow {
 	t.Helper()
-	rows := make(map[string]payerRow)
-	require.Nil(t, s.readPayersSince(context.Background(), since, func(r *payerRow) {
+	rows := make(map[string]rateVisitorRow)
+	require.Nil(t, s.readRateVisitorsSince(context.Background(), since, func(r *rateVisitorRow) {
 		rows[r.topic] = *r
 	}))
 	return rows
 }
 
-// payerTopicsOf returns the map's topics, sorted
-func payerTopicsOf(rows map[string]payerRow) []string {
+// rateVisitorTopicsOf returns the map's topics, sorted
+func rateVisitorTopicsOf(rows map[string]rateVisitorRow) []string {
 	topics := make([]string, 0, len(rows))
 	for topic := range rows {
 		topics = append(topics, topic)
@@ -281,13 +281,13 @@ func payerTopicsOf(rows map[string]payerRow) []string {
 	return topics
 }
 
-// newPayerRow returns a payer row; a user key ("user:<id>") has its user ID
-func newPayerRow(topic, key string, seenAt int64) payerRow {
+// newRateVisitorRow returns a rate visitor row; a user key ("user:<id>") has its user ID
+func newRateVisitorRow(topic, key string, seenAt int64) rateVisitorRow {
 	userID, _ := strings.CutPrefix(key, "user:")
 	if userID == key {
 		userID = ""
 	}
-	return payerRow{
+	return rateVisitorRow{
 		topic:  topic,
 		key:    key,
 		userID: userID,

@@ -65,10 +65,10 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	limiter           *limit.Service  // Decides on and counts the visitors' usage, keyed by visitor key
-	visitors          *visitorEnv     // Shared by all visitors, which are built per request
-	payerUsers        *payerUserCache // Users of the UnifiedPush topics' payers, by ID
-	ban               *ban.Service    // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	limiter           *limit.Service        // Decides on and counts the visitors' usage, keyed by visitor key
+	visitors          *visitorEnv           // Shared by all visitors, which are built per request
+	rateVisitorUsers  *rateVisitorUserCache // Users of the UnifiedPush topics' rate visitors, by ID
+	ban               *ban.Service          // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
@@ -361,9 +361,9 @@ func New(conf *Config) (*Server, error) {
 		Store: createUsageStore(pool, userDB),
 	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
-	s.payerUsers = newPayerUserCache(nil)
+	s.rateVisitorUsers = newRateVisitorUserCache(nil)
 	if userManager != nil {
-		s.payerUsers.lookup = userManager.UserByID
+		s.rateVisitorUsers.lookup = userManager.UserByID
 	}
 	s.firebaseClient = firebaseClient
 	if pool != nil {
@@ -1104,7 +1104,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && vrate == v { // No payer, see limitRequestsWithTopic
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && vrate == v { // No rate visitor, see limitRequestsWithTopic
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
@@ -1727,7 +1727,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
-	if err := s.maybeSetPayers(r, v, topics); err != nil {
+	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1755,7 +1755,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
-		s.touchPayers(topics) // The subscriber was last seen now
+		s.touchRateVisitors(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1892,7 +1892,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return conn.WriteJSON(msg)
 	}
-	if err := s.maybeSetPayers(r, v, topics); err != nil {
+	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1915,7 +1915,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
-		s.touchPayers(topics) // The subscriber was last seen now
+		s.touchRateVisitors(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1951,22 +1951,22 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 	return
 }
 
-// maybeSetPayers makes v the payer of a topic (limit.Service.SetPayer), indicating that all messages published
-// to that topic will be rate limited against the payer instead of the publishing visitor.
+// maybeSetRateVisitors makes v the rate visitor of a topic (limit.Service.SetRateVisitor), indicating that all messages published
+// to that topic will be rate limited against the rate visitor instead of the publishing visitor.
 //
-// Setting the payer is ony allowed if the `visitor-subscriber-rate-limiting` setting is enabled, AND
+// Setting the rate visitor is ony allowed if the `visitor-subscriber-rate-limiting` setting is enabled, AND
 // - auth-file is not set (everything is open by default)
 // - or the topic is reserved, and v.user is the owner
 // - or the topic is not reserved, and v.user has write access
 //
 // This only applies to UnifiedPush topics ("up...").
-func (s *Server) maybeSetPayers(r *http.Request, v *visitor, topics []*topic) error {
+func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic) error {
 	// Bail out if not enabled
 	if !s.config.VisitorSubscriberRateLimiting {
 		return nil
 	}
 
-	// Make a list of topics that we'll actually set the payer on; the others count as subscriber activity only
+	// Make a list of topics that we'll actually set the rate visitor on; the others count as subscriber activity only
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
 		if isUnifiedPushTopic(t.ID) {
@@ -1976,14 +1976,14 @@ func (s *Server) maybeSetPayers(r *http.Request, v *visitor, topics []*topic) er
 	if len(eligibleRateTopics) == 0 {
 		return nil
 	}
-	s.touchPayers(eligibleRateTopics)
+	s.touchRateVisitors(eligibleRateTopics)
 
-	// If access controls are turned off, v has access to everything, and we can set the payer
+	// If access controls are turned off, v has access to everything, and we can set the rate visitor
 	if s.userManager == nil {
-		return s.setPayers(r, v, eligibleRateTopics)
+		return s.setRateVisitors(r, v, eligibleRateTopics)
 	}
 
-	// If access controls are enabled, only set payer if
+	// If access controls are enabled, only set rate visitor if
 	// - topic is reserved, and v.user is the owner
 	// - topic is not reserved, and v.user has write access
 	writableRateTopics := make([]*topic, 0)
@@ -2003,16 +2003,16 @@ func (s *Server) maybeSetPayers(r *http.Request, v *visitor, topics []*topic) er
 			writableRateTopics = append(writableRateTopics, t)
 		}
 	}
-	return s.setPayers(r, v, writableRateTopics)
+	return s.setRateVisitors(r, v, writableRateTopics)
 }
 
-func (s *Server) setPayers(r *http.Request, v *visitor, rateTopics []*topic) error {
+func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
-			Debug("Setting visitor as payer for topic %s", t.ID)
-		s.limiter.SetPayer(t.ID, &limit.Payer{
+			Debug("Setting visitor as rate visitor for topic %s", t.ID)
+		s.limiter.SetRateVisitor(t.ID, &limit.RateVisitor{
 			Key:    v.key,
 			UserID: v.MaybeUserID(),
 			SeenAt: time.Now(),

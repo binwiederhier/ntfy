@@ -17,8 +17,8 @@ const (
 	oneDay = 24 * time.Hour
 
 	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
-	// forgotten (see Server.pruneVisitors), and how long a topic keeps a payer whose subscriber is
-	// gone (see Server.payerVisitor). This number has to be very high to prevent e-mail abuse, but it
+	// forgotten (see Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber is
+	// gone (see Server.rateVisitor). This number has to be very high to prevent e-mail abuse, but it
 	// doesn't really affect the other limits anyway, since they are replenished faster (typically).
 	visitorExpungeAfter = oneDay
 
@@ -99,10 +99,10 @@ func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
 	return v
 }
 
-// newPayerVisitor returns the visitor of a UnifiedPush topic's payer (see Server.payerVisitor):
+// newRateVisitor returns the visitor of a UnifiedPush topic's rate visitor (see Server.rateVisitor):
 // the subscriber's key, with its user's current limits. A user with a tier now is keyed by the
 // user, as vis.Key would, even if it had none when it subscribed. Its IP is unknown.
-func newPayerVisitor(env *visitorEnv, key string, u *user.User) *visitor {
+func newRateVisitor(env *visitorEnv, key string, u *user.User) *visitor {
 	if u != nil && u.Tier != nil {
 		key = vis.Key(netip.Addr{}, u, env.limitsConfig)
 	}

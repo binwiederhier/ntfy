@@ -15,8 +15,8 @@
 // current rows. Store failures never reach the request path: counts stay unflushed and are
 // written once the store is back (fail open, per-node limits meanwhile).
 //
-// The service also keeps the payers of the UnifiedPush topics (see SetPayer), synced through the
-// topic_payer table by the same worker, so a push on any node is billed to the topic's subscriber.
+// The service also keeps the rate visitors of the UnifiedPush topics (see SetRateVisitor), synced through the
+// topic table by the same worker, so a push on any node is billed to the topic's subscriber.
 //
 // Periods, updated_at and the read-back watermark use the node's clock, so the nodes must
 // keep their clocks in sync (NTP); a skew below a second or so is harmless, a skew beyond
@@ -63,19 +63,19 @@ const (
 
 // Service decides on usage from memory; see the package comment
 type Service struct {
-	conf      *Config
-	now       func() time.Time          // Injectable clock, for tests
-	counters  [shardCount]*counterShard // Daily counts, kept until their period ends
-	buckets   [shardCount]*bucketShard  // Token buckets, per node, evicted when idle and full
-	payers    *payerTable               // Payers of the UnifiedPush topics, kept for payerPruneAfter
-	store     *Store                    // Nil: memory only
-	watermark int64                     // Time of the last read, unix seconds; the sync worker's only
-	prunedAt  int64                     // Time of the last prune, unix seconds; the sync worker's only
-	interval  time.Duration             // How often the worker syncs (syncInterval); tests change it
-	ctx       context.Context           // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
-	cancel    context.CancelFunc
-	closeOnce sync.Once
-	wg        sync.WaitGroup
+	conf         *Config
+	now          func() time.Time          // Injectable clock, for tests
+	counters     [shardCount]*counterShard // Daily counts, kept until their period ends
+	buckets      [shardCount]*bucketShard  // Token buckets, per node, evicted when idle and full
+	rateVisitors *rateVisitorTable         // Rate visitors of the UnifiedPush topics, kept for rateVisitorPruneAfter
+	store        *Store                    // Nil: memory only
+	watermark    int64                     // Time of the last read, unix seconds; the sync worker's only
+	prunedAt     int64                     // Time of the last prune, unix seconds; the sync worker's only
+	interval     time.Duration             // How often the worker syncs (syncInterval); tests change it
+	ctx          context.Context           // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
+	cancel       context.CancelFunc
+	closeOnce    sync.Once
+	wg           sync.WaitGroup
 }
 
 // New creates the service
@@ -89,8 +89,8 @@ func newService(conf *Config, now func() time.Time) *Service {
 		now:      now,
 		store:    conf.Store,
 		interval: syncInterval,
-		payers: &payerTable{
-			entries: make(map[string]*payerEntry),
+		rateVisitors: &rateVisitorTable{
+			entries: make(map[string]*rateVisitorEntry),
 		},
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
@@ -172,7 +172,7 @@ func (s *Service) Close() {
 		ctx, cancel := context.WithTimeout(context.Background(), statementTimeout)
 		defer cancel()
 		s.write(ctx)
-		s.writePayers(ctx)
+		s.writeRateVisitors(ctx)
 	})
 }
 
@@ -271,7 +271,7 @@ func (s *Service) Prune(idle time.Duration) int {
 		}
 		cs.mu.Unlock()
 	}
-	s.prunePayers(now)
+	s.pruneRateVisitors(now)
 	return pruned
 }
 
@@ -353,18 +353,18 @@ func (s *Service) load() bool {
 		log.Tag(tag).Err(err).Warn("Cannot load usage; retrying in %v", s.interval)
 		return false
 	}
-	payers, err := s.readPayers(ctx, now-int64(payerPruneAfter/time.Second))
+	rateVisitors, err := s.readRateVisitors(ctx, now-int64(rateVisitorPruneAfter/time.Second))
 	if err != nil {
-		log.Tag(tag).Err(err).Warn("Cannot load payers; retrying in %v", s.interval)
+		log.Tag(tag).Err(err).Warn("Cannot load rate visitors; retrying in %v", s.interval)
 		return false
 	}
 	s.watermark, s.prunedAt = now, now
-	log.Tag(tag).Info("Loaded usage of %d key(s) and %d payer(s) in %v", n, payers, time.Since(started).Round(time.Millisecond))
+	log.Tag(tag).Info("Loaded usage of %d key(s) and %d rate visitor(s) in %v", n, rateVisitors, time.Since(started).Round(time.Millisecond))
 	return true
 }
 
 // sync is one round of the sync worker: write the unflushed counts of the promoted keys and the
-// changed payers, read back the rows changed since the last round, and prune once in a while.
+// changed rate visitors, read back the rows changed since the last round, and prune once in a while.
 // Every error is logged and leaves the state as it was, for the next round.
 func (s *Service) sync() {
 	now := s.now().Unix()
@@ -372,7 +372,7 @@ func (s *Service) sync() {
 	s.write(ctx)
 	cancel()
 	ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
-	s.writePayers(ctx)
+	s.writeRateVisitors(ctx)
 	cancel()
 	since := s.watermark - int64(readOverlap/time.Second)
 	ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
@@ -380,11 +380,11 @@ func (s *Service) sync() {
 	cancel()
 	if err == nil {
 		ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
-		_, err = s.readPayers(ctx, since)
+		_, err = s.readRateVisitors(ctx, since)
 		cancel()
 	}
 	if err != nil {
-		log.Tag(tag).Err(err).Warn("Cannot read usage or payers; those of other nodes are stale until the next round")
+		log.Tag(tag).Err(err).Warn("Cannot read usage or rate visitors; those of other nodes are stale until the next round")
 	} else {
 		s.watermark = now
 	}
@@ -399,12 +399,12 @@ func (s *Service) sync() {
 			log.Tag(tag).Debug("Pruned %d usage row(s)", deleted)
 		}
 		ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
-		deleted, err = s.store.prunePayers(ctx, now-int64(payerPruneAfter/time.Second))
+		deleted, err = s.store.pruneRateVisitors(ctx, now-int64(rateVisitorPruneAfter/time.Second))
 		cancel()
 		if err != nil {
-			log.Tag(tag).Err(err).Warn("Cannot prune payers")
+			log.Tag(tag).Err(err).Warn("Cannot prune rate visitors")
 		} else {
-			log.Tag(tag).Debug("Pruned %d payer row(s)", deleted)
+			log.Tag(tag).Debug("Pruned %d rate visitor row(s)", deleted)
 		}
 	}
 }

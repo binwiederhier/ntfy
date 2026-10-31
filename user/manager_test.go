@@ -3710,24 +3710,24 @@ func TestMigrationFrom10To11Postgres(t *testing.T) {
 // testMigrationFrom10To11 turns the manager's database back into a version 10 one, and closes it
 func testMigrationFrom10To11(t *testing.T, a *Manager, setVersionQuery string) {
 	t.Helper()
-	_, err := a.db.Exec(`DROP TABLE IF EXISTS topic_payer`)
+	_, err := a.db.Exec(`DROP TABLE IF EXISTS topic`)
 	require.Nil(t, err)
 	_, err = a.db.Exec(setVersionQuery)
 	require.Nil(t, err)
 	require.Nil(t, a.Close())
 }
 
-// checkMigrated10To11 checks that the migration created the topic_payer table
+// checkMigrated10To11 checks that the migration created the topic table
 func checkMigrated10To11(t *testing.T, a *Manager, selectVersionQuery string) {
 	t.Helper()
 	var version int
 	require.Nil(t, a.db.QueryRow(selectVersionQuery).Scan(&version))
 	require.Equal(t, latestSchemaVersion, version)
-	_, err := a.db.Exec(`INSERT INTO topic_payer (topic, payer_key, payer_user_id, seen_at, updated_at) VALUES ('upAAAAAAAAAAAA', 'ip:1.2.3.4', '', 1793380800, 1793380805)`)
+	_, err := a.db.Exec(`INSERT INTO topic (topic, rate_visitor_key, rate_visitor_user_id, seen_at, updated_at) VALUES ('upAAAAAAAAAAAA', 'ip:1.2.3.4', '', 1793380800, 1793380805)`)
 	require.Nil(t, err)
-	var payerKey string
-	require.Nil(t, a.db.QueryRow(`SELECT payer_key FROM topic_payer WHERE topic = 'upAAAAAAAAAAAA' AND updated_at >= 1793380805`).Scan(&payerKey))
-	require.Equal(t, "ip:1.2.3.4", payerKey)
+	var rateVisitorKey string
+	require.Nil(t, a.db.QueryRow(`SELECT rate_visitor_key FROM topic WHERE topic = 'upAAAAAAAAAAAA' AND updated_at >= 1793380805`).Scan(&rateVisitorKey))
+	require.Equal(t, "ip:1.2.3.4", rateVisitorKey)
 }
 
 // newTestSQLiteManager opens the SQLite user database and creates a manager on it

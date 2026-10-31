@@ -53,10 +53,10 @@ type Usage struct {
 	counts [numKinds]int64
 }
 
-// Payer is who pays for the pushes to a UnifiedPush topic (its subscriber), and when the topic last
-// had subscriber activity (see Service.SetPayer)
-type Payer struct {
-	Key    string    // The subscriber's limiter key; empty for a topic with subscriber activity or a refused push, but no payer
+// RateVisitor is who pays for the pushes to a UnifiedPush topic (its subscriber), and when the topic last
+// had subscriber activity (see Service.SetRateVisitor)
+type RateVisitor struct {
+	Key    string    // The subscriber's limiter key; empty for a topic with subscriber activity or a refused push, but no rate visitor
 	UserID string    // The subscriber's user ID, empty if anonymous
 	SeenAt time.Time // Last subscribe, poll or open stream, or the refused push that made the topic known; node clock
 }
@@ -95,26 +95,26 @@ type bucketShard struct {
 	mu      sync.Mutex // Protects entries and everything inside them
 }
 
-// payerWrite is what a payer entry still has to write to the store; a set outranks a touch
-type payerWrite uint8
+// rateVisitorWrite is what a rate visitor entry still has to write to the store; a set outranks a touch
+type rateVisitorWrite uint8
 
 const (
-	payerWriteNone  payerWrite = iota
-	payerWriteTouch            // Only seen_at: keep the stored payer (TouchPayer, NoteTopic)
-	payerWriteSet              // Payer and seen_at (SetPayer)
+	rateVisitorWriteNone  rateVisitorWrite = iota
+	rateVisitorWriteTouch                  // Only seen_at: keep the stored rate visitor (TouchRateVisitor, NoteTopic)
+	rateVisitorWriteSet                    // RateVisitor and seen_at (SetRateVisitor)
 )
 
-// payerEntry is one topic's payer, as last set here or read from the store
-type payerEntry struct {
+// rateVisitorEntry is one topic's rate visitor, as last set here or read from the store
+type rateVisitorEntry struct {
 	key    string
 	userID string
-	seenAt int64      // Unix seconds
-	write  payerWrite // Unwritten change; the read-back leaves an entry with one alone
+	seenAt int64            // Unix seconds
+	write  rateVisitorWrite // Unwritten change; the read-back leaves an entry with one alone
 }
 
-// payerTable is the payers of the UnifiedPush topics, by topic
-type payerTable struct {
-	entries map[string]*payerEntry
+// rateVisitorTable is the rate visitors of the UnifiedPush topics, by topic
+type rateVisitorTable struct {
+	entries map[string]*rateVisitorEntry
 	mu      sync.Mutex // Protects entries and everything inside them
 }
 

@@ -951,10 +951,9 @@ See https://docs.ntfy.sh/deprecations/ for details.
 **********************************************************************
 ```
 
-The server logs at startup whether it is listening on the socket, and why not if it isn't:
+If the server cannot create the socket, it logs a warning at startup and runs without it:
 
 ```
-INFO Admin socket listening on /run/ntfy/admin.sock (tag=startup)
 WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
 ```
 

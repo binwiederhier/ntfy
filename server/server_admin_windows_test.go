@@ -18,7 +18,7 @@ func TestAdminSocket_NewDirectoryDACL(t *testing.T) {
 	conf.ListenAdminUnix = filepath.Join(shortTempDir(t), "sub", "admin.sock")
 	s := newTestServer(t, conf)
 	runTestServer(t, s)
-	require.NotNil(t, s.adminSocketServer)
+	waitFor(t, func() bool { return adminSocketListening(s) })
 
 	// Only Administrators, SYSTEM and the server's user, on the directory and the socket
 	dir := filepath.Dir(conf.ListenAdminUnix)
@@ -38,7 +38,7 @@ func TestAdminSocket_ExistingDirectoryDACL(t *testing.T) {
 	conf.ListenAdminUnix = filepath.Join(dir, "admin.sock")
 	s := newTestServer(t, conf)
 	runTestServer(t, s)
-	require.NotNil(t, s.adminSocketServer)
+	waitFor(t, func() bool { return adminSocketListening(s) })
 	require.True(t, isDACLProtected(t, dir))
 	require.Equal(t, adminSocketAllowedSIDs(t), daclSIDs(t, dir))
 	require.Equal(t, adminSocketAllowedSIDs(t), daclSIDs(t, conf.ListenAdminUnix))

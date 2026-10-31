@@ -51,43 +51,42 @@ import (
 
 // Server is the main server, providing the UI and API for ntfy
 type Server struct {
-	config              *Config
-	db                  *db.DB          // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
-	cluster             cluster.Cluster // Fans messages out to peer cluster nodes (nop when not clustered)
-	httpServers         []*http.Server
-	httpsServer         *http.Server
-	httpMetricsServer   *http.Server
-	httpProfileServer   *http.Server
-	httpClusterServer   *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
-	unixListener        net.Listener
-	adminSocketServer   *http.Server // Serves the admin API on the local admin socket, see handleAdminSocket
-	adminSocketListener net.Listener
-	smtpServer          *smtp.Server
-	smtpServerBackend   *smtpBackend
-	mailer              mail.Sender
-	topics              map[string]*topic
-	limiter             *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
-	visitors            *visitorEnv    // Shared by all visitors, which are built per request
-	ban                 *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
-	firebaseClient      *firebaseClient
-	twilio              *twilio.Client
-	messages            int64                               // Total number of messages (persisted if messageCache enabled)
-	messagesHistory     []int64                             // Last n values of the messages counter, used to determine rate
-	messagesFlushed     int64                               // Value of the messages counter at the last stats flush; the difference is written as a delta
-	userManager         *user.Manager                       // Might be nil!
-	messageCache        *message.Cache                      // Database that stores the messages
-	webPush             *webpush.Store                      // Database that stores web push subscriptions
-	attachment          *attachment.Store                   // Attachment store (file system or S3)
-	stripe              stripeAPI                           // Stripe API, can be replaced with a mock
-	priceCache          *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
-	metricsHandler      http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
-	closeChan           chan bool
-	tail                *message.Tail // Reads what was written, see runTail; nil without a message cache
-	stopOnce            sync.Once
-	stopped             atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
-	streams             *streamRegistry // Open subscriber connections, for Drain
-	readOnly            atomic.Bool     // Second phase of a drain: new subscriptions and publishes get 503 (see Drain)
-	mu                  sync.RWMutex
+	config            *Config
+	db                *db.DB          // Shared PostgreSQL connection pool (with optional replicas), nil when using SQLite
+	cluster           cluster.Cluster // Fans messages out to peer cluster nodes (nop when not clustered)
+	httpServers       []*http.Server
+	httpsServer       *http.Server
+	httpMetricsServer *http.Server
+	httpProfileServer *http.Server
+	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
+	unixListener      net.Listener
+	adminUnixListener net.Listener // Serves the admin API on the local admin socket, see handleAdminSocket
+	smtpServer        *smtp.Server
+	smtpServerBackend *smtpBackend
+	mailer            mail.Sender
+	topics            map[string]*topic
+	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
+	visitors          *visitorEnv    // Shared by all visitors, which are built per request
+	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	firebaseClient    *firebaseClient
+	twilio            *twilio.Client
+	messages          int64                               // Total number of messages (persisted if messageCache enabled)
+	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
+	messagesFlushed   int64                               // Value of the messages counter at the last stats flush; the difference is written as a delta
+	userManager       *user.Manager                       // Might be nil!
+	messageCache      *message.Cache                      // Database that stores the messages
+	webPush           *webpush.Store                      // Database that stores web push subscriptions
+	attachment        *attachment.Store                   // Attachment store (file system or S3)
+	stripe            stripeAPI                           // Stripe API, can be replaced with a mock
+	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
+	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
+	closeChan         chan bool
+	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
+	stopOnce          sync.Once
+	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
+	streams           *streamRegistry // Open subscriber connections, for Drain
+	readOnly          atomic.Bool     // Second phase of a drain: new subscriptions and publishes get 503 (see Drain)
+	mu                sync.RWMutex
 }
 
 // handleFunc extends the normal http.HandlerFunc to be able to easily return errors
@@ -506,17 +505,25 @@ func (s *Server) Run() error {
 		}()
 	}
 	if s.config.ListenAdminUnix != "" && s.userManager != nil { // Without auth, there is nothing to administer
-		if listener, err := s.listenAdminSocket(); err != nil {
-			// Deprecated: not fatal yet, unlike the other listeners, because the CLI can fall back to the
-			// database. After 2027-01-30, this fails the startup (see docs/deprecations.md).
-			log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly. DEPRECATED: after 2027-01-30, ntfy will not start without it, see https://ntfy.sh/docs/deprecations/", s.config.ListenAdminUnix)
-		} else {
-			s.adminSocketListener = listener
-			s.adminSocketServer = &http.Server{Handler: http.HandlerFunc(s.handleAdminSocket)}
-			go func() {
-				errChan <- s.adminSocketServer.Serve(listener)
-			}()
-		}
+		go func() {
+			var err error
+			s.mu.Lock()
+			if s.stopped.Load() {
+				s.mu.Unlock()
+				return // Nobody would close this listener anymore
+			}
+			s.adminUnixListener, err = s.listenAdminSocket()
+			if err != nil {
+				s.mu.Unlock()
+				// Not fatal, unlike the other listeners: the CLI falls back to writing to the database (deprecated)
+				log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/", s.config.ListenAdminUnix)
+				return
+			}
+			defer s.adminUnixListener.Close()
+			s.mu.Unlock()
+			httpServer := &http.Server{Handler: http.HandlerFunc(s.handleAdminSocket)}
+			errChan <- httpServer.Serve(s.adminUnixListener)
+		}()
 	}
 	if s.config.MetricsListenHTTP != "" {
 		s.httpMetricsServer = &http.Server{Addr: s.config.MetricsListenHTTP, Handler: promhttp.Handler()}
@@ -594,9 +601,8 @@ func (s *Server) stop() {
 	if s.unixListener != nil {
 		s.unixListener.Close()
 	}
-	if s.adminSocketServer != nil {
-		s.adminSocketServer.Close()
-		s.adminSocketListener.Close() // Serve may not have picked it up yet; closing it removes the socket file
+	if s.adminUnixListener != nil {
+		s.adminUnixListener.Close()
 	}
 	if s.smtpServer != nil {
 		s.smtpServer.Close()

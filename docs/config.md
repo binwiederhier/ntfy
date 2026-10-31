@@ -925,25 +925,22 @@ mode `0660` in a directory with mode `0750`, both owned by the user ntfy runs as
 and `root` can use it. With the Debian/Ubuntu/Fedora packages, the shipped systemd unit creates `/run/ntfy` (via
 `RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group just work.
 
-The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`). If no
-server answers on the socket (the server is not running, or it cannot create the socket), the commands fall back to
-writing to the database directly, like they did before, and print a warning:
+The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`). If the
+server cannot create the socket, it logs a warning at startup and runs without it:
 
 ```
-warning: ntfy server not reachable at /run/ntfy/admin.sock, writing to the database directly; a running server picks this up within 1m27s
+WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
 ```
 
 To change the path, set `listen-admin-unix` in the `server.yml` file; the commands read it from there, too. To disable the
-socket, set `listen-admin-unix: "-"`.
+socket, set `listen-admin-unix: "-"`. If you change the path, pick a directory that only the ntfy user can write to;
+otherwise the server logs a warning at startup, since other users may be able to use or replace the socket.
 
 On Windows, the socket is `%ProgramData%\ntfy\admin.sock` by default (e.g. `C:\ProgramData\ntfy\admin.sock`; this needs
 Windows 10 version 1803 or later). File modes mean nothing there, so the server instead sets the permissions of the socket's
 directory so that only `Administrators`, `SYSTEM` and the user the server runs as can open it (run `ntfy user ...` from an
 elevated prompt). It does this even if the directory already exists, but leaves files already in it alone; point
 `listen-admin-unix` to a directory that only ntfy uses.
-
-If the server cannot create the socket, it logs a warning and starts anyway. This is
-[deprecated](deprecations.md): after 2027-01-30, the server will not start without it.
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,

@@ -503,6 +503,10 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 	if err := prepareAdminSocketDir(filepath.Dir(path)); err != nil {
 		return nil, err
 	}
+	if reason := insecureAdminSocketDir(filepath.Dir(path)); reason != "" {
+		// Not fatal: the path is the admin's choice
+		log.Tag(tagStartup).Warn("Admin socket directory %s %s; other users may be able to use or replace the admin socket", filepath.Dir(path), reason)
+	}
 	if conn, err := net.DialTimeout("unix", path, adminSocketDialTimeout); err == nil {
 		conn.Close()
 		return nil, fmt.Errorf("another server is listening on %s", path)

@@ -4,31 +4,7 @@ This page is used to list deprecation notices for ntfy. Deprecated commands and 
 before the behavior is changed depends on the severity of the change, and how prominent the feature is.
 
 ## Active deprecations
-
-### ntfy server: Failing to create the admin socket will stop the server
-> Active since 2026-10-30, behavior will change after 2027-01-30
-
-If [access control](config.md#access-control) is configured, the server listens on a local
-[admin socket](config.md#admin-socket) (`listen-admin-unix`, by default `/run/ntfy/admin.sock`). If it cannot create
-the socket, for instance because a custom systemd unit has no `RuntimeDirectory=ntfy`, it currently only logs a
-warning and starts anyway. After 2027-01-30, this will be an error, like for all other listeners, and the server
-will not start.
-
-To fix it, let the server create the socket (e.g. add `RuntimeDirectory=ntfy` to your systemd unit), point
-`listen-admin-unix` to a directory the server can write to, or disable the socket with `listen-admin-unix: "-"`.
-
-=== "Before"
-    ```
-    $ ntfy serve
-    WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly. DEPRECATED: ...
-    INFO Listening on :80[http], ntfy 2.36.0
-    ```
-
-=== "After"
-    ```
-    $ ntfy serve
-    ntfy error: cannot listen on /run/ntfy/admin.sock: ...
-    ```
+_No active deprecations_
 
 ## Previous deprecations
 

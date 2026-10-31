@@ -55,3 +55,9 @@ func prepareAdminSocketDir(dir string) error {
 func restrictAdminSocket(path string) error {
 	return nil
 }
+
+// insecureAdminSocketDir returns "" on Windows: prepareAdminSocketDir sets the directory's DACL
+// instead, so there is nothing left to warn about
+func insecureAdminSocketDir(dir string) string {
+	return ""
+}

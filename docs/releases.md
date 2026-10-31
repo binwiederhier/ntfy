@@ -2292,13 +2292,17 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Features:**
 
-* Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working for now; after 2027-01-30, the server will not start without the socket (see [deprecations](deprecations.md))
+* Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working as before (see [admin socket](config.md#admin-socket))
 * Admin socket on Windows (default `%ProgramData%\ntfy\admin.sock`, Windows 10 1803 or later): only Administrators, SYSTEM and the server's user can open it
 * Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
 
 **Bug fixes + maintenance:**
 
 * Admin API: return 4xx errors instead of a 500 for invalid input, and remove a deleted user's web push subscriptions
+* Web app: Deleted notifications no longer come back when a poll replays messages published in the same second as the last one ([#2098](https://github.com/binwiederhier/ntfy/issues/2098), thanks to [@mattford63](https://github.com/mattford63) and [@arminus](https://github.com/arminus) for reporting)
+* Web app: A message replayed after a reconnect keeps its read state and no longer notifies again, and an older version of a sequence no longer replaces a newer one ([#2090](https://github.com/binwiederhier/ntfy/issues/2090), thanks to [@tobykaspar79](https://github.com/tobykaspar79) for reporting)
+* Check the whole server config again when `base-url` or a `message-size-limit` above 4K is set; most checks after them were skipped, so an invalid config (e.g. `upstream-base-url` equal to `base-url`) now fails to start ([#1969](https://github.com/binwiederhier/ntfy/pull/1969), thanks to [@mikejgray](https://github.com/mikejgray) for the contribution)
+* CLI: `ntfy pub --wait-pid` now waits for processes owned by other users instead of failing with "not running" ([#1710](https://github.com/binwiederhier/ntfy/pull/1710), thanks to [@bekoeppel](https://github.com/bekoeppel) for the contribution)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

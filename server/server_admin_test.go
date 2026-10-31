@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1387,6 +1389,35 @@ func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 	require.Contains(t, output, "Admin socket")
 	require.Contains(t, output, "which is deprecated and stops working after 2026-12-30, see https://ntfy.sh/docs/deprecations/")
 	require.False(t, adminSocketListening(s))
+}
+
+func TestAdminSocket_InsecureDirectoryWarning(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix file modes")
+	}
+	for _, tt := range []struct {
+		mode fs.FileMode
+		warn bool
+	}{
+		{0750, false},
+		{0777, true},                  // Anyone can replace the socket
+		{0777 | fs.ModeSticky, false}, // Like /tmp: only the owner can remove or replace it
+	} {
+		dir := shortTempDir(t)
+		require.Nil(t, os.Chmod(dir, tt.mode))
+		conf := newTestConfigWithAuthFile(t, "")
+		conf.ListenAdminUnix = filepath.Join(dir, "admin.sock")
+		s := newTestServer(t, conf)
+		output := captureLog(t, func() {
+			runTestServer(t, s)
+			waitFor(t, func() bool { return adminSocketListening(s) }) // Warned before it listens
+		})
+		if tt.warn {
+			require.Contains(t, output, "Admin socket directory "+dir+" is writable by all users", tt.mode)
+		} else {
+			require.NotContains(t, output, "Admin socket directory", tt.mode)
+		}
+	}
 }
 
 func TestAdminSocket_DisabledWithoutPathOrAuth(t *testing.T) {

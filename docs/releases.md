@@ -2303,8 +2303,8 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Daily limits now reset on a rolling 24-hour period per account or IP address instead of for everyone at midnight UTC: each visitor's period starts at its own time of day, which spreads the resets over the day. The account page and the `/v1/account` API (`stats.reset_at`) show when the visitor's counts reset
 * Visitors without a tier have a daily e-mail limit again (24h / `visitor-email-limit-replenish`), now that it is shared between servers and survives restarts
 * The daily reset job is gone; the `stats_*` columns of the user table are zeroed by the upgrade and no longer read or written
-* With `visitor-subscriber-rate-limiting`, a UnifiedPush push to a topic that has had no subscriber (subscribe, poll or open stream) for 7 days is answered with `404` (error code 40402) instead of `507`, so app servers like Mastodon remove the expired subscription ([#664](https://github.com/binwiederhier/ntfy/issues/664)); a Matrix push to such a topic gets its pushkey rejected
-* With `visitor-subscriber-rate-limiting`, a deleted user no longer pays for the pushes to its UnifiedPush topics, and a tier change applies to them within a minute
+* With `visitor-subscriber-rate-limiting`, a UnifiedPush push to a topic that has had no subscriber (subscribe, poll or open stream) for 7 days is answered with `404` (error code 40402) instead of `507`, so app servers like Mastodon remove the expired subscription ([#664](https://github.com/binwiederhier/ntfy/issues/664)); a Matrix push to such a topic gets its pushkey rejected (before: after 12 hours without a subscriber on the server that got the push)
+* With `visitor-subscriber-rate-limiting`, UnifiedPush messages are counted against the subscriber's account only while it has a tier, and against the subscriber's IP address otherwise (also after the account lost its tier or was deleted); a tier change applies within a minute
 
 **Bug fixes + maintenance:**
 

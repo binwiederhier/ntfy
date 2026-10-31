@@ -59,7 +59,16 @@ func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visito
 }
 
 func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	users, grants, err := s.readUsersAndGrants(r.URL.Query().Get("username"))
+	var (
+		users  []*user.User
+		grants map[string][]user.Grant
+		err    error
+	)
+	if username := r.URL.Query().Get("username"); username != "" {
+		users, grants, err = s.readUserAndGrants(username)
+	} else {
+		users, grants, err = s.readAllUsersAndGrants()
+	}
 	if err != nil {
 		return err
 	}
@@ -90,19 +99,8 @@ func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visit
 	return s.writeJSON(w, usersResponse)
 }
 
-// readUsersAndGrants returns one user (if username is set), or all users, with their grants
-func (s *Server) readUsersAndGrants(username string) ([]*user.User, map[string][]user.Grant, error) {
-	if username == "" {
-		users, err := s.userManager.Users()
-		if err != nil {
-			return nil, nil, err
-		}
-		grants, err := s.userManager.AllGrants()
-		if err != nil {
-			return nil, nil, err
-		}
-		return users, grants, nil
-	}
+// readUserAndGrants returns one user, with its grants keyed by user ID, like readAllUsersAndGrants
+func (s *Server) readUserAndGrants(username string) ([]*user.User, map[string][]user.Grant, error) {
 	u, err := s.userManager.User(username)
 	if err != nil {
 		return nil, nil, mapUserErrorToHTTP(err)
@@ -112,6 +110,19 @@ func (s *Server) readUsersAndGrants(username string) ([]*user.User, map[string][
 		return nil, nil, err
 	}
 	return []*user.User{u}, map[string][]user.Grant{u.ID: grants}, nil
+}
+
+// readAllUsersAndGrants returns all users, with their grants keyed by user ID
+func (s *Server) readAllUsersAndGrants() ([]*user.User, map[string][]user.Grant, error) {
+	users, err := s.userManager.Users()
+	if err != nil {
+		return nil, nil, err
+	}
+	grants, err := s.userManager.AllGrants()
+	if err != nil {
+		return nil, nil, err
+	}
+	return users, grants, nil
 }
 
 func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {

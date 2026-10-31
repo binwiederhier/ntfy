@@ -16,10 +16,8 @@ const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
-	// forgotten (see Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber
-	// is gone. This number has to be very high to prevent e-mail abuse, but it doesn't really affect
-	// the other limits anyway, since they are replenished faster (typically).
+	// visitorExpungeAfter is how long a topic keeps a rate visitor whose subscriber is gone. The
+	// limiter forgets a key on its own, once forgetting it changes nothing (see limit.Service.Prune).
 	visitorExpungeAfter = oneDay
 
 	// promoteRate is the divisor of the daily message cap (cap / promoteRate, i.e. 10%) from which

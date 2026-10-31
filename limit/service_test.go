@@ -213,9 +213,9 @@ func TestService_Allow_DailyChangeAppliesAtOnce(t *testing.T) {
 func TestService_Allow_Unlimited(t *testing.T) {
 	s, _ := newTestServiceWithClock(t)
 	for i := 0; i < 1000; i++ {
-		require.True(t, s.Allow("k", Rule{Kind: KindTopics}, 1).OK)
+		require.True(t, s.Allow("k", Rule{Kind: KindBandwidth}, 1).OK)
 	}
-	require.Equal(t, int64(1000), s.Usage("k").Count(KindTopics))
+	require.Equal(t, int64(1000), s.Usage("k").Count(KindBandwidth))
 }
 
 func TestService_Allow_NeverRefills(t *testing.T) {
@@ -282,7 +282,7 @@ func TestService_Prune(t *testing.T) {
 	clock.advance(10 * time.Minute)
 	require.True(t, s.Allow("fresh", rule, 1).OK)
 	require.Equal(t, 2, s.Size())
-	s.Prune(5 * time.Minute)
+	s.Prune()
 	require.Equal(t, 1, s.Size())
 	require.True(t, s.Allow("old", rule, 1).OK)    // Forgotten: back with a full bucket
 	require.False(t, s.Allow("fresh", rule, 1).OK) // Kept
@@ -300,11 +300,11 @@ func TestService_Prune_KeepsKeyUntilBucketsRefill(t *testing.T) {
 	}
 	require.True(t, s.Allow("key", rule, 1).OK)
 	clock.advance(10 * time.Minute)
-	s.Prune(5 * time.Minute)
+	s.Prune()
 	require.Equal(t, 1, s.Size())
 	require.False(t, s.Allow("key", rule, 1).OK)
 	clock.advance(time.Hour)
-	s.Prune(5 * time.Minute)
+	s.Prune()
 	require.Equal(t, 0, s.Size())
 	require.True(t, s.Allow("key", rule, 1).OK)
 }
@@ -318,13 +318,157 @@ func TestService_Prune_DropsEndedPeriods(t *testing.T) {
 	}
 	require.True(t, s.Allow("k", rule, 4).OK)
 	clock.advance(15 * time.Hour)
-	s.Prune(time.Minute)
+	s.Prune()
 	require.Equal(t, 0, s.Size())
 	require.Equal(t, int64(4), s.Usage("k").Count(KindMessages))
 	require.Len(t, s.counters[shardIndex("k")].counters, 1)
 	clock.advance(time.Hour)
-	s.Prune(time.Minute)
+	s.Prune()
 	require.Empty(t, s.counters[shardIndex("k")].counters)
+}
+
+func TestService_Prune_ForgetsSettledKeyAfterAMinute(t *testing.T) {
+	// A one-shot key (e.g. one of a flood of IPs) is forgotten once its buckets are full again and
+	// it went unused for settledIdle, not after a day
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Second,
+	}
+	require.True(t, s.Allow("k", rule, 1).OK)
+	clock.advance(settledIdle / 2)
+	require.Zero(t, s.Prune())
+	require.Equal(t, 1, s.Size()) // Full again, but used too recently
+	clock.advance(settledIdle)
+	require.Equal(t, 1, s.Prune())
+	require.Equal(t, 0, s.Size())
+	require.Equal(t, rule.Burst, s.Tokens("k", rule))
+}
+
+func TestService_Prune_NoRefillDoesNotHoldKey(t *testing.T) {
+	// A bucket without refill is never full again, so it does not hold the key: like any settled
+	// key, it is forgotten after settledIdle and comes back with a full bucket
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:  KindAccount,
+		Burst: 1,
+	}
+	require.True(t, s.Allow("k", rule, 1).OK)
+	require.False(t, s.Allow("k", rule, 1).OK)
+	clock.advance(2 * settledIdle)
+	require.Equal(t, 1, s.Prune())
+	require.True(t, s.Allow("k", rule, 1).OK)
+}
+
+func TestService_Prune_ForgettingIsARefillAtPruneTime(t *testing.T) {
+	// Forgetting a settled key is the same as refilling its buckets when it is forgotten: a
+	// wall clock stepped back afterwards finds the same tokens either way
+	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
+	pruned, kept := newService(&Config{}, clock.now), newService(&Config{}, clock.now)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Second,
+	}
+	for _, s := range []*Service{pruned, kept} {
+		require.True(t, s.Allow("k", rule, 10).OK)
+	}
+	clock.advance(time.Hour)
+	require.Equal(t, 1, pruned.Prune())
+	require.Equal(t, rule.Burst, kept.Tokens("k", rule))
+	clock.advance(-59 * time.Minute) // 5 s after the bucket was emptied
+	for _, s := range []*Service{pruned, kept} {
+		require.Equal(t, rule.Burst, s.Tokens("k", rule))
+		require.True(t, s.Allow("k", rule, 10).OK)
+		require.False(t, s.Allow("k", rule, 1).OK)
+	}
+}
+
+func TestService_Prune_DeniedSlowerRuleHoldsKey(t *testing.T) {
+	// A bucket charged with a fast rule and then denied with a slower one (a tier downgrade, a
+	// config change) is full again only at the slower rate: the key must be kept until then, or
+	// it comes back with a full bucket
+	s, clock := newTestServiceWithClock(t)
+	fast := Rule{
+		Kind:   KindRequests,
+		Burst:  2,
+		Refill: time.Second,
+	}
+	slow := Rule{
+		Kind:   KindRequests,
+		Burst:  2,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("k", fast, 2).OK)
+	clock.advance(time.Second)
+	require.False(t, s.Allow("k", slow, 2).OK)
+	clock.advance(2 * settledIdle)
+	require.Zero(t, s.Prune())
+	require.Equal(t, 1, s.Size())
+	require.False(t, s.Allow("k", slow, 1).OK)
+}
+
+func TestService_Prune_TokensWithSlowerRuleHoldsKey(t *testing.T) {
+	// Tokens refills too, so a slower rule read there moves the time the bucket is full again
+	s, clock := newTestServiceWithClock(t)
+	fast := Rule{
+		Kind:   KindRequests,
+		Burst:  2,
+		Refill: time.Second,
+	}
+	slow := Rule{
+		Kind:   KindRequests,
+		Burst:  2,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("k", fast, 2).OK)
+	clock.advance(time.Second)
+	require.Zero(t, s.Tokens("k", slow))
+	clock.advance(2 * settledIdle)
+	require.Zero(t, s.Prune())
+	require.Zero(t, s.Tokens("k", slow))
+}
+
+func TestService_Prune_BandwidthTallyHoldsKeyUntilPeriodEnd(t *testing.T) {
+	// A big bandwidth bucket refills a small download in milliseconds, but the bytes stay in the
+	// key's usage until its period ends, so the key is kept until then
+	s, clock := newTestServiceWithClock(t)
+	burst := int64(15 * 1024 * 1024 * 1024)
+	rule := Rule{
+		Kind:   KindBandwidth,
+		Burst:  burst,
+		Refill: oneDay / time.Duration(burst),
+	}
+	require.True(t, s.Allow("k", rule, 1024*1024).OK)
+	clock.advance(2 * settledIdle)
+	require.Zero(t, s.Prune())
+	require.Equal(t, int64(1024*1024), s.Usage("k").Count(KindBandwidth))
+	require.Equal(t, int64(1024*1024), s.Limiter("k", rule).Value())
+	clock.t = s.ResetAt("k")
+	require.Equal(t, 1, s.Prune())
+	require.Equal(t, Usage{}, s.Usage("k"))
+}
+
+func TestService_Prune_LimiterViewAcrossPrune(t *testing.T) {
+	// A limiter view (e.g. a reader metering an upload) refers to the key, not to its entry: bytes
+	// it charged keep the entry, a revert finds them, and after a prune it charges a fresh entry
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindBandwidth,
+		Burst:  1000,
+		Refill: time.Millisecond,
+	}
+	l := s.Limiter("k", rule)
+	require.True(t, l.AllowN(100))
+	clock.advance(2 * settledIdle)
+	require.Zero(t, s.Prune())
+	require.True(t, l.AllowN(-100)) // Revert: the upload failed
+	require.Zero(t, l.Value())
+	require.Equal(t, 1, s.Prune())
+	require.True(t, l.AllowN(50))
+	require.Equal(t, int64(50), l.Value())
+	require.Equal(t, rule.Burst-50, s.Tokens("k", rule))
 }
 
 func TestService_Allow_Concurrent(t *testing.T) {
@@ -420,11 +564,11 @@ func TestService_TouchAndSeen(t *testing.T) {
 	require.Equal(t, clock.now(), s.Seen("k"))
 	clock.advance(10 * time.Minute)
 	s.Touch("k")
-	s.Prune(5 * time.Minute)
+	s.Prune()
 	require.Equal(t, 1, s.Size()) // Touched, so not idle
 	require.Equal(t, clock.now(), s.Seen("k"))
 	clock.advance(10 * time.Minute)
-	s.Prune(5 * time.Minute)
+	s.Prune()
 	require.True(t, s.Seen("k").IsZero())
 }
 
@@ -497,13 +641,13 @@ func TestService_Prune_ConcurrentAllow(t *testing.T) {
 		defer wg.Done()
 		<-start
 		for i := 0; i < 100; i++ {
-			s.Prune(time.Hour)
+			s.Prune()
 		}
 	}()
 	close(start)
 	wg.Wait()
 	require.Zero(t, admitted.Load())
-	require.Equal(t, int64(1), s.Usage("hot").Count(rule.Kind))
+	require.Zero(t, s.Tokens("hot", rule))
 	require.Equal(t, 1, s.Size())
 }
 
@@ -777,7 +921,7 @@ func TestService_Persist_ReadBackKeyIsNotUsedHere(t *testing.T) {
 
 		// Once the period ended and the buckets are idle and full, the key is gone
 		clock.advance(25 * time.Hour)
-		b.Prune(time.Hour)
+		b.Prune()
 		require.Equal(t, 0, b.Size())
 		require.Equal(t, Usage{}, b.Usage("user:u_1"))
 	})
@@ -984,6 +1128,7 @@ const (
 	benchIdleKeys      = 400_000
 	benchPublisherKeys = 50_000
 	benchPromotedKeys  = 5_000
+	benchFloodKeys     = 500_000
 )
 
 var (
@@ -1055,6 +1200,36 @@ func BenchmarkService_Memory(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&after)
 		b.ReportMetric(float64(after.HeapAlloc-before.HeapAlloc)/float64(benchIdleKeys+benchPublisherKeys), "B/key")
+		runtime.KeepAlive(s)
+	}
+}
+
+func BenchmarkService_MemoryFlood(b *testing.B) {
+	// A flood of one-shot keys (one request each, as from new IPs): what the buckets hold right
+	// after it, and after a prune a little later
+	for i := 0; i < b.N; i++ {
+		var base, flooded, pruned runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&base)
+		clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
+		s := newService(&Config{}, clock.now)
+		for j := 0; j < benchFloodKeys; j++ {
+			key := fmt.Sprintf("ip:10.%d.%d.%d", j>>16, (j>>8)&255, j&255)
+			s.Touch(key)
+			s.Allow(key, benchRequestRule, 1)
+		}
+		runtime.GC()
+		runtime.ReadMemStats(&flooded)
+		keys := s.Size()
+		clock.advance(2 * settledIdle)
+		s.Prune()
+		runtime.GC()
+		runtime.ReadMemStats(&pruned)
+		b.ReportMetric(float64(keys), "keys")
+		b.ReportMetric(float64(flooded.HeapAlloc-base.HeapAlloc)/float64(benchFloodKeys), "B/key")
+		b.ReportMetric(float64(flooded.HeapAlloc-base.HeapAlloc)/1e6, "MB-flooded")
+		b.ReportMetric(float64(s.Size()), "keys-pruned")
+		b.ReportMetric(float64(int64(pruned.HeapAlloc)-int64(base.HeapAlloc))/1e6, "MB-pruned")
 		runtime.KeepAlive(s)
 	}
 }

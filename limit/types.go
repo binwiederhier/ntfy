@@ -48,7 +48,7 @@ type Decision struct {
 	RetryAfter time.Duration
 }
 
-// Usage is a key's daily counts in its current period
+// Usage is a key's counts in its current period: the daily counts, and this node's bandwidth
 type Usage struct {
 	counts [numKinds]int64
 }
@@ -75,10 +75,10 @@ type counterShard struct {
 // bucketEntry is one key's token buckets
 type bucketEntry struct {
 	buckets     [numKinds]bucket
-	counts      [numKinds]int64 // Units used in the current period of the kinds without a counter (bandwidth, ...), memory only
-	periodStart int64           // The period of counts (see periodStart)
-	seen        int64           // Last use, unix nanoseconds
-	full        int64           // When every bucket is full again, unix nanoseconds
+	bandwidth   int64 // Bytes used in the current period, memory only; the only kind without a counter that is tallied
+	periodStart int64 // The period of bandwidth (see periodStart)
+	seen        int64 // Last use, unix nanoseconds
+	full        int64 // When every bucket is full again, unix nanoseconds
 }
 
 // bucketShard is one independently locked part of the token buckets
@@ -145,7 +145,7 @@ func (l *limiter) AllowN(n int64) bool {
 	return l.s.Allow(l.key, l.rule, n).OK
 }
 
-// Value returns the key's daily count of the kind (0 for a kind without one)
+// Value returns the key's count of the kind in its current period (see Usage)
 func (l *limiter) Value() int64 {
 	return l.s.Usage(l.key).Count(l.rule.Kind)
 }

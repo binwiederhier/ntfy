@@ -2314,6 +2314,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.36.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Cluster: a forwarded message for a topic without subscribers on the receiving node now counts as wasted (`ntfy_cluster_messages_wasted_total`) and no longer keeps that idle topic in memory
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

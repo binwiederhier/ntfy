@@ -12,12 +12,17 @@ import (
 // node's local subscribers. It is the receive-side counterpart to Cluster.ForwardMessage: local
 // delivery and all global side effects (Firebase, email, web push, upstream) already ran on the
 // origin node, so this only publishes to the local topic, and never re-relays.
+//
+// A message whose topic has no subscriber here is counted as wasted and not published: publishing
+// would keep the idle topic alive (Keepalive), so a node would never expunge a topic the other
+// nodes keep publishing to. A subscriber that comes along later gets it from its since= read of
+// the cache, or from the tail (which sends what never went out here).
 func (s *Server) deliverFromBus(m *model.Message) {
 	s.mu.RLock()
 	t, ok := s.topics[m.Topic]
 	s.mu.RUnlock()
-	if !ok {
-		metrics.ClusterMessagesWasted.Inc() // Relayed here needlessly: this node had no use for the message
+	if !ok || t.SubscribersCount() == 0 {
+		metrics.ClusterMessagesWasted.Inc() // Relayed here needlessly: no subscriber here wanted the message
 		return
 	}
 	v := s.visitor(m.Sender, nil)

@@ -65,9 +65,10 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
-	visitors          *visitorEnv    // Shared by all visitors, which are built per request
-	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	limiter           *limit.Service  // Decides on and counts the visitors' usage, keyed by visitor key
+	visitors          *visitorEnv     // Shared by all visitors, which are built per request
+	payerUsers        *payerUserCache // Users of the UnifiedPush topics' payers, by ID
+	ban               *ban.Service    // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
@@ -360,6 +361,10 @@ func New(conf *Config) (*Server, error) {
 		Store: createUsageStore(pool, userDB),
 	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
+	s.payerUsers = newPayerUserCache(nil)
+	if userManager != nil {
+		s.payerUsers.lookup = userManager.UserByID
+	}
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
@@ -1099,11 +1104,17 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && vrate == v { // No payer, see limitRequestsWithTopic
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
+		// That is what a topic abandoned for unifiedPushAbandonedAfter gets: a 404, so the subscription is removed.
+		if s.unifiedPushTopicAbandoned(t) {
+			return nil, errHTTPNotFoundUnifiedPushTopicAbandoned.With(t)
+		} else if isUnifiedPushTopic(t.ID) {
+			s.limiter.NoteTopic(t.ID) // Starts the countdown to the 404 of a topic nobody ever subscribed to
+		}
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) && !vrate.MessageAllowed() {
 		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
@@ -1216,7 +1227,13 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		metrics.MessagesPublishedFailure.Inc()
 		metrics.MatrixPublishedFailure.Inc()
-		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
+		if e, ok := err.(*errHTTP); ok && e.Code == errHTTPNotFoundUnifiedPushTopicAbandoned.Code {
+			pushKey, err := fromContext[string](r, contextMatrixPushKey)
+			if err != nil {
+				return err
+			}
+			return writeMatrixResponse(w, pushKey)
+		} else if ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
 			topic, err := fromContext[*topic](r, contextTopic)
 			if err != nil {
 				return err
@@ -1710,7 +1727,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		}
 		return nil
 	}
-	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
+	if err := s.maybeSetPayers(r, v, topics); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1738,6 +1755,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
+		s.touchPayers(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1874,7 +1892,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		}
 		return conn.WriteJSON(msg)
 	}
-	if err := s.maybeSetRateVisitors(r, v, topics); err != nil {
+	if err := s.maybeSetPayers(r, v, topics); err != nil {
 		return err
 	}
 	w.Header().Set("Access-Control-Allow-Origin", s.config.AccessControlAllowOrigin) // CORS, allow cross-origin requests
@@ -1897,6 +1915,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
+		s.touchPayers(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1932,38 +1951,39 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 	return
 }
 
-// maybeSetRateVisitors sets the rate visitor on a topic (v.SetRateVisitor), indicating that all messages published
-// to that topic will be rate limited against the rate visitor instead of the publishing visitor.
+// maybeSetPayers makes v the payer of a topic (limit.Service.SetPayer), indicating that all messages published
+// to that topic will be rate limited against the payer instead of the publishing visitor.
 //
-// Setting the rate visitor is ony allowed if the `visitor-subscriber-rate-limiting` setting is enabled, AND
+// Setting the payer is ony allowed if the `visitor-subscriber-rate-limiting` setting is enabled, AND
 // - auth-file is not set (everything is open by default)
 // - or the topic is reserved, and v.user is the owner
 // - or the topic is not reserved, and v.user has write access
 //
 // This only applies to UnifiedPush topics ("up...").
-func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*topic) error {
+func (s *Server) maybeSetPayers(r *http.Request, v *visitor, topics []*topic) error {
 	// Bail out if not enabled
 	if !s.config.VisitorSubscriberRateLimiting {
 		return nil
 	}
 
-	// Make a list of topics that we'll actually set the RateVisitor on
+	// Make a list of topics that we'll actually set the payer on; the others count as subscriber activity only
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
+		if isUnifiedPushTopic(t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
 	if len(eligibleRateTopics) == 0 {
 		return nil
 	}
+	s.touchPayers(eligibleRateTopics)
 
-	// If access controls are turned off, v has access to everything, and we can set the rate visitor
+	// If access controls are turned off, v has access to everything, and we can set the payer
 	if s.userManager == nil {
-		return s.setRateVisitors(r, v, eligibleRateTopics)
+		return s.setPayers(r, v, eligibleRateTopics)
 	}
 
-	// If access controls are enabled, only set rate visitor if
+	// If access controls are enabled, only set payer if
 	// - topic is reserved, and v.user is the owner
 	// - topic is not reserved, and v.user has write access
 	writableRateTopics := make([]*topic, 0)
@@ -1983,16 +2003,21 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 			writableRateTopics = append(writableRateTopics, t)
 		}
 	}
-	return s.setRateVisitors(r, v, writableRateTopics)
+	return s.setPayers(r, v, writableRateTopics)
 }
 
-func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
+func (s *Server) setPayers(r *http.Request, v *visitor, rateTopics []*topic) error {
 	for _, t := range rateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
-			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v)
+			Debug("Setting visitor as payer for topic %s", t.ID)
+		s.limiter.SetPayer(t.ID, &limit.Payer{
+			Key:    v.key,
+			UserID: v.MaybeUserID(),
+			SeenAt: time.Now(),
+		})
+		t.Keepalive()
 	}
 	return nil
 }

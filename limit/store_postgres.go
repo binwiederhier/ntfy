@@ -3,6 +3,7 @@ package limit
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgconn"
 
@@ -39,11 +40,11 @@ func NewPostgresStore(d *db.DB) *Store {
 		},
 	}
 	s.writeChunk = s.writePostgres
-	s.mayHaveCommitted = mayHaveCommittedPostgres
 	return s
 }
 
-// writePostgres writes the rows in one statement, as arrays
+// writePostgres writes the rows in one statement, as arrays. A timeout after the statement was
+// sent is wrapped in errMaybeWritten, since the commit may have been acknowledged after the deadline.
 func (s *Store) writePostgres(ctx context.Context, rows []usageRow, now int64) error {
 	keys := make([]string, len(rows))
 	periodStarts := make([]int64, len(rows))
@@ -58,6 +59,9 @@ func (s *Store) writePostgres(ctx context.Context, rows []usageRow, now int64) e
 		}
 	}
 	_, err := s.db.ExecContext(ctx, s.queries.upsert, keys, periodStarts, counts[0], counts[1], counts[2], now)
+	if err != nil && mayHaveCommittedPostgres(err) {
+		return fmt.Errorf("%w: %w", errMaybeWritten, err)
+	}
 	return err
 }
 

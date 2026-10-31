@@ -2,6 +2,7 @@ package limit
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 
@@ -17,6 +18,12 @@ const (
 	pruneChunkRows = 10000
 )
 
+var (
+	// errMaybeWritten wraps a chunk's error when the chunk may have been written anyway (a timeout
+	// after the statement was sent), so the caller counts it as written rather than writing it twice
+	errMaybeWritten = errors.New("chunk may have been written")
+)
+
 // usageRow is one key's daily counts in one period: a delta on the way to the store, the row's
 // totals on the way back
 type usageRow struct {
@@ -29,10 +36,9 @@ type usageRow struct {
 // stamped (updated_at) with the writing node's clock, like the reader's watermark, so the
 // database's clock does not matter. Only the service's sync worker calls it.
 type Store struct {
-	db               *db.DB
-	queries          *queries
-	writeChunk       func(ctx context.Context, rows []usageRow, now int64) error // Dialect specific: unnest on Postgres, a prepared statement per row on SQLite
-	mayHaveCommitted func(err error) bool                                        // Dialect specific: whether a failed chunk may have been written anyway
+	db         *db.DB
+	queries    *queries
+	writeChunk func(ctx context.Context, rows []usageRow, now int64) error // Dialect specific: unnest on Postgres, a prepared statement per row on SQLite
 }
 
 // queries are the dialect's SQL statements
@@ -46,8 +52,9 @@ type queries struct {
 // row's period is older. Rows of an older period than the stored one are added to the stored
 // one (a node's leftover of a finished period, see the usage queries). Rows are written sorted
 // by key in chunks, so two nodes lock overlapping keys in the same order; it returns how many
-// rows (in sorted order) are committed: on an error, the chunks before it are. The rows'
-// updated_at is now (unix seconds).
+// rows (in sorted order) are committed: on an error, the chunks before it are, plus the failed
+// chunk if it may have been written anyway (errMaybeWritten). The rows' updated_at is now (unix
+// seconds).
 func (s *Store) write(ctx context.Context, rows []usageRow, now int64) (int, error) {
 	slices.SortFunc(rows, func(a, b usageRow) int {
 		return strings.Compare(a.key, b.key)
@@ -55,6 +62,9 @@ func (s *Store) write(ctx context.Context, rows []usageRow, now int64) (int, err
 	written := 0
 	for chunk := range slices.Chunk(rows, writeChunkRows) {
 		if err := s.writeChunk(ctx, chunk, now); err != nil {
+			if errors.Is(err, errMaybeWritten) {
+				written += len(chunk)
+			}
 			return written, err
 		}
 		written += len(chunk)

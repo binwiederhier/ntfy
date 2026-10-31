@@ -822,7 +822,7 @@ func TestService_Persist_TimeoutAfterCommitIsNotCountedTwice(t *testing.T) {
 		if err := writeChunk(ctx, rows, now); err != nil {
 			return err
 		}
-		return context.DeadlineExceeded // Committed, but the answer came too late
+		return fmt.Errorf("%w: %w", errMaybeWritten, context.DeadlineExceeded) // Committed, but the answer came too late
 	}
 	s := startTestService(t, store, time.Now)
 	require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages}, 26).OK)

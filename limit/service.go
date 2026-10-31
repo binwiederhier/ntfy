@@ -401,9 +401,6 @@ func (s *Service) write(ctx context.Context) {
 		return
 	}
 	written, err := s.store.write(ctx, rows, s.now().Unix())
-	if err != nil && s.store.mayHaveCommitted(err) {
-		written = min(written+writeChunkRows, len(rows))
-	}
 	for i := range rows[:written] {
 		s.retire(&rows[i])
 	}

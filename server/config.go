@@ -272,7 +272,7 @@ func NewConfig() *Config {
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,
-		ListenAdminUnix:                      DefaultListenAdminUnix(),
+		ListenAdminUnix:                      "", // Experimental, off unless configured
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",

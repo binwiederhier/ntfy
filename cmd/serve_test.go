@@ -498,7 +498,7 @@ func TestCLI_Serve_ListenAdminUnixDisabled(t *testing.T) {
 	configFile := newEmptyFile(t)
 	go func() {
 		app, _, _, _ := newTestApp()
-		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile, "--auth-file=" + filepath.Join(dir, "user.db"), "--listen-admin-unix=-"})
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile, "--auth-file=" + filepath.Join(dir, "user.db"), "--experimental-listen-admin-unix=-"})
 		require.Nil(t, err)
 	}()
 	for i := 0; i < 40 && !util.FileExists(sockFile); i++ {
@@ -506,6 +506,21 @@ func TestCLI_Serve_ListenAdminUnixDisabled(t *testing.T) {
 	}
 	require.True(t, util.FileExists(sockFile))
 	require.False(t, util.FileExists(filepath.Join(dir, "-")))
+}
+
+func TestCLI_Serve_ExperimentalListenAdminUnix(t *testing.T) {
+	dir := t.TempDir()
+	adminSockFile := filepath.Join(dir, "admin.sock")
+	configFile := newEmptyFile(t)
+	go func() {
+		app, _, _, _ := newTestApp()
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + filepath.Join(dir, "ntfy.sock"), "--auth-file=" + filepath.Join(dir, "user.db"), "--experimental-listen-admin-unix=" + adminSockFile})
+		require.Nil(t, err)
+	}()
+	for i := 0; i < 40 && !util.FileExists(adminSockFile); i++ {
+		time.Sleep(50 * time.Millisecond)
+	}
+	require.True(t, util.FileExists(adminSockFile))
 }
 
 func TestCLI_Serve_WebSocket(t *testing.T) {

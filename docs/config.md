@@ -951,11 +951,13 @@ The server logs at startup whether it is listening on the socket, and why not if
 
 ```
 INFO Admin socket listening on /run/ntfy/admin.sock (tag=startup)
-WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated and stops working after 2026-12-30, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
+WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
 ```
 
 To change the path, set `listen-admin-unix` in the `server.yml` file (or `NTFY_LISTEN_ADMIN_UNIX`); the commands read it from
-there, too. To disable the socket, set `listen-admin-unix: "-"`. Depending on how you installed ntfy:
+there, too. To disable the socket, set `listen-admin-unix: "-"`. If you change the path, pick a directory that only the
+ntfy user can write to; otherwise the server logs a warning at startup, since other users may be able to use or replace
+the socket. Depending on how you installed ntfy:
 
 * **Debian/Ubuntu/Fedora packages**: Works out of the box. The shipped systemd unit creates `/run/ntfy` (via
   `RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group can manage users. If you use

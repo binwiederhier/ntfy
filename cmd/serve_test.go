@@ -708,6 +708,19 @@ func TestCLI_Serve_AttachmentExpiryLongerThanCacheDurationWarning(t *testing.T) 
 	require.NotContains(t, buf.String(), "attachment-expiry-duration")
 }
 
+func TestCLI_Serve_ValidationAfterBaseURLAndMessageSizeLimit(t *testing.T) {
+	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
+	// A valid base-url used to end the checks, so the ones after it never ran; an invalid
+	// auth-default-access fails right after the checks, so the server never starts
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--auth-default-access=invalid", "--base-url=https://ntfy.example.com", "--upstream-base-url=https://ntfy.example.com"})
+	require.ErrorContains(t, err, "base-url and upstream-base-url cannot be identical")
+	// The same for a message-size-limit above 4K
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--auth-default-access=invalid", "--message-size-limit=8k", "--visitor-prefix-bits-ipv4=0"})
+	require.ErrorContains(t, err, "visitor-prefix-bits-ipv4 must be between 1 and 32")
+}
+
 func newEmptyFile(t *testing.T) string {
 	filename := filepath.Join(t.TempDir(), "empty")
 	require.Nil(t, os.WriteFile(filename, []byte{}, 0600))

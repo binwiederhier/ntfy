@@ -1458,8 +1458,8 @@ func TestAdminSocket_UnwritableDirectory(t *testing.T) {
 	output := captureLogUntil(t, "not available", func() {
 		runTestServer(t, s)
 	})
-	require.Contains(t, output, "Admin socket")
-	require.Contains(t, output, "directly, which is deprecated, see https://ntfy.sh/docs/deprecations/")
+	require.Contains(t, output, "Admin socket "+conf.ListenAdminUnix+" not available")
+	require.NotContains(t, output, "deprecated") // The CLI does not use the socket yet, so there is nothing to fall back from
 	require.False(t, adminSocketListening(s))
 }
 

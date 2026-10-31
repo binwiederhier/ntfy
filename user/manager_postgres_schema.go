@@ -146,15 +146,34 @@ const (
 	`
 )
 
+// The topic_payer table holds who pays for the pushes to a UnifiedPush topic and when it last had
+// a subscriber, one row per topic (see package limit, which reads and writes it)
+const (
+	postgresCreateTopicPayerTableQuery = `
+		CREATE TABLE IF NOT EXISTS topic_payer (
+			topic TEXT NOT NULL PRIMARY KEY,
+			payer_key TEXT NOT NULL,
+			payer_user_id TEXT NOT NULL,
+			seen_at BIGINT NOT NULL,
+			updated_at BIGINT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_topic_payer_updated_at ON topic_payer (updated_at);
+	`
+
+	// 10 -> 11: The topic_payer table
+	postgresMigrate10To11UpdateQueries = postgresCreateTopicPayerTableQuery
+)
+
 var (
-	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries + postgresCreateUsageTableQuery)
+	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries + postgresCreateUsageTableQuery + postgresCreateTopicPayerTableQuery)
 
 	// postgresMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
 	postgresMigrations = schema.Migrations{
-		{From: 6, To: 7}:  schema.Query(postgresMigrate6To7UpdateQueries),
-		{From: 7, To: 8}:  schema.Query(postgresMigrate7To8UpdateQueries),
-		{From: 8, To: 9}:  schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
-		{From: 9, To: 10}: schema.Query(postgresMigrate9To10UpdateQueries),
+		{From: 6, To: 7}:   schema.Query(postgresMigrate6To7UpdateQueries),
+		{From: 7, To: 8}:   schema.Query(postgresMigrate7To8UpdateQueries),
+		{From: 8, To: 9}:   schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
+		{From: 9, To: 10}:  schema.Query(postgresMigrate9To10UpdateQueries),
+		{From: 10, To: 11}: schema.Query(postgresMigrate10To11UpdateQueries),
 	}
 )

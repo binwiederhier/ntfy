@@ -387,21 +387,40 @@ const (
 	`
 )
 
+// The topic_payer table holds who pays for the pushes to a UnifiedPush topic and when it last had
+// a subscriber, one row per topic (see package limit, which reads and writes it)
+const (
+	sqliteCreateTopicPayerTableQuery = `
+		CREATE TABLE IF NOT EXISTS topic_payer (
+			topic TEXT NOT NULL PRIMARY KEY,
+			payer_key TEXT NOT NULL,
+			payer_user_id TEXT NOT NULL,
+			seen_at INT NOT NULL,
+			updated_at INT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_topic_payer_updated_at ON topic_payer (updated_at);
+	`
+
+	// 10 -> 11: The topic_payer table
+	sqliteMigrate10To11UpdateQueries = sqliteCreateTopicPayerTableQuery
+)
+
 var (
-	sqliteCreateTables = schema.AsMigrateFunc(sqliteCreateTablesQueries + sqliteCreateUsageTableQuery)
+	sqliteCreateTables = schema.AsMigrateFunc(sqliteCreateTablesQueries + sqliteCreateUsageTableQuery + sqliteCreateTopicPayerTableQuery)
 
 	// sqliteMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
 	sqliteMigrations = schema.Migrations{
-		{From: 1, To: 2}:  schema.Func(sqliteMigrateFrom1),
-		{From: 2, To: 3}:  schema.Query(sqliteMigrate2To3UpdateQueries),
-		{From: 3, To: 4}:  schema.Query(sqliteMigrate3To4UpdateQueries),
-		{From: 4, To: 5}:  schema.Query(sqliteMigrate4To5UpdateQueries),
-		{From: 5, To: 6}:  schema.Query(sqliteMigrate5To6UpdateQueries),
-		{From: 6, To: 7}:  schema.Query(sqliteMigrate6To7UpdateQueries),
-		{From: 7, To: 8}:  schema.Query(sqliteMigrate7To8UpdateQueries),
-		{From: 8, To: 9}:  schema.Query(sqliteMigrate8To9UpdateQueries),
-		{From: 9, To: 10}: schema.Query(sqliteMigrate9To10UpdateQueries),
+		{From: 1, To: 2}:   schema.Func(sqliteMigrateFrom1),
+		{From: 2, To: 3}:   schema.Query(sqliteMigrate2To3UpdateQueries),
+		{From: 3, To: 4}:   schema.Query(sqliteMigrate3To4UpdateQueries),
+		{From: 4, To: 5}:   schema.Query(sqliteMigrate4To5UpdateQueries),
+		{From: 5, To: 6}:   schema.Query(sqliteMigrate5To6UpdateQueries),
+		{From: 6, To: 7}:   schema.Query(sqliteMigrate6To7UpdateQueries),
+		{From: 7, To: 8}:   schema.Query(sqliteMigrate7To8UpdateQueries),
+		{From: 8, To: 9}:   schema.Query(sqliteMigrate8To9UpdateQueries),
+		{From: 9, To: 10}:  schema.Query(sqliteMigrate9To10UpdateQueries),
+		{From: 10, To: 11}: schema.Query(sqliteMigrate10To11UpdateQueries),
 	}
 )
 

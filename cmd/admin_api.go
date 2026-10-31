@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/netip"
+	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,6 +30,11 @@ See https://docs.ntfy.sh/deprecations/ for details.`
 	adminSocketDisabledCause = "The admin socket is disabled\n(listen-admin-unix is \"-\" or empty)"
 	adminWarningColorYellow  = "\033[1;33m"
 	adminWarningColorReset   = "\033[0m"
+)
+
+var (
+	// adminTargetFlags choose which server a command talks to, see newAdminAPI
+	adminTargetFlags = []string{"--server", "-S", "--token", "-k", "--listen-admin-unix", "--listen_admin_unix", "--config", "-c"}
 )
 
 // adminAPI is what the user, access, token and tier commands need. client.Admin implements it
@@ -57,10 +65,20 @@ type adminAPI interface {
 // socket when a server answers on it, else the database directly, with a warning. A socket file
 // that nobody answers on is treated as absent (stale file after a crash).
 func newAdminAPI(c *cli.Context) (adminAPI, error) {
+	for _, arg := range c.Args().Slice() {
+		if slices.Contains(adminTargetFlags, strings.SplitN(arg, "=", 2)[0]) {
+			// The CLI stops parsing flags at the first argument, so this one would be silently ignored,
+			// and the command would go to the local server instead of the one the user meant
+			return nil, fmt.Errorf("%s must come before the command and its arguments, e.g. 'ntfy user --server=URL --token=TOKEN list'", arg)
+		}
+	}
 	if server := c.String("server"); server != "" {
 		token := c.String("token")
 		if token == "" {
 			return nil, errors.New("--token is required with --server")
+		}
+		if u, err := url.Parse(server); err == nil && u.Scheme == "http" && !isLoopbackHost(u.Hostname()) {
+			fmt.Fprintf(c.App.ErrWriter, "warning: --server %s is not HTTPS, the token is sent unencrypted\n", server)
 		}
 		return client.NewAdmin(server, token), nil
 	}
@@ -95,6 +113,15 @@ func newAdminAPI(c *cli.Context) (adminAPI, error) {
 		return nil, err // The server answered with some other error; do not hide it behind a fallback
 	}
 	return newDirectAdminAPI(c)
+}
+
+// isLoopbackHost reports whether host is this machine, so plain HTTP never leaves it
+func isLoopbackHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.IsLoopback()
 }
 
 // adminError turns an admin API error into the message the CLI printed before it talked to the
@@ -139,7 +166,7 @@ func adminError(err error, username, tier, token string) error {
 	case client.AdminErrCodePasswordHashInvalid:
 		return errors.New("password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate")
 	case client.AdminErrCodeAdminSocketOnly:
-		return errors.New("changing roles or admin users is only possible over the admin socket or directly in the database, not over --server")
+		return errors.New("only possible over the admin socket or directly in the database, not over --server: setting roles, changing admin users or their tokens, listing all users' tokens, and resetting the whole access control list")
 	case client.AdminErrCodeNotFound:
 		return errors.New("the server does not support this command, upgrade the server or use direct database access")
 	case client.AdminErrCodeUnauthorized:

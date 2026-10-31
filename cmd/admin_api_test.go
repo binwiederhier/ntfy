@@ -147,6 +147,29 @@ func TestCLI_AdminAPI_Server(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "only possible over the admin socket")
 
+	// Neither can all users' tokens be listed, and the error says what is socket-only, not just roles
+	_, err = remote("token", "list")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "listing all users' tokens")
+
+	// Flags after the arguments would be ignored, i.e. the command would silently go to the local
+	// server (here: the database) instead of --server
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "change-role", "ben", "admin", "--server=" + serverURL, "--token=" + token.Value})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "must come before")
+	out, err = remote("user", "list")
+	require.Nil(t, err)
+	require.Contains(t, out, "user ben (role: user, tier: none)")
+
+	// The token goes over plain HTTP: warn, unless it stays on this machine
+	app, _, _, stderr := newTestApp()
+	_ = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--server=http://ntfy.invalid:1", "--token=" + token.Value, "list"})
+	require.Contains(t, stderr.String(), "warning: --server http://ntfy.invalid:1 is not HTTPS, the token is sent unencrypted")
+	app, _, _, stderr = newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--server=" + serverURL, "--token=" + token.Value, "list"}))
+	require.NotContains(t, stderr.String(), "not HTTPS")
+
 	// --token is required, and must be an admin's
 	app, _, _, _ = newTestApp()
 	err = app.Run([]string{"ntfy", "user", "--config=" + conf.File, "--server=" + serverURL, "list"})

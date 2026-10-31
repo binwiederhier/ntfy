@@ -250,7 +250,7 @@ func execUserAdd(c *cli.Context) error {
 			return nil
 		}
 		return fmt.Errorf("user %s already exists", username)
-	} else if !isAPIErrorCode(err, apiErrCodeUserNotFound) {
+	} else if !isAPIErrorCode(err, client.ErrCodeUserNotFound) {
 		return mapAPIError(err, username, "", "")
 	}
 	hash, err := readPasswordHash(c)

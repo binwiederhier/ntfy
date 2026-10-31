@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/v2/cmd/client"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
@@ -156,10 +157,10 @@ func showUserAccess(c *cli.Context, api backend, username string) error {
 	if err != nil {
 		return mapAPIError(err, username, "", "")
 	}
-	return showUsers(c, []*apiUser{u})
+	return showUsers(c, []*client.User{u})
 }
 
-func showUsers(c *cli.Context, users []*apiUser) error {
+func showUsers(c *cli.Context, users []*client.User) error {
 	for _, u := range users {
 		tier := "none"
 		if u.TierName != "" {

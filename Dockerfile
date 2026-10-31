@@ -12,6 +12,8 @@ LABEL org.opencontainers.image.title="ntfy"
 LABEL org.opencontainers.image.description="Send push notifications to your phone or desktop using PUT/POST"
 LABEL org.opencontainers.image.version="$VERSION"
 
+RUN apk upgrade --no-cache
+
 RUN apk add --no-cache tzdata
 COPY ntfy /usr/bin
 

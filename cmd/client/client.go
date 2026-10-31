@@ -165,17 +165,10 @@ func (c *Client) User(username string) (*User, error) {
 	var users []*User
 	if err := c.do(http.MethodGet, apiPathUsers+"?username="+url.QueryEscape(username), nil, &users); err != nil {
 		return nil, err
+	} else if len(users) != 1 {
+		return nil, fmt.Errorf("expected one user from the admin API, got %d", len(users))
 	}
-	for _, u := range users { // Servers before v2.36.0 ignore the username and return all users
-		if u.Username == username {
-			return u, nil
-		}
-	}
-	return nil, &Error{
-		HTTPCode: http.StatusBadRequest,
-		Code:     ErrCodeUserNotFound,
-		Message:  "invalid request: user does not exist",
-	}
+	return users[0], nil
 }
 
 // AddUser adds a user with a bcrypt password hash. Tier and role may be empty; the role can

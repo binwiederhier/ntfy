@@ -28,16 +28,12 @@ const (
 	defaultAttachmentBandwidthLimit = "1G"
 )
 
-var (
-	flagsTier = withBackendFlags(flagsUser)
-)
-
 var cmdTier = &cli.Command{
 	Name:      "tier",
 	Usage:     "Manage/show tiers",
 	UsageText: "ntfy tier [list|add|change|remove] ...",
-	Flags:     flagsTier,
-	Before:    initConfigFileInputSourceFunc("config", flagsTier, initLogFunc),
+	Flags:     flagsUser,
+	Before:    initConfigFileInputSourceFunc("config", flagsUser, initLogFunc),
 	Category:  categoryServer,
 	Subcommands: []*cli.Command{
 		{

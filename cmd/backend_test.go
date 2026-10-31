@@ -3,11 +3,11 @@
 package cmd
 
 import (
+	"bytes"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -40,8 +40,7 @@ func TestCLI_Backend_FallbackWarning(t *testing.T) {
 	socket := filepath.Join(shortTempDir(t), "admin.sock")
 	require.Nil(t, app.Run([]string{"ntfy", "tier", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "add", "--name=Pro", "pro"}))
 	require.Contains(t, stdout.String(), "tier added")
-	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket)
-	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
+	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket+" (no such file or directory)")
 
 	// Stale socket file, nobody listening
 	listener, err := net.Listen("unix", socket)
@@ -50,8 +49,7 @@ func TestCLI_Backend_FallbackWarning(t *testing.T) {
 	listener.Close()
 	app, _, _, stderr = newTestApp()
 	require.Nil(t, app.Run([]string{"ntfy", "tier", "--config=" + conf.File, "--auth-file=" + conf.AuthFile, "--listen-admin-unix=" + socket, "list"}))
-	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket)
-	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
+	require.Contains(t, stderr.String(), "DEPRECATION WARNING: No ntfy server answered on the admin socket\n"+socket+" (connection refused)")
 }
 
 func TestCLI_Backend_SocketDisabled(t *testing.T) {
@@ -68,7 +66,8 @@ func TestCLI_Backend_SocketDisabled(t *testing.T) {
 }
 
 func TestCLI_Backend_FallbackWarningBanner(t *testing.T) {
-	plain := adminFallbackWarning("No ntfy server answered on the admin socket\n/run/ntfy/admin.sock (no such file or directory)", false)
+	var buf bytes.Buffer
+	printAdminFallbackWarning(&buf, "No ntfy server answered on the admin socket\n/run/ntfy/admin.sock (no such file or directory)")
 	require.Equal(t, `**********************************************************************
 DEPRECATION WARNING: No ntfy server answered on the admin socket
 /run/ntfy/admin.sock (no such file or directory), writing to the database
@@ -78,9 +77,7 @@ Direct database access will be removed after 2026-12-30. After that, the
 ntfy user/access/token/tier commands need a running server.
 See https://docs.ntfy.sh/deprecations/ for details.
 **********************************************************************
-`, plain)
-	yellow := adminFallbackWarning("No ntfy server answered on the admin socket\n/run/ntfy/admin.sock (no such file or directory)", true)
-	require.Equal(t, "\033[1;33m"+strings.TrimSuffix(plain, "\n")+"\033[0m\n", yellow)
+`, buf.String())
 }
 
 func TestCLI_Backend_SocketErrorNoFallback(t *testing.T) {

@@ -37,6 +37,11 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 		}
 		requests = append(requests, rec)
 		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/users" && r.URL.RawQuery == "username=nobody":
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"code":40031,"http":400,"error":"invalid request: user does not exist"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/users" && r.URL.RawQuery == "username=ben":
+			w.Write([]byte(`[{"username":"ben","role":"user","tier":"pro","tier_name":"Pro"}]`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users":
 			w.Write([]byte(`[{"username":"ben","role":"user","tier":"pro","tier_name":"Pro","grants":[{"topic":"t*","permission":"read-only","provisioned":true}]},{"username":"*","role":"anonymous","default_access":"deny-all"}]`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/users/tokens":
@@ -65,7 +70,7 @@ func TestClient_RequestsAndResponses(t *testing.T) {
 	u, err := sc.User("ben")
 	require.Nil(t, err)
 	require.Equal(t, "pro", u.Tier)
-	require.Equal(t, "username=ben", requests[len(requests)-1].Query) // Servers before v2.36.0 ignore it and return all users
+	require.Equal(t, "username=ben", requests[len(requests)-1].Query)
 	_, err = sc.User("nobody")
 	var apiErr *Error
 	require.True(t, errors.As(err, &apiErr))

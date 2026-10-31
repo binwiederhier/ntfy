@@ -7,15 +7,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
-	"strings"
+	"syscall"
 	"time"
 
 	"github.com/urfave/cli/v2"
-	"github.com/urfave/cli/v2/altsrc"
-	"golang.org/x/term"
 	"heckel.io/ntfy/v2/cmd/client"
-	"heckel.io/ntfy/v2/server"
 )
 
 const (
@@ -27,15 +23,6 @@ Direct database access will be removed after 2026-12-30. After that, the
 ntfy user/access/token/tier commands need a running server.
 See https://docs.ntfy.sh/deprecations/ for details.`
 	adminSocketDisabledCause = "The admin socket is disabled\n(listen-admin-unix is \"-\" or empty)"
-	adminWarningColorYellow  = "\033[1;33m"
-	adminWarningColorReset   = "\033[0m"
-)
-
-var (
-	// flagsBackend are the flags of the commands that use newBackend
-	flagsBackend = []cli.Flag{
-		altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-admin-unix", Aliases: []string{"listen_admin_unix"}, EnvVars: []string{"NTFY_LISTEN_ADMIN_UNIX"}, Value: server.DefaultListenAdminUnix(), DefaultText: "/run/ntfy/admin.sock on Linux, /var/run/ntfy/admin.sock on macOS/BSD", Usage: "admin socket of the local ntfy server; \"-\" disables it (then the database is used directly, which is deprecated)"}),
-	}
 )
 
 // backend is what the user, access, token and tier commands need. client.Client implements it
@@ -102,11 +89,6 @@ func newBackend(c *cli.Context) (backend, error) {
 	return newDBBackend(c)
 }
 
-// withBackendFlags returns a copy of flags with flagsBackend, for the commands that use newBackend
-func withBackendFlags(flags []cli.Flag) []cli.Flag {
-	return append(append([]cli.Flag{}, flags...), flagsBackend...)
-}
-
 // mapAPIError turns an admin API error into the message the CLI printed before it talked to the
 // server, so scripts and tests see the same text no matter how the command reached the database.
 // The wording lives only here.
@@ -148,8 +130,6 @@ func mapAPIError(err error, username, tier, token string) error {
 		return errors.New("permission must be one of: read-write, read-only, write-only, or deny (or the aliases: read, ro, write, wo, none)")
 	case client.ErrCodePasswordHashInvalid:
 		return errors.New("password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate")
-	case client.ErrCodeNotFound:
-		return errors.New("the server does not support this command, upgrade the server or use direct database access")
 	}
 	return apiErr
 }
@@ -165,31 +145,20 @@ func adminUnreachableCause(socket string, err error) string {
 	return fmt.Sprintf("No ntfy server answered on the admin socket\n%s (%s)", socket, adminUnreachableReason(err))
 }
 
-// adminUnreachableReason extracts the cause from a wrapped client.ErrUnreachable, e.g.
+// adminUnreachableReason is the system error behind a wrapped client.ErrUnreachable, e.g.
 // "no such file or directory", for the fallback warning
 func adminUnreachableReason(err error) string {
-	reason := strings.TrimPrefix(err.Error(), client.ErrUnreachable.Error()+": ")
-	if i := strings.LastIndex(reason, ": "); i >= 0 {
-		reason = reason[i+2:]
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno.Error()
 	}
-	return reason
+	return err.Error()
 }
 
 // printAdminFallbackWarning tells the user, loudly, that the change bypasses the running server, and
-// that this fallback is deprecated (see docs/deprecations.md).
-// It is yellow on a terminal, and plain text in logs and pipes, or if NO_COLOR is set.
+// that this fallback is deprecated (see docs/deprecations.md)
 func printAdminFallbackWarning(w io.Writer, cause string) {
-	color := false
-	if f, ok := w.(*os.File); ok && os.Getenv("NO_COLOR") == "" {
-		color = term.IsTerminal(int(f.Fd()))
-	}
-	fmt.Fprint(w, adminFallbackWarning(cause, color))
-}
-
-func adminFallbackWarning(cause string, color bool) string {
-	warning := adminFallbackWarningBanner + "\n" + fmt.Sprintf(adminFallbackWarningText, cause) + "\n" + adminFallbackWarningBanner
-	if color {
-		warning = adminWarningColorYellow + warning + adminWarningColorReset
-	}
-	return warning + "\n"
+	fmt.Fprintln(w, adminFallbackWarningBanner)
+	fmt.Fprintf(w, adminFallbackWarningText+"\n", cause)
+	fmt.Fprintln(w, adminFallbackWarningBanner)
 }

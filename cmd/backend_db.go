@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/mail"
 	"heckel.io/ntfy/v2/user"
 )
@@ -21,25 +20,25 @@ const (
 	directPasswordResetPath   = "/account/password/reset/"
 )
 
-// directAdminAPI implements adminAPI against the user database, without a server. It is the
+// dbBackend implements backend against the user database, without a server. It is the
 // fallback when no admin socket answers (server not running, Docker without a shared socket,
 // custom systemd unit without RuntimeDirectory, Windows). It must behave like the server's
 // handlers over the admin socket, including the error codes, so the commands cannot tell the
 // difference. Direct access is at least as privileged as the socket, so admins may be changed.
-type directAdminAPI struct {
+type dbBackend struct {
 	manager  *user.Manager
 	baseURL  string
 	smtpConf *mail.Config
 }
 
-var _ adminAPI = (*directAdminAPI)(nil)
+var _ backend = (*dbBackend)(nil)
 
-func newDirectAdminAPI(c *cli.Context) (*directAdminAPI, error) {
+func newDBBackend(c *cli.Context) (*dbBackend, error) {
 	manager, err := createUserManager(c)
 	if err != nil {
 		return nil, err
 	}
-	return &directAdminAPI{
+	return &dbBackend{
 		manager: manager,
 		baseURL: strings.TrimSuffix(c.String("base-url"), "/"),
 		smtpConf: &mail.Config{
@@ -51,7 +50,7 @@ func newDirectAdminAPI(c *cli.Context) (*directAdminAPI, error) {
 	}, nil
 }
 
-func (d *directAdminAPI) Users() ([]*client.AdminUser, error) {
+func (d *dbBackend) Users() ([]*apiUser, error) {
 	users, err := d.manager.Users()
 	if err != nil {
 		return nil, err
@@ -60,14 +59,14 @@ func (d *directAdminAPI) Users() ([]*client.AdminUser, error) {
 	if err != nil {
 		return nil, err
 	}
-	adminUsers := make([]*client.AdminUser, len(users))
+	adminUsers := make([]*apiUser, len(users))
 	for i, u := range users {
 		adminUsers[i] = d.toAdminUser(u, grants[u.ID])
 	}
 	return adminUsers, nil
 }
 
-func (d *directAdminAPI) User(username string) (*client.AdminUser, error) {
+func (d *dbBackend) User(username string) (*apiUser, error) {
 	u, err := d.manager.User(username)
 	if err != nil {
 		return nil, directError(err)
@@ -79,14 +78,14 @@ func (d *directAdminAPI) User(username string) (*client.AdminUser, error) {
 	return d.toAdminUser(u, grants), nil
 }
 
-func (d *directAdminAPI) AddUser(username, hash, tier, role string) error {
+func (d *dbBackend) AddUser(username, hash, tier, role string) error {
 	if role == "" {
 		role = string(user.RoleUser)
 	} else if !user.AllowedRole(user.Role(role)) {
-		return directErrorCode(client.AdminErrCodeRoleInvalid)
+		return directErrorCode(apiErrCodeRoleInvalid)
 	}
 	if _, err := d.manager.User(username); err == nil {
-		return directErrorCode(client.AdminErrCodeUserExists)
+		return directErrorCode(apiErrCodeUserExists)
 	} else if !errors.Is(err, user.ErrUserNotFound) {
 		return err
 	}
@@ -104,18 +103,18 @@ func (d *directAdminAPI) AddUser(username, hash, tier, role string) error {
 	return nil
 }
 
-func (d *directAdminAPI) ChangePassword(username, hash string) error {
+func (d *dbBackend) ChangePassword(username, hash string) error {
 	if _, err := d.manager.User(username); err != nil {
 		return directError(err)
 	}
 	return directError(d.manager.ChangePassword(username, hash, true))
 }
 
-func (d *directAdminAPI) ChangeTier(username, tier string) error {
+func (d *dbBackend) ChangeTier(username, tier string) error {
 	if _, err := d.manager.User(username); err != nil {
 		return directError(err)
 	}
-	if tier == client.AdminTierReset {
+	if tier == tierReset {
 		return directError(d.manager.ResetTier(username))
 	}
 	if _, err := d.manager.Tier(tier); err != nil {
@@ -124,9 +123,9 @@ func (d *directAdminAPI) ChangeTier(username, tier string) error {
 	return directError(d.manager.ChangeTier(username, tier))
 }
 
-func (d *directAdminAPI) ChangeRole(username, role string) error {
+func (d *dbBackend) ChangeRole(username, role string) error {
 	if !user.AllowedRole(user.Role(role)) {
-		return directErrorCode(client.AdminErrCodeRoleInvalid)
+		return directErrorCode(apiErrCodeRoleInvalid)
 	}
 	if _, err := d.manager.User(username); err != nil {
 		return directError(err)
@@ -134,9 +133,9 @@ func (d *directAdminAPI) ChangeRole(username, role string) error {
 	return directError(d.manager.ChangeRole(username, user.Role(role)))
 }
 
-func (d *directAdminAPI) RemoveUser(username string) error {
+func (d *dbBackend) RemoveUser(username string) error {
 	if username == user.Everyone {
-		return &client.AdminError{HTTPCode: http.StatusBadRequest, Message: "invalid request: cannot remove the everyone user"}
+		return &apiError{HTTPCode: http.StatusBadRequest, Message: "invalid request: cannot remove the everyone user"}
 	}
 	if _, err := d.manager.User(username); err != nil {
 		return directError(err)
@@ -144,26 +143,26 @@ func (d *directAdminAPI) RemoveUser(username string) error {
 	return directError(d.manager.RemoveUser(username))
 }
 
-func (d *directAdminAPI) ResetPassword(username string, sendEmail bool) (*client.AdminPasswordReset, error) {
+func (d *dbBackend) ResetPassword(username string, sendEmail bool) (*apiPasswordReset, error) {
 	if d.baseURL == "" {
-		return nil, directErrorCode(client.AdminErrCodeBaseURLNotConfigured)
+		return nil, directErrorCode(apiErrCodeBaseURLNotConfigured)
 	}
 	u, err := d.manager.User(username)
 	if err != nil {
 		return nil, directError(err)
 	} else if u.Provisioned {
-		return nil, directErrorCode(client.AdminErrCodeProvisionedUserChange)
+		return nil, directErrorCode(apiErrCodeProvisionedUserChange)
 	}
 	// Resolve the primary email up front if we need to send -- fail before creating a token
 	var email string
 	if sendEmail {
 		if d.smtpConf.SMTPAddr == "" {
-			return nil, &client.AdminError{HTTPCode: http.StatusBadRequest, Message: "smtp-sender-addr is not configured"}
+			return nil, &apiError{HTTPCode: http.StatusBadRequest, Message: "smtp-sender-addr is not configured"}
 		}
 		if email, err = d.manager.PrimaryEmail(u.ID); err != nil {
 			return nil, err
 		} else if email == "" {
-			return nil, directErrorCode(client.AdminErrCodeUserNoPrimaryEmail)
+			return nil, directErrorCode(apiErrCodeUserNoPrimaryEmail)
 		}
 	}
 	// The reset token is bound to the user, not an email -- so this works even with no SMTP
@@ -177,27 +176,27 @@ func (d *directAdminAPI) ResetPassword(username string, sendEmail bool) (*client
 			return nil, err
 		}
 	}
-	return &client.AdminPasswordReset{
+	return &apiPasswordReset{
 		Link:  link,
 		Email: email,
 	}, nil
 }
 
-func (d *directAdminAPI) AllowAccess(username, topic, permission string) error {
+func (d *dbBackend) AllowAccess(username, topic, permission string) error {
 	u, err := d.manager.User(username)
 	if err != nil {
 		return directError(err)
 	} else if u.IsAdmin() {
-		return directErrorCode(client.AdminErrCodeAccessAdminUser)
+		return directErrorCode(apiErrCodeAccessAdminUser)
 	}
 	p, err := user.ParsePermission(permission)
 	if err != nil {
-		return directErrorCode(client.AdminErrCodePermissionInvalid)
+		return directErrorCode(apiErrCodePermissionInvalid)
 	}
 	return directError(d.manager.AllowAccess(username, topic, p))
 }
 
-func (d *directAdminAPI) ResetAccess(username, topic string) error {
+func (d *dbBackend) ResetAccess(username, topic string) error {
 	if username != "" {
 		if _, err := d.manager.User(username); err != nil {
 			return directError(err)
@@ -206,7 +205,7 @@ func (d *directAdminAPI) ResetAccess(username, topic string) error {
 	return directError(d.manager.ResetAccess(username, topic))
 }
 
-func (d *directAdminAPI) Tokens(username string) ([]*client.AdminToken, error) {
+func (d *dbBackend) Tokens(username string) ([]*apiToken, error) {
 	var users []*user.User
 	if username != "" {
 		u, err := d.manager.User(username)
@@ -220,7 +219,7 @@ func (d *directAdminAPI) Tokens(username string) ([]*client.AdminToken, error) {
 			return nil, err
 		}
 	}
-	adminTokens := make([]*client.AdminToken, 0)
+	adminTokens := make([]*apiToken, 0)
 	for _, u := range users {
 		tokens, err := d.manager.Tokens(u.ID)
 		if err != nil {
@@ -233,7 +232,7 @@ func (d *directAdminAPI) Tokens(username string) ([]*client.AdminToken, error) {
 	return adminTokens, nil
 }
 
-func (d *directAdminAPI) AddToken(username, label string, expires time.Time) (*client.AdminToken, error) {
+func (d *dbBackend) AddToken(username, label string, expires time.Time) (*apiToken, error) {
 	u, err := d.manager.User(username)
 	if err != nil {
 		return nil, directError(err)
@@ -248,7 +247,7 @@ func (d *directAdminAPI) AddToken(username, label string, expires time.Time) (*c
 	return toAdminToken(u.Name, token), nil
 }
 
-func (d *directAdminAPI) RemoveToken(username, token string) error {
+func (d *dbBackend) RemoveToken(username, token string) error {
 	u, err := d.manager.User(username)
 	if err != nil {
 		return directError(err)
@@ -256,7 +255,7 @@ func (d *directAdminAPI) RemoveToken(username, token string) error {
 	return directError(d.manager.RemoveToken(u.ID, token))
 }
 
-func (d *directAdminAPI) Tiers() ([]*client.AdminTier, error) {
+func (d *dbBackend) Tiers() ([]*apiTier, error) {
 	tiers, err := d.manager.Tiers()
 	if err != nil {
 		return nil, err
@@ -268,14 +267,14 @@ func (d *directAdminAPI) Tiers() ([]*client.AdminTier, error) {
 	slices.SortFunc(tiers, func(a, b *user.Tier) int {
 		return strings.Compare(a.Code, b.Code)
 	})
-	adminTiers := make([]*client.AdminTier, len(tiers))
+	adminTiers := make([]*apiTier, len(tiers))
 	for i, t := range tiers {
 		adminTiers[i] = toAdminTier(t, counts[t.Code])
 	}
 	return adminTiers, nil
 }
 
-func (d *directAdminAPI) Tier(code string) (*client.AdminTier, error) {
+func (d *dbBackend) Tier(code string) (*apiTier, error) {
 	t, err := d.manager.Tier(code)
 	if err != nil {
 		return nil, directError(err)
@@ -287,21 +286,21 @@ func (d *directAdminAPI) Tier(code string) (*client.AdminTier, error) {
 	return toAdminTier(t, counts[t.Code]), nil
 }
 
-func (d *directAdminAPI) AddTier(t *client.AdminTier) error {
+func (d *dbBackend) AddTier(t *apiTier) error {
 	if !user.AllowedTier(t.Code) || strings.TrimSpace(t.Name) == "" {
-		return directErrorCode(client.AdminErrCodeTierCodeInvalid)
+		return directErrorCode(apiErrCodeTierCodeInvalid)
 	}
 	if _, err := d.manager.Tier(t.Code); err == nil {
-		return directErrorCode(client.AdminErrCodeTierExists)
+		return directErrorCode(apiErrCodeTierExists)
 	} else if !errors.Is(err, user.ErrTierNotFound) {
 		return err
 	}
 	return directError(d.manager.AddTier(fromAdminTier(t)))
 }
 
-func (d *directAdminAPI) UpdateTier(t *client.AdminTier) error {
+func (d *dbBackend) UpdateTier(t *apiTier) error {
 	if !user.AllowedTier(t.Code) || strings.TrimSpace(t.Name) == "" {
-		return directErrorCode(client.AdminErrCodeTierCodeInvalid)
+		return directErrorCode(apiErrCodeTierCodeInvalid)
 	}
 	if _, err := d.manager.Tier(t.Code); err != nil {
 		return directError(err)
@@ -309,7 +308,7 @@ func (d *directAdminAPI) UpdateTier(t *client.AdminTier) error {
 	return directError(d.manager.UpdateTier(fromAdminTier(t)))
 }
 
-func (d *directAdminAPI) RemoveTier(code string) error {
+func (d *dbBackend) RemoveTier(code string) error {
 	if _, err := d.manager.Tier(code); err != nil {
 		return directError(err)
 	}
@@ -317,17 +316,17 @@ func (d *directAdminAPI) RemoveTier(code string) error {
 	if err != nil {
 		return err
 	} else if counts[code] > 0 {
-		return directErrorCode(client.AdminErrCodeTierInUse)
+		return directErrorCode(apiErrCodeTierInUse)
 	}
 	return directError(d.manager.RemoveTier(code))
 }
 
-func (d *directAdminAPI) Close() error {
+func (d *dbBackend) Close() error {
 	return d.manager.Close()
 }
 
-func (d *directAdminAPI) toAdminUser(u *user.User, grants []user.Grant) *client.AdminUser {
-	adminUser := &client.AdminUser{
+func (d *dbBackend) toAdminUser(u *user.User, grants []user.Grant) *apiUser {
+	adminUser := &apiUser{
 		Username:    u.Name,
 		Role:        string(u.Role),
 		Provisioned: u.Provisioned,
@@ -340,7 +339,7 @@ func (d *directAdminAPI) toAdminUser(u *user.User, grants []user.Grant) *client.
 		adminUser.DefaultAccess = d.manager.DefaultAccess().String()
 	}
 	for _, g := range grants {
-		adminUser.Grants = append(adminUser.Grants, &client.AdminGrant{
+		adminUser.Grants = append(adminUser.Grants, &apiGrant{
 			Topic:       g.TopicPattern,
 			Permission:  g.Permission.String(),
 			Provisioned: g.Provisioned,
@@ -349,8 +348,8 @@ func (d *directAdminAPI) toAdminUser(u *user.User, grants []user.Grant) *client.
 	return adminUser
 }
 
-func toAdminToken(username string, t *user.Token) *client.AdminToken {
-	token := &client.AdminToken{
+func toAdminToken(username string, t *user.Token) *apiToken {
+	token := &apiToken{
 		Username:    username,
 		Token:       t.Value,
 		Label:       t.Label,
@@ -364,8 +363,8 @@ func toAdminToken(username string, t *user.Token) *client.AdminToken {
 	return token
 }
 
-func toAdminTier(t *user.Tier, users int64) *client.AdminTier {
-	return &client.AdminTier{
+func toAdminTier(t *user.Tier, users int64) *apiTier {
+	return &apiTier{
 		ID:                       t.ID,
 		Code:                     t.Code,
 		Name:                     t.Name,
@@ -384,7 +383,7 @@ func toAdminTier(t *user.Tier, users int64) *client.AdminTier {
 	}
 }
 
-func fromAdminTier(t *client.AdminTier) *user.Tier {
+func fromAdminTier(t *apiTier) *user.Tier {
 	return &user.Tier{
 		Code:                     t.Code,
 		Name:                     strings.TrimSpace(t.Name),
@@ -409,21 +408,21 @@ func directError(err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, user.ErrUserNotFound):
-		return directErrorCode(client.AdminErrCodeUserNotFound)
+		return directErrorCode(apiErrCodeUserNotFound)
 	case errors.Is(err, user.ErrUserExists):
-		return directErrorCode(client.AdminErrCodeUserExists)
+		return directErrorCode(apiErrCodeUserExists)
 	case errors.Is(err, user.ErrTierNotFound):
-		return directErrorCode(client.AdminErrCodeTierNotFound)
+		return directErrorCode(apiErrCodeTierNotFound)
 	case errors.Is(err, user.ErrTokenNotFound):
-		return directErrorCode(client.AdminErrCodeTokenNotFound)
+		return directErrorCode(apiErrCodeTokenNotFound)
 	case errors.Is(err, user.ErrProvisionedUserChange):
-		return directErrorCode(client.AdminErrCodeProvisionedUserChange)
+		return directErrorCode(apiErrCodeProvisionedUserChange)
 	case errors.Is(err, user.ErrProvisionedTokenChange):
-		return directErrorCode(client.AdminErrCodeProvisionedTokenChange)
+		return directErrorCode(apiErrCodeProvisionedTokenChange)
 	case errors.Is(err, user.ErrTooManyReservations):
-		return directErrorCode(client.AdminErrCodeTierReservationsLimit)
+		return directErrorCode(apiErrCodeTierReservationsLimit)
 	case errors.Is(err, user.ErrPasswordHashInvalid), errors.Is(err, user.ErrPasswordHashWeak):
-		return directErrorCode(client.AdminErrCodePasswordHashInvalid)
+		return directErrorCode(apiErrCodePasswordHashInvalid)
 	}
 	return err
 }
@@ -431,7 +430,7 @@ func directError(err error) error {
 // directErrorCode returns an admin API error with the given code. The message is never shown:
 // adminError replaces it with the CLI's own wording for every code used here.
 func directErrorCode(code int) error {
-	return &client.AdminError{
+	return &apiError{
 		HTTPCode: http.StatusBadRequest,
 		Code:     code,
 		Message:  "invalid request",

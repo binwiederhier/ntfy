@@ -12,7 +12,6 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"github.com/urfave/cli/v2/altsrc"
-	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	"heckel.io/ntfy/v2/server"
@@ -240,7 +239,7 @@ func execUserAdd(c *cli.Context) error {
 	} else if !user.AllowedRole(role) {
 		return errors.New("role must be either 'user' or 'admin'")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
@@ -251,8 +250,8 @@ func execUserAdd(c *cli.Context) error {
 			return nil
 		}
 		return fmt.Errorf("user %s already exists", username)
-	} else if !isAdminErrorCode(err, client.AdminErrCodeUserNotFound) {
-		return adminError(err, username, "", "")
+	} else if !isAPIErrorCode(err, apiErrCodeUserNotFound) {
+		return mapAPIError(err, username, "", "")
 	}
 	hash, err := readPasswordHash(c)
 	if err != nil {
@@ -263,7 +262,7 @@ func execUserAdd(c *cli.Context) error {
 		roleParam = string(role) // Only send the role if needed: over --server, the API refuses it
 	}
 	if err := api.AddUser(username, hash, "", roleParam); err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintf(c.App.Writer, "user %s added with role %s\n", username, role)
 	return nil
@@ -276,13 +275,13 @@ func execUserDel(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	if err := api.RemoveUser(username); err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintf(c.App.Writer, "user %s removed\n", username)
 	return nil
@@ -295,20 +294,20 @@ func execUserChangePass(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	if _, err := api.User(username); err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	hash, err := readPasswordHash(c)
 	if err != nil {
 		return err
 	}
 	if err := api.ChangePassword(username, hash); err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintf(c.App.Writer, "changed password for user %s\n", username)
 	return nil
@@ -322,14 +321,14 @@ func execUserResetPass(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	reset, err := api.ResetPassword(username, sendEmail)
 	if err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintln(c.App.Writer, reset.Link)
 	if reset.Email != "" {
@@ -346,13 +345,13 @@ func execUserChangeRole(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	if err := api.ChangeRole(username, string(role)); err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	fmt.Fprintf(c.App.Writer, "changed role for user %s to %s\n", username, role)
 	return nil
@@ -381,19 +380,19 @@ func execUserChangeTier(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	if tier == tierReset {
-		if err := api.ChangeTier(username, client.AdminTierReset); err != nil {
-			return adminError(err, username, tier, "")
+		if err := api.ChangeTier(username, tierReset); err != nil {
+			return mapAPIError(err, username, tier, "")
 		}
 		fmt.Fprintf(c.App.Writer, "removed tier from user %s\n", username)
 	} else {
 		if err := api.ChangeTier(username, tier); err != nil {
-			return adminError(err, username, tier, "")
+			return mapAPIError(err, username, tier, "")
 		}
 		fmt.Fprintf(c.App.Writer, "changed tier for user %s to %s\n", username, tier)
 	}
@@ -401,14 +400,14 @@ func execUserChangeTier(c *cli.Context) error {
 }
 
 func execUserList(c *cli.Context) error {
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	users, err := api.Users()
 	if err != nil {
-		return adminError(err, "", "", "")
+		return mapAPIError(err, "", "", "")
 	}
 	return showUsers(c, users)
 }
@@ -482,8 +481,8 @@ func readPasswordHash(c *cli.Context) (string, error) {
 	return user.HashPassword(password, user.DefaultUserPasswordBcryptCost)
 }
 
-// isAdminErrorCode reports whether err is an admin API error with the given ntfy error code
-func isAdminErrorCode(err error, code int) bool {
-	var apiErr *client.AdminError
+// isAPIErrorCode reports whether err is an admin API error with the given ntfy error code
+func isAPIErrorCode(err error, code int) bool {
+	var apiErr *apiError
 	return errors.As(err, &apiErr) && apiErr.Code == code
 }

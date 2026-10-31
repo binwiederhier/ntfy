@@ -3,16 +3,17 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/v2/client"
-	"heckel.io/ntfy/v2/log"
-	"heckel.io/ntfy/v2/util"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/urfave/cli/v2"
+	"heckel.io/ntfy/v2/client"
+	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/util"
 )
 
 func init() {

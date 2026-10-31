@@ -5,10 +5,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
-	"time"
 )
 
 func init() {
@@ -121,14 +122,14 @@ func execTokenAdd(c *cli.Context) error {
 			return err
 		}
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	token, err := api.AddToken(username, label, expires)
 	if err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	if token.Expires == 0 {
 		fmt.Fprintf(c.App.Writer, "token %s created for user %s, never expires\n", token.Token, token.Username)
@@ -145,13 +146,13 @@ func execTokenDel(c *cli.Context) error {
 	} else if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	if err := api.RemoveToken(username, token); err != nil {
-		return adminError(err, username, "", token)
+		return mapAPIError(err, username, "", token)
 	}
 	fmt.Fprintf(c.App.Writer, "token %s for user %s removed\n", token, username)
 	return nil
@@ -162,14 +163,14 @@ func execTokenList(c *cli.Context) error {
 	if username == userEveryone || username == user.Everyone {
 		return errors.New("username not allowed")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	tokens, err := api.Tokens(username)
 	if err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	} else if len(tokens) == 0 && username != "" {
 		fmt.Fprintf(c.App.Writer, "user %s has no access tokens\n", username)
 		return nil

@@ -5,8 +5,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
@@ -86,7 +86,7 @@ func execUserAccess(c *cli.Context) error {
 	} else if !reset && perms == "" && topic != "" {
 		return errors.New("invalid syntax, please check 'ntfy access --help' for usage details")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func execUserAccess(c *cli.Context) error {
 	return changeAccess(c, api, username, topic, perms)
 }
 
-func changeAccess(c *cli.Context, api adminAPI, username string, topic string, perms string) error {
+func changeAccess(c *cli.Context, api backend, username string, topic string, perms string) error {
 	if !util.Contains([]string{"", "read-write", "rw", "read-only", "read", "ro", "write-only", "write", "wo", "none", "deny"}, perms) {
 		return errors.New("permission must be one of: read-write, read-only, write-only, or deny (or the aliases: read, ro, write, wo, none)")
 	}
@@ -108,7 +108,7 @@ func changeAccess(c *cli.Context, api adminAPI, username string, topic string, p
 		return err
 	}
 	if err := api.AllowAccess(username, topic, permission.String()); err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	if permission.IsReadWrite() {
 		fmt.Fprintf(c.App.Writer, "granted read-write access to topic %s\n\n", topic)
@@ -122,9 +122,9 @@ func changeAccess(c *cli.Context, api adminAPI, username string, topic string, p
 	return showUserAccess(c, api, username)
 }
 
-func resetAccess(c *cli.Context, api adminAPI, username, topic string) error {
+func resetAccess(c *cli.Context, api backend, username, topic string) error {
 	if err := api.ResetAccess(username, topic); err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
 	if username == "" {
 		fmt.Fprintln(c.App.Writer, "reset access for all users")
@@ -137,30 +137,30 @@ func resetAccess(c *cli.Context, api adminAPI, username, topic string) error {
 	return showUserAccess(c, api, username)
 }
 
-func showAccess(c *cli.Context, api adminAPI, username string) error {
+func showAccess(c *cli.Context, api backend, username string) error {
 	if username == "" {
 		return showAllAccess(c, api)
 	}
 	return showUserAccess(c, api, username)
 }
 
-func showAllAccess(c *cli.Context, api adminAPI) error {
+func showAllAccess(c *cli.Context, api backend) error {
 	users, err := api.Users()
 	if err != nil {
-		return adminError(err, "", "", "")
+		return mapAPIError(err, "", "", "")
 	}
 	return showUsers(c, users)
 }
 
-func showUserAccess(c *cli.Context, api adminAPI, username string) error {
+func showUserAccess(c *cli.Context, api backend, username string) error {
 	u, err := api.User(username)
 	if err != nil {
-		return adminError(err, username, "", "")
+		return mapAPIError(err, username, "", "")
 	}
-	return showUsers(c, []*client.AdminUser{u})
+	return showUsers(c, []*apiUser{u})
 }
 
-func showUsers(c *cli.Context, users []*client.AdminUser) error {
+func showUsers(c *cli.Context, users []*apiUser) error {
 	for _, u := range users {
 		tier := "none"
 		if u.TierName != "" {

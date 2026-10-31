@@ -5,11 +5,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
-	"time"
 )
 
 func init() {
@@ -212,7 +212,7 @@ func execTierAdd(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
@@ -223,10 +223,10 @@ func execTierAdd(c *cli.Context) error {
 			return nil
 		}
 		return fmt.Errorf("tier %s already exists", code)
-	} else if !isAdminErrorCode(err, client.AdminErrCodeTierNotFound) {
-		return adminError(err, "", code, "")
+	} else if !isAPIErrorCode(err, apiErrCodeTierNotFound) {
+		return mapAPIError(err, "", code, "")
 	}
-	tier := &client.AdminTier{
+	tier := &apiTier{
 		Code:                     code,
 		Name:                     name,
 		MessagesLimit:            c.Int64("message-limit"),
@@ -242,11 +242,11 @@ func execTierAdd(c *cli.Context) error {
 		StripeYearlyPriceID:      c.String("stripe-yearly-price-id"),
 	}
 	if err := api.AddTier(tier); err != nil {
-		return adminError(err, "", code, "")
+		return mapAPIError(err, "", code, "")
 	}
 	tier, err = api.Tier(code)
 	if err != nil {
-		return adminError(err, "", code, "")
+		return mapAPIError(err, "", code, "")
 	}
 	fmt.Fprintf(c.App.Writer, "tier added\n\n")
 	printTier(c, tier)
@@ -260,14 +260,14 @@ func execTierChange(c *cli.Context) error {
 	} else if !user.AllowedTier(code) {
 		return errors.New("tier code must consist only of numbers and letters")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	tier, err := api.Tier(code)
 	if err != nil {
-		return adminError(err, "", code, "")
+		return mapAPIError(err, "", code, "")
 	}
 	if c.IsSet("name") {
 		tier.Name = c.String("name")
@@ -328,7 +328,7 @@ func execTierChange(c *cli.Context) error {
 		return errors.New("if stripe-yearly-price-id is set, stripe-monthly-price-id must also be set")
 	}
 	if err := api.UpdateTier(tier); err != nil {
-		return adminError(err, "", code, "")
+		return mapAPIError(err, "", code, "")
 	}
 	fmt.Fprintf(c.App.Writer, "tier updated\n\n")
 	printTier(c, tier)
@@ -340,27 +340,27 @@ func execTierDel(c *cli.Context) error {
 	if code == "" {
 		return errors.New("tier code expected, type 'ntfy tier del --help' for help")
 	}
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	if err := api.RemoveTier(code); err != nil {
-		return adminError(err, "", code, "")
+		return mapAPIError(err, "", code, "")
 	}
 	fmt.Fprintf(c.App.Writer, "tier %s removed\n", code)
 	return nil
 }
 
 func execTierList(c *cli.Context) error {
-	api, err := newAdminAPI(c)
+	api, err := newBackend(c)
 	if err != nil {
 		return err
 	}
 	defer api.Close()
 	tiers, err := api.Tiers()
 	if err != nil {
-		return adminError(err, "", "", "")
+		return mapAPIError(err, "", "", "")
 	}
 	for _, tier := range tiers {
 		printTier(c, tier)
@@ -368,7 +368,7 @@ func execTierList(c *cli.Context) error {
 	return nil
 }
 
-func printTier(c *cli.Context, tier *client.AdminTier) {
+func printTier(c *cli.Context, tier *apiTier) {
 	prices := "(none)"
 	if tier.StripeMonthlyPriceID != "" && tier.StripeYearlyPriceID != "" {
 		prices = fmt.Sprintf("%s / %s", tier.StripeMonthlyPriceID, tier.StripeYearlyPriceID)

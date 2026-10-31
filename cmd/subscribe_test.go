@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCLI_Subscribe_Default_UserPass_Subscription_Token(t *testing.T) {

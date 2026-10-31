@@ -16,7 +16,6 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"golang.org/x/term"
-	"heckel.io/ntfy/v2/client"
 )
 
 const (
@@ -33,38 +32,38 @@ See https://docs.ntfy.sh/deprecations/ for details.`
 )
 
 var (
-	// adminTargetFlags choose which server a command talks to, see newAdminAPI
+	// adminTargetFlags choose which server a command talks to, see newBackend
 	adminTargetFlags = []string{"--server", "-S", "--token", "-k", "--listen-admin-unix", "--listen_admin_unix", "--config", "-c"}
 )
 
-// adminAPI is what the user, access, token and tier commands need. client.Admin implements it
-// over the admin socket or HTTP; directAdminAPI implements it against the database (the fallback).
-type adminAPI interface {
-	Users() ([]*client.AdminUser, error)
-	User(username string) (*client.AdminUser, error)
+// backend is what the user, access, token and tier commands need. serverClient implements it
+// over the admin socket or HTTP; dbBackend implements it against the database (the fallback).
+type backend interface {
+	Users() ([]*apiUser, error)
+	User(username string) (*apiUser, error)
 	AddUser(username, hash, tier, role string) error
 	ChangePassword(username, hash string) error
 	ChangeTier(username, tier string) error
 	ChangeRole(username, role string) error
 	RemoveUser(username string) error
-	ResetPassword(username string, sendEmail bool) (*client.AdminPasswordReset, error)
+	ResetPassword(username string, sendEmail bool) (*apiPasswordReset, error)
 	AllowAccess(username, topic, permission string) error
 	ResetAccess(username, topic string) error
-	Tokens(username string) ([]*client.AdminToken, error)
-	AddToken(username, label string, expires time.Time) (*client.AdminToken, error)
+	Tokens(username string) ([]*apiToken, error)
+	AddToken(username, label string, expires time.Time) (*apiToken, error)
 	RemoveToken(username, token string) error
-	Tiers() ([]*client.AdminTier, error)
-	Tier(code string) (*client.AdminTier, error)
-	AddTier(t *client.AdminTier) error
-	UpdateTier(t *client.AdminTier) error
+	Tiers() ([]*apiTier, error)
+	Tier(code string) (*apiTier, error)
+	AddTier(t *apiTier) error
+	UpdateTier(t *apiTier) error
 	RemoveTier(code string) error
 	Close() error
 }
 
-// newAdminAPI picks the transport: an explicit --server (never falls back), else the admin
+// newBackend picks the transport: an explicit --server (never falls back), else the admin
 // socket when a server answers on it, else the database directly, with a warning. A socket file
 // that nobody answers on is treated as absent (stale file after a crash).
-func newAdminAPI(c *cli.Context) (adminAPI, error) {
+func newBackend(c *cli.Context) (backend, error) {
 	for _, arg := range c.Args().Slice() {
 		if slices.Contains(adminTargetFlags, strings.SplitN(arg, "=", 2)[0]) {
 			// The CLI stops parsing flags at the first argument, so this one would be silently ignored,
@@ -80,42 +79,42 @@ func newAdminAPI(c *cli.Context) (adminAPI, error) {
 		if u, err := url.Parse(server); err == nil && u.Scheme == "http" && !isLoopbackHost(u.Hostname()) {
 			fmt.Fprintf(c.App.ErrWriter, "warning: --server %s is not HTTPS, the token is sent unencrypted\n", server)
 		}
-		return client.NewAdmin(server, token), nil
+		return newServerClient(server, token), nil
 	}
 	authConfigured := c.String("auth-file") != "" || c.String("database-url") != ""
 	socket := c.String("listen-admin-unix")
 	if !authConfigured {
-		return newDirectAdminAPI(c) // Fails with the message for the missing auth config
+		return newDBBackend(c) // Fails with the message for the missing auth config
 	} else if socket == "" || socket == "-" { // "-" disables it, as in the server
 		printAdminFallbackWarning(c.App.ErrWriter, adminSocketDisabledCause)
-		return newDirectAdminAPI(c)
+		return newDBBackend(c)
 	}
 	if err := checkAdminSocketOwner(socket, c.String("auth-file")); err != nil {
 		return nil, err
 	}
-	admin := client.NewAdminSocket(socket)
-	err := admin.Ping()
-	var apiErr *client.AdminError
+	sc := newServerSocketClient(socket)
+	err := sc.Ping()
+	var apiErr *apiError
 	switch {
 	case err == nil:
-		return admin, nil
-	case errors.As(err, &apiErr) && apiErr.Code == client.AdminErrCodeNotFound:
+		return sc, nil
+	case errors.As(err, &apiErr) && apiErr.Code == apiErrCodeNotFound:
 		// The server runs without auth, i.e. it does not use this database; createUserManager decides
 	case errors.Is(err, fs.ErrPermission):
 		// Either this user may not manage the server, or the socket is some other server's (e.g. the
 		// system's, while managing one's own instance). Only the database can tell the two apart.
-		direct, directErr := newDirectAdminAPI(c)
+		direct, directErr := newDBBackend(c)
 		if directErr != nil {
 			return nil, fmt.Errorf("permission denied on the admin socket %s, run this command as root or as a member of the server's group (usually ntfy)", socket)
 		}
 		printAdminFallbackWarning(c.App.ErrWriter, adminUnreachableCause(socket, err))
 		return direct, nil
-	case errors.Is(err, client.ErrAdminUnreachable):
+	case errors.Is(err, errServerUnreachable):
 		printAdminFallbackWarning(c.App.ErrWriter, adminUnreachableCause(socket, err))
 	default:
 		return nil, err // The server answered with some other error; do not hide it behind a fallback
 	}
-	return newDirectAdminAPI(c)
+	return newDBBackend(c)
 }
 
 // isLoopbackHost reports whether host is this machine, so plain HTTP never leaves it
@@ -130,49 +129,49 @@ func isLoopbackHost(host string) bool {
 // adminError turns an admin API error into the message the CLI printed before it talked to the
 // server, so scripts and tests see the same text no matter how the command reached the database.
 // The wording lives only here.
-func adminError(err error, username, tier, token string) error {
-	var apiErr *client.AdminError
+func mapAPIError(err error, username, tier, token string) error {
+	var apiErr *apiError
 	if !errors.As(err, &apiErr) {
 		return err
 	}
 	switch apiErr.Code {
-	case client.AdminErrCodeUserNotFound:
+	case apiErrCodeUserNotFound:
 		return fmt.Errorf("user %s does not exist", username)
-	case client.AdminErrCodeUserExists:
+	case apiErrCodeUserExists:
 		return fmt.Errorf("user %s already exists", username)
-	case client.AdminErrCodeTierNotFound:
+	case apiErrCodeTierNotFound:
 		return fmt.Errorf("tier %s does not exist", tier)
-	case client.AdminErrCodeTierExists:
+	case apiErrCodeTierExists:
 		return fmt.Errorf("tier %s already exists", tier)
-	case client.AdminErrCodeTierInUse:
+	case apiErrCodeTierInUse:
 		return fmt.Errorf("tier %s is still assigned to users", tier)
-	case client.AdminErrCodeTierReservationsLimit:
+	case apiErrCodeTierReservationsLimit:
 		return fmt.Errorf("user %s has more topic reservations than tier %s allows, remove reservations first", username, tier)
-	case client.AdminErrCodeTokenNotFound:
+	case apiErrCodeTokenNotFound:
 		return fmt.Errorf("token %s for user %s does not exist", token, username)
-	case client.AdminErrCodeAccessAdminUser:
+	case apiErrCodeAccessAdminUser:
 		return fmt.Errorf("user %s is an admin user, access control entries have no effect", username)
-	case client.AdminErrCodeProvisionedUserChange:
+	case apiErrCodeProvisionedUserChange:
 		return fmt.Errorf("user %s is provisioned in the config file and cannot be changed", username)
-	case client.AdminErrCodeProvisionedTokenChange:
+	case apiErrCodeProvisionedTokenChange:
 		return fmt.Errorf("token %s is provisioned in the config file and cannot be changed", token)
-	case client.AdminErrCodeUserNoPrimaryEmail:
+	case apiErrCodeUserNoPrimaryEmail:
 		return fmt.Errorf("user %s has no primary email; cannot send reset link (omit --send-email to just print it)", username)
-	case client.AdminErrCodeBaseURLNotConfigured:
+	case apiErrCodeBaseURLNotConfigured:
 		return errors.New("base-url must be configured to generate a reset link")
-	case client.AdminErrCodeRoleInvalid:
+	case apiErrCodeRoleInvalid:
 		return errors.New("role must be either 'user' or 'admin'")
-	case client.AdminErrCodeTierCodeInvalid:
+	case apiErrCodeTierCodeInvalid:
 		return errors.New("tier code must consist only of numbers and letters, and the tier needs a name")
-	case client.AdminErrCodePermissionInvalid:
+	case apiErrCodePermissionInvalid:
 		return errors.New("permission must be one of: read-write, read-only, write-only, or deny (or the aliases: read, ro, write, wo, none)")
-	case client.AdminErrCodePasswordHashInvalid:
+	case apiErrCodePasswordHashInvalid:
 		return errors.New("password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate")
-	case client.AdminErrCodeAdminSocketOnly:
+	case apiErrCodeAdminSocketOnly:
 		return errors.New("only possible over the admin socket or directly in the database, not over --server: setting roles, changing admin users or their tokens, listing all users' tokens, and resetting the whole access control list")
-	case client.AdminErrCodeNotFound:
+	case apiErrCodeNotFound:
 		return errors.New("the server does not support this command, upgrade the server or use direct database access")
-	case client.AdminErrCodeUnauthorized:
+	case apiErrCodeUnauthorized:
 		return errors.New("unauthorized: --token must belong to an admin user")
 	}
 	return apiErr
@@ -183,10 +182,10 @@ func adminUnreachableCause(socket string, err error) string {
 	return fmt.Sprintf("No ntfy server answered on the admin socket\n%s (%s)", socket, adminUnreachableReason(err))
 }
 
-// adminUnreachableReason extracts the cause from a wrapped client.ErrAdminUnreachable, e.g.
+// adminUnreachableReason extracts the cause from a wrapped errServerUnreachable, e.g.
 // "no such file or directory", for the fallback warning
 func adminUnreachableReason(err error) string {
-	reason := strings.TrimPrefix(err.Error(), client.ErrAdminUnreachable.Error()+": ")
+	reason := strings.TrimPrefix(err.Error(), errServerUnreachable.Error()+": ")
 	if i := strings.LastIndex(reason, ": "); i >= 0 {
 		reason = reason[i+2:]
 	}

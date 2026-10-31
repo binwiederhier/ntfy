@@ -18,7 +18,7 @@ import (
 	"heckel.io/ntfy/v2/user"
 )
 
-func TestCLI_AdminAPI_SocketDoesNotTouchDatabase(t *testing.T) {
+func TestCLI_Backend_SocketDoesNotTouchDatabase(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, true)
 	defer test.StopServer(t, s, port)
 
@@ -32,7 +32,7 @@ func TestCLI_AdminAPI_SocketDoesNotTouchDatabase(t *testing.T) {
 	require.NotContains(t, stderr.String(), "warning")
 }
 
-func TestCLI_AdminAPI_FallbackWarning(t *testing.T) {
+func TestCLI_Backend_FallbackWarning(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
@@ -55,7 +55,7 @@ func TestCLI_AdminAPI_FallbackWarning(t *testing.T) {
 	require.NotContains(t, stderr.String(), "\033[") // Not a terminal, no colors
 }
 
-func TestCLI_AdminAPI_SocketDisabled(t *testing.T) {
+func TestCLI_Backend_SocketDisabled(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
@@ -69,7 +69,7 @@ func TestCLI_AdminAPI_SocketDisabled(t *testing.T) {
 	}
 }
 
-func TestCLI_AdminAPI_FallbackWarningBanner(t *testing.T) {
+func TestCLI_Backend_FallbackWarningBanner(t *testing.T) {
 	plain := adminFallbackWarning("No ntfy server answered on the admin socket\n/run/ntfy/admin.sock (no such file or directory)", false)
 	require.Equal(t, `**********************************************************************
 DEPRECATION WARNING: No ntfy server answered on the admin socket
@@ -85,7 +85,7 @@ See https://docs.ntfy.sh/deprecations/ for details.
 	require.Equal(t, "\033[1;33m"+strings.TrimSuffix(plain, "\n")+"\033[0m\n", yellow)
 }
 
-func TestCLI_AdminAPI_SocketErrorNoFallback(t *testing.T) {
+func TestCLI_Backend_SocketErrorNoFallback(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
@@ -106,7 +106,7 @@ func TestCLI_AdminAPI_SocketErrorNoFallback(t *testing.T) {
 	require.Empty(t, stdout.String())
 }
 
-func TestCLI_AdminAPI_Server(t *testing.T) {
+func TestCLI_Backend_Server(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
@@ -179,7 +179,7 @@ func TestCLI_AdminAPI_Server(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestCLI_AdminAPI_SocketPermissionDenied(t *testing.T) {
+func TestCLI_Backend_SocketPermissionDenied(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("root can open any socket")
 	}

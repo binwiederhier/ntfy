@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/urfave/cli/v2"
-	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/server"
 	"heckel.io/ntfy/v2/test"
-	"testing"
 )
 
 func TestCLI_Access_Show(t *testing.T) {
@@ -85,7 +85,7 @@ func TestCLI_Access_ShowUsers_OldServer(t *testing.T) {
 	// Servers before v2.36.0 do not send the default access; skip that line instead of failing
 	app, _, stdout, _ := newTestApp()
 	c := cli.NewContext(app, nil, nil)
-	require.Nil(t, showUsers(c, []*client.AdminUser{{Username: "*", Role: "anonymous"}}))
+	require.Nil(t, showUsers(c, []*apiUser{{Username: "*", Role: "anonymous"}}))
 	require.Equal(t, "user * (role: anonymous, tier: none)\n- no topic-specific permissions\n", stdout.String())
 }
 

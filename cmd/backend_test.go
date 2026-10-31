@@ -238,7 +238,9 @@ func (r *testRemote) run(command string, args ...string) (string, error) {
 // (whose token the remote uses) and a regular user "ben", both created directly in the database
 func newTestServerWithAdminToken(t *testing.T) (s *server.Server, port int, remote *testRemote) {
 	s, conf, port := newTestServerWithAuth(t, false)
-	manager, err := user.NewSQLiteManager(conf.AuthFile, "", &user.Config{BcryptCost: user.DefaultUserPasswordBcryptCost})
+	userDB, err := user.OpenSQLite(conf.AuthFile)
+	require.Nil(t, err)
+	manager, err := user.NewSQLiteManager(userDB, "", &user.Config{BcryptCost: user.DefaultUserPasswordBcryptCost})
 	require.Nil(t, err)
 	require.Nil(t, manager.AddUser("phil", "phil", user.RoleAdmin, false))
 	require.Nil(t, manager.AddUser("ben", "ben", user.RoleUser, false))

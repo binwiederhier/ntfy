@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,7 +11,7 @@ import (
 )
 
 func TestCLI_User_Add(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	app, stdin, stdout, _ := newTestApp()
@@ -23,7 +21,7 @@ func TestCLI_User_Add(t *testing.T) {
 }
 
 func TestCLI_User_Add_Exists(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	app, stdin, stdout, _ := newTestApp()
@@ -39,7 +37,7 @@ func TestCLI_User_Add_Exists(t *testing.T) {
 }
 
 func TestCLI_User_Add_Admin(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	app, stdin, stdout, _ := newTestApp()
@@ -49,7 +47,7 @@ func TestCLI_User_Add_Admin(t *testing.T) {
 }
 
 func TestCLI_User_Add_Password_Mismatch(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	app, stdin, _, _ := newTestApp()
@@ -60,7 +58,7 @@ func TestCLI_User_Add_Password_Mismatch(t *testing.T) {
 }
 
 func TestCLI_User_ChangePass(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	conf.AuthUsers = []*user.User{
 		{Name: "philuser", Hash: "$2a$10$U4WSIYY6evyGmZaraavM2e2JeVG6EMGUKN1uUwufUeeRd4Jpg6cGC", Role: user.RoleUser}, // philuser:philpass
 	}
@@ -85,7 +83,7 @@ func TestCLI_User_ChangePass(t *testing.T) {
 }
 
 func TestCLI_User_ChangeRole(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	// Add user
@@ -101,7 +99,7 @@ func TestCLI_User_ChangeRole(t *testing.T) {
 }
 
 func TestCLI_User_Delete(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	// Add user
@@ -123,7 +121,7 @@ func TestCLI_User_Delete(t *testing.T) {
 }
 
 func TestCLI_User_ResetPass(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	app, stdin, _, _ := newTestApp()
@@ -137,7 +135,7 @@ func TestCLI_User_ResetPass(t *testing.T) {
 }
 
 func TestCLI_User_ResetPass_NoBaseURL(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	app, stdin, _, _ := newTestApp()
@@ -151,7 +149,7 @@ func TestCLI_User_ResetPass_NoBaseURL(t *testing.T) {
 }
 
 func TestCLI_User_ResetPass_SendEmailNoPrimary(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	app, stdin, _, _ := newTestApp()
@@ -166,7 +164,7 @@ func TestCLI_User_ResetPass_SendEmailNoPrimary(t *testing.T) {
 }
 
 func TestCLI_User_ResetPass_ProvisionedRejected(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	// Seed a provisioned user into the auth database via config provisioning
@@ -185,18 +183,6 @@ func TestCLI_User_ResetPass_ProvisionedRejected(t *testing.T) {
 	err = runUserCommand(app, conf, "--base-url=https://ntfy.example.com", "reset-pass", "provuser")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "provisioned")
-}
-
-func newTestServerWithAuth(t *testing.T) (s *server.Server, conf *server.Config, port int) {
-	configFile := filepath.Join(t.TempDir(), "server-dummy.yml")
-	require.Nil(t, os.WriteFile(configFile, []byte(""), 0600)) // Dummy config file to avoid lookup of real server.yml
-	conf = server.NewConfig()
-	conf.File = configFile
-	conf.AuthFile = filepath.Join(t.TempDir(), "user.db")
-	conf.AuthDefault = user.PermissionDenyAll
-	conf.AuthAccessCacheEnabled = false
-	s, port = test.StartServerWithConfig(t, conf)
-	return
 }
 
 func runUserCommand(app *cli.App, conf *server.Config, args ...string) error {

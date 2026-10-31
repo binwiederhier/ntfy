@@ -7,14 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1286,11 +1284,10 @@ func TestAdminSocket_ListenAndRemove(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s, socket := newTestServerWithAdminSocket(t, newTestConfigWithAuthFile(t, databaseURL))
 
-		// Socket exists with the right mode
+		// Socket exists; who may open it is checked per OS (server_admin_unix_test.go, server_admin_windows_test.go)
 		stat, err := os.Stat(socket)
 		require.Nil(t, err)
 		require.Equal(t, os.ModeSocket, stat.Mode().Type())
-		require.Equal(t, DefaultListenAdminUnixMode, stat.Mode().Perm())
 
 		// Removed on stop
 		s.Stop()
@@ -1371,53 +1368,6 @@ func TestAdminSocket_AnotherServerListening(t *testing.T) {
 	// The other listener is untouched
 	_, err = os.Stat(conf.ListenAdminUnix)
 	require.Nil(t, err)
-}
-
-func TestAdminSocket_UnwritableDirectory(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("root can write anywhere")
-	}
-	dir := shortTempDir(t)
-	require.Nil(t, os.Chmod(dir, 0500))
-	t.Cleanup(func() { os.Chmod(dir, 0700) })
-	conf := newTestConfigWithAuthFile(t, "")
-	conf.ListenAdminUnix = filepath.Join(dir, "sub", "admin.sock")
-	s := newTestServer(t, conf)
-	output := captureLogUntil(t, "not available", func() {
-		runTestServer(t, s)
-	})
-	require.Contains(t, output, "Admin socket")
-	require.Contains(t, output, "directly, which is deprecated, see https://ntfy.sh/docs/deprecations/")
-	require.False(t, adminSocketListening(s))
-}
-
-func TestAdminSocket_InsecureDirectoryWarning(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("unix file modes")
-	}
-	for _, tt := range []struct {
-		mode fs.FileMode
-		warn bool
-	}{
-		{0750, false},
-		{0777, true},                  // Anyone can replace the socket
-		{0777 | fs.ModeSticky, false}, // Like /tmp: only the owner can remove or replace it
-	} {
-		dir := shortTempDir(t)
-		require.Nil(t, os.Chmod(dir, tt.mode))
-		conf := newTestConfigWithAuthFile(t, "")
-		conf.ListenAdminUnix = filepath.Join(dir, "admin.sock")
-		s := newTestServer(t, conf)
-		output := captureLog(t, func() {
-			runTestServer(t, s)
-			waitFor(t, func() bool { return adminSocketListening(s) }) // Warned before it listens
-		})
-		if tt.warn {
-			require.Contains(t, output, "Admin socket directory "+dir+" is writable by all users", tt.mode)
-		} else {
-			require.NotContains(t, output, "Admin socket directory", tt.mode)
-		}
-	}
 }
 
 func TestAdminSocket_DisabledWithoutPathOrAuth(t *testing.T) {

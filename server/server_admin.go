@@ -19,8 +19,7 @@ import (
 )
 
 const (
-	apiTierReset           = "-" // Tier value that removes a user's tier (PUT /v1/users); same marker the CLI uses
-	adminSocketDirMode     = fs.FileMode(0750)
+	apiTierReset           = "-"         // Tier value that removes a user's tier (PUT /v1/users); same marker the CLI uses
 	adminSocketDialTimeout = time.Second // Used to detect a stale socket file (nobody listening)
 )
 
@@ -497,10 +496,11 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 
 // listenAdminSocket creates the socket's directory, removes a stale socket file (one with no
 // server behind it) and listens. A socket that answers belongs to another running server; in
-// that case this one does not take it over.
+// that case this one does not take it over. Who may open the socket is up to the OS-specific
+// prepareAdminSocketDir and restrictAdminSocket (file modes on unix, a DACL on Windows).
 func (s *Server) listenAdminSocket() (net.Listener, error) {
 	path := s.config.ListenAdminUnix
-	if err := os.MkdirAll(filepath.Dir(path), adminSocketDirMode); err != nil {
+	if err := prepareAdminSocketDir(filepath.Dir(path)); err != nil {
 		return nil, err
 	}
 	if reason := insecureAdminSocketDir(filepath.Dir(path)); reason != "" {
@@ -518,7 +518,7 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot listen on %s: %w", path, err)
 	}
-	if err := os.Chmod(path, DefaultListenAdminUnixMode); err != nil {
+	if err := restrictAdminSocket(path); err != nil {
 		listener.Close()
 		return nil, err
 	}
@@ -526,7 +526,8 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 }
 
 // handleAdminSocket serves one admin API request that arrived over the local socket. There is
-// no authentication: whoever can open the socket (file mode 0660, owner ntfy) is an admin.
+// no authentication: whoever can open the socket (file mode 0660, owner ntfy; on Windows, see
+// adminSocketDirSDDL) is an admin.
 // The request runs as adminSocketUser, bypasses rate limiting and the ban feed, and carries
 // contextAdminSocket so handlers can allow what the network API refuses.
 func (s *Server) handleAdminSocket(w http.ResponseWriter, r *http.Request) {

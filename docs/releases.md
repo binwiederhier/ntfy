@@ -2293,6 +2293,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working as before (see [admin socket](config.md#admin-socket))
+* Admin socket on Windows (default `%ProgramData%\ntfy\admin.sock`, Windows 10 1803 or later): only Administrators, SYSTEM and the server's user can open it
 * Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
 
 **Bug fixes + maintenance:**

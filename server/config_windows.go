@@ -8,10 +8,19 @@ import (
 )
 
 func init() {
-	programData := os.Getenv("ProgramData")
-	if programData == "" {
-		programData = `C:\ProgramData`
+	DefaultConfigFile = filepath.Join(programDataDir(), "ntfy", "server.yml")
+	DefaultTemplateDir = filepath.Join(programDataDir(), "ntfy", "templates")
+}
+
+// DefaultListenAdminUnix returns the default admin socket path, %ProgramData%\ntfy\admin.sock.
+// Access to it is restricted by a DACL, see prepareAdminSocketDir.
+func DefaultListenAdminUnix() string {
+	return filepath.Join(programDataDir(), "ntfy", "admin.sock")
+}
+
+func programDataDir() string {
+	if programData := os.Getenv("ProgramData"); programData != "" {
+		return programData
 	}
-	DefaultConfigFile = filepath.Join(programData, "ntfy", "server.yml")
-	DefaultTemplateDir = filepath.Join(programData, "ntfy", "templates")
+	return `C:\ProgramData`
 }

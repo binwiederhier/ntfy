@@ -6,11 +6,88 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.32.0 | Oct 18, 2026  |
+| ntfy server      | v2.35.0 | Oct 30, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.35.0
+Released October 30, 2026
+
+This release keeps what a user already spent when their tier changes, and makes a tier's daily email limit a hard
+cap. It also fixes intermittent 403s under concurrent requests from the same IP, and the Matrix push gateway storing
+messages under a protected topic on SQLite.
+
+**Security:**
+
+* Reject Matrix push gateway requests whose push key does not name a valid topic. Publishing strips NUL bytes and invalid UTF-8 from the topic after authorization, so an anonymous push key like `/sec%00ret` was authorized against an unmatched topic and then stored under the protected topic `secret` (SQLite only; on PostgreSQL the request was denied; thanks to [Efe Çam](https://github.com/the-arma-of-owl) for reporting)
+
+**Features:**
+
+* A tier change (an upgrade, a downgrade, or a tier edited in place) applies on the user's next request and keeps what was already spent; before, it refilled the request, email and attachment bandwidth limits ([#2104](https://github.com/binwiederhier/ntfy/pull/2104), [#2105](https://github.com/binwiederhier/ntfy/pull/2105))
+* A tier's daily email limit is a hard cap; before, the tier's email burst came on top of it, so a user could send more emails a day than the tier allows
+
+**Bug fixes + maintenance:**
+
+* Fix intermittent 403s and panics in the account handlers under concurrent requests from the same IP: a login or logout could change the user under another request, so a request with valid credentials was treated as anonymous, or the other way around. Every request now gets its own visitor ([#1051](https://github.com/binwiederhier/ntfy/issues/1051), [#2113](https://github.com/binwiederhier/ntfy/issues/2113), [#2118](https://github.com/binwiederhier/ntfy/pull/2118), thanks to [@ivanetinajero](https://github.com/ivanetinajero) for reporting)
+* A tier with a daily email limit of zero sends no emails; before, it could still send the server's email burst (`visitor-email-limit-burst`)
+* An attachment upload rejected at a size limit is no longer charged to the attachment bandwidth limit for the part that went over
+* Rate limits live in one shared limit service, keyed by `ip:<prefix>` or `user:<id>`, instead of in each visitor, which uses less memory per visitor and takes a global lock off the request path
+* Accept terabyte units (e.g. `1T`) in size settings such as attachment and tier limits, matching how sizes are displayed ([#2078](https://github.com/binwiederhier/ntfy/pull/2078), thanks to [@cangen185-sudo](https://github.com/cangen185-sudo) for the contribution)
+
+## ntfy server v2.34.0
+Released October 24, 2026
+
+This release prepares the experimental cluster to run behind load balancers: nodes drain on shutdown instead of
+dropping all of their clients at once, ntfy can listen on several addresses, and access changes reach every node. It
+also fixes a revoked or deleted user keeping some of their subscriptions, on every server.
+
+**Features:**
+
+* Allow several comma-separated addresses in `listen-http`, so a load balancer can hold more than ~63k connections to one ntfy node
+* Cluster nodes drain on shutdown: an active node withdraws (stops being ready), then turns read-only and closes its subscriber connections gradually (`experimental-cluster-drain-delay`, `experimental-cluster-drain-duration`), so its clients move to the other nodes without a reconnect storm (experimental, see [draining on shutdown](config.md#draining-on-shutdown))
+
+**Security:**
+
+* End all of a user's subscriptions when their access to a topic is reset or the user is deleted: only the first one was ended, so the others kept receiving the topic's messages ([#1845](https://github.com/binwiederhier/ntfy/pull/1845), thanks to [@gigioneggiando](https://github.com/gigioneggiando) for reporting)
+* In an experimental cluster, tell the other nodes when access changes (e.g. a reservation or a revoked permission), so they reload their access cache and disconnect subscribers who lost access; the access cache reload also catches changes made elsewhere, e.g. by the `ntfy access` CLI, and now runs every 67 seconds instead of 87
+
+**Bug fixes + maintenance:**
+
+* Fix a deadlock when ending subscriptions (reserving a topic with live subscribers, revoking access, deleting a user) while debug logging or `log-level-overrides` is on: the subscriptions' topic stayed locked for good
+* Fix a data race when `log-level-overrides` changes (e.g. on a config reload with SIGHUP) while the server logs
+
+## ntfy server v2.33.1
+Released October 23, 2026
+
+This is a hotfix release for the amd64 binaries of v2.33.0, which crashed with "Illegal instruction" on older CPUs.
+
+**Bug fixes + maintenance:**
+
+* Fix "Illegal instruction" crash of the amd64 binaries on CPUs without x86-64-v3 (AVX2/BMI2), by building releases on Ubuntu 24.04 again ([#2092](https://github.com/binwiederhier/ntfy/issues/2092), thanks to [@frank-bg](https://github.com/frank-bg) for reporting)
+
+## ntfy server v2.33.0
+Released October 23, 2026
+
+This release builds ntfy with Go 1.27.3 (security fixes, including rejecting the compromised eMudhra intermediate
+CAs), and adds monitoring for the experimental cluster: each node's view of its peers, per-peer and database
+connection pool metrics.
+
+**Features:**
+
+* Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
+* Export PostgreSQL connection pool metrics (`ntfy_db_pool_*`: connections in use, and queries that waited for a free connection, per pool), to size `pool_max_conns` (see [PostgreSQL](config.md#postgresql))
+
+**Security:**
+
+* Build with Go 1.27.3, which includes the security fixes of Go 1.27.2 (`crypto/tls`, `net/http`, `html/template` and others) and 1.27.3 (`crypto/x509`: certificate chains through the compromised eMudhra intermediate CAs are rejected)
+* Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
+* Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
+
+**Bug fixes + maintenance:**
+
+* Count published messages from every cluster node: each node adds its own publishes to the stored total instead of the leader overwriting it with its own count (experimental clustering)
 
 ## ntfy server v2.32.0
 Released October 18, 2026
@@ -2211,17 +2288,28 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
-### ntfy server v2.33.0 (UNRELEASED)
+### ntfy server v2.36.0 (UNRELEASED)
 
 **Features:**
 
-* Show each cluster node's view of its peers with `ntfy cluster status`, `/v1/cluster/status` on the cluster listener, and per-peer metrics, so a link that only works in one direction is visible (experimental clustering, see [cluster status](config.md#cluster-status))
-* **Experimental clustering (branch `cluster3`):** ntfy can run as a cluster of stateless nodes behind a shared PostgreSQL database. Nodes discover each other via a node registry, deliver published messages to subscribers on any node over a private peer mesh (`experimental-cluster-listen`, `experimental-cluster-node-id`, `experimental-cluster-advertise-url`, `experimental-cluster-secret`), and elect a leader for singleton background jobs. Scheduled (delayed) messages are claimed by exactly one node, daily visitor quotas (messages, emails, calls) and the request/bandwidth budgets are enforced cluster-wide, UnifiedPush subscriber-based rate limiting works across nodes, and reservation takeover / access revocation disconnect subscribers on all nodes
+* Daily limits (messages, e-mails, phone calls) are kept in the user database (`auth-file` for SQLite, or `database-url` for PostgreSQL) and survive restarts; with PostgreSQL, all servers share them, so a visitor gets one daily allowance in total, not one per server (see [message limits](config.md#message-limits))
+* Local admin socket (`listen-admin-unix`, default `/run/ntfy/admin.sock`) that serves the admin API without credentials to whoever can open it (the ntfy user and group, and root); the shipped systemd unit now sets `RuntimeDirectory=ntfy` so the server can create it. Custom unit files without it log a warning at startup and keep working as before (see [admin socket](config.md#admin-socket))
+* Admin API (internal, undocumented): manage tokens of other users, tiers and password reset links
+* Export `ntfy_db_up` (1 if the last health check of a PostgreSQL pool's database succeeded, per pool) and health-check the primary like the replicas, to alert on a server that is cut off from its database (see [PostgreSQL](config.md#postgresql))
 
-**Security:**
+**Behavior changes:**
 
-* Reject phone number verification unless Twilio confirms the code as approved, instead of accepting any successful response
-* Ignore duplicate topics in a subscription and limit a subscription to 150 topics, so a single request cannot replay the same topic's cache over and over
+* Daily limits now reset on a rolling 24-hour period per account or IP address instead of for everyone at midnight UTC: each visitor's period starts at its own time of day, which spreads the resets over the day. The account page and the `/v1/account` API (`stats.reset_at`) show when the visitor's counts reset
+* Visitors without a tier have a daily e-mail limit again (24h / `visitor-email-limit-replenish`), now that it is shared between servers and survives restarts
+* The daily reset job is gone; the `stats_*` columns of the user table are zeroed by the upgrade and no longer read or written
+
+**Bug fixes + maintenance:**
+
+* Admin API: return 4xx errors instead of a 500 for invalid input, and remove a deleted user's web push subscriptions
+* Web app: Deleted notifications no longer come back when a poll replays messages published in the same second as the last one ([#2098](https://github.com/binwiederhier/ntfy/issues/2098), thanks to [@mattford63](https://github.com/mattford63) and [@arminus](https://github.com/arminus) for reporting)
+* Web app: A message replayed after a reconnect keeps its read state and no longer notifies again, and an older version of a sequence no longer replaces a newer one ([#2090](https://github.com/binwiederhier/ntfy/issues/2090), thanks to [@tobykaspar79](https://github.com/tobykaspar79) for reporting)
+* Check the whole server config again when `base-url` or a `message-size-limit` above 4K is set; most checks after them were skipped, so an invalid config (e.g. `upstream-base-url` equal to `base-url`) now fails to start ([#1969](https://github.com/binwiederhier/ntfy/pull/1969), thanks to [@mikejgray](https://github.com/mikejgray) for the contribution)
+* CLI: `ntfy pub --wait-pid` now waits for processes owned by other users instead of failing with "not running" ([#1710](https://github.com/binwiederhier/ntfy/pull/1710), thanks to [@bekoeppel](https://github.com/bekoeppel) for the contribution)
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

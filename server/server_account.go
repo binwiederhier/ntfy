@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"heckel.io/ntfy/v2/cluster"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -97,6 +96,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			ReservationsRemaining:        stats.ReservationsRemaining,
 			AttachmentTotalSize:          stats.AttachmentTotalSize,
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
+			ResetAt:                      stats.ResetAt.Unix(),
 		},
 	}
 	u := v.User()
@@ -246,6 +246,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 	if err := s.userManager.MarkUserRemoved(u); err != nil {
 		return err
 	}
+	s.userDeleted(u)
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -326,9 +327,8 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
 	if u == nil {
-		// ensureUser already checked, but the user can be nil'd between that check and this
-		// re-read: IP-keyed visitors are shared, and a concurrent anonymous request on the
-		// same IP calls SetUser(nil) on this very object (recurring production panic)
+		// ensureUser already checked; kept as a guard, since a nil user here was a recurring
+		// production panic while visitors were shared between requests (#1051)
 		return errHTTPUnauthorized
 	}
 	req, err := readJSONWithLimit[apiAccountTokenUpdateRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
@@ -554,9 +554,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-	t.CancelSubscribersExceptUser(u.ID)
-	// The topic/subscriber registry is per-node; peer nodes must kick their subscribers too
-	s.cluster.BroadcastState(&cluster.State{SubscriberCancels: []*cluster.SubscriberCancel{{Topic: t.ID, ExceptUserID: u.ID}}})
+	t.CancelSubscribersExceptUser(u.ID) // The other nodes end theirs when they reload their access cache, see broadcastAccessChanged
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -996,7 +994,6 @@ func (s *Server) publishSyncEventForUser(v *visitor, u *user.User) error {
 		return err
 	}
 	m := model.NewDefaultMessage(syncTopic.ID, string(messageBytes))
-	// Dispatch so the sync event also reaches the user's devices connected to peer cluster nodes
 	if err := s.dispatch(v, syncTopic, m, dispatchOpts{}); err != nil {
 		return err
 	}

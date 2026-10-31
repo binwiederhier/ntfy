@@ -78,14 +78,6 @@ const (
 	// the topic. Rejecting the push key will instruct the Matrix server to invalidate the pushkey and stop sending
 	// messages to it. This must be longer than topicExpungeAfter. See https://spec.matrix.org/v1.6/push-gateway-api/
 	matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter = 12 * time.Hour
-
-	// matrixRejectClusterAfter is the equivalent window when the shared topic table decides
-	// (cluster mode): reject the pushkey only if the topic saw no subscriber, publish, or
-	// rate-visitor activity anywhere in the cluster for this long. It is much wider than the
-	// in-memory 12h rule, which was only that tight because state used to die with the
-	// process; the durable record makes a generous window safe (fewer wrongful rejections,
-	// which permanently remove the pusher on the Matrix homeserver).
-	matrixRejectClusterAfter = 72 * time.Hour
 )
 
 // errMatrixPushkeyRejected represents an error when handing Matrix gateway messages
@@ -138,6 +130,11 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 	newRequest, err := http.NewRequest(http.MethodPost, pushKey, io.NopCloser(bytes.NewReader(body.PeekedBytes)))
 	if err != nil {
 		return nil, err
+	}
+	// The pushkey bypasses the router's topic path check, so check it here: publishing sanitizes the
+	// topic after authorization (e.g. strips a NUL), so an invalid topic could land on a protected one
+	if !topicPathRegex.MatchString(newRequest.URL.Path) {
+		return nil, errHTTPBadRequestTopicInvalid
 	}
 	newRequest.RemoteAddr = r.RemoteAddr // Not strictly necessary, since visitor was already extracted
 	if r.Header.Get("X-Forwarded-For") != "" {

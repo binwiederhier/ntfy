@@ -38,10 +38,10 @@ const (
 
 // Default constants that may be overridden by configs
 const (
-	DefaultUserStatsQueueWriterInterval = 33 * time.Second
+	DefaultUserStatsQueueWriterInterval = 33 * time.Second // How often the token access stats are written; the daily counts are the limit service's (see package limit)
 	DefaultUserPasswordBcryptCost       = 10
 	DefaultAccessCacheEnabled           = false
-	DefaultAccessCacheReloadInterval    = 87 * time.Second
+	DefaultAccessCacheReloadInterval    = 67 * time.Second
 	DefaultExpiredMagicLinkReapInterval = time.Hour // How often expired email-verify/password-reset links are swept
 )
 
@@ -56,9 +56,8 @@ type Manager struct {
 	config      *Config
 	db          *db.DB
 	queries     queries
-	statsQueue  map[string]*Stats       // Accumulated stats deltas to be written to the database (UserID -> Stats)
 	tokenQueue  map[string]*TokenUpdate // "Queue" to asynchronously write token access stats to the database (Token ID -> TokenUpdate)
-	accessCache *accessCache            // In-memory snapshot of user_access; refreshed by maybeReloadAccessCache after every ACL mutation
+	accessCache *accessCache            // In-memory snapshot of user_access; reloaded by accessWritten after every ACL mutation
 	quit        chan struct{}           // Closed by Close() to signal background goroutines to stop
 	mu          sync.Mutex
 }
@@ -81,7 +80,6 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 	manager := &Manager{
 		config:     config,
 		db:         d,
-		statsQueue: make(map[string]*Stats),
 		tokenQueue: make(map[string]*TokenUpdate),
 		quit:       make(chan struct{}),
 		queries:    queries,
@@ -90,57 +88,39 @@ func newManager(d *db.DB, queries queries, config *Config) (*Manager, error) {
 		return nil, err
 	}
 	if config.AccessCacheEnabled {
-		manager.accessCache = newAccessCache()
-		if err := manager.maybeReloadAccessCache(); err != nil {
+		manager.accessCache = newAccessCache(d, queries.selectAccessCacheAll, config.AccessCacheChangedFunc)
+		if err := manager.accessCache.Start(config.AccessCacheReloadInterval); err != nil {
 			return nil, err
 		}
-		go manager.asyncAccessCacheReloadLoop(manager.config.AccessCacheReloadInterval)
 	}
 	go manager.asyncQueueWriteLoop(manager.config.QueueWriterInterval)
 	go manager.asyncExpiredMagicLinkReapLoop(manager.config.ExpiredMagicLinkReapInterval)
 	return manager, nil
 }
 
-// ReloadAccessCache refreshes the in-memory access cache for the given users (all users when
-// none are named) from the primary database. No-op when the cache is disabled. Callers that
-// learn about an ACL change made elsewhere (another cluster node revoking access) use it to
-// avoid serving a stale permission until the periodic reload.
-func (a *Manager) ReloadAccessCache(usernames ...string) error {
-	return a.maybeReloadAccessCache(usernames...)
+// RequestAccessCacheReload asks for a reload of the whole access cache soon, e.g. because another
+// cluster node changed access entries, and returns at once; bursts are coalesced (see
+// accessCache.RequestReload). No-op when the cache is disabled.
+func (a *Manager) RequestAccessCacheReload() {
+	if a.accessCache == nil {
+		return
+	}
+	a.accessCache.RequestReload()
 }
 
-// maybeReloadAccessCache refreshes the in-memory access cache from the
-// primary database. No-op when the cache is disabled. With no usernames it
-// does a full bulk reload; with one or more it refreshes only those users'
-// slices in a single DB round-trip via an IN clause.
-func (a *Manager) maybeReloadAccessCache(usernames ...string) error {
+// accessWritten is called after this process wrote access entries (or users): it tells
+// Config.AccessWrittenFunc first, so that the other cluster nodes start reloading their access
+// cache right away, then reloads this node's cache, so the change applies here before the write
+// returns. Never called for a reload alone, which would loop. No reload runs under a.mu, so
+// Config.AccessCacheChangedFunc may call back into the manager.
+func (a *Manager) accessWritten() error {
+	if a.config.AccessWrittenFunc != nil {
+		a.config.AccessWrittenFunc()
+	}
 	if a.accessCache == nil {
 		return nil
 	}
-	if len(usernames) == 0 {
-		return a.accessCache.Reload(a.db, a.queries.selectAccessCacheAll)
-	}
-	return a.accessCache.Reload(a.db, a.queries.selectAccessCacheUsers(len(usernames)), usernames...)
-}
-
-// asyncAccessCacheReloadLoop periodically bulk-reloads the access cache so that
-// writes made by other processes against the same database (most notably the
-// `ntfy access` CLI subcommand running while a server holds the cache) become
-// visible within the configured interval. This Manager's own mutations do
-// not depend on the poller -- they refresh affected users synchronously.
-func (a *Manager) asyncAccessCacheReloadLoop(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-a.quit:
-			return
-		case <-ticker.C:
-			if err := a.maybeReloadAccessCache(); err != nil {
-				log.Tag(tag).Err(err).Warn("Reloading ACL cache failed")
-			}
-		}
-	}
+	return a.accessCache.Reload()
 }
 
 // asyncExpiredMagicLinkReapLoop periodically deletes expired email-verification and
@@ -243,7 +223,7 @@ func (a *Manager) RemoveUser(username string) error {
 		return err
 	}
 	// Reload user-specific parts of the access cache
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // removeUserTx deletes the user with the given username
@@ -281,7 +261,7 @@ func (a *Manager) MarkUserRemoved(user *User) error {
 		return err
 	}
 	// Reload user-specific parts of the access cache
-	return a.maybeReloadAccessCache(user.Name, Everyone)
+	return a.accessWritten()
 }
 
 // RemoveDeletedUsers deletes all users that have been marked deleted
@@ -297,7 +277,7 @@ func (a *Manager) RemoveDeletedUsers() error {
 		return nil
 	}
 	// Full cache reload, because we don't know which users were affected.
-	return a.maybeReloadAccessCache()
+	return a.accessWritten()
 }
 
 // ChangePassword changes a user's password
@@ -335,7 +315,7 @@ func (a *Manager) ChangeRole(username string, role Role) error {
 		return err
 	}
 	// Full cache reload: Role changes are extremely rare.
-	return a.maybeReloadAccessCache()
+	return a.accessWritten()
 }
 
 // changeRoleTx changes a user's role
@@ -440,42 +420,6 @@ func (a *Manager) checkReservationsLimitTx(tx *sql.Tx, username string, reservat
 	return nil
 }
 
-// ResetStats resets all user stats in the user database. This touches all users.
-func (a *Manager) ResetStats() error {
-	a.mu.Lock() // Includes database query to avoid races!
-	defer a.mu.Unlock()
-	if _, err := a.db.Exec(a.queries.updateUserStatsResetAll); err != nil {
-		return err
-	}
-	a.statsQueue = make(map[string]*Stats)
-	return nil
-}
-
-// ResetStatsQueue drops the queued stats deltas without touching the database. Nodes that do
-// not run the shared daily reset (only one node in a cluster does) use it so yesterday's
-// increments cannot be added on top of the freshly zeroed rows.
-func (a *Manager) ResetStatsQueue() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.statsQueue = make(map[string]*Stats)
-}
-
-// EnqueueUserStats adds the given stats *delta* to a queue which writes out user stats
-// (messages, emails, ..) in batches at a regular interval. Deltas accumulate in the queue and
-// are flushed as SQL increments, so concurrent flushes from multiple nodes add up instead of
-// overwriting each other.
-func (a *Manager) EnqueueUserStats(userID string, delta *Stats) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if queued, ok := a.statsQueue[userID]; ok {
-		queued.Messages += delta.Messages
-		queued.Emails += delta.Emails
-		queued.Calls += delta.Calls
-	} else {
-		a.statsQueue[userID] = &Stats{Messages: delta.Messages, Emails: delta.Emails, Calls: delta.Calls}
-	}
-}
-
 func (a *Manager) asyncQueueWriteLoop(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -484,45 +428,11 @@ func (a *Manager) asyncQueueWriteLoop(interval time.Duration) {
 		case <-a.quit:
 			return
 		case <-ticker.C:
-			if err := a.writeUserStatsQueue(); err != nil {
-				log.Tag(tag).Err(err).Warn("Writing user stats queue failed")
-			}
 			if err := a.writeTokenUpdateQueue(); err != nil {
 				log.Tag(tag).Err(err).Warn("Writing token update queue failed")
 			}
 		}
 	}
-}
-
-func (a *Manager) writeUserStatsQueue() error {
-	a.mu.Lock()
-	if len(a.statsQueue) == 0 {
-		a.mu.Unlock()
-		log.Tag(tag).Trace("No user stats updates to commit")
-		return nil
-	}
-	statsQueue := a.statsQueue
-	a.statsQueue = make(map[string]*Stats)
-	a.mu.Unlock()
-
-	return db.ExecTx(a.db, func(tx *sql.Tx) error {
-		log.Tag(tag).Debug("Writing user stats queue for %d user(s)", len(statsQueue))
-		for userID, update := range statsQueue {
-			log.
-				Tag(tag).
-				Fields(log.Context{
-					"user_id":        userID,
-					"messages_count": update.Messages,
-					"emails_count":   update.Emails,
-					"calls_count":    update.Calls,
-				}).
-				Trace("Updating stats for user %s", userID)
-			if _, err := tx.Exec(a.queries.updateUserStats, update.Messages, update.Emails, update.Calls, userID); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
 }
 
 // User returns the user with the given username if it exists, or ErrUserNotFound otherwise
@@ -649,9 +559,8 @@ func (a *Manager) scanUser(rows *sql.Rows) (*User, error) {
 	var id, username, hash, role, prefs, syncTopic string
 	var provisioned bool
 	var stripeCustomerID, stripeSubscriptionID, stripeSubscriptionStatus, stripeSubscriptionInterval, stripeMonthlyPriceID, stripeYearlyPriceID, tierID, tierCode, tierName sql.NullString
-	var messages, emails, calls int64
 	var messagesLimit, messagesExpiryDuration, emailsLimit, callsLimit, reservationsLimit, attachmentFileSizeLimit, attachmentTotalSizeLimit, attachmentExpiryDuration, attachmentBandwidthLimit, stripeSubscriptionPaidUntil, stripeSubscriptionCancelAt, deleted sql.NullInt64
-	if err := rows.Scan(&id, &username, &hash, &role, &prefs, &syncTopic, &provisioned, &messages, &emails, &calls, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionInterval, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &deleted, &tierID, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &callsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &attachmentBandwidthLimit, &stripeMonthlyPriceID, &stripeYearlyPriceID); err != nil {
+	if err := rows.Scan(&id, &username, &hash, &role, &prefs, &syncTopic, &provisioned, &stripeCustomerID, &stripeSubscriptionID, &stripeSubscriptionStatus, &stripeSubscriptionInterval, &stripeSubscriptionPaidUntil, &stripeSubscriptionCancelAt, &deleted, &tierID, &tierCode, &tierName, &messagesLimit, &messagesExpiryDuration, &emailsLimit, &callsLimit, &reservationsLimit, &attachmentFileSizeLimit, &attachmentTotalSizeLimit, &attachmentExpiryDuration, &attachmentBandwidthLimit, &stripeMonthlyPriceID, &stripeYearlyPriceID); err != nil {
 		return nil, err
 	} else if err := rows.Err(); err != nil {
 		return nil, err
@@ -664,11 +573,6 @@ func (a *Manager) scanUser(rows *sql.Rows) (*User, error) {
 		Prefs:       &Prefs{},
 		SyncTopic:   syncTopic,
 		Provisioned: provisioned,
-		Stats: &Stats{
-			Messages: messages,
-			Emails:   emails,
-			Calls:    calls,
-		},
 		Billing: &Billing{
 			StripeCustomerID:            stripeCustomerID.String,                                            // May be empty
 			StripeSubscriptionID:        stripeSubscriptionID.String,                                        // May be empty
@@ -761,7 +665,7 @@ func (a *Manager) AllowAccess(username string, topicPattern string, permission P
 		return err
 	}
 	// Only this user's row set changed; refresh their slice only.
-	return a.maybeReloadAccessCache(username)
+	return a.accessWritten()
 }
 
 func (a *Manager) allowAccessTx(tx *sql.Tx, username string, topicPattern string, permission Permission, provisioned bool) error {
@@ -783,14 +687,7 @@ func (a *Manager) ResetAccess(username string, topicPattern string) error {
 	if err != nil {
 		return err
 	}
-	// Empty username -> deleteAllAccess affected every user, bulk reload.
-	// Otherwise refresh the named user plus Everyone, since resetUserAccessTx
-	// and deleteTopicAccess both touch rows owned by the user (typically the
-	// Everyone row from their reservations).
-	if username == "" {
-		return a.maybeReloadAccessCache()
-	}
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 func (a *Manager) resetAccessTx(tx *sql.Tx, username string, topicPattern string) error {
@@ -951,7 +848,7 @@ func (a *Manager) AddReservation(username string, topic string, everyone Permiss
 		return err
 	}
 	// Both user's and Everyone's rows changed.
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // RemoveReservations deletes the access control entries associated with the given username/topic,
@@ -979,7 +876,7 @@ func (a *Manager) RemoveReservations(username string, topics ...string) error {
 	}
 	// Mirror the DB: rows for this user and any Everyone rows owned by this
 	// user are gone. Refresh both slices.
-	return a.maybeReloadAccessCache(username, Everyone)
+	return a.accessWritten()
 }
 
 // Reservations returns all user-owned topics, and the associated everyone-access
@@ -1101,7 +998,7 @@ func (a *Manager) RemoveExcessReservations(username string, limit int64) ([]stri
 	if len(removedTopics) > 0 {
 		// removeReservationAccessTx deletes rows owned by this user and the
 		// matching Everyone rows, so we refresh the access cache.
-		if err := a.maybeReloadAccessCache(username, Everyone); err != nil {
+		if err := a.accessWritten(); err != nil {
 			return nil, err
 		}
 	}
@@ -1418,6 +1315,28 @@ func (a *Manager) Tier(code string) (*Tier, error) {
 	}
 	defer rows.Close()
 	return a.readTier(rows)
+}
+
+// TierUsersCount returns the number of users per tier code, including tiers without users
+func (a *Manager) TierUsersCount() (map[string]int64, error) {
+	rows, err := a.db.Query(a.queries.selectTierUsersCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	counts := make(map[string]int64)
+	for rows.Next() {
+		var code string
+		var count int64
+		if err := rows.Scan(&code, &count); err != nil {
+			return nil, err
+		}
+		counts[code] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return counts, nil
 }
 
 // TierByStripePrice returns a Tier based on the Stripe price ID, or ErrTierNotFound if it does not exist
@@ -2000,6 +1919,9 @@ func (a *Manager) Close() error {
 		// Already closed
 	default:
 		close(a.quit)
+		if a.accessCache != nil {
+			a.accessCache.Close()
+		}
 	}
 	return a.db.Close()
 }

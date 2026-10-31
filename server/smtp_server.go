@@ -30,6 +30,11 @@ var (
 	errTooManyRecipients      = errors.New("too many recipients")
 	errMultipartNestedTooDeep = errors.New("multipart message nested too deep")
 	errUnsupportedContentType = errors.New("unsupported content type")
+	errSMTPServiceUnavailable = &smtp.SMTPError{ // 4xx: temporary, so the sending mail server retries instead of bouncing
+		Code:         451,
+		EnhancedCode: smtp.EnhancedCode{4, 3, 2},
+		Message:      "Service temporarily unavailable, please try again later",
+	}
 )
 
 var (
@@ -211,7 +216,9 @@ func (s *smtpSession) publishMessage(m *model.Message) error {
 	}
 	rr := httptest.NewRecorder()
 	s.backend.handler(rr, req)
-	if rr.Code != http.StatusOK {
+	if rr.Code == http.StatusServiceUnavailable {
+		return errSMTPServiceUnavailable // Draining: the sender retries, e.g. with the next MX
+	} else if rr.Code != http.StatusOK {
 		return errors.New("error: " + rr.Body.String())
 	}
 	return nil

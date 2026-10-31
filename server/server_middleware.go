@@ -13,7 +13,8 @@ const (
 	contextRateVisitor contextKey = iota + 2586
 	contextTopic
 	contextMatrixPushKey
-	contextVisitorIP // Client IP extracted in maybeAuthenticate; reused by the abuse ban-feed (see ban.Service.Record)
+	contextVisitorIP   // Client IP extracted in maybeAuthenticate; reused by the abuse ban-feed (see ban.Service.Record)
+	contextAdminSocket // Set (to true) on requests that arrived over the admin socket, see isAdminSocketRequest
 )
 
 func (s *Server) limitRequests(next handleFunc) handleFunc {
@@ -35,7 +36,7 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 			return err
 		}
 		vrate := v
-		if rateVisitor := s.rateVisitor(t); rateVisitor != nil {
+		if rateVisitor := t.RateVisitor(); rateVisitor != nil {
 			vrate = rateVisitor
 		}
 		r = withContext(r, map[contextKey]any{

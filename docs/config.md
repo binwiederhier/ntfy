@@ -24,6 +24,10 @@ get a list of [command line options](#command-line-options).
 The most basic settings are `base-url` (the external URL of the ntfy server), the HTTP/HTTPS listen address (`listen-http`
 and `listen-https`), and socket path (`listen-unix`). All the other things are additional features.
 
+`listen-http` may list several comma-separated addresses, e.g. `10.0.0.5:2586,10.0.0.5:2588`. This is useful behind a
+load balancer: it connects to each address from one source IP, so a single address caps it at ~63k connections (one per
+source port), and every extra address adds as many again.
+
 Here are a few working sample configs using a `/etc/ntfy/server.yml` file:
 
 === "server.yml (HTTP-only, with cache + attachments)"
@@ -406,7 +410,7 @@ This generator helps you configure your self-hosted ntfy instance. It's not full
 </div>
 
 ## Database options
-ntfy uses a database for storing messages ([message cache](#message-cache)), users and [access control](#access-control), and [web push](#web-push) subscriptions.
+ntfy uses a database for storing messages ([message cache](#message-cache)), users and [access control](#access-control) (which includes the visitors' daily usage counts, see [message limits](#message-limits)), and [web push](#web-push) subscriptions.
 You can choose between **SQLite** and **PostgreSQL** as the database backend.
 
 ### SQLite
@@ -490,6 +494,15 @@ on the primary and on every replica (this is what ntfy.sh runs). The reasoning:
   both without noticeable churn.
 * `pool_conn_max_idle_time`: releases connections the server does not need overnight; under steady traffic the pool
   rotates through all connections, so the limit never triggers.
+
+To size the pools, watch the `ntfy_db_pool_*` [metrics](#monitoring), one series per pool (`role` is `primary` or
+`replica`): `ntfy_db_pool_connections_in_use` is how many connections are busy right now, and `ntfy_db_pool_waits_total`
+and `ntfy_db_pool_wait_seconds_total` count queries that had to wait for a free connection. The open connection count
+says little, since the pool rotates through all of them. Waits that keep going up mean the pool is too small.
+
+`ntfy_db_up` is 1 if the server reached the pool's database at its last health check (a ping every 30 seconds), and 0
+if not, one series per pool like the above. Alert on `ntfy_db_up{role="primary"} == 0`: a server that cannot reach its
+primary cannot publish or authenticate, and enforces the daily limits on its own until it is back.
 
 
 ## Message cache
@@ -904,6 +917,29 @@ Here's an example:
 In this example, the `auth-users` section defines two users, `phil` and `backup-service`. The `auth-tokens` section
 defines access tokens for these users. `phil` has a token `tk_3gd7d2yftt4b8ixyfe9mnmro88o76`, while `backup-service`
 has a token `tk_f099we8uzj7xi5qshzajwp6jffvkz` with the label "Backup script".
+
+### Admin socket
+The `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` commands talk to the running ntfy server through a local
+admin socket, by default `/run/ntfy/admin.sock` (`/var/run/ntfy/admin.sock` on macOS). That way, changes take effect
+immediately: a removed user is disconnected right away, a new tier applies to the user's next request, and there is no
+delay until the server reloads its access control list.
+
+The socket needs no password or token: **being able to open the socket is the authorization**. It is created with
+mode `0660` in a directory with mode `0750`, both owned by the user ntfy runs as, so only that user, members of its group
+and `root` can use it. With the Debian/Ubuntu/Fedora packages, the shipped systemd unit creates `/run/ntfy` (via
+`RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group just work.
+
+The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`). If the
+server cannot create the socket, it logs a warning at startup and runs without it:
+
+```
+WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
+```
+
+To change the path, set `listen-admin-unix` in the `server.yml` file; the commands read it from there, too. To disable the
+socket, set `listen-admin-unix: "-"`. The admin socket is not available on Windows. If you change the path, pick a
+directory that only the ntfy user can write to; otherwise the server logs a warning at startup, since other users may be
+able to use or replace the socket.
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,
@@ -1917,7 +1953,14 @@ For instance, if the request limit allows for 15,000 requests per day, and all o
 to publish messages, then that is the daily message limit.
 
 To limit the number of daily messages per visitor, you can set `visitor-message-daily-limit`. This defines the number 
-of messages a visitor can send in a day. This counter is reset every day at midnight (UTC).
+of messages a visitor can send in a day. The day is a rolling 24-hour period per visitor, not the calendar day; the
+account page shows when the counts reset next.
+
+!!! info
+    The servers sharing a database must keep their clocks in sync (e.g. with `systemd-timesyncd` or `chrony`, which most
+    distributions enable by default). The 24-hour periods and the shared counts are based on each server's own clock; a
+    difference of a second or two is harmless, but servers whose clocks drift apart by more than a few seconds may miss
+    each other's counts.
 
 ### Attachment limits
 Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 
@@ -1938,6 +1981,10 @@ are enabled):
 
 * `visitor-email-limit-burst` is the initial bucket of emails each visitor has. This defaults to 16.
 * `visitor-email-limit-replenish` is the rate at which the bucket is refilled (one email per x). Defaults to 1h.
+
+Visitors without a tier can send at most 24h / `visitor-email-limit-replenish` e-mails per day (24 by default), a daily
+limit that, like the message limit, survives restarts and is shared between servers if a user database is configured.
+If `visitor-email-limit-replenish` is longer than a day, there is no daily limit, only the bucket.
 
 ### Topic creation limits
 To mitigate topic-enumeration / squatting attacks (where a single source pokes thousands of guessable
@@ -2212,52 +2259,6 @@ applies the prefix):
     bantime = 1h
     ```
 
-## Clustering (experimental)
-ntfy can run as a **cluster of stateless nodes** behind a load balancer or DNS round-robin, so you can scale
-horizontally and survive single-node failures. Clustering is **experimental** and requires:
-
-* **PostgreSQL** as the database backend (`database-url`, see [database options](#database-options)); the shared
-  database carries all durable state (messages, users, web push) plus the cluster coordination tables.
-* **Shared attachment storage** if you use [attachments](#attachments): per-node cache directories cannot serve
-  files uploaded via another node.
-
-Clustering is enabled by setting `experimental-cluster-listen`. Nodes discover each other through the shared database and
-deliver published messages to subscribers on any node directly over a private HTTP listener. Messages, delayed
-messages, [rate limits and daily quotas](#rate-limiting), UnifiedPush subscriber-based rate limiting, and access
-control all behave as if the cluster were one server: a visitor spreading requests across N nodes does not get
-N times the limits, scheduled messages are delivered exactly once, and revoking access disconnects subscribers
-on every node.
-
-Example config for a node (all nodes are identical except `experimental-cluster-node-id`, `experimental-cluster-listen` and
-`experimental-cluster-advertise-url`):
-
-``` yaml
-base-url: "https://ntfy.example.com"
-database-url: "postgres://user:pass@dbhost:5432/ntfy"
-
-experimental-cluster-node-id: "node-1"                       # stable identity, e.g. the hostname
-experimental-cluster-listen: "10.0.0.5:2587"                 # private network interface!
-experimental-cluster-advertise-url: "http://10.0.0.5:2587"   # how the other nodes reach this one
-experimental-cluster-secret: "long-random-shared-secret"     # must match on all nodes
-```
-
-A few important notes:
-
-* **The cluster listener must not be publicly reachable.** It accepts message injections from anyone with the
-  shared secret, so bind it to a private network interface and firewall it to the peer nodes.
-* `experimental-cluster-node-id` must be **stable across restarts** (use the hostname). A node restarting under the same ID
-  reuses its registry entry.
-* **Health checks:** point your load balancer at `/v1/ready`, not `/v1/health` (see [Health checks](#health-checks)).
-  An unhealthy active node stops being ready while another active node can take its clients; your health checker
-  should still fail open (never remove all nodes at once): during a full database outage, all nodes report unhealthy
-  while message delivery keeps working.
-* Cross-node delivery is fire-and-forget. A message a node does not receive from its peer still reaches its
-  subscribers: every node also reads new messages from the database and delivers those its subscribers have not
-  had, a little later than live delivery. Messages published with `cache: no` are not in the database, so for
-  those cross-node delivery is best effort.
-* Some limiters deliberately remain per-node: active subscription counts (connections are per-node by nature),
-  and the topic-creation, signup and login-failure limiters (they protect node-local resources).
-
 ## IPv6 support
 ntfy fully supports IPv6, though there are a few things to keep in mind.
 
@@ -2315,10 +2316,40 @@ A few important notes:
   `passive` node never leads and never becomes ready, so it stays out of the load balancer; use it for test clients
   only, since while it is cut off from the database, its clients can miss messages published elsewhere.
 * **Health checks:** point your load balancer at `/v1/ready`, not `/v1/health` (see [Health checks](#health-checks)).
+* **Draining on shutdown:** when an active node gets `SIGTERM` (e.g. `systemctl restart ntfy` during a deploy) and
+  another active node is up, it moves its clients to the other nodes gradually before it exits, so a restart does not
+  cause a reconnect storm. See [draining on shutdown](#draining-on-shutdown).
 * **Limits are per node.** Rate limits and daily quotas are counted on each node separately, so a visitor spreading
   requests across N nodes gets N times the limits. Access changes (e.g. a revoked token) reach the other nodes when
   their access cache reloads.
 * Messages published with `cache: no` are not in the database, so for those, delivery across nodes is best effort.
+
+### Draining on shutdown
+Restarting a node drops all of its subscriber connections at once, and all of its clients reconnect to the other nodes
+in one burst. To avoid that, an active node that gets `SIGTERM` while another active node is up **drains** before it
+exits, moving its clients to the other nodes gradually, and without failed requests:
+
+1. **Withdrawing** (`experimental-cluster-drain-delay`, default 15 seconds): `/v1/ready` fails at once, so your load
+   balancer stops sending the node new requests, but the node still serves everything, so requests already on their
+   way succeed. In the cluster, the node acts as passive from now on: another node takes over the leader's jobs, and
+   it sends no scheduled (delayed) messages.
+2. **Read-only** (`experimental-cluster-drain-duration`, default 1 minute): new subscriptions and publishes get HTTP
+   503 (incoming email gets a temporary SMTP error, so mail servers retry), and the open subscriber connections are
+   closed evenly over the duration (all at once with `0`). The clients reconnect, through the load balancer, to the
+   other nodes, and catch up on what they missed. Once no connections are left, the node exits.
+
+| | Active | Passive | Draining: withdrawing | Draining: read-only |
+|---|---|---|---|---|
+| `/v1/ready` | 200 | 503 | 503, `"role": "passive", "draining": true` | 503, `"role": "passive", "draining": true` |
+| New subscriptions (streams, WebSockets) | accepted | accepted | accepted | 503 |
+| Open subscriber connections | kept | kept | kept | closed gradually |
+| Polls (`poll=1`) | served | served | served | served |
+| Publishes (HTTP and email) | served | served | served | rejected (503, SMTP 451) |
+| Leads the cluster's jobs, sends delayed messages | may | never | never | never |
+
+Your load balancer should stop routing to a node once its `/v1/ready` fails, and your service manager must wait for
+both phases (e.g. systemd's `TimeoutStopSec`, default 90 seconds). A passive node, and the last active node, exit at
+once.
 
 ### Cluster status
 `/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,
@@ -2384,10 +2415,12 @@ few seconds, has failed for 30 seconds.
 For load balancers, use `/v1/ready` instead: it returns 200 only if the server should receive clients. Without
 clustering that is always the case. With clustering, a passive node is never ready, and an unhealthy active node is not ready
 while another active node can take its clients. The only active node stays ready even when it is unhealthy, since there is
-nowhere better for its clients.
+nowhere better for its clients. A node [draining](#draining-on-shutdown) before a shutdown is not ready either: it acts
+as passive, and says so:
 
 ```json
 {"ready":true,"role":"active"}
+{"ready":false,"role":"passive","draining":true}
 ```
 
 See [Installation for Docker](install.md#docker) for an example of how this could be used in a `docker-compose` environment.
@@ -2509,10 +2542,11 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | Config option                              | Env variable                                    | Format                                              | Default           | Description                                                                                                                                                                                                                             |
 |--------------------------------------------|-------------------------------------------------|-----------------------------------------------------|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `base-url`                                 | `NTFY_BASE_URL`                                 | *URL*                                               | -                 | Public facing base URL of the service (e.g. `https://ntfy.sh`)                                                                                                                                                                          |
-| `listen-http`                              | `NTFY_LISTEN_HTTP`                              | `[host]:port`                                       | `:80`             | Listen address for the HTTP web server                                                                                                                                                                                                  |
+| `listen-http`                              | `NTFY_LISTEN_HTTP`                              | `[host]:port`                                       | `:80`             | Listen address for the HTTP web server; several comma-separated addresses are allowed                                                                                                                                                   |
 | `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`                                       | -                 | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                                       |
 | `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*                                          | -                 | Path to a Unix socket to listen on                                                                                                                                                                                                      |
 | `listen-unix-mode`                         | `NTFY_LISTEN_UNIX_MODE`                         | *file mode*                                         | *system default*  | File mode of the Unix socket, e.g. 0700 or 0777                                                                                                                                                                                         |
+| `listen-admin-unix`                        | `NTFY_LISTEN_ADMIN_UNIX`                        | *filename*                                          | `/run/ntfy/admin.sock` | Path of the local [admin socket](#admin-socket) the `ntfy user/access/token/tier` commands use; `"-"` disables it. Only opened if auth is configured; not available on Windows                                                           |
 | `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*                                          | -                 | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
@@ -2523,6 +2557,8 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `experimental-cluster-secret`              | `NTFY_EXPERIMENTAL_CLUSTER_SECRET`              | *string*                                            | -                 | Experimental, not ready for production. Shared secret authenticating node-to-node traffic; must match on all nodes.                                                                                                                      |
 | `experimental-cluster-batch-linger`        | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
 | `experimental-cluster-role`                | `NTFY_EXPERIMENTAL_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
+| `experimental-cluster-drain-delay`         | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY`         | *duration*                                          | `15s`             | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long a node withdraws: it is not ready but still serves everything, so the load balancer stops sending it requests before the node turns read-only. |
+| `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` closes them all at once. The service manager's stop timeout must be longer than the delay plus this. |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |
@@ -2562,7 +2598,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size*                                              | 500M              | Rate limiting: Total daily traffic limit per visitor, covering attachment downloads/uploads and messages replayed from the cache by poll requests. This is to protect your bandwidth costs from exploding.                              |
 | `visitor-email-limit-burst`                | `NTFY_VISITOR_EMAIL_LIMIT_BURST`                | *number*                                            | 16                | Rate limiting:Initial limit of e-mails per visitor                                                                                                                                                                                      |
 | `visitor-email-limit-replenish`            | `NTFY_VISITOR_EMAIL_LIMIT_REPLENISH`            | *duration*                                          | 1h                | Rate limiting: Strongly related to `visitor-email-limit-burst`: The rate at which the bucket is refilled                                                                                                                                |
-| `visitor-message-daily-limit`              | `NTFY_VISITOR_MESSAGE_DAILY_LIMIT`              | *number*                                            | -                 | Rate limiting: Allowed number of messages per day per visitor, reset every day at midnight (UTC). By default, this value is unset.                                                                                                      |
+| `visitor-message-daily-limit`              | `NTFY_VISITOR_MESSAGE_DAILY_LIMIT`              | *number*                                            | -                 | Rate limiting: Allowed number of messages per day per visitor, reset every 24 hours at the visitor's own time of day. By default, this value is unset.                                                                                  |
 | `visitor-request-limit-burst`              | `NTFY_VISITOR_REQUEST_LIMIT_BURST`              | *number*                                            | 60                | Rate limiting: Allowed GET/PUT/POST requests per second, per visitor. This setting is the initial bucket of requests each visitor has                                                                                                   |
 | `visitor-request-limit-replenish`          | `NTFY_VISITOR_REQUEST_LIMIT_REPLENISH`          | *duration*                                          | 5s                | Rate limiting: Strongly related to `visitor-request-limit-burst`: The rate at which the bucket is refilled                                                                                                                              |
 | `visitor-request-limit-exempt-hosts`       | `NTFY_VISITOR_REQUEST_LIMIT_EXEMPT_HOSTS`       | *comma-separated host/IP/CIDR list*                 | -                 | Rate limiting: List of hostnames and IPs to be exempt from request rate limiting                                                                                                                                                        |
@@ -2629,10 +2665,11 @@ OPTIONS:
    --log-file value, --log_file value                                                                                     set log file, default is STDOUT [$NTFY_LOG_FILE]
    --config value, -c value                                                                                               config file (default: "/etc/ntfy/server.yml") [$NTFY_CONFIG_FILE]
    --base-url value, --base_url value, -B value                                                                           externally visible base URL for this host (e.g. https://ntfy.sh) [$NTFY_BASE_URL]
-   --listen-http value, --listen_http value, -l value                                                                     ip:port used as HTTP listen address (default: ":80") [$NTFY_LISTEN_HTTP]
+   --listen-http value, --listen_http value, -l value                                                                     ip:port used as HTTP listen address; several comma-separated addresses are allowed (default: ":80") [$NTFY_LISTEN_HTTP]
    --listen-https value, --listen_https value, -L value                                                                   ip:port used as HTTPS listen address [$NTFY_LISTEN_HTTPS]
    --listen-unix value, --listen_unix value, -U value                                                                     listen on unix socket path [$NTFY_LISTEN_UNIX]
    --listen-unix-mode value, --listen_unix_mode value                                                                     file permissions of unix socket, e.g. 0700 (default: system default) [$NTFY_LISTEN_UNIX_MODE]
+   --listen-admin-unix value, --listen_admin_unix value                                                                   unix socket path for credential-less local admin access (ntfy user/access/token/tier); "-" disables it (default: /run/ntfy/admin.sock (empty on Windows)) [$NTFY_LISTEN_ADMIN_UNIX]
    --key-file value, --key_file value, -K value                                                                           private key file, if listen-https is set [$NTFY_KEY_FILE]
    --cert-file value, --cert_file value, -E value                                                                         certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --firebase-key-file value, --firebase_key_file value, -F value                                                         Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]

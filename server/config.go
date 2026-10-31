@@ -7,10 +7,9 @@ import (
 	"io/fs"
 	"net/netip"
 	"reflect"
+	"runtime"
 	"text/template"
 	"time"
-
-	"heckel.io/ntfy/v2/cluster/quota"
 
 	"heckel.io/ntfy/v2/ban"
 	"heckel.io/ntfy/v2/cluster"
@@ -19,6 +18,7 @@ import (
 
 // Defines default config settings (excluding limits, see below)
 const (
+	DefaultListenAdminUnixMode                  = fs.FileMode(0660) // Owner (the ntfy user) and the ntfy group; root bypasses anyway
 	DefaultListenHTTP                           = ":80"
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultCacheBatchTimeout                    = time.Duration(0)
@@ -33,8 +33,9 @@ const (
 	DefaultFirebaseQuotaExceededPenaltyDuration = 10 * time.Minute       // Time that over-users are locked out of Firebase if it returns "quota exceeded"
 	DefaultStripePriceCacheDuration             = 3 * time.Hour          // Time to keep Stripe prices cached in memory before a refresh is needed
 	DefaultClusterBatchLinger                   = 500 * time.Millisecond // How long fan-out messages wait to form a per-peer batch (experimental clustering)
-	DefaultTopicStoreUpdateInterval             = 5 * time.Minute        // Per-topic throttle for shared liveness records (cluster mode; keeps the topic table off the hot path)
 	DefaultClusterRole                          = cluster.RoleActive     // Active nodes take client traffic, lead and fence (experimental clustering)
+	DefaultClusterDrainDelay                    = 15 * time.Second       // On shutdown, how long a draining node withdraws (not ready, still serves everything); with the drain duration, fits systemd's default stop timeout (90s) (experimental clustering)
+	DefaultClusterDrainDuration                 = time.Minute            // On shutdown, how long a draining node takes to close its streams, read-only (experimental clustering)
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -117,9 +118,6 @@ const (
 )
 
 var (
-	// DefaultVisitorStatsResetTime defines the time at which visitor stats are reset (wall clock only)
-	DefaultVisitorStatsResetTime = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-
 	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
 	// extended using the server.yml config. If updated, also update in Android and web app.
 	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "metrics", "account", "settings", "signup", "login", "v1"}
@@ -129,20 +127,23 @@ var (
 type Config struct {
 	File                                 string // Config file, only used for testing
 	BaseURL                              string
-	ListenHTTP                           string
+	ListenHTTP                           []string // Several addresses let a load balancer open more than ~63k connections to this node
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
+	ListenAdminUnix                      string // Path of the local admin socket (CLI access without credentials); empty disables it
 	KeyFile                              string
 	CertFile                             string
 	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
 	DatabaseReplicaURLs                  []string      // PostgreSQL read replica connection strings
 	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; required in cluster mode
 	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
-	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<experimental-cluster-listen>")
+	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
 	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	ClusterRole                          cluster.Role  // Active (default) or passive: a passive node never leads and never fences
+	ClusterDrainDelay                    time.Duration // On shutdown, how long a draining node withdraws (not ready, still serves everything) before it turns read-only
+	ClusterDrainDuration                 time.Duration // On shutdown, how long an active node takes to close its streams so they reconnect to other nodes; 0 disables
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
@@ -214,9 +215,6 @@ type Config struct {
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
-	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
-	VisitorUsageFlushInterval            time.Duration  // Cadence for flushing/pulling cluster-wide visitor usage (cluster mode only; no CLI flag, tests override it)
-	TopicStoreUpdateInterval             time.Duration  // Per-topic throttle for shared liveness records (cluster mode only; no CLI flag, tests override it)
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
@@ -249,15 +247,28 @@ type Config struct {
 	BuildCommit                          string        // Injected by App
 }
 
+// DefaultListenAdminUnix returns the default admin socket path. On Windows there is none: unix socket
+// file permissions do not protect it there, so the CLI uses the database or --server instead.
+func DefaultListenAdminUnix() string {
+	switch runtime.GOOS {
+	case "windows":
+		return ""
+	case "darwin":
+		return "/var/run/ntfy/admin.sock"
+	}
+	return "/run/ntfy/admin.sock"
+}
+
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
 		File:                                 DefaultConfigFile, // Only used for testing
 		BaseURL:                              "",
-		ListenHTTP:                           DefaultListenHTTP,
+		ListenHTTP:                           []string{DefaultListenHTTP},
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,
+		ListenAdminUnix:                      DefaultListenAdminUnix(),
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",
@@ -267,6 +278,8 @@ func NewConfig() *Config {
 		ClusterSecret:                        "",
 		ClusterBatchLinger:                   DefaultClusterBatchLinger,
 		ClusterRole:                          DefaultClusterRole,
+		ClusterDrainDelay:                    DefaultClusterDrainDelay,
+		ClusterDrainDuration:                 DefaultClusterDrainDuration,
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
@@ -334,9 +347,6 @@ func NewConfig() *Config {
 		VisitorAccountCreationLimitReplenish: DefaultVisitorAccountCreationLimitReplenish,
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
-		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
-		VisitorUsageFlushInterval:            quota.DefaultFlushInterval,
-		TopicStoreUpdateInterval:             DefaultTopicStoreUpdateInterval,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address

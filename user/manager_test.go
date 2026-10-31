@@ -7,6 +7,8 @@ import (
 	"net/netip"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -31,7 +33,7 @@ func forEachBackend(t *testing.T, f func(t *testing.T, newManager newManagerFunc
 	t.Run("sqlite", func(t *testing.T) {
 		dir := t.TempDir()
 		f(t, func(config *Config) *Manager {
-			a, err := NewSQLiteManager(filepath.Join(dir, "user.db"), "", config)
+			a, err := newTestSQLiteManager(filepath.Join(dir, "user.db"), "", config)
 			require.Nil(t, err)
 			return a
 		})
@@ -796,54 +798,6 @@ func TestManager_Token_MaxCount_AutoDelete(t *testing.T) {
 	})
 }
 
-func TestManager_EnqueueStats_ResetStats(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
-		conf := &Config{
-			DefaultAccess:       PermissionReadWrite,
-			BcryptCost:          bcrypt.MinCost,
-			QueueWriterInterval: 1500 * time.Millisecond,
-		}
-		a := newTestManagerFromConfig(t, newManager, conf)
-		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
-
-		// Baseline: No messages or emails
-		u, err := a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
-		a.EnqueueUserStats(u.ID, &Stats{
-			Messages: 11,
-			Emails:   2,
-		})
-
-		// Still no change, because it's queued asynchronously
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
-
-		// After 2 seconds they should be persisted
-		time.Sleep(2 * time.Second)
-
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(11), u.Stats.Messages)
-		require.Equal(t, int64(2), u.Stats.Emails)
-
-		// Now reset stats (enqueued stats will be thrown out)
-		a.EnqueueUserStats(u.ID, &Stats{
-			Messages: 99,
-			Emails:   23,
-		})
-		require.Nil(t, a.ResetStats())
-
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
-	})
-}
-
 func TestManager_EnqueueTokenUpdate(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		conf := &Config{
@@ -1062,6 +1016,22 @@ func TestAccount_Tier_Create_With_ID(t *testing.T) {
 		ti, err := a.Tier("pro")
 		require.Nil(t, err)
 		require.Equal(t, "ti_123", ti.ID)
+	})
+}
+
+func TestManager_TierUsersCount(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddTier(&Tier{Code: "pro", Name: "Pro"}))
+		require.Nil(t, a.AddTier(&Tier{Code: "empty", Name: "Empty"}))
+		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+		require.Nil(t, a.AddUser("emma", "emma", RoleUser, false))
+		require.Nil(t, a.ChangeTier("ben", "pro"))
+		require.Nil(t, a.ChangeTier("emma", "pro"))
+
+		counts, err := a.TierUsersCount()
+		require.Nil(t, err)
+		require.Equal(t, map[string]int64{"pro": 2, "empty": 0}, counts)
 	})
 }
 
@@ -1907,7 +1877,7 @@ func TestMigrationFrom6Postgres(t *testing.T) {
 	require.Nil(t, err)
 	var version int
 	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'user'`).Scan(&version))
-	require.Equal(t, 9, version)
+	require.Equal(t, 10, version)
 	// The manager works against the migrated schema
 	require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
 	u, err := a.User("phil")
@@ -1949,7 +1919,7 @@ func checkSchemaVersion(t *testing.T, d *db.DB) {
 
 	var schemaVersion int
 	require.Nil(t, rows.Scan(&schemaVersion))
-	require.Equal(t, 9, schemaVersion)
+	require.Equal(t, 10, schemaVersion)
 	require.Nil(t, rows.Close())
 }
 
@@ -1964,7 +1934,7 @@ func newTestManager(t *testing.T, newManager newManagerFunc, defaultAccess Permi
 }
 
 func newTestManagerFromFile(t *testing.T, filename, startupQueries string, defaultAccess Permission, bcryptCost int, statsWriterInterval time.Duration) *Manager {
-	a, err := NewSQLiteManager(filename, startupQueries, &Config{
+	a, err := newTestSQLiteManager(filename, startupQueries, &Config{
 		DefaultAccess:       defaultAccess,
 		BcryptCost:          bcryptCost,
 		QueueWriterInterval: statsWriterInterval,
@@ -1985,7 +1955,7 @@ func testDB(a *Manager) *db.DB {
 
 func forEachStoreBackend(t *testing.T, f func(t *testing.T, manager *Manager)) {
 	t.Run("sqlite", func(t *testing.T) {
-		manager, err := NewSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &Config{})
+		manager, err := newTestSQLiteManager(filepath.Join(t.TempDir(), "user.db"), "", &Config{})
 		require.Nil(t, err)
 		t.Cleanup(func() { manager.Close() })
 		f(t, manager)
@@ -2420,6 +2390,81 @@ func TestAuthorizeTopicAccess_CacheAndDirectDBAgree(t *testing.T) {
 	})
 }
 
+func TestAccessCache_ReloadReportsChanges(t *testing.T) {
+	// A reload that finds entries added, changed or removed by someone else (another cluster
+	// node, the CLI) reports them, so the server can re-check the live subscribers they affect
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		var mu sync.Mutex
+		var changes []*AccessChange
+		takeChanges := func() []*AccessChange {
+			mu.Lock()
+			defer mu.Unlock()
+			taken := changes
+			changes = nil
+			return taken
+		}
+		writer := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess: PermissionReadWrite,
+			BcryptCost:    bcrypt.MinCost,
+		})
+		require.Nil(t, writer.AddUser("phil", "phil", RoleUser, false))
+		require.Nil(t, writer.AllowAccess("phil", "unchanged", PermissionRead))
+		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionReadWrite))
+		reader := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess:             PermissionReadWrite,
+			BcryptCost:                bcrypt.MinCost,
+			AccessCacheEnabled:        true,
+			AccessCacheReloadInterval: time.Hour,
+			AccessCacheChangedFunc: func(c []*AccessChange) {
+				mu.Lock()
+				defer mu.Unlock()
+				changes = append(changes, c...)
+			},
+		})
+
+		// The initial load finds every row new; that is no change to report (and nobody subscribed yet)
+		require.Empty(t, takeChanges())
+
+		// A reservation (owner and everyone rows), a new wildcard, a downgrade; one row untouched
+		require.Nil(t, writer.AddReservation("phil", "my_topic", PermissionDenyAll, 0))
+		require.Nil(t, writer.AllowAccess("phil", "up_*", PermissionRead))
+		require.Nil(t, writer.AllowAccess("phil", "downgraded", PermissionRead))
+		require.Nil(t, reader.accessCache.Reload())
+		require.ElementsMatch(t, []*AccessChange{
+			{
+				Username:     "phil",
+				TopicPattern: "my_topic",
+			},
+			{
+				Username:     Everyone,
+				TopicPattern: "my_topic",
+			},
+			{
+				Username:     "phil",
+				TopicPattern: "up_*",
+			},
+			{
+				Username:     "phil",
+				TopicPattern: "downgraded",
+			},
+		}, takeChanges())
+
+		// A removal
+		require.Nil(t, writer.ResetAccess("phil", "up_*"))
+		require.Nil(t, reader.accessCache.Reload())
+		require.Equal(t, []*AccessChange{
+			{
+				Username:     "phil",
+				TopicPattern: "up_*",
+			},
+		}, takeChanges())
+
+		// Nothing changed, nothing reported
+		require.Nil(t, reader.accessCache.Reload())
+		require.Empty(t, takeChanges())
+	})
+}
+
 // TestAccessCacheReloadInterval_PicksUpExternalWrite proves that the
 // background reloader actually closes the cross-process coherence gap: a
 // write made through a *different* Manager on the same backend becomes
@@ -2520,13 +2565,10 @@ func TestAccessCache_RemoveExcessReservationsInvalidatesCache(t *testing.T) {
 	})
 }
 
-// TestAccessCache_FullReloadDoesNotClobberConcurrentRevoke models finding #2:
-// a periodic full reload scans the whole user_access table outside the cache
-// lock. If a local ACL mutation revokes a grant and refreshes that user's slice
-// while the scan is in flight, applying the now-stale full snapshot must not
-// resurrect the revoked grant. The testHookReloadScanned seam injects the revoke
-// into exactly that race window.
-func TestAccessCache_FullReloadDoesNotClobberConcurrentRevoke(t *testing.T) {
+// TestAccessCache_WriteDuringFullReloadIsNotLost: a full reload scans user_access outside the cache
+// lock. If an access write lands while the scan is in flight, the write's own reload must still
+// apply it: the stale snapshot must not win.
+func TestAccessCache_WriteDuringFullReloadIsNotLost(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		a := newTestManagerFromConfig(t, newManager, &Config{
 			DefaultAccess:             PermissionDenyAll,
@@ -2537,33 +2579,94 @@ func TestAccessCache_FullReloadDoesNotClobberConcurrentRevoke(t *testing.T) {
 		require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
 		require.Nil(t, a.AllowAccess("phil", "secret", PermissionReadWrite))
 
-		// Sanity: the grant is served from the cache.
-		_, _, found, err := a.authorizeTopicAccess("phil", "secret")
-		require.Nil(t, err)
-		require.True(t, found)
-
-		// Arm the seam: when the full reload below finishes scanning (and still
-		// sees the grant), revoke it via a per-user reload before the full reload
-		// applies its now-stale snapshot. The re-entrant per-user reload that
-		// ResetAccess triggers is a no-op here (fired guard), and the whole thing
-		// runs single-threaded in this goroutine.
+		// When the full reload below has scanned (and still sees the grant), revoke it from another
+		// goroutine, as a concurrent request would
+		revoked := make(chan struct{})
 		fired := false
 		testHookReloadScanned = func() {
 			if fired {
 				return
 			}
 			fired = true
-			require.Nil(t, a.ResetAccess("phil", "secret"))
+			go func() {
+				require.Nil(t, a.ResetAccess("phil", "secret"))
+				close(revoked)
+			}()
+			time.Sleep(100 * time.Millisecond) // Let the revoke write to the database
 		}
 		defer func() { testHookReloadScanned = nil }()
 
-		// Trigger the full reload. Without the seq guard it would swap in its
-		// stale snapshot and resurrect the grant.
-		require.Nil(t, a.maybeReloadAccessCache())
-
-		_, _, found, err = a.authorizeTopicAccess("phil", "secret")
+		require.Nil(t, a.accessCache.Reload())
+		<-revoked
+		_, _, found, err := a.authorizeTopicAccess("phil", "secret")
 		require.Nil(t, err)
-		require.False(t, found, "stale full reload resurrected a revoked grant")
+		require.False(t, found, "a stale full reload resurrected a revoked grant")
+	})
+}
+
+func TestManager_AccessWriteTellsPeersBeforeReloading(t *testing.T) {
+	// The peers are told first, so their reloads start without waiting for this node's
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		var mu sync.Mutex
+		calls := make([]string, 0)
+		record := func(call string) {
+			mu.Lock()
+			defer mu.Unlock()
+			calls = append(calls, call)
+		}
+		a := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess:             PermissionReadWrite,
+			BcryptCost:                bcrypt.MinCost,
+			AccessCacheEnabled:        true,
+			AccessCacheReloadInterval: time.Hour,
+			AccessWrittenFunc: func() {
+				record("written")
+			},
+			AccessCacheChangedFunc: func(_ []*AccessChange) {
+				record("changed")
+			},
+		})
+		require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
+		mu.Lock()
+		calls = calls[:0]
+		mu.Unlock()
+		require.Nil(t, a.AllowAccess("phil", "secret", PermissionRead))
+		mu.Lock()
+		defer mu.Unlock()
+		require.Equal(t, []string{"written", "changed"}, calls)
+	})
+}
+
+func TestManager_AccessWritesTellPeers(t *testing.T) {
+	// Every access write is passed on (the server tells the other cluster nodes, which reload their
+	// access cache); a reload alone is not a write, so passing it on would loop between nodes
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		written := atomic.Int32{}
+		a := newTestManagerFromConfig(t, newManager, &Config{
+			DefaultAccess:             PermissionReadWrite,
+			BcryptCost:                bcrypt.MinCost,
+			AccessCacheEnabled:        true,
+			AccessCacheReloadInterval: time.Hour,
+			AccessWrittenFunc: func() {
+				written.Add(1)
+			},
+		})
+		require.Nil(t, a.AddUser("phil", "mypass", RoleUser, false))
+		require.Nil(t, a.AddUser("ben", "mypass", RoleUser, false))
+		before := written.Load()
+		require.Nil(t, a.AllowAccess("phil", "secret", PermissionRead))
+		require.Equal(t, before+1, written.Load())
+		require.Nil(t, a.ResetAccess("phil", "secret"))
+		require.Equal(t, before+2, written.Load())
+		require.Nil(t, a.AddReservation("phil", "mytopic", PermissionDenyAll, 10))
+		require.Equal(t, before+3, written.Load())
+		require.Nil(t, a.RemoveReservations("phil", "mytopic"))
+		require.Equal(t, before+4, written.Load())
+		require.Nil(t, a.RemoveUser("ben"))
+		require.Equal(t, before+5, written.Load())
+
+		require.Nil(t, a.accessCache.Reload())
+		require.Equal(t, before+5, written.Load())
 	})
 }
 
@@ -2571,7 +2674,7 @@ func TestAccessCache_FullReloadDoesNotClobberConcurrentRevoke(t *testing.T) {
 // topic matching being case-insensitive. SQLite's LIKE is case-insensitive for
 // ASCII by default, which would let a request for "SECRET" match an ACL rule
 // for "secret" -- a security hole. PostgreSQL's LIKE is already case-sensitive.
-// NewSQLiteManager opens the database with case_sensitive_like enabled to close
+// OpenSQLite opens the database with case_sensitive_like enabled to close
 // this gap. This exercises the direct-DB path (cache disabled), which is the
 // path that runs the LIKE query; the in-memory cache is independently
 // case-sensitive (Go map keys / case-sensitive regex).
@@ -2881,41 +2984,6 @@ func TestStoreChangeBilling(t *testing.T) {
 		require.Nil(t, err)
 		require.Equal(t, "cus_123", u.Billing.StripeCustomerID)
 		require.Equal(t, "sub_456", u.Billing.StripeSubscriptionID)
-	})
-}
-
-func TestStoreUpdateStats(t *testing.T) {
-	forEachStoreBackend(t, func(t *testing.T, manager *Manager) {
-		require.Nil(t, manager.AddUser("phil", "mypass", RoleUser, false))
-		u, err := manager.User("phil")
-		require.Nil(t, err)
-
-		manager.EnqueueUserStats(u.ID, &Stats{Messages: 42, Emails: 3, Calls: 1})
-		require.Nil(t, manager.writeUserStatsQueue())
-
-		u2, err := manager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(42), u2.Stats.Messages)
-		require.Equal(t, int64(3), u2.Stats.Emails)
-		require.Equal(t, int64(1), u2.Stats.Calls)
-	})
-}
-
-func TestStoreResetStats(t *testing.T) {
-	forEachStoreBackend(t, func(t *testing.T, manager *Manager) {
-		require.Nil(t, manager.AddUser("phil", "mypass", RoleUser, false))
-		u, err := manager.User("phil")
-		require.Nil(t, err)
-
-		manager.EnqueueUserStats(u.ID, &Stats{Messages: 42, Emails: 3, Calls: 1})
-		require.Nil(t, manager.writeUserStatsQueue())
-		require.Nil(t, manager.ResetStats())
-
-		u2, err := manager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(0), u2.Stats.Messages)
-		require.Equal(t, int64(0), u2.Stats.Emails)
-		require.Equal(t, int64(0), u2.Stats.Calls)
 	})
 }
 
@@ -3561,39 +3629,63 @@ func TestManager_AccountReadsUsePrimary(t *testing.T) {
 	require.Len(t, pendingEmails, 1)
 }
 
-func TestManager_EnqueueStats_DeltasAccumulate(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
-		conf := &Config{
-			DefaultAccess:       PermissionReadWrite,
-			BcryptCost:          bcrypt.MinCost,
-			QueueWriterInterval: time.Hour, // Flushed manually below
-		}
-		a := newTestManagerFromConfig(t, newManager, conf)
-		require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
-		u, err := a.User("ben")
-		require.Nil(t, err)
+func TestMigrationFrom9To10SQLite(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "user.db")
+	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	testMigrationFrom9To10(t, a, `UPDATE schemaVersion SET version = 9 WHERE id = 1`, `UPDATE user SET stats_messages = 5, stats_emails = 2, stats_calls = 1`)
+	a = newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	checkMigrated9To10(t, a, `SELECT version FROM schemaVersion WHERE id = 1`, `SELECT stats_messages, stats_emails, stats_calls FROM user`)
+	checkMigratedSqliteSchema(t, filename)
+}
 
-		// Two enqueues before a flush add up (deltas, not absolute snapshots)
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 3, Emails: 1})
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 2, Calls: 4})
-		require.Nil(t, a.writeUserStatsQueue())
-		u, err = a.User("ben")
+func TestMigrationFrom9To10Postgres(t *testing.T) {
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	open := func() *Manager {
+		host, err := pg.Open(schemaDSN)
 		require.Nil(t, err)
-		require.Equal(t, int64(5), u.Stats.Messages)
-		require.Equal(t, int64(1), u.Stats.Emails)
-		require.Equal(t, int64(4), u.Stats.Calls)
+		a, err := NewPostgresManager(db.New(host, nil), &Config{DefaultAccess: PermissionDenyAll, BcryptCost: bcrypt.MinCost, QueueWriterInterval: DefaultUserStatsQueueWriterInterval})
+		require.Nil(t, err)
+		t.Cleanup(func() { a.Close() })
+		return a
+	}
+	testMigrationFrom9To10(t, open(), `UPDATE schema_version SET version = 9 WHERE store = 'user'`, `UPDATE "user" SET stats_messages = 5, stats_emails = 2, stats_calls = 1`)
+	checkMigrated9To10(t, open(), `SELECT version FROM schema_version WHERE store = 'user'`, `SELECT stats_messages, stats_emails, stats_calls FROM "user"`)
+}
 
-		// A flush from a second manager on the same database (= another cluster node)
-		// adds to the existing stats instead of overwriting them
-		b := newManager(conf)
-		b.EnqueueUserStats(u.ID, &Stats{Messages: 10, Emails: 2})
-		require.Nil(t, b.writeUserStatsQueue())
-		a.EnqueueUserStats(u.ID, &Stats{Messages: 1})
-		require.Nil(t, a.writeUserStatsQueue())
-		u, err = a.User("ben")
-		require.Nil(t, err)
-		require.Equal(t, int64(16), u.Stats.Messages)
-		require.Equal(t, int64(3), u.Stats.Emails)
-		require.Equal(t, int64(4), u.Stats.Calls)
-	})
+// testMigrationFrom9To10 turns the manager's database back into a version 9 one with stats, and closes it
+func testMigrationFrom9To10(t *testing.T, a *Manager, setVersionQuery, setStatsQuery string) {
+	t.Helper()
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+	_, err := a.db.Exec(`DROP TABLE IF EXISTS usage`)
+	require.Nil(t, err)
+	_, err = a.db.Exec(setVersionQuery)
+	require.Nil(t, err)
+	_, err = a.db.Exec(setStatsQuery)
+	require.Nil(t, err)
+	require.Nil(t, a.Close())
+}
+
+// checkMigrated9To10 checks that the migration zeroed the stats and created the usage table
+func checkMigrated9To10(t *testing.T, a *Manager, selectVersionQuery, selectStatsQuery string) {
+	t.Helper()
+	var version int
+	require.Nil(t, a.db.QueryRow(selectVersionQuery).Scan(&version))
+	require.Equal(t, 10, version)
+	var messages, emails, calls int64
+	require.Nil(t, a.db.QueryRow(selectStatsQuery).Scan(&messages, &emails, &calls))
+	require.Equal(t, []int64{0, 0, 0}, []int64{messages, emails, calls})
+	_, err := a.db.Exec(`INSERT INTO usage (key, period_start, messages, emails, calls, updated_at) VALUES ('ip:1.2.3.4', 1793344380, 37, 0, 0, 1793380805)`)
+	require.Nil(t, err)
+	var count int64
+	require.Nil(t, a.db.QueryRow(`SELECT messages FROM usage WHERE key = 'ip:1.2.3.4' AND updated_at >= 1793380805`).Scan(&count))
+	require.Equal(t, int64(37), count)
+}
+
+// newTestSQLiteManager opens the SQLite user database and creates a manager on it
+func newTestSQLiteManager(filename, startupQueries string, config *Config) (*Manager, error) {
+	d, err := OpenSQLite(filename)
+	if err != nil {
+		return nil, err
+	}
+	return NewSQLiteManager(d, startupQueries, config)
 }

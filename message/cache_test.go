@@ -1120,7 +1120,9 @@ func TestStore_AddStats_SumsAcrossNodes(t *testing.T) {
 		d := db.New(host, nil)
 		store, err := message.NewPostgresStore(d, 0, 0)
 		require.Nil(t, err)
-		t.Cleanup(func() { store.Close() })
+		t.Cleanup(func() {
+			store.Close()
+		})
 		return store
 	}
 	a, b := openStore(), openStore()
@@ -1302,7 +1304,9 @@ func TestStore_MessagesSinceID_ReplicaLagFallsBackToPrimary(t *testing.T) {
 		d.MarkReplicasHealthyForTest() // Route ReadOnly() to the lagged replica deterministically
 		store, err := message.NewPostgresStore(d, 0, 0)
 		require.Nil(t, err)
-		t.Cleanup(func() { store.Close() })
+		t.Cleanup(func() {
+			store.Close()
+		})
 		return store
 	}
 	// The "replica" is a separate schema holding only the first 3 messages (fully lagged after

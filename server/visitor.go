@@ -1,101 +1,68 @@
 package server
 
 import (
-	"math"
 	"net/netip"
-	"sync"
 	"time"
 
-	"golang.org/x/time/rate"
-	"heckel.io/ntfy/v2/cluster/quota"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	vis "heckel.io/ntfy/v2/visitor" // Aliased: the server has its own visitor type
 )
 
 const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter defines how long a visitor is active before it is removed from memory. This number
-	// has to be very high to prevent e-mail abuse, but it doesn't really affect the other limits anyway, since
-	// they are replenished faster (typically).
+	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
+	// forgotten (see Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber
+	// is gone. This number has to be very high to prevent e-mail abuse, but it doesn't really affect
+	// the other limits anyway, since they are replenished faster (typically).
 	visitorExpungeAfter = oneDay
 
-	// visitorDefaultReservationsLimit is the amount of topic names a user without a tier is allowed to reserve.
-	// This number is zero, and changing it may have unintended consequences in the web app, or otherwise
-	visitorDefaultReservationsLimit = int64(0)
-
-	// visitorDefaultCallsLimit is the amount of calls a user without a tier is allowed to make.
-	// This number is zero, because phone numbers have to be verified first.
-	visitorDefaultCallsLimit = int64(0)
+	// promoteRate is the divisor of the daily message cap (cap / promoteRate, i.e. 10%) from which
+	// the count of a visitor without a user is written to the usage table; below it, a restart
+	// forgets it, and N nodes may admit up to N x (threshold - 1) without a row. A larger
+	// divisor writes more keys.
+	promoteRate = 10
 )
 
-// Constants used to convert a tier-user's MessageSizeLimit (see user.Tier) into adequate request limiter
-// values (token bucket). This is only used to increase the values in server.yml, never decrease them.
-//
-// Example: Assuming a user.Tier's MessageSizeLimit is 10,000:
-// - the allowed burst is 500 (= 10,000 * 5%), which is < 1000 (the max)
-// - the replenish rate is 2 * 10,000 / 24 hours
-const (
-	visitorMessageToRequestLimitBurstRate       = 0.05
-	visitorMessageToRequestLimitBurstMax        = 1000
-	visitorMessageToRequestLimitReplenishFactor = 2
-)
-
-// Constants used to convert a tier-user's EmailLimit (see user.Tier) into adequate email limiter
-// values (token bucket). Example: Assuming a user.Tier's EmailLimit is 200, the allowed burst is
-// 40 (= 200 * 20%), which is <150 (the max).
-const (
-	visitorEmailLimitBurstRate = 0.2
-	visitorEmailLimitBurstMax  = 150
-)
-
-// visitor represents an API user, and its associated rate.Limiter used for rate limiting
+// visitor represents one request's API user: its identity (the IP, or the user) and the limits that
+// apply to it. It is built per request and never changed afterwards, so concurrent requests from the
+// same IP cannot see each other's user (#1051). The counting happens in the limit service, keyed by
+// key, so two visitors with the same key share one set of buckets and counts.
 type visitor struct {
-	config               *Config
-	messageCache         *message.Cache
-	userManager          *user.Manager      // May be nil
-	quota                *quota.Tracker     // Cluster-wide usage counters; nil when not clustered (see quotaAllowedNoLock)
-	quotaKey             quota.Key          // This visitor's usage key, same identity as the visitor ID; updated on SetUser
-	ip                   netip.Addr         // Visitor IP address
-	user                 *user.User         // Only set if authenticated user, otherwise nil
-	requestLimiter       *rate.Limiter      // Rate limiter for (almost) all requests (including messages)
-	messagesLimiter      *util.FixedLimiter // Rate limiter for messages
-	emailsLimiter        *util.RateLimiter  // Rate limiter for emails
-	callsLimiter         *util.FixedLimiter // Rate limiter for calls
-	subscriptionLimiter  *util.FixedLimiter // Fixed limiter for active subscriptions (ongoing connections)
-	topicCreationLimiter *rate.Limiter      // Rate limiter for inserting new topics into the in-memory topic map
-	bandwidthLimiter     *util.RateLimiter  // Limiter for attachment downloads and cached-message replay (polls)
-	accountLimiter       *rate.Limiter      // Rate limiter for account actions (signup, password-reset requests), may be nil
-	authLimiter          *rate.Limiter      // Limiter for incorrect login attempts, may be nil
-	firebase             time.Time          // Next allowed Firebase message
-	seen                 time.Time          // Last seen time of this visitor (needed for removal of stale visitors)
-	statsPersisted       user.Stats         // Counter values already handed to the user manager's write queue; deltas against it are enqueued (see enqueueUserStatsDeltaNoLock)
-	mu                   sync.RWMutex
+	env    *visitorEnv
+	key    string      // The limiter key: "ip:<prefix>" or "user:<id>", see vis.Key
+	ip     netip.Addr  // Visitor IP address
+	user   *user.User  // Only set if authenticated user, otherwise nil
+	limits *vis.Limits // Resolved from the config or the user's tier
+}
+
+// visitorEnv is what every visitor of a server shares; it is built once, so building a visitor per
+// request costs little
+type visitorEnv struct {
+	config        *Config
+	limitsConfig  *vis.Config    // The parts of config that keying and limit resolution need (see visitorConfigFrom)
+	ipLimits      *vis.Limits    // The config-based limits of visitors without a tier; never modified
+	limiter       *limit.Service // Decides on and counts usage, keyed by key
+	subscriptions *subscriptionGauge
+	messageCache  *message.Cache
+	userManager   *user.Manager // May be nil
 }
 
 type visitorInfo struct {
-	Limits *visitorLimits
+	Limits *vis.Limits
 	Stats  *visitorStats
 }
 
-type visitorLimits struct {
-	Basis                    visitorLimitBasis
-	RequestLimitBurst        int
-	RequestLimitReplenish    rate.Limit
-	MessageLimit             int64
-	MessageExpiryDuration    time.Duration
-	EmailLimit               int64
-	EmailLimitBurst          int
-	EmailLimitReplenish      rate.Limit
-	CallLimit                int64
-	ReservationsLimit        int64
-	AttachmentTotalSizeLimit int64
-	AttachmentFileSizeLimit  int64
-	AttachmentExpiryDuration time.Duration
-	AttachmentBandwidthLimit int64
+// visitorUsage is a key's daily counts (see visitor.Stats)
+type visitorUsage struct {
+	Messages int64
+	Emails   int64
+	Calls    int64
 }
 
 type visitorStats struct {
@@ -109,80 +76,65 @@ type visitorStats struct {
 	ReservationsRemaining        int64
 	AttachmentTotalSize          int64
 	AttachmentTotalSizeRemaining int64
+	ResetAt                      time.Time // When the daily counts start over
 }
 
-// visitorLimitBasis describes how the visitor limits were derived, either from a user's
-// IP address (default config), or from its tier
-type visitorLimitBasis string
+func newVisitorEnv(conf *Config, limiter *limit.Service, messageCache *message.Cache, userManager *user.Manager) *visitorEnv {
+	limitsConfig := visitorConfigFrom(conf)
+	return &visitorEnv{
+		config:        conf,
+		limitsConfig:  limitsConfig,
+		ipLimits:      vis.LimitsFor(limitsConfig, nil),
+		limiter:       limiter,
+		subscriptions: newSubscriptionGauge(),
+		messageCache:  messageCache,
+		userManager:   userManager, // May be nil
+	}
+}
 
-const (
-	visitorLimitBasisIP   = visitorLimitBasis("ip")
-	visitorLimitBasisTier = visitorLimitBasis("tier")
-)
-
-func newVisitor(conf *Config, messageCache *message.Cache, userManager *user.Manager, tracker *quota.Tracker, ip netip.Addr, user *user.User) *visitor {
-	var messages, emails, calls int64
-	if user != nil {
-		messages = user.Stats.Messages
-		emails = user.Stats.Emails
-		calls = user.Stats.Calls
+func newVisitor(env *visitorEnv, ip netip.Addr, u *user.User) *visitor {
+	limits := env.ipLimits
+	var tier *user.Tier
+	if u != nil && u.Tier != nil {
+		tier = u.Tier
+		limits = vis.LimitsFor(env.limitsConfig, tier) // Resolved per request: the tier's fields may change at any time
 	}
 	v := &visitor{
-		config:               conf,
-		messageCache:         messageCache,
-		userManager:          userManager, // May be nil
-		quota:                tracker,     // May be nil (not clustered)
-		quotaKey:             quota.Key(visitorID(ip, user, conf)),
-		ip:                   ip,
-		user:                 user,
-		firebase:             time.Unix(0, 0),
-		seen:                 time.Now(),
-		subscriptionLimiter:  util.NewFixedLimiter(int64(conf.VisitorSubscriptionLimit)),
-		requestLimiter:       nil, // Set in resetLimiters
-		messagesLimiter:      nil, // Set in resetLimiters, may be nil
-		emailsLimiter:        nil, // Set in resetLimiters
-		callsLimiter:         nil, // Set in resetLimiters, may be nil
-		topicCreationLimiter: nil, // Set in resetLimiters
-		bandwidthLimiter:     nil, // Set in resetLimiters
-		accountLimiter:       nil, // Set in resetLimiters, may be nil
-		authLimiter:          nil, // Set in resetLimiters, may be nil
+		env:    env,
+		key:    vis.Key(ip, u, env.limitsConfig),
+		ip:     ip,
+		user:   u,
+		limits: limits,
 	}
-	v.resetLimitersNoLock(messages, emails, calls)
+	env.limiter.Touch(v.key) // The key is seen now, as the visitor's request is
 	return v
 }
 
 func (v *visitor) Context() log.Context {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	return v.contextNoLock()
-}
-
-func (v *visitor) contextNoLock() log.Context {
-	info := v.infoLightNoLock()
+	info := v.infoLight()
 	fields := log.Context{
-		"visitor_id":                 visitorID(v.ip, v.user, v.config),
+		"visitor_id":                 v.key,
 		"visitor_ip":                 v.ip.String(),
-		"visitor_seen":               util.FormatTime(v.seen),
 		"visitor_messages":           info.Stats.Messages,
 		"visitor_messages_limit":     info.Limits.MessageLimit,
 		"visitor_messages_remaining": info.Stats.MessagesRemaining,
-		"visitor_requests_remaining": int64(math.Floor(v.requestLimiter.Tokens())),
+		"visitor_requests_remaining": v.env.limiter.Tokens(v.key, v.requestRule()),
 	}
-	if v.config.SMTPSenderFrom != "" {
+	if v.env.config.SMTPSenderFrom != "" {
 		fields["visitor_emails"] = info.Stats.Emails
 		fields["visitor_emails_limit"] = info.Limits.EmailLimit
 		fields["visitor_emails_remaining"] = info.Stats.EmailsRemaining
 	}
-	if v.config.TwilioAccount != "" {
+	if v.env.config.TwilioAccount != "" {
 		fields["visitor_calls"] = info.Stats.Calls
 		fields["visitor_calls_limit"] = info.Limits.CallLimit
 		fields["visitor_calls_remaining"] = info.Stats.CallsRemaining
 	}
-	if v.authLimiter != nil {
-		fields["visitor_auth_attempts_remaining"] = int64(math.Floor(v.authLimiter.Tokens()))
+	if v.user == nil {
+		fields["visitor_auth_attempts_remaining"] = v.env.limiter.Tokens(v.key, v.authRule())
 	}
-	if v.topicCreationLimiter != nil {
-		fields["visitor_topic_creations_remaining"] = int64(math.Floor(v.topicCreationLimiter.Tokens()))
+	if v.topicCreationLimited() {
+		fields["visitor_topic_creations_remaining"] = v.env.limiter.Tokens(v.key, v.topicCreationRule())
 	}
 	if v.user != nil {
 		fields["user_id"] = v.user.ID
@@ -213,432 +165,260 @@ func visitorExtendedInfoContext(info *visitorInfo) log.Context {
 	}
 
 }
+
 func (v *visitor) RequestAllowed() bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if !v.requestLimiter.Allow() {
-		return false
+	if v.limits.RequestLimitBurst <= 0 {
+		return false // A bucket of nothing admits nothing, as before
 	}
-	if v.quota != nil {
-		v.quota.Inc(v.quotaKey, quota.Counters{Requests: 1})
-	}
-	return true
+	return v.env.limiter.Allow(v.key, v.requestRule(), 1).OK
 }
 
+// FirebaseAllowed returns false while Firebase sends are paused for the key (see FirebaseTemporarilyDeny)
 func (v *visitor) FirebaseAllowed() bool {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	return !time.Now().Before(v.firebase)
+	rule := v.firebaseRule()
+	if rule.Refill <= 0 {
+		return true
+	}
+	return v.env.limiter.Tokens(v.key, rule) >= 1
 }
 
+// FirebaseTemporarilyDeny pauses Firebase sends for the key for the configured penalty duration
 func (v *visitor) FirebaseTemporarilyDeny() {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.firebase = time.Now().Add(v.config.FirebaseQuotaExceededPenaltyDuration)
+	rule := v.firebaseRule()
+	if rule.Refill <= 0 {
+		return
+	}
+	v.env.limiter.Allow(v.key, rule, 1)
 }
 
 func (v *visitor) MessageAllowed() bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if !v.quotaAllowedNoLock(v.limitsNoLock().MessageLimit, func(c quota.Counters) int64 { return c.Messages }) {
-		return false
+	if v.limits.MessageLimit <= 0 {
+		return false // A daily limit of zero admits nothing; the limit service reads it as "no cap"
 	}
-	if !v.messagesLimiter.Allow() {
-		return false
-	}
-	if v.quota != nil {
-		v.quota.Inc(v.quotaKey, quota.Counters{Messages: 1})
-	}
-	return true
+	return v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
 }
 
 func (v *visitor) EmailAllowed() bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if !v.quotaAllowedNoLock(v.limitsNoLock().EmailLimit, func(c quota.Counters) int64 { return c.Emails }) {
-		return false
+	if v.limits.EmailLimitBurst <= 0 {
+		return false // No email bucket
+	} else if v.limits.Basis == vis.BasisTier && v.limits.EmailLimit <= 0 {
+		return false // No emails on the tier: the limit service reads a daily limit of zero as "no cap"
 	}
-	if !v.emailsLimiter.Allow() {
-		return false
-	}
-	if v.quota != nil {
-		v.quota.Inc(v.quotaKey, quota.Counters{Emails: 1})
-	}
-	return true
+	return v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
 }
 
 func (v *visitor) CallAllowed() bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if !v.quotaAllowedNoLock(v.limitsNoLock().CallLimit, func(c quota.Counters) int64 { return c.Calls }) {
-		return false
+	if v.limits.CallLimit <= 0 {
+		return false // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
 	}
-	if !v.callsLimiter.Allow() {
-		return false
-	}
-	if v.quota != nil {
-		v.quota.Inc(v.quotaKey, quota.Counters{Calls: 1})
-	}
-	return true
+	return v.env.limiter.Allow(v.key, v.callRule(), 1).OK
 }
 
-// reseedBucketsNoLock burns today's already-consumed usage (from the cluster usage tracker)
-// into the freshly built request and bandwidth buckets, so a restart or visitor eviction does
-// not hand back a full burst (restart amnesty). The burn is capped at the burst -- a reseeded
-// bucket starts at worst EMPTY, never in debt: a day total says nothing about how much the
-// bucket would have replenished since, so debt would over-punish long-lived visitors. Nop when
-// not clustered. (Rehydration piece 1, plans/260829-topic-visitor-tables.md.)
-func (v *visitor) reseedBucketsNoLock(limits *visitorLimits) {
-	if v.quota == nil {
-		return
-	}
-	totals := v.quota.Totals(v.quotaKey)
-	if n := totals.Requests; n > 0 {
-		if burst := int64(limits.RequestLimitBurst); n > burst {
-			n = burst
-		}
-		util.BurnTokens(v.requestLimiter, n)
-	}
-	if n := totals.BandwidthBytes; n > 0 {
-		if limit := limits.AttachmentBandwidthLimit; n > limit {
-			n = limit
-		}
-		v.bandwidthLimiter.Burn(n)
-	}
-}
-
-// quotaAllowedNoLock reports whether the cluster-wide usage for this visitor is still below the
-// given daily limit. Always true when not clustered, or when the limit is zero (zero limits are
-// enforced by the local limiters, which know whether zero means "none allowed" or "unlimited").
-func (v *visitor) quotaAllowedNoLock(limit int64, counter func(quota.Counters) int64) bool {
-	if v.quota == nil || limit <= 0 {
-		return true
-	}
-	return counter(v.quota.Totals(v.quotaKey)) < limit
-}
-
+// SubscriptionAllowed takes one of the visitor key's subscription slots on this node, if one is free.
+// Every successful call must be paired with RemoveSubscription.
 func (v *visitor) SubscriptionAllowed() bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	return v.subscriptionLimiter.Allow()
+	return v.env.subscriptions.Acquire(v.key, int64(v.env.config.VisitorSubscriptionLimit))
 }
 
 // TopicCreationAllowed returns true if the visitor is allowed to cause a new topic to be
 // inserted into the server's in-memory topic map. Returns true if no limiter is configured.
 func (v *visitor) TopicCreationAllowed() bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if v.topicCreationLimiter == nil {
+	if !v.topicCreationLimited() {
 		return true
 	}
-	return v.topicCreationLimiter.Allow()
+	return v.env.limiter.Allow(v.key, v.topicCreationRule(), 1).OK
 }
 
-// AuthAllowed returns true if an auth request can be attempted (> 1 token available)
+// AuthAllowed returns true if an auth request can be attempted (a token is available)
 func (v *visitor) AuthAllowed() bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if v.authLimiter == nil {
-		return true
-	}
-	return v.authLimiter.Tokens() > 1
+	return v.env.limiter.Tokens(v.key, v.authRule()) >= 1
 }
 
 // AuthFailed records an auth failure
 func (v *visitor) AuthFailed() {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if v.authLimiter != nil {
-		v.authLimiter.Allow()
-	}
+	v.env.limiter.Allow(v.key, v.authRule(), 1)
 }
 
 // AccountActionAllowed returns true if a rate-limited account action (signup or password-reset
 // request) is currently allowed for this visitor
 func (v *visitor) AccountActionAllowed() bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if v.accountLimiter == nil || (v.accountLimiter != nil && v.accountLimiter.Tokens() < 1) {
-		return false
-	}
-	return true
+	return v.env.limiter.Tokens(v.key, v.accountRule()) >= 1
 }
 
 // AccountActionPerformed decreases the account limiter. This is to be called after a rate-limited
 // account action (signup or password-reset request).
 func (v *visitor) AccountActionPerformed() {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if v.accountLimiter != nil {
-		v.accountLimiter.Allow()
-	}
+	v.env.limiter.Allow(v.key, v.accountRule(), 1)
 }
 
 func (v *visitor) BandwidthAllowed(bytes int64) bool {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if !v.bandwidthLimiter.AllowN(bytes) {
-		return false
+	if v.limits.AttachmentBandwidthLimit <= 0 {
+		return false // A bandwidth limit of zero admits nothing, as before
 	}
-	if v.quota != nil {
-		v.quota.Inc(v.quotaKey, quota.Counters{BandwidthBytes: bytes})
-	}
-	return true
+	return v.env.limiter.Allow(v.key, v.bandwidthRule(), bytes).OK
 }
 
+// RemoveSubscription gives back a slot taken by SubscriptionAllowed
 func (v *visitor) RemoveSubscription() {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	v.subscriptionLimiter.AllowN(-1)
+	v.env.subscriptions.Release(v.key)
 }
 
+// Keepalive marks the visitor's key as seen, so the limiter keeps the key of a long-lived subscription
 func (v *visitor) Keepalive() {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.seen = time.Now()
+	v.env.limiter.Touch(v.key)
 }
 
+// BandwidthLimiter returns the visitor's bandwidth bucket as a util.Limiter, for the readers and
+// writers that meter bytes. A revert on the limiter (a negative AllowN) refunds the bytes.
 func (v *visitor) BandwidthLimiter() util.Limiter {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if v.quota == nil {
-		return v.bandwidthLimiter
+	if v.limits.AttachmentBandwidthLimit <= 0 {
+		return util.NewFixedLimiter(0) // A bandwidth limit of zero admits nothing, as BandwidthAllowed
 	}
-	return &meteredBandwidthLimiter{v}
+	return v.env.limiter.Limiter(v.key, v.bandwidthRule())
 }
 
-// BurnPeerUsage reflects request and bandwidth usage this visitor consumed on OTHER cluster
-// nodes into the local token buckets, so N nodes do not hand out N times the burst. Only the
-// time-replenished buckets need this; the daily quotas are enforced directly against cluster
-// totals (see quotaAllowedNoLock).
-func (v *visitor) BurnPeerUsage(delta quota.Counters) {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	if delta.Requests > 0 {
-		util.BurnTokens(v.requestLimiter, delta.Requests)
+// Stats returns the key's daily counts in its current period
+func (v *visitor) Stats() *visitorUsage {
+	usage := v.env.limiter.Usage(v.key)
+	return &visitorUsage{
+		Messages: usage.Count(limit.KindMessages),
+		Emails:   usage.Count(limit.KindEmails),
+		Calls:    usage.Count(limit.KindCalls),
 	}
-	if delta.BandwidthBytes > 0 {
-		v.bandwidthLimiter.Burn(delta.BandwidthBytes)
-	}
-}
-
-func (v *visitor) Stale() bool {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	return time.Since(v.seen) > visitorExpungeAfter
-}
-
-func (v *visitor) Stats() *user.Stats {
-	v.mu.RLock() // limiters could be replaced!
-	defer v.mu.RUnlock()
-	return &user.Stats{
-		Messages: v.messagesLimiter.Value(),
-		Emails:   v.emailsLimiter.Value(),
-		Calls:    v.callsLimiter.Value(),
-	}
-}
-
-// ResetStats zeroes the visitor's in-memory stats at the daily rollover, and with them the
-// persisted seeds its deltas are measured against, because the caller zeroes the user's
-// database row in the same pass (in a cluster that row is reset once, by the leader). Only the
-// stats resetter calls this.
-func (v *visitor) ResetStats() {
-	v.mu.Lock() // Also protects statsPersisted
-	defer v.mu.Unlock()
-	v.emailsLimiter.Reset()
-	v.messagesLimiter.Reset()
-	v.callsLimiter.Reset()
-	v.statsPersisted = user.Stats{} // The database row is zeroed by the (leader's) daily reset
-}
-
-// EnqueueUserStatsDelta enqueues the visitor's not-yet-persisted stats increments to the user
-// manager's write queue. Deltas add up across cluster nodes (see Manager.EnqueueUserStats).
-func (v *visitor) EnqueueUserStatsDelta() {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.enqueueUserStatsDeltaNoLock()
-}
-
-func (v *visitor) enqueueUserStatsDeltaNoLock() {
-	u := v.user // Pinned for the whole function: SetUser(nil) must not turn this into a nil deref
-	if v.userManager == nil || u == nil {
-		return
-	}
-	current := user.Stats{
-		Messages: v.messagesLimiter.Value(),
-		Emails:   v.emailsLimiter.Value(),
-		Calls:    v.callsLimiter.Value(),
-	}
-	delta := user.Stats{
-		Messages: current.Messages - v.statsPersisted.Messages,
-		Emails:   current.Emails - v.statsPersisted.Emails,
-		Calls:    current.Calls - v.statsPersisted.Calls,
-	}
-	if delta == (user.Stats{}) {
-		return
-	}
-	v.statsPersisted = current
-	v.userManager.EnqueueUserStats(u.ID, &delta)
-}
-
-// QuotaKey returns the visitor's usage-tracking identity key ("ip:<addr>" or "user:<id>")
-func (v *visitor) QuotaKey() quota.Key {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	return v.quotaKey
 }
 
 // User returns the visitor user, or nil if there is none
 func (v *visitor) User() *user.User {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
 	return v.user // May be nil
 }
 
 // IP returns the visitor IP address
 func (v *visitor) IP() netip.Addr {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
 	return v.ip
 }
 
 // Authenticated returns true if a user successfully authenticated
 func (v *visitor) Authenticated() bool {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
 	return v.user != nil
-}
-
-// SetUser sets the visitors user to the given value
-func (v *visitor) SetUser(u *user.User) {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	shouldResetLimiters := v.user.TierID() != u.TierID() // TierID works with nil receiver
-	if shouldResetLimiters && v.user != nil && v.user.Tier != nil {
-		// Flush increments counted against the old limiters, under the old account, before they
-		// are replaced below; the rebuilt limiters are re-seeded from the new user's persisted
-		// stats. Usage of an IP-keyed visitor (no user, or no tier) is never persisted, so it must
-		// not land on the new account.
-		v.enqueueUserStatsDeltaNoLock()
-	}
-	v.user = u // u may be nil!
-	v.quotaKey = quota.Key(visitorID(v.ip, u, v.config))
-	if shouldResetLimiters {
-		var messages, emails, calls int64
-		if u != nil {
-			messages, emails, calls = u.Stats.Messages, u.Stats.Emails, u.Stats.Calls
-		}
-		v.resetLimitersNoLock(messages, emails, calls)
-	}
 }
 
 // MaybeUserID returns the user ID of the visitor (if any). If this is an anonymous visitor,
 // an empty string is returned.
 func (v *visitor) MaybeUserID() string {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
 	if v.user != nil {
 		return v.user.ID
 	}
 	return ""
 }
 
-func (v *visitor) resetLimitersNoLock(messages, emails, calls int64) {
-	limits := v.limitsNoLock()
-	v.requestLimiter = rate.NewLimiter(limits.RequestLimitReplenish, limits.RequestLimitBurst)
-	v.messagesLimiter = util.NewFixedLimiterWithValue(limits.MessageLimit, messages)
-	v.emailsLimiter = util.NewRateLimiterWithValue(limits.EmailLimitReplenish, limits.EmailLimitBurst, emails)
-	v.callsLimiter = util.NewFixedLimiterWithValue(limits.CallLimit, calls)
-	if v.config.VisitorTopicCreationLimitBurst > 0 && v.config.VisitorTopicCreationLimitReplenish > 0 {
-		v.topicCreationLimiter = rate.NewLimiter(rate.Every(v.config.VisitorTopicCreationLimitReplenish), v.config.VisitorTopicCreationLimitBurst)
-	} else {
-		v.topicCreationLimiter = nil // Disabled
+func (v *visitor) Limits() *vis.Limits {
+	return v.limits
+}
+
+// The rules the visitor's limits translate to, built per call (they are small values); the
+// limiter keeps the state.
+
+func (v *visitor) requestRule() limit.Rule {
+	return limit.Rule{
+		Kind:   limit.KindRequests,
+		Burst:  int64(v.limits.RequestLimitBurst),
+		Refill: v.limits.RequestLimitReplenish,
 	}
-	v.bandwidthLimiter = util.NewBytesLimiter(int(limits.AttachmentBandwidthLimit), oneDay)
+}
+
+// messageRule is the daily message limit. The count of a visitor without a user is written to the
+// usage table only from a tenth of the cap on (most keys never get there, so their rows are
+// saved); a logged-in user's from the first message. A user without a tier is keyed by the IP
+// (see vis.Key), so that persists the IP key's count, shared with the IP's anonymous visitors.
+func (v *visitor) messageRule() limit.Rule {
+	rule := limit.Rule{
+		Kind:  limit.KindMessages,
+		Daily: v.limits.MessageLimit,
+	}
 	if v.user == nil {
-		v.accountLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAccountCreationLimitReplenish), v.config.VisitorAccountCreationLimitBurst)
-		v.authLimiter = rate.NewLimiter(rate.Every(v.config.VisitorAuthFailureLimitReplenish), v.config.VisitorAuthFailureLimitBurst)
-	} else {
-		v.accountLimiter = nil // Users cannot create accounts when logged in
-		v.authLimiter = nil    // Users are already logged in, no need to limit requests
+		rule.Threshold = v.limits.MessageLimit / promoteRate
 	}
-	v.statsPersisted = user.Stats{Messages: messages, Emails: emails, Calls: calls} // Seeds come from the persisted user stats, so nothing is owed to the queue
-	v.reseedBucketsNoLock(limits)
-	log.Fields(v.contextNoLock()).Debug("Rate limiters reset for visitor") // Must be after function, because contextNoLock() describes rate limiters
+	return rule
 }
 
-func (v *visitor) Limits() *visitorLimits {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	return v.limitsNoLock()
-}
-
-func (v *visitor) limitsNoLock() *visitorLimits {
-	if v.user != nil && v.user.Tier != nil {
-		return tierBasedVisitorLimits(v.config, v.user.Tier)
-	}
-	return configBasedVisitorLimits(v.config)
-}
-
-func tierBasedVisitorLimits(conf *Config, tier *user.Tier) *visitorLimits {
-	return &visitorLimits{
-		Basis:                    visitorLimitBasisTier,
-		RequestLimitBurst:        util.MinMax(int(float64(tier.MessageLimit)*visitorMessageToRequestLimitBurstRate), conf.VisitorRequestLimitBurst, visitorMessageToRequestLimitBurstMax),
-		RequestLimitReplenish:    util.Max(rate.Every(conf.VisitorRequestLimitReplenish), dailyLimitToRate(tier.MessageLimit*visitorMessageToRequestLimitReplenishFactor)),
-		MessageLimit:             tier.MessageLimit,
-		MessageExpiryDuration:    tier.MessageExpiryDuration,
-		EmailLimit:               tier.EmailLimit,
-		EmailLimitBurst:          util.MinMax(int(float64(tier.EmailLimit)*visitorEmailLimitBurstRate), conf.VisitorEmailLimitBurst, visitorEmailLimitBurstMax),
-		EmailLimitReplenish:      dailyLimitToRate(tier.EmailLimit),
-		CallLimit:                tier.CallLimit,
-		ReservationsLimit:        tier.ReservationLimit,
-		AttachmentTotalSizeLimit: tier.AttachmentTotalSizeLimit,
-		AttachmentFileSizeLimit:  tier.AttachmentFileSizeLimit,
-		AttachmentExpiryDuration: tier.AttachmentExpiryDuration,
-		AttachmentBandwidthLimit: tier.AttachmentBandwidthLimit,
+// emailRule is the email bucket and the daily email limit; without a tier, the daily limit is
+// derived from the refill (24h / visitor-email-limit-replenish)
+func (v *visitor) emailRule() limit.Rule {
+	return limit.Rule{
+		Kind:   limit.KindEmails,
+		Burst:  int64(v.limits.EmailLimitBurst),
+		Refill: v.limits.EmailLimitReplenish,
+		Daily:  v.limits.EmailLimit,
 	}
 }
 
-func configBasedVisitorLimits(conf *Config) *visitorLimits {
-	messagesLimit := replenishDurationToDailyLimit(conf.VisitorRequestLimitReplenish) // Approximation!
-	if conf.VisitorMessageDailyLimit > 0 {
-		messagesLimit = int64(conf.VisitorMessageDailyLimit)
+func (v *visitor) callRule() limit.Rule {
+	return limit.Rule{
+		Kind:  limit.KindCalls,
+		Daily: v.limits.CallLimit,
 	}
-	var emailLimit int64
-	if conf.VisitorEmailLimitBurst > 0 {
-		emailLimit = replenishDurationToDailyLimit(conf.VisitorEmailLimitReplenish) // Approximation!
+}
+
+// bandwidthRule is a bucket of the daily bandwidth bytes that refills over a day
+func (v *visitor) bandwidthRule() limit.Rule {
+	rule := limit.Rule{
+		Kind:  limit.KindBandwidth,
+		Burst: v.limits.AttachmentBandwidthLimit,
 	}
-	return &visitorLimits{
-		Basis:                    visitorLimitBasisIP,
-		RequestLimitBurst:        conf.VisitorRequestLimitBurst,
-		RequestLimitReplenish:    rate.Every(conf.VisitorRequestLimitReplenish),
-		MessageLimit:             messagesLimit,
-		MessageExpiryDuration:    conf.CacheDuration,
-		EmailLimit:               emailLimit,
-		EmailLimitBurst:          conf.VisitorEmailLimitBurst,
-		EmailLimitReplenish:      rate.Every(conf.VisitorEmailLimitReplenish),
-		CallLimit:                visitorDefaultCallsLimit,
-		ReservationsLimit:        visitorDefaultReservationsLimit,
-		AttachmentTotalSizeLimit: conf.VisitorAttachmentTotalSizeLimit,
-		AttachmentFileSizeLimit:  conf.AttachmentFileSizeLimit,
-		AttachmentExpiryDuration: conf.AttachmentExpiryDuration,
-		AttachmentBandwidthLimit: conf.VisitorAttachmentDailyBandwidthLimit,
+	if rule.Burst > 0 {
+		rule.Refill = oneDay / time.Duration(rule.Burst)
+	}
+	return rule
+}
+
+func (v *visitor) topicCreationRule() limit.Rule {
+	return limit.Rule{
+		Kind:   limit.KindTopics,
+		Burst:  int64(v.env.config.VisitorTopicCreationLimitBurst),
+		Refill: v.env.config.VisitorTopicCreationLimitReplenish,
+	}
+}
+
+func (v *visitor) topicCreationLimited() bool {
+	return v.env.config.VisitorTopicCreationLimitBurst > 0 && v.env.config.VisitorTopicCreationLimitReplenish > 0
+}
+
+func (v *visitor) accountRule() limit.Rule {
+	return limit.Rule{
+		Kind:   limit.KindAccount,
+		Burst:  int64(v.env.config.VisitorAccountCreationLimitBurst),
+		Refill: v.env.config.VisitorAccountCreationLimitReplenish,
+	}
+}
+
+func (v *visitor) authRule() limit.Rule {
+	return limit.Rule{
+		Kind:   limit.KindAuth,
+		Burst:  int64(v.env.config.VisitorAuthFailureLimitBurst),
+		Refill: v.env.config.VisitorAuthFailureLimitReplenish,
+	}
+}
+
+// firebaseRule is a single token that takes the penalty duration to come back: taking it pauses sends
+func (v *visitor) firebaseRule() limit.Rule {
+	return limit.Rule{
+		Kind:   limit.KindFirebase,
+		Burst:  1,
+		Refill: v.env.config.FirebaseQuotaExceededPenaltyDuration,
 	}
 }
 
 func (v *visitor) Info() (*visitorInfo, error) {
-	v.mu.RLock()
-	info := v.infoLightNoLock()
-	v.mu.RUnlock()
+	info := v.infoLight()
 
 	// Attachment stats from database
 	var attachmentsBytesUsed int64
 	var err error
 	u := v.User()
 	if u != nil {
-		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedByUser(u.ID)
+		attachmentsBytesUsed, err = v.env.messageCache.AttachmentBytesUsedByUser(u.ID)
 	} else {
-		attachmentsBytesUsed, err = v.messageCache.AttachmentBytesUsedBySender(v.IP().String())
+		attachmentsBytesUsed, err = v.env.messageCache.AttachmentBytesUsedBySender(v.IP().String())
 	}
 	if err != nil {
 		return nil, err
@@ -648,8 +428,8 @@ func (v *visitor) Info() (*visitorInfo, error) {
 
 	// Reservation stats from database
 	var reservations int64
-	if v.userManager != nil && u != nil {
-		reservations, err = v.userManager.ReservationsCount(u.Name)
+	if v.env.userManager != nil && u != nil {
+		reservations, err = v.env.userManager.ReservationsCount(u.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -660,31 +440,23 @@ func (v *visitor) Info() (*visitorInfo, error) {
 	return info, nil
 }
 
-func (v *visitor) infoLightNoLock() *visitorInfo {
-	messages := v.messagesLimiter.Value()
-	emails := v.emailsLimiter.Value()
-	calls := v.callsLimiter.Value()
-	if v.quota != nil {
-		// Clustered: display the cluster-wide usage (what enforcement actually uses), not
-		// this node's local slice -- behind a load balancer, per-node numbers would differ
-		// between page loads
-		totals := v.quota.Totals(v.quotaKey)
-		messages, emails, calls = totals.Messages, totals.Emails, totals.Calls
-	}
-	limits := v.limitsNoLock()
-	stats := &visitorStats{
-		Messages:          messages,
-		MessagesRemaining: zeroIfNegative(limits.MessageLimit - messages),
-		Emails:            emails,
-		EmailsRemaining:   zeroIfNegative(limits.EmailLimit - emails),
-		Calls:             calls,
-		CallsRemaining:    zeroIfNegative(limits.CallLimit - calls),
-	}
+func (v *visitor) infoLight() *visitorInfo {
+	stats := v.Stats()
+	limits := v.limits
 	return &visitorInfo{
 		Limits: limits,
-		Stats:  stats,
+		Stats: &visitorStats{
+			Messages:          stats.Messages,
+			MessagesRemaining: zeroIfNegative(limits.MessageLimit - stats.Messages),
+			Emails:            stats.Emails,
+			EmailsRemaining:   zeroIfNegative(limits.EmailLimit - stats.Emails),
+			Calls:             stats.Calls,
+			CallsRemaining:    zeroIfNegative(limits.CallLimit - stats.Calls),
+			ResetAt:           v.env.limiter.ResetAt(v.key),
+		},
 	}
 }
+
 func zeroIfNegative(value int64) int64 {
 	if value < 0 {
 		return 0
@@ -692,68 +464,20 @@ func zeroIfNegative(value int64) int64 {
 	return value
 }
 
-func replenishDurationToDailyLimit(duration time.Duration) int64 {
-	return int64(oneDay / duration)
-}
-
-func dailyLimitToRate(limit int64) rate.Limit {
-	return rate.Limit(limit) * rate.Every(oneDay)
-}
-
-// Visitor identity key prefixes (see visitorID); the keys are shared cluster-wide, so they are
-// parsed back by visitorFromKey
-const (
-	visitorKeyUserPrefix = "user:"
-	visitorKeyIPPrefix   = "ip:"
-)
-
-// visitorID returns a unique identifier for a visitor based on user or IP, using configurable prefix bits for IPv4/IPv6
-func visitorID(ip netip.Addr, u *user.User, conf *Config) string {
-	if u != nil && u.Tier != nil {
-		return visitorKeyUserPrefix + u.ID
+// visitorConfigFrom assembles the keying and limit-resolution config from the server config
+func visitorConfigFrom(conf *Config) *vis.Config {
+	return &vis.Config{
+		PrefixBitsIPv4:                conf.VisitorPrefixBitsIPv4,
+		PrefixBitsIPv6:                conf.VisitorPrefixBitsIPv6,
+		RequestLimitBurst:             conf.VisitorRequestLimitBurst,
+		RequestLimitReplenish:         conf.VisitorRequestLimitReplenish,
+		MessageDailyLimit:             conf.VisitorMessageDailyLimit,
+		EmailLimitBurst:               conf.VisitorEmailLimitBurst,
+		EmailLimitReplenish:           conf.VisitorEmailLimitReplenish,
+		AttachmentTotalSizeLimit:      conf.VisitorAttachmentTotalSizeLimit,
+		AttachmentFileSizeLimit:       conf.AttachmentFileSizeLimit,
+		AttachmentExpiryDuration:      conf.AttachmentExpiryDuration,
+		AttachmentDailyBandwidthLimit: conf.VisitorAttachmentDailyBandwidthLimit,
+		MessageExpiryDuration:         conf.CacheDuration,
 	}
-	if ip.Is4() {
-		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv4).Masked().Addr()
-	} else if ip.Is6() {
-		ip = netip.PrefixFrom(ip, conf.VisitorPrefixBitsIPv6).Masked().Addr()
-	}
-	return visitorKeyIPPrefix + ip.String()
-}
-
-// meteredBandwidthLimiter forwards to the visitor's bandwidth limiter and mirrors successfully
-// consumed bytes into the cluster-wide usage tracker. Refunds (negative n, from LimitWriter
-// reverts) are no-ops on the underlying RateLimiter and are not mirrored.
-type meteredBandwidthLimiter struct {
-	v *visitor
-}
-
-var _ util.Limiter = (*meteredBandwidthLimiter)(nil)
-
-func (l *meteredBandwidthLimiter) Allow() bool {
-	return l.AllowN(1)
-}
-
-func (l *meteredBandwidthLimiter) AllowN(n int64) bool {
-	l.v.mu.RLock() // limiters could be replaced!
-	limiter, key := l.v.bandwidthLimiter, l.v.quotaKey
-	l.v.mu.RUnlock()
-	if !limiter.AllowN(n) {
-		return false
-	}
-	if n > 0 {
-		l.v.quota.Inc(key, quota.Counters{BandwidthBytes: n})
-	}
-	return true
-}
-
-func (l *meteredBandwidthLimiter) Value() int64 {
-	l.v.mu.RLock() // limiters could be replaced!
-	defer l.v.mu.RUnlock()
-	return l.v.bandwidthLimiter.Value()
-}
-
-func (l *meteredBandwidthLimiter) Reset() {
-	l.v.mu.RLock() // limiters could be replaced!
-	defer l.v.mu.RUnlock()
-	l.v.bandwidthLimiter.Reset()
 }

@@ -13,6 +13,10 @@ builds:
       - "-linkmode=external -extldflags=-static -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}"
     goos: [ linux ]
     goarch: [ amd64 ]
+    hooks:
+      post:
+        - cmd: ./scripts/check-cpu-baseline.sh "{{ .Path }}" # catch x86-64-v3 C code, see #2092
+          output: true
   - id: ntfy_linux_armv6
     binary: ntfy
     env:

@@ -38,17 +38,16 @@ var flagsUser = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", Aliases: []string{"smtp_sender_user"}, EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-pass", Aliases: []string{"smtp_sender_pass"}, EnvVars: []string{"NTFY_SMTP_SENDER_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-from", Aliases: []string{"smtp_sender_from"}, EnvVars: []string{"NTFY_SMTP_SENDER_FROM"}, Usage: "SMTP sender address (if e-mail sending is enabled)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-admin-unix", Aliases: []string{"listen_admin_unix"}, EnvVars: []string{"NTFY_LISTEN_ADMIN_UNIX"}, Value: server.DefaultListenAdminUnix(), DefaultText: "/run/ntfy/admin.sock on Linux, /var/run/ntfy/admin.sock on macOS/BSD", Usage: "admin socket of the local ntfy server; \"-\" disables it (then the database is used directly, which is deprecated)"}),
-	&cli.StringFlag{Name: "server", Aliases: []string{"S"}, EnvVars: []string{"NTFY_ADMIN_SERVER"}, Usage: "manage a remote server over HTTPS instead (base URL, e.g. https://ntfy.example.com); requires --token of an admin user"},
-	&cli.StringFlag{Name: "token", Aliases: []string{"k"}, EnvVars: []string{"NTFY_ADMIN_TOKEN"}, Usage: "admin access token for --server (better: NTFY_ADMIN_TOKEN, other users can see command line arguments)"},
 )
+
+var flagsUserCommand = withBackendFlags(flagsUser)
 
 var cmdUser = &cli.Command{
 	Name:      "user",
 	Usage:     "Manage/show users",
 	UsageText: "ntfy user [list|add|remove|change-pass|reset-pass|change-role] ...",
-	Flags:     flagsUser,
-	Before:    initConfigFileInputSourceFunc("config", flagsUser, initLogFunc),
+	Flags:     flagsUserCommand,
+	Before:    initConfigFileInputSourceFunc("config", flagsUserCommand, initLogFunc),
 	Category:  categoryServer,
 	Subcommands: []*cli.Command{
 		{

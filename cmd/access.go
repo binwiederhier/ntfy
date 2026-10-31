@@ -19,7 +19,7 @@ const (
 )
 
 var flagsAccess = append(
-	append([]cli.Flag{}, flagsUser...),
+	withBackendFlags(flagsUser),
 	&cli.BoolFlag{Name: "reset", Aliases: []string{"r"}, Usage: "reset access for user (and topic)"},
 )
 

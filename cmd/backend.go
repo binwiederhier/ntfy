@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v2/altsrc"
 	"golang.org/x/term"
+	"heckel.io/ntfy/v2/server"
 )
 
 const (
@@ -32,7 +34,14 @@ See https://docs.ntfy.sh/deprecations/ for details.`
 )
 
 var (
-	// adminTargetFlags choose which server a command talks to, see newBackend
+	// flagsBackend are the flags of the commands that use newBackend
+	flagsBackend = []cli.Flag{
+		altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-admin-unix", Aliases: []string{"listen_admin_unix"}, EnvVars: []string{"NTFY_LISTEN_ADMIN_UNIX"}, Value: server.DefaultListenAdminUnix(), DefaultText: "/run/ntfy/admin.sock on Linux, /var/run/ntfy/admin.sock on macOS/BSD", Usage: "admin socket of the local ntfy server; \"-\" disables it (then the database is used directly, which is deprecated)"}),
+		&cli.StringFlag{Name: "server", Aliases: []string{"S"}, EnvVars: []string{"NTFY_ADMIN_SERVER"}, Usage: "manage a remote server over HTTPS instead (base URL, e.g. https://ntfy.example.com); requires --token of an admin user"},
+		&cli.StringFlag{Name: "token", Aliases: []string{"k"}, EnvVars: []string{"NTFY_ADMIN_TOKEN"}, Usage: "admin access token for --server (better: NTFY_ADMIN_TOKEN, other users can see command line arguments)"},
+	}
+
+	// adminTargetFlags are the flags that choose which server a command talks to, see newBackend
 	adminTargetFlags = []string{"--server", "-S", "--token", "-k", "--listen-admin-unix", "--listen_admin_unix", "--config", "-c"}
 )
 
@@ -115,6 +124,11 @@ func newBackend(c *cli.Context) (backend, error) {
 		return nil, err // The server answered with some other error; do not hide it behind a fallback
 	}
 	return newDBBackend(c)
+}
+
+// withBackendFlags returns a copy of flags with flagsBackend, for the commands that use newBackend
+func withBackendFlags(flags []cli.Flag) []cli.Flag {
+	return append(append([]cli.Flag{}, flags...), flagsBackend...)
 }
 
 // isLoopbackHost reports whether host is this machine, so plain HTTP never leaves it

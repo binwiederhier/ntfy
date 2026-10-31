@@ -28,7 +28,7 @@ const (
 )
 
 var (
-	flagsTier = append([]cli.Flag{}, flagsUser...)
+	flagsTier = withBackendFlags(flagsUser)
 )
 
 var cmdTier = &cli.Command{
@@ -36,7 +36,7 @@ var cmdTier = &cli.Command{
 	Usage:     "Manage/show tiers",
 	UsageText: "ntfy tier [list|add|change|remove] ...",
 	Flags:     flagsTier,
-	Before:    initConfigFileInputSourceFunc("config", flagsUser, initLogFunc),
+	Before:    initConfigFileInputSourceFunc("config", flagsTier, initLogFunc),
 	Category:  categoryServer,
 	Subcommands: []*cli.Command{
 		{

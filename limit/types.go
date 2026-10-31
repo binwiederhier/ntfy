@@ -59,7 +59,7 @@ type Config struct {
 
 // counter is one key's daily usage in its current period
 type counter struct {
-	periodStart int64           // Database time the period started (unix seconds, see periodStart)
+	periodStart int64           // When the period started (unix seconds, see periodStart)
 	base        [numDaily]int64 // The key's row as last read: all nodes' usage
 	unflushed   [numDaily]int64 // Admitted here since the last write
 	promoted    bool            // Written to the store: reached the threshold here, or has a row

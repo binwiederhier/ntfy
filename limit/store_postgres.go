@@ -6,16 +6,13 @@ import (
 	"heckel.io/ntfy/v2/db"
 )
 
-// Timestamps come from the database clock, never from a node's (see Store), rounded down to the
-// second like SQLite's. The upsert is one
-// fixed statement per chunk (unnest), because SQL built per call bloats pgx's statement cache.
+// The upsert is one fixed statement per chunk (unnest), because SQL built per call bloats pgx's statement cache.
 // Same period: add; a newer one: replace; an older one (a leftover): add to the stored period.
 const (
-	postgresSelectClockQuery = `SELECT FLOOR(EXTRACT(EPOCH FROM now()))::BIGINT`
 	postgresSelectSinceQuery = `SELECT key, period_start, messages, emails, calls FROM usage WHERE updated_at >= $1`
 	postgresUpsertQuery      = `
 		INSERT INTO usage AS u (key, period_start, messages, emails, calls, updated_at)
-		SELECT key, ps, m, e, c, FLOOR(EXTRACT(EPOCH FROM now()))::BIGINT
+		SELECT key, ps, m, e, c, $6::BIGINT
 		FROM unnest($1::TEXT[], $2::BIGINT[], $3::BIGINT[], $4::BIGINT[], $5::BIGINT[]) AS d(key, ps, m, e, c)
 		ON CONFLICT (key) DO UPDATE SET
 			messages = CASE WHEN u.period_start >= EXCLUDED.period_start THEN u.messages + EXCLUDED.messages ELSE EXCLUDED.messages END,
@@ -33,7 +30,6 @@ func NewPostgresStore(d *db.DB) *Store {
 	s := &Store{
 		db: d,
 		queries: &queries{
-			selectClock: postgresSelectClockQuery,
 			selectSince: postgresSelectSinceQuery,
 			upsert:      postgresUpsertQuery,
 			prune:       postgresPruneQuery,
@@ -44,7 +40,7 @@ func NewPostgresStore(d *db.DB) *Store {
 }
 
 // writePostgres writes the rows in one statement, as arrays
-func (s *Store) writePostgres(ctx context.Context, rows []usageRow) error {
+func (s *Store) writePostgres(ctx context.Context, rows []usageRow, now int64) error {
 	keys := make([]string, len(rows))
 	periodStarts := make([]int64, len(rows))
 	var counts [numDaily][]int64
@@ -57,6 +53,6 @@ func (s *Store) writePostgres(ctx context.Context, rows []usageRow) error {
 			counts[j][i] = r.counts[j]
 		}
 	}
-	_, err := s.db.ExecContext(ctx, s.queries.upsert, keys, periodStarts, counts[0], counts[1], counts[2])
+	_, err := s.db.ExecContext(ctx, s.queries.upsert, keys, periodStarts, counts[0], counts[1], counts[2], now)
 	return err
 }

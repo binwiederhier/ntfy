@@ -21,46 +21,39 @@ const (
 // totals on the way back
 type usageRow struct {
 	key         string
-	periodStart int64 // Unix seconds, database time (see periodStart)
+	periodStart int64 // Unix seconds (see periodStart)
 	counts      [numDaily]int64
 }
 
-// Store reads and writes the usage table, on SQLite (the user database) or Postgres. Timestamps
-// (updated_at) come from the database clock, never from a node's, so that nodes with different
-// clocks agree on what changed since when. Only the service's sync worker calls it.
+// Store reads and writes the usage table, on SQLite (the user database) or Postgres. Rows are
+// stamped (updated_at) with the writing node's clock, like the reader's watermark, so the
+// database's clock does not matter. Only the service's sync worker calls it.
 type Store struct {
 	db         *db.DB
 	queries    *queries
-	writeChunk func(ctx context.Context, rows []usageRow) error // Dialect specific: unnest on Postgres, a prepared statement per row on SQLite
+	writeChunk func(ctx context.Context, rows []usageRow, now int64) error // Dialect specific: unnest on Postgres, a prepared statement per row on SQLite
 }
 
 // queries are the dialect's SQL statements
 type queries struct {
-	selectClock string
 	selectSince string
 	upsert      string
 	prune       string
-}
-
-// clock returns the database's time as unix seconds
-func (s *Store) clock(ctx context.Context) (int64, error) {
-	var now int64
-	err := s.db.QueryRowContext(ctx, s.queries.selectClock).Scan(&now)
-	return now, err
 }
 
 // write adds the rows' counts to their keys' rows if the periods match, or replaces them if the
 // row's period is older. Rows of an older period than the stored one are added to the stored
 // one (a node's leftover of a finished period, see the usage queries). Rows are written sorted
 // by key in chunks, so two nodes lock overlapping keys in the same order; it returns how many
-// rows (in sorted order) are committed: on an error, the chunks before it are.
-func (s *Store) write(ctx context.Context, rows []usageRow) (int, error) {
+// rows (in sorted order) are committed: on an error, the chunks before it are. The rows'
+// updated_at is now (unix seconds).
+func (s *Store) write(ctx context.Context, rows []usageRow, now int64) (int, error) {
 	slices.SortFunc(rows, func(a, b usageRow) int {
 		return strings.Compare(a.key, b.key)
 	})
 	written := 0
 	for chunk := range slices.Chunk(rows, writeChunkRows) {
-		if err := s.writeChunk(ctx, chunk); err != nil {
+		if err := s.writeChunk(ctx, chunk, now); err != nil {
 			return written, err
 		}
 		written += len(chunk)
@@ -68,7 +61,7 @@ func (s *Store) write(ctx context.Context, rows []usageRow) (int, error) {
 	return written, nil
 }
 
-// readSince calls fn for every row written at or after the given database time, streaming them
+// readSince calls fn for every row written at or after the given time (unix seconds), streaming them
 // from the primary (a replica may not have this node's own writes yet)
 func (s *Store) readSince(ctx context.Context, since int64, fn func(r *usageRow)) error {
 	rows, err := s.db.QueryContext(ctx, s.queries.selectSince, since)
@@ -86,7 +79,7 @@ func (s *Store) readSince(ctx context.Context, since int64, fn func(r *usageRow)
 	return rows.Err()
 }
 
-// prune deletes the rows not written since the given database time, in chunks, and returns how
+// prune deletes the rows not written since the given time (unix seconds), in chunks, and returns how
 // many it deleted
 func (s *Store) prune(ctx context.Context, before int64) (int64, error) {
 	var deleted int64

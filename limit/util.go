@@ -51,7 +51,7 @@ func keyOffset(key string) time.Duration {
 }
 
 // periodStart returns the unix second the key's current 24h period started at t: the latest
-// day + keyOffset(key) at or before t. t is database time, so all nodes agree.
+// day + keyOffset(key) at or before t. Nodes with synced clocks agree on it.
 func periodStart(key string, t time.Time) int64 {
 	offset := int64(keyOffset(key) / time.Second)
 	since := t.Unix() - offset

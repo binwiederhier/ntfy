@@ -1939,6 +1939,12 @@ it reaches 10% of its daily limit on a server, so the many visitors that publish
 a restart forgets those few, and N servers may admit up to N times that much before the count is shared. Without a user
 database, the counts are kept in memory only and start over with every restart.
 
+!!! info
+    The servers sharing a database must keep their clocks in sync (e.g. with `systemd-timesyncd` or `chrony`, which most
+    distributions enable by default). The 24-hour periods and the shared counts are based on each server's own clock; a
+    difference of a second or two is harmless, but servers whose clocks drift apart by more than a few seconds may miss
+    each other's counts.
+
 ### Attachment limits
 Aside from the global file size and total attachment cache limits (see [above](#attachments)), there are two relevant 
 per-visitor limits:

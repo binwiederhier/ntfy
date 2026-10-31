@@ -69,7 +69,7 @@ func TestStore_WriteAddsSamePeriodReplacesNewer(t *testing.T) {
 				periodStart: 2000,
 				counts:      [numDaily]int64{3, 1, 0},
 			},
-		})
+		}, time.Now().Unix())
 		require.Nil(t, err)
 		require.Equal(t, 2, written)
 		written, err = s.write(ctx, []usageRow{
@@ -83,7 +83,7 @@ func TestStore_WriteAddsSamePeriodReplacesNewer(t *testing.T) {
 				periodStart: 1000 + daySeconds,
 				counts:      [numDaily]int64{4, 0, 0},
 			}, // Newer period: replaces
-		})
+		}, time.Now().Unix())
 		require.Nil(t, err)
 		require.Equal(t, 2, written)
 		rows := readAll(t, s, 0)
@@ -105,7 +105,7 @@ func TestStore_WriteAddsSamePeriodReplacesNewer(t *testing.T) {
 				periodStart: 1000,
 				counts:      [numDaily]int64{2, 0, 0},
 			},
-		})
+		}, time.Now().Unix())
 		require.Nil(t, err)
 		require.Equal(t, usageRow{
 			key:         "user:u_1",
@@ -126,7 +126,7 @@ func TestStore_WriteManyRows_Chunked(t *testing.T) {
 				counts:      [numDaily]int64{int64(i), 0, 0},
 			}
 		}
-		written, err := s.write(context.Background(), rows)
+		written, err := s.write(context.Background(), rows, time.Now().Unix())
 		require.Nil(t, err)
 		require.Equal(t, 2500, written)
 		read := readAll(t, s, 0)
@@ -144,16 +144,15 @@ func TestStore_ReadSince(t *testing.T) {
 		require.Equal(t, []string{"new"}, keysOf(readAll(t, s, 200)))
 		require.Equal(t, []string{"new", "old"}, keysOf(readAll(t, s, 100)))
 
-		// A write stamps the database clock
-		dbNow, err := s.clock(ctx)
-		require.Nil(t, err)
+		// A write stamps the given time
+		dbNow := time.Now().Unix()
 		_, err = s.write(ctx, []usageRow{
 			{
 				key:         "written",
 				periodStart: 1,
 				counts:      [numDaily]int64{0, 0, 1},
 			},
-		})
+		}, time.Now().Unix())
 		require.Nil(t, err)
 		require.Equal(t, []string{"written"}, keysOf(readAll(t, s, dbNow)))
 	})
@@ -211,30 +210,4 @@ func keysOf(rows map[string]usageRow) []string {
 	}
 	slices.Sort(keys)
 	return keys
-}
-
-func TestStore_ClockTruncatesToTheSecond(t *testing.T) {
-	// Database time is whole seconds, rounded down on both dialects, for the clock and for
-	// updated_at alike (the test database runs on this host's clock)
-	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
-		s := newStore()
-		ctx := context.Background()
-		for i := 0; i < 20; i++ {
-			dbNow, err := s.clock(ctx)
-			require.Nil(t, err)
-			require.LessOrEqual(t, dbNow, time.Now().Unix())
-			_, err = s.write(ctx, []usageRow{
-				{
-					key:         "k",
-					periodStart: 1,
-					counts:      [numDaily]int64{1, 0, 0},
-				},
-			})
-			require.Nil(t, err)
-			var updatedAt int64
-			require.Nil(t, s.db.QueryRow(`SELECT updated_at FROM usage WHERE key = 'k'`).Scan(&updatedAt))
-			require.LessOrEqual(t, updatedAt, time.Now().Unix())
-			time.Sleep(37 * time.Millisecond)
-		}
-	})
 }

@@ -633,9 +633,8 @@ func TestService_Persist_SurvivesRestart(t *testing.T) {
 func TestService_Persist_NextPeriodStartsAtZero(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		store := newStore()
-		dbNow, err := store.clock(context.Background())
-		require.Nil(t, err)
-		_, err = store.write(context.Background(), []usageRow{
+		dbNow := time.Now().Unix()
+		_, err := store.write(context.Background(), []usageRow{
 			{
 				key:         "user:u_1",
 				periodStart: periodStart("user:u_1", time.Unix(dbNow, 0)) - daySeconds,
@@ -646,7 +645,7 @@ func TestService_Persist_NextPeriodStartsAtZero(t *testing.T) {
 				periodStart: periodStart("user:u_2", time.Unix(dbNow, 0)),
 				counts:      [numDaily]int64{4, 0, 0},
 			},
-		})
+		}, time.Now().Unix())
 		require.Nil(t, err)
 		s := startTestService(t, newStore(), time.Now)
 		require.Equal(t, Usage{}, s.Usage("user:u_1")) // Stale: the previous period
@@ -654,13 +653,29 @@ func TestService_Persist_NextPeriodStartsAtZero(t *testing.T) {
 	})
 }
 
+func TestService_Persist_UpdatedAtIsTheNodesTime(t *testing.T) {
+	// Rows are stamped with the writing node's clock, so the read-back watermark (also the node's
+	// clock) never depends on the database's clock
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		ahead := time.Now().Add(time.Hour)
+		s := startTestService(t, newStore(), func() time.Time {
+			return ahead
+		})
+		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages}, 1).OK)
+		s.sync()
+		var updatedAt int64
+		require.Nil(t, s.conf.Store.db.QueryRow(`SELECT updated_at FROM usage WHERE key = 'user:u_1'`).Scan(&updatedAt))
+		require.Equal(t, ahead.Unix(), updatedAt)
+	})
+}
+
 func TestService_Persist_TwoNodesConverge(t *testing.T) {
-	// Two nodes on one store, one with its clock 10 minutes ahead: periods follow the database
-	// clock, so both agree on the key's period, and after a sync on its count
+	// Two nodes on one store, one with its clock 2 s ahead (synced within the read overlap): both
+	// agree on the key's period, and after a sync on its count
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		a := startTestService(t, newStore(), time.Now)
 		b := startTestService(t, newStore(), func() time.Time {
-			return time.Now().Add(10 * time.Minute)
+			return time.Now().Add(2 * time.Second)
 		})
 		rule := Rule{
 			Kind:  KindMessages,
@@ -737,7 +752,7 @@ func TestService_Persist_WriteFailureRetries(t *testing.T) {
 		}
 		require.True(t, s.Allow("k", rule, 30).OK)
 		writeChunk := store.writeChunk
-		store.writeChunk = func(ctx context.Context, rows []usageRow) error {
+		store.writeChunk = func(ctx context.Context, rows []usageRow, now int64) error {
 			return errors.New("database is down")
 		}
 		s.sync()
@@ -757,15 +772,14 @@ func TestService_Persist_StartupWithoutStore(t *testing.T) {
 	// can load them
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		store := newStore()
-		dbNow, err := store.clock(context.Background())
-		require.Nil(t, err)
-		_, err = store.write(context.Background(), []usageRow{
+		dbNow := time.Now().Unix()
+		_, err := store.write(context.Background(), []usageRow{
 			{
 				key:         "k",
 				periodStart: periodStart("k", time.Unix(dbNow, 0)),
 				counts:      [numDaily]int64{3, 0, 0},
 			},
-		})
+		}, time.Now().Unix())
 		require.Nil(t, err)
 		_, err = store.db.Exec(`ALTER TABLE usage RENAME TO usage_down`)
 		require.Nil(t, err)
@@ -798,21 +812,20 @@ func TestService_Persist_LeftoverAfterRollover(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		store := newStore()
 		s := startTestService(t, store, time.Now)
-		dbNow, err := store.clock(context.Background())
-		require.Nil(t, err)
+		dbNow := time.Now().Unix()
 		rule := Rule{
 			Kind: KindMessages,
 		}
 
 		// A new period's counts replace the row of an old one, they do not add to it
 		start := periodStart("a", time.Unix(dbNow, 0))
-		_, err = store.write(context.Background(), []usageRow{
+		_, err := store.write(context.Background(), []usageRow{
 			{
 				key:         "a",
 				periodStart: start - daySeconds,
 				counts:      [numDaily]int64{100, 0, 0},
 			},
-		})
+		}, time.Now().Unix())
 		require.Nil(t, err)
 		require.True(t, s.Allow("a", rule, 2).OK)
 		s.sync()
@@ -833,7 +846,7 @@ func TestService_Persist_LeftoverAfterRollover(t *testing.T) {
 				periodStart: start + daySeconds,
 				counts:      [numDaily]int64{4, 0, 0},
 			},
-		})
+		}, time.Now().Unix())
 		require.Nil(t, err)
 		s.sync()
 		require.Equal(t, usageRow{

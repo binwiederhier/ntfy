@@ -5,11 +5,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"time"
-
 	"github.com/urfave/cli/v2"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	"time"
 )
 
 func init() {

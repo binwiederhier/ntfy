@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -203,4 +204,42 @@ func TestAdmin_TiersNotAdmin(t *testing.T) {
 	var apiErr *AdminError
 	require.ErrorAs(t, err, &apiErr)
 	require.Equal(t, AdminErrCodeUnauthorized, apiErr.Code)
+}
+
+func TestAdmin_NoRedirects(t *testing.T) {
+	// A redirect could resend the token over plain HTTP, and turn a DELETE into a GET that succeeds
+	var deletes int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deletes++
+			http.Redirect(w, r, "/v1/users", http.StatusMovedPermanently)
+			return
+		}
+		w.Write([]byte(`[]`))
+	}))
+	defer server.Close()
+	err := NewAdmin(server.URL, "tk_admin").RemoveUser("ben")
+	require.Error(t, err)
+	require.Equal(t, 1, deletes)
+	var apiErr *AdminError
+	require.True(t, errors.As(err, &apiErr))
+	require.Equal(t, http.StatusMovedPermanently, apiErr.HTTPCode)
+}
+
+func TestAdmin_CloseClosesIdleConnections(t *testing.T) {
+	var conns atomic.Int32
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"version":"1.0.0"}`))
+	}))
+	server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		if state == http.StateClosed {
+			conns.Add(1)
+		}
+	}
+	server.Start()
+	defer server.Close()
+	admin := NewAdmin(server.URL, "tk_admin")
+	require.Nil(t, admin.Ping())
+	require.Nil(t, admin.Close())
+	require.Eventually(t, func() bool { return conns.Load() == 1 }, 2*time.Second, 10*time.Millisecond)
 }

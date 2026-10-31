@@ -137,9 +137,12 @@ type Admin struct {
 // NewAdmin creates an admin API client for a server's HTTP(S) API, authenticating with an admin's access token
 func NewAdmin(baseURL, token string) *Admin {
 	return &Admin{
-		baseURL:    strings.TrimSuffix(baseURL, "/"),
-		token:      token,
-		httpClient: &http.Client{Timeout: adminTimeout},
+		baseURL: strings.TrimSuffix(baseURL, "/"),
+		token:   token,
+		httpClient: &http.Client{
+			Timeout:       adminTimeout,
+			CheckRedirect: noRedirects,
+		},
 	}
 }
 
@@ -148,7 +151,8 @@ func NewAdminSocket(socketPath string) *Admin {
 	return &Admin{
 		baseURL: adminSocketBaseURL,
 		httpClient: &http.Client{
-			Timeout: adminTimeout,
+			Timeout:       adminTimeout,
+			CheckRedirect: noRedirects,
 			Transport: &http.Transport{
 				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 					var d net.Dialer
@@ -356,9 +360,16 @@ func (a *Admin) RemoveTier(code string) error {
 	}, nil)
 }
 
-// Close is a no-op; it exists so Admin matches the CLI's admin interface
+// Close closes the client's idle (kept-alive) connections
 func (a *Admin) Close() error {
-	return nil // Nothing to close, connections are per request
+	a.httpClient.CloseIdleConnections()
+	return nil
+}
+
+// noRedirects makes the client return a redirect as the response. Following it could send the token
+// over plain HTTP (https -> http), or turn a DELETE into a GET that succeeds.
+func noRedirects(_ *http.Request, _ []*http.Request) error {
+	return http.ErrUseLastResponse
 }
 
 // do sends a JSON request and decodes the JSON response into out (if not nil)

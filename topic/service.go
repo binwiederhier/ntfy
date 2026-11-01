@@ -29,10 +29,10 @@ const (
 	readOverlap      = statementTimeout + time.Second
 	loadTimeout      = 2 * time.Minute
 
-	// pruneAfter must stay well above the server's 410 threshold (7 days), so the row that
-	// starts the countdown is still there when it is reached
+	// pruneAfter must stay well above the server's 410 threshold (4 days): only a push between the
+	// two gets the 410, so app servers pushing at least every 3 days get theirs
 	pruneInterval = time.Hour
-	pruneAfter    = 14 * 24 * time.Hour
+	pruneAfter    = 7 * 24 * time.Hour
 
 	// keepaliveInterval is how often an open stream writes its subscriber activity at most
 	keepaliveInterval = 5 * time.Minute

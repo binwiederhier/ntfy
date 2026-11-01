@@ -120,15 +120,15 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers410(t *testing.T) {
 			return toHTTPError(t, response.Body.String())
 		}
 
-		// Never subscribed: 507 for a week from the first push, then 410
+		// Never subscribed: 507 for 4 days from the first push, then 410
 		require.Equal(t, 50701, push().Code)
-		ageTopic(t, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter-time.Hour, s)
+		ageTopic(t, "upAAAAAAAAAAAA", 4*oneDay-time.Hour, s)
 		require.Equal(t, 50701, push().Code)
 		ageTopic(t, "upAAAAAAAAAAAA", 2*time.Hour, s)
 		require.Equal(t, 41002, push().Code)
 		require.Equal(t, 410, push().HTTPCode)
 
-		// A subscriber comes (back): it pays again; a week after it is gone, 410
+		// A subscriber comes (back): it pays again; 4 days after it is gone, 410
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, func(r *http.Request) {
 			r.RemoteAddr = "1.2.3.4:1234"
 		})
@@ -171,7 +171,7 @@ func TestServer_UnifiedPush_AbandonedTopicReadsRowBeforeAnswering410(t *testing.
 		require.Equal(t, subscribed, s.topicService.State("upAAAAAAAAAAAA").SubscribedAt)
 
 		// Known as abandoned, and so is the row: 410
-		ageTopic(t, "upAAAAAAAAAAAA", 6*oneDay, s)
+		ageTopic(t, "upAAAAAAAAAAAA", 3*oneDay, s)
 		response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 		require.Equal(t, 410, response.Code)
 	})
@@ -196,7 +196,7 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers507IfRowReadFails(t *testing.T)
 }
 
 func TestServer_UnifiedPush_AbandonedTopicOnOtherNode(t *testing.T) {
-	// The first refused push starts the countdown for every node: a node started a week later
+	// The first refused push starts the countdown for every node: a node started 4 days later
 	// answers 410
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)

@@ -15,8 +15,8 @@ import (
 const (
 	// unifiedPushAbandonedAfter is how long a UnifiedPush topic may go without subscriber activity
 	// before a push to it is told to go away (410), so app servers like Mastodon delete the
-	// subscription (#664); long enough for a phone offline for a few days
-	unifiedPushAbandonedAfter = 7 * oneDay
+	// subscription (#664); below the row's prune (7 days), which ends the 410s
+	unifiedPushAbandonedAfter = 4 * oneDay
 
 	// rateVisitorLiveFor is how long a rate visitor pays after its subscriber was last active on
 	// any node; a stream open here keeps it live regardless

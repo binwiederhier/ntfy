@@ -151,17 +151,17 @@ func TestService_Prune(t *testing.T) {
 	require.NotNil(t, s.Note("upOneTooMany"))
 }
 
-func TestService_Prune_AfterTwoWeeks(t *testing.T) {
-	// The sync prunes topics two weeks after their last write: long enough that an abandoned
-	// UnifiedPush topic still has its row when a push 7+ days later decides on the 410
+func TestService_Prune_AfterAWeek(t *testing.T) {
+	// The sync prunes topics a week after their last write: long enough that an abandoned
+	// UnifiedPush topic still has its row when a push 4+ days later decides on the 410
 	s, clock := newTestServiceWithClock(t)
 	s.Touch("upA")
 	clock.advance(2 * 24 * time.Hour)
 	s.Touch("upB")
-	clock.advance(13 * 24 * time.Hour)
+	clock.advance(6 * 24 * time.Hour)
 	s.sync()
-	require.Nil(t, s.State("upA"))    // Written 15 days ago
-	require.NotNil(t, s.State("upB")) // Written 13 days ago
+	require.Nil(t, s.State("upA"))    // Written 8 days ago
+	require.NotNil(t, s.State("upB")) // Written 6 days ago
 }
 
 func TestService_Persist_SharedAcrossNodes(t *testing.T) {

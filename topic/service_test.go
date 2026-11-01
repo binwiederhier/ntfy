@@ -145,7 +145,7 @@ func TestService_Prune(t *testing.T) {
 
 func TestService_Prune_AfterTwoWeeks(t *testing.T) {
 	// The sync prunes topics two weeks after their last write: long enough that an abandoned
-	// UnifiedPush topic still has its row when a push 7+ days later decides on the 404
+	// UnifiedPush topic still has its row when a push 7+ days later decides on the 410
 	s, clock := newTestServiceWithClock(t)
 	s.Touch("upA")
 	clock.advance(2 * 24 * time.Hour)

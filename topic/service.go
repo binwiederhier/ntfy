@@ -50,7 +50,7 @@ const (
 	loadTimeout = 2 * time.Minute
 
 	// pruneInterval is how often a node deletes rows not written for pruneAfter, from the table
-	// and from memory. pruneAfter must be well above the server's 404 threshold for an abandoned
+	// and from memory. pruneAfter must be well above the server's 410 threshold for an abandoned
 	// UnifiedPush topic (7 days), so the row that starts the countdown is still there when the
 	// threshold is reached: a pruned row restarts the countdown on the next push, so a topic
 	// pushed to less often than every pruneAfter never gets its 404.

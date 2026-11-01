@@ -1133,9 +1133,10 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
-		// That is what a topic abandoned for unifiedPushAbandonedAfter gets: a 404, so the subscription is removed.
+		// A topic abandoned for unifiedPushAbandonedAfter gets a 410 instead, so the subscription is removed: every
+		// app server that removes it on a 404 also does on a 410, and some (Misskey and its forks) only on a 410.
 		if s.unifiedPushTopicAbandoned(r, t) {
-			return nil, errHTTPNotFoundUnifiedPushTopicAbandoned.With(t)
+			return nil, errHTTPGoneUnifiedPushTopicAbandoned.With(t)
 		} else if isUnifiedPushTopic(t.ID) {
 			s.topicService.Note(t.ID) // Starts the countdown to the 404 of a topic nobody ever subscribed to
 		}
@@ -1256,7 +1257,7 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 		// An abandoned topic (see unifiedPushTopicAbandoned) gets its pushkey rejected, so the Matrix
 		// server stops sending to it; everything else, including a topic nobody subscribed to yet, is
 		// the error as it is (a 507 is transient to the Matrix server)
-		if e, ok := err.(*errHTTP); ok && e.Code == errHTTPNotFoundUnifiedPushTopicAbandoned.Code {
+		if e, ok := err.(*errHTTP); ok && e.Code == errHTTPGoneUnifiedPushTopicAbandoned.Code {
 			pushKey, err := fromContext[string](r, contextMatrixPushKey)
 			if err != nil {
 				return err

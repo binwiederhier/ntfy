@@ -109,9 +109,9 @@ func TestServer_UnifiedPush_StreamOnOtherNodeKeepsRateVisitor(t *testing.T) {
 	})
 }
 
-func TestServer_UnifiedPush_AbandonedTopicAnswers404(t *testing.T) {
+func TestServer_UnifiedPush_AbandonedTopicAnswers410(t *testing.T) {
 	// A UnifiedPush push to a topic without subscriber activity for unifiedPushAbandonedAfter is
-	// told to go away (404, RFC 8030 section 7.3); before that, it may be retried (507)
+	// told to go away (410); before that, it may be retried (507)
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
@@ -124,15 +124,15 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers404(t *testing.T) {
 			return toHTTPError(t, response.Body.String())
 		}
 
-		// Never subscribed: 507 for a week from the first push, then 404
+		// Never subscribed: 507 for a week from the first push, then 410
 		require.Equal(t, 50701, push().Code)
 		ageTopic(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter-time.Hour)
 		require.Equal(t, 50701, push().Code)
 		ageTopic(s, "upAAAAAAAAAAAA", 2*time.Hour)
-		require.Equal(t, 40402, push().Code)
-		require.Equal(t, 404, push().HTTPCode)
+		require.Equal(t, 41002, push().Code)
+		require.Equal(t, 410, push().HTTPCode)
 
-		// A subscriber comes (back): it pays again; a week after it is gone, 404
+		// A subscriber comes (back): it pays again; a week after it is gone, 410
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, func(r *http.Request) {
 			r.RemoteAddr = "1.2.3.4:1234"
 		})
@@ -141,7 +141,7 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers404(t *testing.T) {
 		ageTopic(s, "upAAAAAAAAAAAA", 2*oneDay)
 		require.Equal(t, 50701, push().Code)
 		ageTopic(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter)
-		require.Equal(t, 40402, push().Code)
+		require.Equal(t, 41002, push().Code)
 
 		// An open stream keeps the topic, however long ago it was seen otherwise
 		ctx, cancel := context.WithCancel(context.Background())
@@ -160,8 +160,8 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers404(t *testing.T) {
 	})
 }
 
-func TestServer_UnifiedPush_AbandonedTopicReadsRowBeforeAnswering404(t *testing.T) {
-	// Before a 404, the node reads the topic's row: a subscriber may have come back on another
+func TestServer_UnifiedPush_AbandonedTopicReadsRowBeforeAnswering410(t *testing.T) {
+	// Before a 410, the node reads the topic's row: a subscriber may have come back on another
 	// node, and the row may be fresher than what this node has read back so far
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
@@ -174,11 +174,11 @@ func TestServer_UnifiedPush_AbandonedTopicReadsRowBeforeAnswering404(t *testing.
 		require.Equal(t, 507, response.Code)
 		require.WithinDuration(t, time.Now().Add(-2*oneDay), s.topicService.State("upAAAAAAAAAAAA").SubscribedAt, time.Minute)
 
-		// Known as abandoned, and so is the row: 404
+		// Known as abandoned, and so is the row: 410
 		ageTopic(s, "upAAAAAAAAAAAA", 6*oneDay)
 		execUserDB(t, c, fmt.Sprintf(`UPDATE topic SET subscribed_at = %d, first_seen_at = %d`, now-8*int64(oneDay/time.Second), now-8*int64(oneDay/time.Second)))
 		response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
-		require.Equal(t, 404, response.Code)
+		require.Equal(t, 410, response.Code)
 	})
 }
 
@@ -196,13 +196,13 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers507IfRowReadFails(t *testing.T)
 		})
 		require.Equal(t, 507, response.Code)
 		response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
-		require.Equal(t, 404, response.Code)
+		require.Equal(t, 410, response.Code)
 	})
 }
 
 func TestServer_UnifiedPush_AbandonedTopicOnOtherNode(t *testing.T) {
 	// The first refused push starts the countdown for every node: a node started a week later
-	// answers 404
+	// answers 410
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
@@ -213,8 +213,8 @@ func TestServer_UnifiedPush_AbandonedTopicOnOtherNode(t *testing.T) {
 		execUserDB(t, c, fmt.Sprintf(`UPDATE topic SET first_seen_at = first_seen_at - %d`, int64((unifiedPushAbandonedAfter+time.Hour)/time.Second)))
 		s2 := newTestServer(t, c)
 		response = request(t, s2, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
-		require.Equal(t, 404, response.Code)
-		require.Equal(t, 40402, toHTTPError(t, response.Body.String()).Code)
+		require.Equal(t, 410, response.Code)
+		require.Equal(t, 41002, toHTTPError(t, response.Body.String()).Code)
 	})
 }
 
@@ -253,7 +253,7 @@ func TestServer_UnifiedPush_NonUnifiedPushTopicIsNotAbandoned(t *testing.T) {
 }
 
 func TestServer_MatrixGateway_AbandonedTopicRejectsPushKey(t *testing.T) {
-	// The Matrix gateway answers an abandoned topic with a rejected pushkey, not with the 404; a
+	// The Matrix gateway answers an abandoned topic with a rejected pushkey, not with the 410; a
 	// topic without a subscriber for less than that is a 507, however long the node has known it
 	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true

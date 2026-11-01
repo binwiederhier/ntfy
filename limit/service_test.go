@@ -506,6 +506,47 @@ func TestService_Prune_TokensWithSlowerRuleHoldsKey(t *testing.T) {
 	require.Zero(t, s.Tokens("k", slow))
 }
 
+func TestService_Prune_CheckWithSlowerRuleHoldsKey(t *testing.T) {
+	// Check refills too, so a slower rule read there moves the time the bucket is full again
+	s, clock := newTestServiceWithClock(t)
+	fast := Rule{
+		Kind:   KindRequests,
+		Burst:  2,
+		Refill: time.Second,
+	}
+	slow := Rule{
+		Kind:   KindRequests,
+		Burst:  2,
+		Refill: time.Hour,
+	}
+	require.True(t, s.Allow("k", fast, 2).OK)
+	clock.advance(time.Second)
+	require.False(t, s.Check("k", slow).OK)
+	clock.advance(2 * settledIdle)
+	require.Zero(t, s.Prune())
+	require.Zero(t, s.Tokens("k", slow))
+}
+
+func TestService_Prune_ForgottenKeyDecidesLikeAFreshOne(t *testing.T) {
+	// A key that is forgotten and used again gets the decision of a never seen key: a full bucket
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  3,
+		Refill: time.Second,
+	}
+	require.True(t, s.Allow("k", rule, 3).OK)
+	clock.advance(2 * settledIdle)
+	require.Equal(t, 1, s.Prune())
+	require.Equal(t, s.Allow("fresh", rule, 1), s.Allow("k", rule, 1))
+	d := s.Allow("k", rule, 1)
+	require.True(t, d.OK)
+	require.Equal(t, int64(3), d.Quota)
+	require.Equal(t, 3*time.Second, d.Window)
+	require.Equal(t, int64(1), d.Remaining)
+	require.Equal(t, s.Check("fresh", rule), s.Check("k", rule))
+}
+
 func TestService_Prune_BandwidthTallyHoldsKeyUntilPeriodEnd(t *testing.T) {
 	// A big bandwidth bucket refills a small download in milliseconds, but the bytes stay in the
 	// key's usage until its period ends, so the key is kept until then

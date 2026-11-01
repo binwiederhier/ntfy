@@ -239,8 +239,7 @@ func (s *Service) check(key string, rule Rule) Decision {
 	if !ok {
 		return Decision{OK: true} // A fresh bucket is full
 	}
-	b := &e.buckets[rule.Kind]
-	b.refill(now, &rule)
+	b := e.refillNoLock(&rule, now)
 	if b.tokens < 1 {
 		return Decision{RetryAfter: b.wait(1, &rule)}
 	}

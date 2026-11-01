@@ -297,6 +297,12 @@ func (v *visitor) IP() netip.Addr {
 	return v.ip
 }
 
+// maskedIP returns the visitor's IP masked to the configured prefix bits, which is what a rate
+// visitor keeps of a subscriber
+func (v *visitor) maskedIP() string {
+	return vis.Mask(v.ip, v.env.limitsConfig).String()
+}
+
 // Authenticated returns true if a user successfully authenticated
 func (v *visitor) Authenticated() bool {
 	return v.user != nil

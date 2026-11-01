@@ -9,7 +9,6 @@ import (
 
 	tp "heckel.io/ntfy/v2/topic"
 	"heckel.io/ntfy/v2/user"
-	vis "heckel.io/ntfy/v2/visitor"
 )
 
 const (
@@ -97,10 +96,4 @@ func topicAbandoned(state *tp.State) bool {
 // UnifiedPush length
 func isUnifiedPushTopic(id string) bool {
 	return strings.HasPrefix(id, unifiedPushTopicPrefix) && len(id) == unifiedPushTopicLength
-}
-
-// maskedIP returns the visitor's IP masked to the configured prefix bits, which is what a rate
-// visitor keeps of a subscriber
-func (v *visitor) maskedIP() string {
-	return vis.Mask(v.ip, v.env.limitsConfig).String()
 }

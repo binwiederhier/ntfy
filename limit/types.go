@@ -45,13 +45,13 @@ type Rule struct {
 // it could be (0 if unknown, e.g. when n exceeds the burst). The other fields describe the limit
 // that decided, for the RateLimit headers: the daily cap if the rule has one, else the bucket.
 type Decision struct {
-	OK         bool
-	RetryAfter time.Duration
-	Kind       Kind          // The rule's kind, which names the limit in the RateLimit headers
-	Quota      int64         // The daily cap or the burst; 0 if the rule has neither
-	Window     time.Duration // A day, or the time the bucket takes to refill completely
-	Remaining  int64         // Units left after this call
-	Reset      time.Duration // Until the period ends, or until the bucket's next token (0 if it never refills)
+	OK         bool          // Whether the usage was admitted; no header
+	RetryAfter time.Duration // Retry-After (on a 429): how long until the usage could be admitted
+	Kind       Kind          // RateLimit-Policy and RateLimit: the policy name ("messages"), the rule's kind
+	Quota      int64         // RateLimit-Policy q=: the daily cap or the burst; 0 if the rule has neither (no headers)
+	Window     time.Duration // RateLimit-Policy w=: a day, or the time the bucket takes to refill completely
+	Remaining  int64         // RateLimit r=: units left after this call
+	Reset      time.Duration // RateLimit t=: until the period ends, or until the bucket's next token (0 if it never refills)
 }
 
 // Usage is a key's daily counts in its current period

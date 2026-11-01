@@ -52,9 +52,10 @@ const (
 	// pruneInterval is how often a node deletes rows not written for pruneAfter, from the table
 	// and from memory. pruneAfter must be well above the server's 404 threshold for an abandoned
 	// UnifiedPush topic (7 days), so the row that starts the countdown is still there when the
-	// threshold is reached.
+	// threshold is reached: a pruned row restarts the countdown on the next push, so a topic
+	// pushed to less often than every pruneAfter never gets its 404.
 	pruneInterval = time.Hour
-	pruneAfter    = 30 * 24 * time.Hour
+	pruneAfter    = 14 * 24 * time.Hour
 
 	// keepaliveInterval is how often an open stream's subscriber activity is recorded at most
 	// (see Keepalive), so a long-lived stream costs one write per interval, not one per call

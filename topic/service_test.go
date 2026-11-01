@@ -143,6 +143,19 @@ func TestService_Prune(t *testing.T) {
 	require.NotNil(t, s.State("upOneTooMany"))
 }
 
+func TestService_Prune_AfterTwoWeeks(t *testing.T) {
+	// The sync prunes topics two weeks after their last write: long enough that an abandoned
+	// UnifiedPush topic still has its row when a push 7+ days later decides on the 404
+	s, clock := newTestServiceWithClock(t)
+	s.Touch("upA")
+	clock.advance(2 * 24 * time.Hour)
+	s.Touch("upB")
+	clock.advance(13 * 24 * time.Hour)
+	s.sync()
+	require.Nil(t, s.State("upA"))    // Written 15 days ago
+	require.NotNil(t, s.State("upB")) // Written 13 days ago
+}
+
 func TestService_RateVisitorUserIDs(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
 	s.SetRateVisitor("upA", &RateVisitor{UserID: "u_1", IP: "1.2.3.4"})

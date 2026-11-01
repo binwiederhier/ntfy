@@ -23,9 +23,6 @@ func shardIndex(key string) int {
 	return int(h % shardCount)
 }
 
-// dailyKinds are the kinds with a counter, in the order of the counter's arrays (see dailyIndex)
-var dailyKinds = [numDaily]Kind{KindMessages, KindEmails, KindCalls}
-
 // dailyIndex returns the index of the kind in a counter's arrays, or -1 if the kind has no daily count
 func dailyIndex(kind Kind) int {
 	switch kind {

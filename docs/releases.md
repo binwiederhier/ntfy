@@ -2321,6 +2321,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Send a `Retry-After` header with HTTP 429 responses that are caused by a rate limit with a known wait, e.g. the request, e-mail or daily message limits (see [rate limiting](config.md#rate-limiting))
 * Send the IETF draft `RateLimit-Policy` and `RateLimit` headers with publish responses, for the request and daily message limits (see [rate limiting](config.md#rate-limiting))
 
+**Behavior changes:**
+
+* The rate limit state of a visitor is forgotten about a minute after it has fully recovered (all buckets refilled) instead of after a day without use, which frees the memory of one-off visitors such as floods of new IPs. The `visitors` stat and the `ntfy_visitors_total` metric therefore count the visitors of roughly the last minute, not of the last day ([#2126](https://github.com/binwiederhier/ntfy/pull/2126))
+
 **Bug fixes + maintenance:**
 
 * Cluster: a forwarded message for a topic without subscribers on the receiving node now counts as wasted (`ntfy_cluster_messages_wasted_total`) and no longer keeps that idle topic in memory

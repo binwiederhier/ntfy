@@ -56,6 +56,10 @@ const (
 	// than a period is never current again
 	pruneInterval = time.Hour
 	pruneAfter    = 25 * time.Hour
+
+	// settledIdle is how long a key whose buckets are full again must go unused before Prune
+	// forgets its buckets, so a key in steady use is not dropped and recreated over and over
+	settledIdle = time.Minute
 )
 
 // Service decides on usage from memory; see the package comment
@@ -63,7 +67,7 @@ type Service struct {
 	conf      *Config
 	now       func() time.Time          // Injectable clock, for tests
 	counters  [shardCount]*counterShard // Daily counts, kept until their period ends
-	buckets   [shardCount]*bucketShard  // Token buckets, per node, evicted when idle and full
+	buckets   [shardCount]*bucketShard  // Token buckets, per node, forgotten when settled (see Prune)
 	store     *Store                    // Nil: memory only
 	watermark int64                     // Time of the last read, unix seconds; the sync worker's only
 	prunedAt  int64                     // Time of the last prune, unix seconds; the sync worker's only
@@ -209,8 +213,7 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 	if !ok {
 		return rule.Burst // A fresh bucket is full; no need to create it to say so
 	}
-	b := &e.buckets[rule.Kind]
-	b.refill(now, &rule)
+	b := e.refillNoLock(&rule, now)
 	return int64(math.Max(0, math.Floor(b.tokens)))
 }
 
@@ -236,8 +239,7 @@ func (s *Service) check(key string, rule Rule) Decision {
 	if !ok {
 		return Decision{OK: true} // A fresh bucket is full
 	}
-	b := &e.buckets[rule.Kind]
-	b.refill(now, &rule)
+	b := e.refillNoLock(&rule, now)
 	if b.tokens < 1 {
 		return Decision{RetryAfter: b.wait(1, &rule)}
 	}
@@ -248,17 +250,11 @@ func (s *Service) check(key string, rule Rule) Decision {
 // sent. The bucket cannot exceed its burst, and the daily count cannot go below zero.
 func (s *Service) Refund(key string, kind Kind, n int64) {
 	s.refundTokens(key, kind, n)
-	start := periodStart(key, s.now())
 	i := dailyIndex(kind)
 	if i < 0 {
-		bs := s.buckets[shardIndex(key)]
-		bs.mu.Lock()
-		defer bs.mu.Unlock()
-		if e, ok := bs.entries[key]; ok && e.periodStart >= start {
-			e.counts[kind] = max(0, e.counts[kind]-n)
-		}
 		return
 	}
+	start := periodStart(key, s.now())
 	cs := s.counters[shardIndex(key)]
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -267,23 +263,17 @@ func (s *Service) Refund(key string, kind Kind, n int64) {
 	}
 }
 
-// Usage returns the key's counts in its current period, from memory: the daily counts (all
-// nodes' as of the last sync, plus this node's since), and this node's units of the other kinds
+// Usage returns the key's daily counts in its current period, from memory: all nodes' as of the
+// last sync, plus this node's since. The other kinds have only buckets (see Tokens).
 func (s *Service) Usage(key string) Usage {
 	start := periodStart(key, s.now())
 	var u Usage
-	bs := s.buckets[shardIndex(key)]
-	bs.mu.Lock()
-	if e, ok := bs.entries[key]; ok && e.periodStart >= start {
-		u.counts = e.counts
-	}
-	bs.mu.Unlock()
 	cs := s.counters[shardIndex(key)]
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	if c, ok := cs.counters[key]; ok && c.periodStart >= start {
-		for i, kind := range dailyKinds {
-			u.counts[kind] = c.base[i] + c.unflushed[i]
+		for i := range c.base {
+			u.counts[i] = c.base[i] + c.unflushed[i]
 		}
 	}
 	return u
@@ -294,17 +284,17 @@ func (s *Service) ResetAt(key string) time.Time {
 	return periodEnd(key, s.now())
 }
 
-// Prune forgets the buckets of keys that have not been used for longer than idle and are full
-// again (a forgotten key comes back with full buckets), and the daily counts of periods that
-// have ended. It returns how many keys' buckets it forgot.
-func (s *Service) Prune(idle time.Duration) int {
+// Prune forgets the buckets of keys that are settled (see bucketEntry.settledNoLock) and have not
+// been used for settledIdle, and the daily counts of periods that have ended. It returns how many
+// keys' buckets it forgot.
+func (s *Service) Prune() int {
 	now := s.now()
-	cutoff := now.Add(-idle).UnixNano()
+	cutoff := now.Add(-settledIdle).UnixNano()
 	pruned := 0
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
 		for key, e := range bs.entries {
-			if e.seen < cutoff && now.UnixNano() >= e.full {
+			if e.seen < cutoff && e.settledNoLock(now) {
 				delete(bs.entries, key)
 				pruned++
 			}
@@ -522,11 +512,9 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	e := bs.entryNoLock(key, now)
 	e.seen = now.UnixNano()
 	if rule.Burst <= 0 {
-		e.countNoLock(key, rule.Kind, n, now)
 		return Decision{OK: true}
 	}
-	b := &e.buckets[rule.Kind]
-	b.refill(now, rule)
+	b := e.refillNoLock(rule, now)
 	if n > rule.Burst {
 		return b.decision(Decision{}, rule) // Can never fit, so there is no time to wait for
 	} else if b.tokens < float64(n) {
@@ -534,7 +522,6 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
-	e.countNoLock(key, rule.Kind, n, now)
 	return b.decision(Decision{OK: true}, rule)
 }
 
@@ -557,7 +544,6 @@ func (s *Service) reset(key string, kind Kind) {
 	bs.mu.Lock()
 	if e, ok := bs.entries[key]; ok {
 		e.buckets[kind].tokens = float64(e.buckets[kind].burst)
-		e.counts[kind] = 0
 	}
 	bs.mu.Unlock()
 	i := dailyIndex(kind)
@@ -596,17 +582,20 @@ func (bs *bucketShard) entryNoLock(key string, now time.Time) *bucketEntry {
 	return e
 }
 
-// countNoLock adds n units of a kind without a counter to the entry's counts of the current
-// period, starting them over if the period has ended. The caller must hold the shard's lock.
-func (e *bucketEntry) countNoLock(key string, kind Kind, n int64, now time.Time) {
-	if dailyIndex(kind) >= 0 {
-		return // Counted in the key's counter
-	}
-	if start := periodStart(key, now); e.periodStart < start {
-		e.counts = [numKinds]int64{}
-		e.periodStart = start
-	}
-	e.counts[kind] += n
+// settledNoLock returns true if forgetting the entry changes nothing: every bucket is full again,
+// and a forgotten key comes back with full buckets. The caller must hold the shard's lock.
+func (e *bucketEntry) settledNoLock(now time.Time) bool {
+	return now.UnixNano() >= e.full
+}
+
+// refillNoLock refills the entry's bucket for the rule and notes when it is full again: the rule
+// may refill slower than the one the bucket was last charged with, also on a denied call. The
+// caller must hold the shard's lock.
+func (e *bucketEntry) refillNoLock(rule *Rule, now time.Time) *bucket {
+	b := &e.buckets[rule.Kind]
+	b.refill(now, rule)
+	e.noteFull(b, rule)
+	return b
 }
 
 // noteFull moves the time from which every bucket is full again to when this bucket is full, if

@@ -610,7 +610,7 @@ func TestVisitor_BandwidthReaderRollback(t *testing.T) {
 	n, err := r.Read(make([]byte, 8))
 	require.ErrorIs(t, err, util.ErrLimitReached)
 	require.Zero(t, n)
-	require.Zero(t, l.Value())
+	require.Equal(t, int64(10), s.limiter.Tokens(v.key, v.bandwidthRule())) // Refunded in full
 	require.True(t, v.BandwidthAllowed(10).OK)
 	require.False(t, l.Allow())
 }
@@ -638,8 +638,8 @@ func TestVisitor_TierWithoutEmailsAdmitsNone(t *testing.T) {
 
 func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	// A topic keeps its rate visitor for as long as the subscriber is around (its keepalive), not
-	// for as long as its limiter key is in use: the limiter forgetting the key must not drop it,
-	// and publishers charging the key must not keep it
+	// for as long as its limiter key is in use: publishers charging the key must not keep it. The
+	// limiter forgetting the key cannot drop it either, since the topic never asks the limiter.
 	c := newTestConfig(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
@@ -647,7 +647,6 @@ func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	topics, err := s.topicsFromIDs(v, "mytopic")
 	require.Nil(t, err)
 	s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics)
-	s.limiter.Prune(0) // The key is gone, the subscriber is not
 	require.NotNil(t, topics[0].RateVisitor())
 	ageRateVisitor(topics[0], 2*visitorExpungeAfter)               // The subscriber is gone
 	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK) // A publisher charges the key

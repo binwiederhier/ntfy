@@ -1923,6 +1923,12 @@ There are various limits and rate limits in place that you can use to configure 
 During normal usage, you shouldn't encounter these limits at all, and even if you burst a few requests or emails
 (e.g. when you reconnect after a connection drop), it shouldn't have any effect.
 
+When a rate limit is hit, the server responds with HTTP 429 (Too Many Requests). If the server knows when the request
+would be allowed again, the response carries a `Retry-After` header with the number of seconds to wait: until the
+visitor's bucket has refilled enough (e.g. for the request, e-mail or topic creation limits), or until the visitor's
+day is over for a daily limit (e.g. messages, e-mails, phone calls or attachment bandwidth). Limits without a known
+wait, such as the subscription limit or the global topic limit, do not send the header.
+
 ### General limits
 Let's do the easy limits first:
 

@@ -2316,6 +2316,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.36.1 (UNRELEASED)
 
+**Features:**
+
+* Send a `Retry-After` header with HTTP 429 responses that are caused by a rate limit with a known wait, e.g. the request, e-mail or daily message limits (see [rate limiting](config.md#rate-limiting))
+
 **Bug fixes + maintenance:**
 
 * Cluster: a forwarded message for a topic without subscribers on the receiving node now counts as wasted (`ntfy_cluster_messages_wasted_total`) and no longer keeps that idle topic in memory

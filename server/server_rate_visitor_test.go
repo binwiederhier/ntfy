@@ -426,7 +426,7 @@ func ageTopic(t *testing.T, topic string, d time.Duration, servers ...*Server) {
 		if c.DatabaseURL != "" {
 			store = tp.NewPostgresStore(userDB)
 		}
-		topicService := tp.New(&tp.Config{Store: store})
+		topicService := tp.New(store)
 		require.Nil(t, topicService.Start(context.Background()))
 		s.topicService = topicService
 		t.Cleanup(func() {

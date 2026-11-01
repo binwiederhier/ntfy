@@ -53,11 +53,6 @@ type Usage struct {
 	counts [numKinds]int64
 }
 
-// Config configures the service
-type Config struct {
-	Store *Store // Where the daily counts are shared and kept across restarts; nil for memory only
-}
-
 // counter is one key's daily usage in its current period
 type counter struct {
 	periodStart int64           // When the period started (unix seconds, see periodStart)

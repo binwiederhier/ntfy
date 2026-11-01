@@ -60,7 +60,6 @@ const (
 
 // Service decides on usage from memory; see the package comment
 type Service struct {
-	conf      *Config
 	now       func() time.Time          // Injectable clock, for tests
 	counters  [shardCount]*counterShard // Daily counts, kept until their period ends
 	buckets   [shardCount]*bucketShard  // Token buckets, per node, evicted when idle and full
@@ -74,16 +73,16 @@ type Service struct {
 	wg        sync.WaitGroup
 }
 
-// New creates the service
-func New(conf *Config) *Service {
-	return newService(conf, time.Now)
+// New creates the service; the store shares the daily counts and keeps them across restarts, nil
+// for memory only
+func New(store *Store) *Service {
+	return newService(store, time.Now)
 }
 
-func newService(conf *Config, now func() time.Time) *Service {
+func newService(store *Store, now func() time.Time) *Service {
 	s := &Service{
-		conf:     conf,
 		now:      now,
-		store:    conf.Store,
+		store:    store,
 		interval: syncInterval,
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())

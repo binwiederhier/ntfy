@@ -1,10 +1,5 @@
 package topic
 
-// Config configures the service
-type Config struct {
-	Store *Store // Where the rows are shared with the other nodes and kept across restarts; nil for memory only
-}
-
 // State is one topic's row of the topic table, as this node knows it. Times are unix seconds.
 type State struct {
 	Topic             string

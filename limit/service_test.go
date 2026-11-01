@@ -36,7 +36,7 @@ func (c *testClock) advance(d time.Duration) {
 func newTestServiceWithClock(t *testing.T) (*Service, *testClock) {
 	t.Helper()
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	return newService(&Config{}, clock.now), clock
+	return newService(nil, clock.now), clock
 }
 
 func newTestService(t *testing.T) *Service {
@@ -348,7 +348,7 @@ func TestService_Prune_DropsEndedPeriods(t *testing.T) {
 }
 
 func TestService_Allow_Concurrent(t *testing.T) {
-	s := New(&Config{})
+	s := New(nil)
 	rule := Rule{
 		Kind:   KindMessages,
 		Burst:  500,
@@ -383,7 +383,7 @@ func TestService_Allow_Concurrent(t *testing.T) {
 }
 
 func BenchmarkAllow_HotKey(b *testing.B) {
-	s := New(&Config{})
+	s := New(nil)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -398,7 +398,7 @@ func BenchmarkAllow_HotKey(b *testing.B) {
 }
 
 func BenchmarkAllow_ManyKeys(b *testing.B) {
-	s := New(&Config{})
+	s := New(nil)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -417,7 +417,7 @@ func BenchmarkAllow_ManyKeys(b *testing.B) {
 }
 
 func BenchmarkAllow_Parallel(b *testing.B) {
-	s := New(&Config{})
+	s := New(nil)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -623,7 +623,7 @@ func TestService_ResetAt(t *testing.T) {
 // on its own: the tests sync by hand. It is closed when the test ends.
 func startTestService(t *testing.T, store *Store, now func() time.Time) *Service {
 	t.Helper()
-	s := newService(&Config{Store: store}, now)
+	s := newService(store, now)
 	s.interval = time.Hour
 	require.Nil(t, s.Start(context.Background()))
 	t.Cleanup(s.Close)
@@ -701,7 +701,7 @@ func TestService_Persist_UpdatedAtIsTheNodesTime(t *testing.T) {
 		require.True(t, s.Allow("user:u_1", Rule{Kind: KindMessages}, 1).OK)
 		s.sync()
 		var updatedAt int64
-		require.Nil(t, s.conf.Store.db.QueryRow(`SELECT updated_at FROM usage WHERE key = 'user:u_1'`).Scan(&updatedAt))
+		require.Nil(t, s.store.db.QueryRow(`SELECT updated_at FROM usage WHERE key = 'user:u_1'`).Scan(&updatedAt))
 		require.Equal(t, ahead.Unix(), updatedAt)
 	})
 }
@@ -731,7 +731,7 @@ func TestService_Persist_TwoNodesConverge(t *testing.T) {
 		b.sync()
 		require.False(t, b.Allow("k", rule, 1).OK)
 		require.Equal(t, int64(6), b.Usage("k").Count(KindMessages))
-		require.Equal(t, int64(6), usageRowOf(t, a.conf.Store, "k").counts[0])
+		require.Equal(t, int64(6), usageRowOf(t, a.store, "k").counts[0])
 	})
 }
 
@@ -745,13 +745,13 @@ func TestService_Persist_ThresholdPromotes(t *testing.T) {
 		}
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 24).OK)
 		s.sync()
-		require.Equal(t, usageRow{}, usageRowOf(t, s.conf.Store, "ip:1.2.3.4"))
+		require.Equal(t, usageRow{}, usageRowOf(t, s.store, "ip:1.2.3.4"))
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 		s.sync()
-		require.Equal(t, int64(25), usageRowOf(t, s.conf.Store, "ip:1.2.3.4").counts[0])
+		require.Equal(t, int64(25), usageRowOf(t, s.store, "ip:1.2.3.4").counts[0])
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 		s.sync()
-		require.Equal(t, int64(26), usageRowOf(t, s.conf.Store, "ip:1.2.3.4").counts[0])
+		require.Equal(t, int64(26), usageRowOf(t, s.store, "ip:1.2.3.4").counts[0])
 	})
 }
 
@@ -772,7 +772,7 @@ func TestService_Persist_ReadBackPromotes(t *testing.T) {
 		a.sync() // Reads b's row
 		require.Equal(t, int64(40), a.Usage("ip:1.2.3.4").Count(KindMessages))
 		a.sync() // Writes its own 10
-		require.Equal(t, int64(40), usageRowOf(t, a.conf.Store, "ip:1.2.3.4").counts[0])
+		require.Equal(t, int64(40), usageRowOf(t, a.store, "ip:1.2.3.4").counts[0])
 		b.sync()
 		require.Equal(t, int64(40), b.Usage("ip:1.2.3.4").Count(KindMessages))
 	})
@@ -869,7 +869,7 @@ func TestService_Persist_StartupWithoutStore(t *testing.T) {
 		require.Nil(t, err)
 		_, err = store.db.Exec(`ALTER TABLE usage RENAME TO usage_down`)
 		require.Nil(t, err)
-		s := newService(&Config{Store: store}, time.Now)
+		s := newService(store, time.Now)
 		s.interval = 50 * time.Millisecond
 		t.Cleanup(s.Close)
 		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -948,7 +948,7 @@ func TestService_Allow_DenyRacesRollover(t *testing.T) {
 	// roll the counter over; run with -race
 	var ticks atomic.Int64
 	start := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
-	s := newService(&Config{}, func() time.Time {
+	s := newService(nil, func() time.Time {
 		return start.Add(time.Duration(ticks.Add(1)) * time.Hour)
 	})
 	rule := Rule{
@@ -978,7 +978,7 @@ func TestService_Close_CancelsStalledLoad(t *testing.T) {
 	conn, err := pool.Conn(context.Background()) // Holds the only connection: the load waits for it
 	require.Nil(t, err)
 	defer conn.Close()
-	s := newService(&Config{Store: store}, time.Now)
+	s := newService(store, time.Now)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.Nil(t, s.Start(ctx))
@@ -1021,7 +1021,7 @@ var (
 
 func newBenchService(b *testing.B) *Service {
 	b.Helper()
-	s := newService(&Config{}, time.Now)
+	s := newService(nil, time.Now)
 	for i := 0; i < benchIdleKeys; i++ {
 		s.Allow(fmt.Sprintf("ip:10.%d.%d.%d", i>>16, (i>>8)&255, i&255), benchRequestRule, 1)
 	}

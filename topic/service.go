@@ -59,9 +59,10 @@ type Service struct {
 	mu        sync.Mutex // Protects entries, pending and noted
 }
 
-// New creates the service
-func New(conf *Config) *Service {
-	return newService(conf.Store, time.Now)
+// New creates the service; the store shares the rows with the other nodes and keeps them across
+// restarts, nil for memory only
+func New(store *Store) *Service {
+	return newService(store, time.Now)
 }
 
 func newService(store *Store, now func() time.Time) *Service {

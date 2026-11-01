@@ -458,7 +458,7 @@ func TestService_Persist_PrunesTableAndMemory(t *testing.T) {
 }
 
 func TestService_WithoutStore(t *testing.T) {
-	s := New(&Config{})
+	s := New(nil)
 	require.Nil(t, s.Start(context.Background()))
 	s.Note("upA")
 	topic, err := s.Refresh(context.Background(), "upA")

@@ -358,13 +358,9 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
-	s.limiter = limit.New(&limit.Config{
-		Store: createUsageStore(pool, userDB),
-	})
+	s.limiter = limit.New(createUsageStore(pool, userDB))
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
-	s.topicService = tp.New(&tp.Config{
-		Store: createTopicStore(pool, userDB),
-	})
+	s.topicService = tp.New(createTopicStore(pool, userDB))
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)

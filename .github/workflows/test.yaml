@@ -43,7 +43,7 @@ jobs:
         run: make docs
       - name: Build web app (required for tests)
         run: make web
-      - name: Run tests, formatting, vetting and linting
-        run: make checkv
-      - name: Run coverage
+      - name: Run web tests, formatting, vetting and linting
+        run: make web-test web-fmt-check fmt-check vet web-lint lint staticcheck template-check go-check # The Go tests run once, with -race, in coverage
+      - name: Run Go tests (race detector, coverage)
         run: make coverage

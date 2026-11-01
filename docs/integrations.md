@@ -205,6 +205,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Sanctumd](https://github.com/Phioster/sanctum_daemon) - Android app for Jellyfin and the *arr stack; subscribes to ntfy topics for live pushes with images, priorities and action buttons (Kotlin)
 - [MeetAlert](https://github.com/roypadina/MeetAlert) - macOS meeting alerts from your calendars; when you're away from the Mac it escalates to your phone via ntfy with Ack/Join/Snooze actions (Swift)
 - [aibot-hostkit](https://github.com/monarchsofchaos004-gif/aibot-hostkit) - Keeps an AI coding agent (Claude Code, Codex, Gemini CLI) running on a cloud Linux box and pushes an ntfy alert to your phone whenever it restarts (Bash)
+- [Wudland](https://github.com/joexk1/wudland) - Pixel-art iPhone village that receives end-to-end encrypted coding-agent status through ntfy, with [plugins for Claude Code, Codex, opencode and terminal commands](https://github.com/joexk1/wudland-plugins) (Node.js, MIT; iOS app GPL-3.0, in App Store review)
 
 ## Blog + forum posts
 

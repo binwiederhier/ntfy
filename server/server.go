@@ -2005,6 +2005,8 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 			}
 		}
 	}
+
+	// Make v the rate visitor of the topics it may write to
 	for _, t := range writableRateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).

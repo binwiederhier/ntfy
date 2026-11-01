@@ -232,9 +232,9 @@ func TestService_Persist_NoteDoesNotReviveRateVisitor(t *testing.T) {
 	})
 }
 
-func TestService_Persist_TouchAfterPruneRestoresRow(t *testing.T) {
-	// A touch written after another node pruned the row recreates it with the rate visitor: every
-	// write carries the full row
+func TestService_Persist_TouchAfterPruneRecreatesRow(t *testing.T) {
+	// A touch written after another node pruned the row recreates it without the rate visitor, since
+	// a touch never writes one (it may be stale); this node keeps its own until the next subscribe
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := newTestClock()
 		store := newStore()
@@ -248,9 +248,10 @@ func TestService_Persist_TouchAfterPruneRestoresRow(t *testing.T) {
 		clock.advance(time.Hour)
 		s.Touch("upA")
 		s.sync()
-		expected := state("upA", set, clock.unix(), "u_1", "1.2.3.4")
+		expected := state("upA", set, clock.unix(), "", "")
 		expected.UpdatedAt = clock.unix()
 		require.Equal(t, *expected, readAll(t, store, 0)["upA"])
+		require.Equal(t, "1.2.3.4", s.State("upA").RateVisitorIP)
 	})
 }
 
@@ -270,6 +271,32 @@ func TestService_Persist_ReadBackKeepsUnwrittenRateVisitor(t *testing.T) {
 		b.sync()
 		a.sync()
 		require.Equal(t, "5.6.7.8", a.State("upA").RateVisitorIP)
+	})
+}
+
+func TestService_Persist_TouchKeepsNewerRateVisitor(t *testing.T) {
+	// A touch or keepalive does not write this node's rate visitor over a newer one set on
+	// another node, and the node adopts the newer one even while its touch is unwritten
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		clock := newTestClock()
+		store := newStore()
+		a := startTestService(t, store, clock.now)
+		b := startTestService(t, newStore(), clock.now)
+		a.SetRateVisitor("upA", "", "1.1.1.1")
+		a.sync()
+		clock.advance(keepaliveInterval)
+		a.Keepalive("upA")
+		a.Touch("upA")
+		b.SetRateVisitor("upA", "u_2", "2.2.2.2")
+		b.sync()
+		a.sync()
+		b.sync()
+		a.sync()
+		for _, s := range []*Service{a, b} {
+			require.Equal(t, "2.2.2.2", s.State("upA").RateVisitorIP)
+			require.Equal(t, "u_2", s.State("upA").RateVisitorUserID)
+		}
+		require.Equal(t, "2.2.2.2", readAll(t, store, 0)["upA"].RateVisitorIP)
 	})
 }
 
@@ -365,6 +392,26 @@ func TestService_Persist_WriteFailureKeepsNewerChange(t *testing.T) {
 		s.sync()
 		require.Equal(t, "5.6.7.8", readAll(t, store, 0)["upA"].RateVisitorIP)
 		require.Equal(t, "5.6.7.8", s.State("upA").RateVisitorIP)
+	})
+}
+
+func TestService_Persist_WriteFailureKeepsUnwrittenRateVisitor(t *testing.T) {
+	// A rate visitor whose write failed is retried even if a touch came in meanwhile
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		clock := newTestClock()
+		store := newStore()
+		s := startTestService(t, store, clock.now)
+		s.SetRateVisitor("upA", "u_1", "1.2.3.4")
+		writeChunk := store.writeChunk
+		store.writeChunk = func(ctx context.Context, rows []State, now int64) error {
+			s.Touch("upA")
+			return errors.New("database is down")
+		}
+		s.sync()
+		store.writeChunk = writeChunk
+		s.sync()
+		require.Equal(t, "u_1", readAll(t, store, 0)["upA"].RateVisitorUserID)
+		require.Equal(t, "1.2.3.4", readAll(t, store, 0)["upA"].RateVisitorIP)
 	})
 }
 

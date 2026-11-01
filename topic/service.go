@@ -116,14 +116,14 @@ func (s *Service) SetRateVisitor(topic, userID, ip string) {
 	defer s.mu.Unlock()
 	e := s.touchNoLock(topic)
 	e.RateVisitorUserID, e.RateVisitorIP = userID, ip
-	s.addPendingNoLock(e)
+	s.addPendingNoLock(e, true)
 }
 
 // Touch records subscriber activity on the topic now, keeping its rate visitor
 func (s *Service) Touch(topic string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.addPendingNoLock(s.touchNoLock(topic))
+	s.addPendingNoLock(s.touchNoLock(topic), false)
 }
 
 // Keepalive records that a stream is open on the topic, as a Touch at most once per keepaliveInterval
@@ -133,7 +133,7 @@ func (s *Service) Keepalive(topic string) {
 	if e, ok := s.entries[topic]; ok && s.now().Unix()-e.SubscribedAt < int64(keepaliveInterval/time.Second) {
 		return
 	}
-	s.addPendingNoLock(s.touchNoLock(topic))
+	s.addPendingNoLock(s.touchNoLock(topic), false)
 }
 
 // Note records a refused push and returns the topic's state. An unknown topic becomes known as
@@ -151,7 +151,7 @@ func (s *Service) Note(topic string) *State {
 		}
 		s.entries[topic] = e
 		s.noted++
-		s.addPendingNoLock(e)
+		s.addPendingNoLock(e, false)
 	}
 	return s.stateNoLock(topic)
 }
@@ -257,7 +257,10 @@ func (s *Service) write(ctx context.Context) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, r := range rows {
-		if _, ok := s.pending[r.Topic]; ok {
+		if p, ok := s.pending[r.Topic]; ok && err != nil && p.RateVisitorIP == "" && r.RateVisitorIP != "" {
+			p.RateVisitorUserID, p.RateVisitorIP = r.RateVisitorUserID, r.RateVisitorIP // A touch since then does not drop it
+			s.pending[r.Topic] = p
+		} else if ok {
 			continue
 		} else if err != nil {
 			s.pending[r.Topic] = r
@@ -280,7 +283,7 @@ func (s *Service) read(ctx context.Context, since int64) (int, error) {
 }
 
 // applyNoLock merges a row read from the store into memory by the store's rules, except that a
-// pending rate visitor is newer than the stored one. The caller must hold s.mu.
+// rate visitor set here and not written yet is newer than the stored one. The caller must hold s.mu.
 func (s *Service) applyNoLock(r *State) {
 	e, ok := s.entries[r.Topic]
 	if !ok {
@@ -297,7 +300,7 @@ func (s *Service) applyNoLock(r *State) {
 	e.FirstSeenAt = min(e.FirstSeenAt, r.FirstSeenAt)
 	e.SubscribedAt = max(e.SubscribedAt, r.SubscribedAt)
 	e.UpdatedAt = max(e.UpdatedAt, r.UpdatedAt)
-	if _, pending := s.pending[r.Topic]; r.RateVisitorIP != "" && !pending {
+	if p, pending := s.pending[r.Topic]; r.RateVisitorIP != "" && (!pending || p.RateVisitorIP == "") {
 		e.RateVisitorUserID, e.RateVisitorIP = r.RateVisitorUserID, r.RateVisitorIP
 	}
 }
@@ -336,12 +339,18 @@ func (s *Service) touchNoLock(topic string) *State {
 	return e
 }
 
-// addPendingNoLock has the entry's row written. Without a store nothing is ever written, so
-// nothing is kept for it. The caller must hold s.mu.
-func (s *Service) addPendingNoLock(e *State) {
-	if s.store != nil {
-		s.pending[e.Topic] = *e
+// addPendingNoLock has the entry's row written. Unless a rate visitor is set here, the row has none,
+// so it keeps the stored one, which may be newer. Without a store nothing is ever written. The
+// caller must hold s.mu.
+func (s *Service) addPendingNoLock(e *State, rateVisitor bool) {
+	if s.store == nil {
+		return
 	}
+	r := *e
+	if p, ok := s.pending[e.Topic]; !rateVisitor && (!ok || p.RateVisitorIP == "") {
+		r.RateVisitorUserID, r.RateVisitorIP = "", ""
+	}
+	s.pending[e.Topic] = r
 }
 
 // stateNoLock returns a copy of the topic's state, or nil if it is unknown. The caller must hold s.mu.

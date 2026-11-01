@@ -563,8 +563,8 @@ func (s *Server) Run() error {
 			s.adminUnixListener, err = s.listenAdminSocket()
 			if err != nil {
 				s.mu.Unlock()
-				// Not fatal, unlike the other listeners: the CLI falls back to writing to the database (deprecated)
-				log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/", s.config.ListenAdminUnix)
+				// Not fatal, unlike the other listeners: nothing depends on the (experimental) admin socket yet
+				log.Tag(tagStartup).Err(err).Warn("Admin socket %s not available", s.config.ListenAdminUnix)
 				return
 			}
 			defer s.adminUnixListener.Close()

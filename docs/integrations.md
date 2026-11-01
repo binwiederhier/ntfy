@@ -202,6 +202,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Flock](https://github.com/HNF-FRN/flock) - Runs several Claude Desktop accounts side by side on Windows; its phone app starts and continues Claude Code sessions on the PC through end-to-end encrypted ntfy messages (JS)
 - [epokio](https://github.com/8rulerstar/epokio) - Alerts when an ML training run stalls, hits NaN or finishes, by reading its existing logs (Python)
 - [Pethost](https://pethost.dev/templates/ntfy/) - One-click ntfy server on Pethost, with an admin user made at the first start and anonymous access denied
+- [podway](https://podway.io/start?app=ntfy&ref=docs-ntfy) - One-click ntfy server on managed hosting, with an AI admin you steer from your Claude plan
 - [Sanctumd](https://github.com/Phioster/sanctum_daemon) - Android app for Jellyfin and the *arr stack; subscribes to ntfy topics for live pushes with images, priorities and action buttons (Kotlin)
 - [MeetAlert](https://github.com/roypadina/MeetAlert) - macOS meeting alerts from your calendars; when you're away from the Mac it escalates to your phone via ntfy with Ack/Join/Snooze actions (Swift)
 - [aibot-hostkit](https://github.com/monarchsofchaos004-gif/aibot-hostkit) - Keeps an AI coding agent (Claude Code, Codex, Gemini CLI) running on a cloud Linux box and pushes an ntfy alert to your phone whenever it restarts (Bash)

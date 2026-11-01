@@ -1731,7 +1731,7 @@ func TestServer_AccountEmailVerify_UserWithoutTier_EmailLimitZero(t *testing.T) 
 	})
 }
 
-func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
+func TestServer_PublishAndExpungeTopicAfter6Hours(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()
 		s := newTestServer(t, newTestConfig(t, databaseURL))
@@ -1770,12 +1770,12 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 		// Fudge with last access, but subscribe, and see that it won't get pruned (because of subscriber)
 		subID := s.topics["mytopic"].Subscribe(subFn, nil, func() {})
 		s.topics["mytopic"].mu.Lock()
-		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+		s.topics["mytopic"].lastAccess = time.Now().Add(-7 * time.Hour)
 		s.topics["mytopic"].mu.Unlock()
 		s.execManager()
 		require.NotNil(t, s.topics["mytopic"])
 
-		// It'll finally get pruned now that there are no subscribers and last access is 17 hours ago
+		// It'll finally get pruned now that there are no subscribers and last access is 7 hours ago
 		s.topics["mytopic"].Unsubscribe(subID)
 		s.execManager()
 		require.Nil(t, s.topics["mytopic"])
@@ -1792,7 +1792,7 @@ func TestServer_TopicKeepaliveOnPoll(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 
 		// Mess with last access time
-		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+		s.topics["mytopic"].lastAccess = time.Now().Add(-7 * time.Hour)
 
 		// Poll again and check keepalive time
 		response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
@@ -1985,8 +1985,8 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.
 		response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 507, response.Code)
 
-		// Slightly unrelated: Test that topic is pruned after 16 hours
-		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+		// Slightly unrelated: Test that topic is pruned after 6 hours
+		s.topics["mytopic"].lastAccess = time.Now().Add(-7 * time.Hour)
 		s.execManager()
 		require.Nil(t, s.topics["mytopic"])
 	})

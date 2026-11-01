@@ -14,8 +14,8 @@ import (
 const (
 	// topicExpungeAfter defines how long a topic is active before it is removed from memory. What
 	// has to outlive it (a UnifiedPush topic's subscriber activity and rate visitor) is kept by
-	// the topic service, not here.
-	topicExpungeAfter = 16 * time.Hour
+	// the topic service, not here. A re-created topic costs its publisher a topic-creation token.
+	topicExpungeAfter = 6 * time.Hour
 
 	// topicDeliveredRetain is how long a topic at least remembers that a message went out to its
 	// subscribers, so the tail (see PublishMissed) does not send it again. It must cover the write

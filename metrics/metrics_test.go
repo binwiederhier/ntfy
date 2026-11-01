@@ -54,9 +54,9 @@ var expectedMetricNames = []string{
 	"ntfy_tail_messages_lag_seconds",
 	"ntfy_tail_messages_missed_total",
 	"ntfy_tail_messages_read_total",
-	"ntfy_topic_states_total",
 	"ntfy_topics_total",
 	"ntfy_unifiedpush_published_success",
+	"ntfy_unifiedpush_topics_total",
 	"ntfy_users_total",
 	"ntfy_visitors_total",
 }

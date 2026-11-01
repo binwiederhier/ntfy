@@ -37,7 +37,8 @@ const (
 	// keepaliveInterval is how often an open stream writes its subscriber activity at most
 	keepaliveInterval = 5 * time.Minute
 
-	// maxNoted caps the topics known only from refused pushes, so a push flood cannot fill memory
+	// maxNoted caps the topics known only from refused pushes, so a push flood cannot fill memory;
+	// rows read from other nodes count too, so it is effectively cluster-wide
 	maxNoted = 100_000
 )
 

@@ -2319,6 +2319,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * Send a `Retry-After` header with HTTP 429 responses that are caused by a rate limit with a known wait, e.g. the request, e-mail or daily message limits (see [rate limiting](config.md#rate-limiting))
+* Send the IETF draft `RateLimit-Policy` and `RateLimit` headers with publish responses, for the request and daily message limits (see [rate limiting](config.md#rate-limiting))
 
 **Bug fixes + maintenance:**
 

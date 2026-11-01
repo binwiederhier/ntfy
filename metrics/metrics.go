@@ -75,8 +75,8 @@ var (
 	Topics = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_topics_total",
 	})
-	UnifiedPushTopics = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "ntfy_unifiedpush_topics_total",
+	TopicsUnifiedPush = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_topics_unifiedpush_total",
 	})
 	HTTPRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ntfy_http_requests_total",
@@ -161,7 +161,7 @@ func init() {
 		Users,
 		Subscribers,
 		Topics,
-		UnifiedPushTopics,
+		TopicsUnifiedPush,
 		HTTPRequests,
 		dbPools,
 	)

@@ -107,11 +107,11 @@ func TestServer_Manager_MessagesTotalSumsAcrossNodes(t *testing.T) {
 	})
 }
 
-func TestServer_Manager_UnifiedPushTopicsGauge(t *testing.T) {
+func TestServer_Manager_TopicsUnifiedPushGauge(t *testing.T) {
 	// The manager exports how many UnifiedPush topics the node keeps in memory, to watch their memory
 	s := newTestServer(t, newTestConfig(t, ""))
 	s.topicService.SetRateVisitor("upAAAAAAAAAAAA", &tp.RateVisitor{IP: "1.2.3.4"})
 	s.topicService.Note("upBBBBBBBBBBBB")
 	s.execManager()
-	require.Equal(t, float64(2), testutil.ToFloat64(metrics.UnifiedPushTopics))
+	require.Equal(t, float64(2), testutil.ToFloat64(metrics.TopicsUnifiedPush))
 }

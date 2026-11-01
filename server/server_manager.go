@@ -85,7 +85,7 @@ func (s *Server) execManager() {
 
 	// Update stats
 	s.updateAndWriteStats(messagesCount)
-	unifiedPushTopics := s.topicService.Size() // UnifiedPush topics this node keeps, to watch their memory
+	topicsUnifiedPush := s.topicService.Size() // UnifiedPush topics this node keeps, to watch their memory
 
 	// Log stats
 	log.
@@ -94,7 +94,7 @@ func (s *Server) execManager() {
 			"messages_published":      messagesCount,
 			"messages_cached":         messagesCached,
 			"topics_active":           topicsCount,
-			"unifiedpush_topics":      unifiedPushTopics,
+			"topics_unifiedpush":      topicsUnifiedPush,
 			"subscribers":             subscribers,
 			"visitors":                visitorsCount,
 			"users":                   usersCount,
@@ -111,7 +111,7 @@ func (s *Server) execManager() {
 	metrics.Users.Set(float64(usersCount))
 	metrics.Subscribers.Set(float64(subscribers))
 	metrics.Topics.Set(float64(topicsCount))
-	metrics.UnifiedPushTopics.Set(float64(unifiedPushTopics))
+	metrics.TopicsUnifiedPush.Set(float64(topicsUnifiedPush))
 	if s.attachment != nil {
 		metrics.AttachmentsTotalSize.Set(float64(s.attachment.Size()))
 	}

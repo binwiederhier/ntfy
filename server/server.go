@@ -1986,29 +1986,23 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	}
 	s.maybeTouchTopics(eligibleRateTopics)
 
-	// If access controls are turned off, v has access to everything, and we can set the rate visitor
-	if s.userManager == nil {
-		return s.setRateVisitors(r, v, eligibleRateTopics)
-	}
-
-	// If access controls are enabled, only set rate visitor if
-	// - topic is reserved, and v.user is the owner
-	// - topic is not reserved, and v.user has write access
-	writableRateTopics := make([]*topic, 0)
-	for _, t := range topics {
-		if !util.Contains(eligibleRateTopics, t) {
-			continue
-		}
-		ownerUserID, err := s.userManager.ReservationOwner(t.ID)
-		if err != nil {
-			return err
-		}
-		if ownerUserID == "" {
-			if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite); err == nil {
+	// With access control, set the rate visitor only if the topic is reserved and v.user is the
+	// owner, or not reserved and v.user has write access; without it, v may write to everything
+	writableRateTopics := eligibleRateTopics
+	if s.userManager != nil {
+		writableRateTopics = make([]*topic, 0)
+		for _, t := range eligibleRateTopics {
+			ownerUserID, err := s.userManager.ReservationOwner(t.ID)
+			if err != nil {
+				return err
+			}
+			if ownerUserID == "" {
+				if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite); err == nil {
+					writableRateTopics = append(writableRateTopics, t)
+				}
+			} else if ownerUserID == v.MaybeUserID() {
 				writableRateTopics = append(writableRateTopics, t)
 			}
-		} else if ownerUserID == v.MaybeUserID() {
-			writableRateTopics = append(writableRateTopics, t)
 		}
 	}
 	return s.setRateVisitors(r, v, writableRateTopics)

@@ -146,9 +146,7 @@ const (
 	`
 )
 
-// The topic table is a topic's cluster-wide state: when it was first seen on any node, when a
-// subscriber was last active, and who pays for the pushes to it (see package topic, which reads
-// and writes it)
+// The topic table is the topics' cluster-wide state (see package topic, which reads and writes it)
 const (
 	postgresCreateTopicTableQuery = `
 		CREATE TABLE IF NOT EXISTS topic (

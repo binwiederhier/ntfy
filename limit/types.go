@@ -42,10 +42,15 @@ type Rule struct {
 }
 
 // Decision is the answer to Allow: whether the usage was admitted, and if not, how long until
-// it could be (0 if unknown, e.g. when n exceeds the burst)
+// it could be (0 if unknown, e.g. when n exceeds the burst). The other fields describe the limit
+// that decided, for the RateLimit headers: the daily cap if the rule has one, else the bucket.
 type Decision struct {
 	OK         bool
 	RetryAfter time.Duration
+	Quota      int64         // The daily cap or the burst; 0 if the rule has neither
+	Window     time.Duration // A day, or the time the bucket takes to refill completely
+	Remaining  int64         // Units left after this call
+	Reset      time.Duration // Until the period ends, or until the bucket's next token (0 if it never refills)
 }
 
 // Usage is a key's daily counts in its current period

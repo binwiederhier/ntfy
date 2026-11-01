@@ -1929,6 +1929,15 @@ visitor's bucket has refilled enough (e.g. for the request, e-mail or topic crea
 day is over for a daily limit (e.g. messages, e-mails, phone calls or attachment bandwidth). Limits without a known
 wait, such as the subscription limit or the global topic limit, do not send the header.
 
+Publish responses, and every 429 caused by one of these limits, also carry the `RateLimit-Policy` and `RateLimit` headers of the IETF draft
+[RateLimit header fields for HTTP](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/)
+(draft-ietf-httpapi-ratelimit-headers-11), so clients can slow down before they hit a limit. There is one policy for the
+request limit (`q` is the burst, `r` the requests left, `t` the seconds until the next request is refilled) and one for
+the daily message limit (`q` is the daily limit, `r` the messages left today, `t` the seconds until the visitor's day is
+over), e.g. `RateLimit-Policy: "messages";q=250;w=86400` and `RateLimit: "messages";r=249;t=3600`. Exempt visitors (see
+`visitor-request-limit-exempt-hosts`) and unlimited limits do not get a policy. With multiple ntfy nodes, the remaining
+daily messages are the answering node's view, which may lag the others' by a few seconds.
+
 ### General limits
 Let's do the easy limits first:
 

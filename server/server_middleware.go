@@ -1,8 +1,11 @@
 package server
 
 import (
+	"fmt"
+	"math"
 	"net/http"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 )
@@ -17,12 +20,18 @@ const (
 	contextAdminSocket // Set (to true) on requests that arrived over the admin socket, see isAdminSocketRequest
 )
 
+// Rate limit headers of draft-ietf-httpapi-ratelimit-headers-11, sent on publishes
+const (
+	headerRateLimitPolicy = "RateLimit-Policy"
+	headerRateLimit       = "RateLimit"
+)
+
 func (s *Server) limitRequests(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 			return next(w, r, v)
 		} else if d := v.RequestAllowed(); !d.OK {
-			return errHTTPTooManyRequestsLimitRequests.RetryAfter(d.RetryAfter)
+			return errHTTPTooManyRequestsLimitRequests.WithLimitDecision(d)
 		}
 		return next(w, r, v)
 	}
@@ -45,11 +54,33 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 		})
 		if util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 			return next(w, r, v)
-		} else if d := vrate.RequestAllowed(); !d.OK {
-			return errHTTPTooManyRequestsLimitRequests.RetryAfter(d.RetryAfter)
 		}
+		d := vrate.RequestAllowed()
+		if !d.OK {
+			return errHTTPTooManyRequestsLimitRequests.WithLimitDecision(d)
+		}
+		setRateLimitHeaders(w, d)
 		return next(w, r, v)
 	}
+}
+
+// setRateLimitHeaders adds the decision's limit as a policy named after its kind, e.g.
+// RateLimit-Policy: "messages";q=250;w=86400 and RateLimit: "messages";r=249;t=3600. Each policy
+// is its own field line, which the draft allows; a decision without a quota adds nothing.
+func setRateLimitHeaders(w http.ResponseWriter, d limit.Decision) {
+	if d.Quota <= 0 {
+		return
+	}
+	policy := fmt.Sprintf(`"%s";q=%d`, d.Kind, d.Quota)
+	if d.Window > 0 {
+		policy += fmt.Sprintf(";w=%d", int64(math.Ceil(d.Window.Seconds())))
+	}
+	current := fmt.Sprintf(`"%s";r=%d`, d.Kind, d.Remaining)
+	if d.Reset > 0 {
+		current += fmt.Sprintf(";t=%d", int64(math.Ceil(d.Reset.Seconds()))) // Rounded up like Retry-After, so the two agree
+	}
+	w.Header().Add(headerRateLimitPolicy, policy)
+	w.Header().Add(headerRateLimit, current)
 }
 
 func (s *Server) ensureWebEnabled(next handleFunc) handleFunc {

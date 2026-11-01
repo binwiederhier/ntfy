@@ -32,6 +32,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/model"
@@ -5685,14 +5686,23 @@ func TestServer_HandleError_RetryAfter(t *testing.T) {
 		r, _ := http.NewRequest("GET", "/mytopic/json", nil)
 		v := newVisitor(s.visitors, netip.MustParseAddr("1.2.3.4"), nil)
 		rr := httptest.NewRecorder()
-		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitRequests.RetryAfter(1500*time.Millisecond))
+		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitRequests.WithLimitDecision(limit.Decision{
+			RetryAfter: 1500 * time.Millisecond,
+			Kind:       limit.KindRequests,
+			Quota:      60,
+			Window:     5 * time.Minute,
+			Reset:      1500 * time.Millisecond,
+		}))
 		require.Equal(t, 429, rr.Code)
 		require.Equal(t, "2", rr.Header().Get("Retry-After"))
+		require.Equal(t, []string{`"requests";q=60;w=300`}, rr.Header().Values("RateLimit-Policy")) // The decision also names the limit
+		require.Equal(t, []string{`"requests";r=0;t=2`}, rr.Header().Values("RateLimit"))
 		require.Equal(t, 42901, toHTTPError(t, rr.Body.String()).Code)
 
 		rr = httptest.NewRecorder()
-		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitRequests.RetryAfter(time.Millisecond))
+		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitRequests.WithLimitDecision(limit.Decision{RetryAfter: time.Millisecond}))
 		require.Equal(t, "1", rr.Header().Get("Retry-After"))
+		require.Empty(t, rr.Header().Values("RateLimit")) // No quota, no policy
 
 		rr = httptest.NewRecorder()
 		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitSubscriptions)

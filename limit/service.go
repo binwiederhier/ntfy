@@ -103,6 +103,13 @@ func newService(conf *Config, now func() time.Time) *Service {
 // bucket is charged first and handed back if the daily cap denies, so the two locks are taken
 // one after the other, never nested.
 func (s *Service) Allow(key string, rule Rule, n int64) Decision {
+	d := s.allow(key, rule, n)
+	d.Kind = rule.Kind
+	return d
+}
+
+// allow is Allow, without naming the decision's kind
+func (s *Service) allow(key string, rule Rule, n int64) Decision {
 	now := s.now()
 	d := s.takeTokens(key, &rule, n, now)
 	if !d.OK {
@@ -211,6 +218,13 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 // it. Like Tokens, a rule without a bucket admits nothing. It is for "may I try" checks that charge
 // only on failure, and still need to tell the client how long to wait.
 func (s *Service) Check(key string, rule Rule) Decision {
+	d := s.check(key, rule)
+	d.Kind = rule.Kind
+	return d
+}
+
+// check is Check, without naming the decision's kind
+func (s *Service) check(key string, rule Rule) Decision {
 	if rule.Burst <= 0 {
 		return Decision{}
 	}

@@ -127,6 +127,7 @@ func TestService_Allow_QuotaBucket(t *testing.T) {
 	}
 	expected := Decision{
 		OK:        true,
+		Kind:      KindRequests,
 		Quota:     3,
 		Window:    300 * time.Millisecond,
 		Remaining: 2,
@@ -139,6 +140,7 @@ func TestService_Allow_QuotaBucket(t *testing.T) {
 	clock.advance(40 * time.Millisecond)
 	expected = Decision{
 		RetryAfter: 60 * time.Millisecond,
+		Kind:       KindRequests,
 		Quota:      3,
 		Window:     300 * time.Millisecond,
 		Remaining:  0,
@@ -157,6 +159,7 @@ func TestService_Allow_QuotaDaily(t *testing.T) {
 	reset := 15*time.Hour + 48*time.Minute + 26*time.Second
 	expected := Decision{
 		OK:        true,
+		Kind:      KindMessages,
 		Quota:     2,
 		Window:    24 * time.Hour,
 		Remaining: 1,
@@ -332,16 +335,16 @@ func TestService_Check(t *testing.T) {
 		Burst:  2,
 		Refill: time.Minute,
 	}
-	require.Equal(t, Decision{OK: true}, s.Check("k", rule)) // A fresh bucket is full
+	require.Equal(t, Decision{OK: true, Kind: KindAuth}, s.Check("k", rule)) // A fresh bucket is full
 	require.True(t, s.Allow("k", rule, 2).OK)
-	require.Equal(t, Decision{RetryAfter: time.Minute}, s.Check("k", rule))
+	require.Equal(t, Decision{RetryAfter: time.Minute, Kind: KindAuth}, s.Check("k", rule))
 	clock.advance(20 * time.Second)
-	require.Equal(t, Decision{RetryAfter: 40 * time.Second}, s.Check("k", rule))
+	require.Equal(t, Decision{RetryAfter: 40 * time.Second, Kind: KindAuth}, s.Check("k", rule))
 	require.Equal(t, int64(0), s.Tokens("k", rule)) // Checking did not take anything
 	clock.advance(40 * time.Second)
-	require.Equal(t, Decision{OK: true}, s.Check("k", rule))
+	require.Equal(t, Decision{OK: true, Kind: KindAuth}, s.Check("k", rule))
 	require.Equal(t, int64(1), s.Tokens("k", rule))
-	require.Equal(t, Decision{}, s.Check("k", Rule{Kind: KindAuth})) // No bucket admits nothing, as Tokens says 0
+	require.Equal(t, Decision{Kind: KindAuth}, s.Check("k", Rule{Kind: KindAuth})) // No bucket admits nothing, as Tokens says 0
 }
 
 func TestService_Prune(t *testing.T) {

@@ -1929,7 +1929,7 @@ visitor's bucket has refilled enough (e.g. for the request, e-mail or topic crea
 day is over for a daily limit (e.g. messages, e-mails, phone calls or attachment bandwidth). Limits without a known
 wait, such as the subscription limit or the global topic limit, do not send the header.
 
-Publish responses (including the 429s) also carry the `RateLimit-Policy` and `RateLimit` headers of the IETF draft
+Publish responses, and every 429 caused by one of these limits, also carry the `RateLimit-Policy` and `RateLimit` headers of the IETF draft
 [RateLimit header fields for HTTP](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/)
 (draft-ietf-httpapi-ratelimit-headers-11), so clients can slow down before they hit a limit. There is one policy for the
 request limit (`q` is the burst, `r` the requests left, `t` the seconds until the next request is refilled) and one for

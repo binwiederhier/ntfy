@@ -704,6 +704,9 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	if retryAfter := httpErr.retryAfterSeconds(); retryAfter != "" {
 		w.Header().Set("Retry-After", retryAfter)
 	}
+	if httpErr.decision != nil {
+		setRateLimitHeaders(w, *httpErr.decision)
+	}
 	ev := logvr(v, r).Err(err)
 	if websocket.IsWebSocketUpgrade(r) {
 		ev.Tag(tagWebsocket).Fields(websocketErrorContext(err))
@@ -1023,7 +1026,7 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 		bandwidthVisitor = s.visitor(m.Sender, nil)
 	}
 	if d := bandwidthVisitor.BandwidthAllowed(size); !d.OK {
-		return errHTTPTooManyRequestsLimitAttachmentBandwidth.With(m).RetryAfter(d.RetryAfter)
+		return errHTTPTooManyRequestsLimitAttachmentBandwidth.With(m).WithLimitDecision(d)
 	}
 	// Actually send file
 	if m.Attachment.Name != "" {
@@ -1110,10 +1113,10 @@ func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 		d := vrate.MessageAllowed()
-		setRateLimitHeaders(w, limit.KindMessages, d)
 		if !d.OK {
-			return nil, errHTTPTooManyRequestsLimitMessages.With(t).RetryAfter(d.RetryAfter)
+			return nil, errHTTPTooManyRequestsLimitMessages.With(t).WithLimitDecision(d)
 		}
+		setRateLimitHeaders(w, d)
 	}
 	if email != "" {
 		var httpErr *errHTTP
@@ -1121,7 +1124,7 @@ func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v
 		if httpErr != nil {
 			return nil, httpErr.With(t)
 		} else if d := vrate.EmailAllowed(); !d.OK {
-			return nil, errHTTPTooManyRequestsLimitEmails.With(t).RetryAfter(d.RetryAfter)
+			return nil, errHTTPTooManyRequestsLimitEmails.With(t).WithLimitDecision(d)
 		}
 	}
 	if call != "" {
@@ -1130,7 +1133,7 @@ func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v
 		if httpErr != nil {
 			return nil, httpErr.With(t)
 		} else if d := vrate.CallAllowed(); !d.OK {
-			return nil, errHTTPTooManyRequestsLimitCalls.With(t).RetryAfter(d.RetryAfter)
+			return nil, errHTTPTooManyRequestsLimitCalls.With(t).WithLimitDecision(d)
 		}
 	}
 	if m.PollID != "" {
@@ -1262,10 +1265,10 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 	}
 	if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 		d := vrate.MessageAllowed()
-		setRateLimitHeaders(w, limit.KindMessages, d)
 		if !d.OK {
-			return errHTTPTooManyRequestsLimitMessages.With(t).RetryAfter(d.RetryAfter)
+			return errHTTPTooManyRequestsLimitMessages.With(t).WithLimitDecision(d)
 		}
+		setRateLimitHeaders(w, d)
 	}
 	sequenceID, e := s.sequenceIDFromPath(r.URL.Path)
 	if e != nil {
@@ -1707,7 +1710,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		// written.
 		if meterPollBandwidth {
 			if d := v.BandwidthAllowed(int64(len(encoded))); !d.OK {
-				return errHTTPTooManyRequestsLimitAttachmentBandwidth.RetryAfter(d.RetryAfter)
+				return errHTTPTooManyRequestsLimitAttachmentBandwidth.WithLimitDecision(d)
 			}
 		}
 		wlock.Lock()
@@ -2152,7 +2155,7 @@ func (s *Server) topicsFromIDs(v *visitor, ids ...string) ([]*topic, error) {
 			}
 			if v != nil {
 				if d := v.TopicCreationAllowed(); !d.OK {
-					return nil, errHTTPTooManyRequestsLimitTopicCreation.RetryAfter(d.RetryAfter)
+					return nil, errHTTPTooManyRequestsLimitTopicCreation.WithLimitDecision(d)
 				}
 			}
 			s.topics[id] = newTopic(id)

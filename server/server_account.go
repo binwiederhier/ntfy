@@ -31,7 +31,7 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
 		if d := v.AccountActionAllowed(); !d.OK {
-			return errHTTPTooManyRequestsLimitAccountActions.RetryAfter(d.RetryAfter)
+			return errHTTPTooManyRequestsLimitAccountActions.WithLimitDecision(d)
 		}
 	}
 	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit, false)
@@ -711,7 +711,7 @@ func (s *Server) handleAccountEmailAdd(w http.ResponseWriter, r *http.Request, v
 	}
 	// Rate limit (counts against the user's email quota)
 	if d := v.EmailAllowed(); !d.OK {
-		return errHTTPTooManyRequestsLimitEmails.RetryAfter(d.RetryAfter)
+		return errHTTPTooManyRequestsLimitEmails.WithLimitDecision(d)
 	}
 	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Starting email verification")
 	if err := s.enqueueEmailVerification(u.ID, req.Email); err != nil {
@@ -804,7 +804,7 @@ func (s *Server) handleAccountEmailResend(w http.ResponseWriter, r *http.Request
 		return errHTTPBadRequestEmailAddressInvalid
 	}
 	if d := v.EmailAllowed(); !d.OK {
-		return errHTTPTooManyRequestsLimitEmails.RetryAfter(d.RetryAfter)
+		return errHTTPTooManyRequestsLimitEmails.WithLimitDecision(d)
 	}
 	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Resending email verification")
 	if err := s.enqueueEmailVerification(u.ID, req.Email); err != nil {
@@ -839,7 +839,7 @@ func (s *Server) handleAccountPasswordResetRequest(w http.ResponseWriter, r *htt
 	}
 	// Rate limit via the shared per-visitor account-creation bucket (no new limiter/config)
 	if d := v.AccountActionAllowed(); !d.OK {
-		return errHTTPTooManyRequestsLimitAccountActions.RetryAfter(d.RetryAfter)
+		return errHTTPTooManyRequestsLimitAccountActions.WithLimitDecision(d)
 	}
 	v.AccountActionPerformed() // Consume a token on every request (including no-match), to throttle probing
 	identifier := strings.TrimSpace(req.Identifier)

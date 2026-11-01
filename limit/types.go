@@ -47,6 +47,7 @@ type Rule struct {
 type Decision struct {
 	OK         bool
 	RetryAfter time.Duration
+	Kind       Kind          // The rule's kind, which names the limit in the RateLimit headers
 	Quota      int64         // The daily cap or the burst; 0 if the rule has neither
 	Window     time.Duration // A day, or the time the bucket takes to refill completely
 	Remaining  int64         // Units left after this call

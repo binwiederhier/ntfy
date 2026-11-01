@@ -5792,6 +5792,84 @@ func TestServer_RetryAfter_TopicCreationLimit(t *testing.T) {
 	})
 }
 
+func TestServer_RateLimitHeaders_Publish(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Each publish carries the request bucket and the daily message limit, and the 429 of
+		// the daily limit says 0 remaining until the same time as Retry-After
+		c := newTestConfig(t, databaseURL)
+		c.VisitorRequestLimitBurst = 60
+		c.VisitorRequestLimitReplenish = 5 * time.Second
+		c.VisitorMessageDailyLimit = 3
+		s := newTestServer(t, c)
+		resetAt := s.limiter.ResetAt(s.visitor(netip.MustParseAddr("9.9.9.9"), nil).key)
+		for i := 0; i < 3; i++ {
+			rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+			require.Equal(t, 200, rr.Code)
+			require.Equal(t, []string{`"requests";q=60;w=300`, `"messages";q=3;w=86400`}, rr.Header().Values("RateLimit-Policy"))
+			limits := rr.Header().Values("RateLimit")
+			require.Len(t, limits, 2)
+			require.Equal(t, fmt.Sprintf(`"requests";r=%d;t=5`, 59-i), limits[0])
+			r, reset := parseRateLimit(t, limits[1], "messages")
+			require.Equal(t, 2-i, r)
+			require.InDelta(t, time.Until(resetAt).Seconds(), reset, 2)
+		}
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, []string{`"requests";q=60;w=300`, `"messages";q=3;w=86400`}, rr.Header().Values("RateLimit-Policy"))
+		require.Equal(t, `"requests";r=56;t=5`, rr.Header().Values("RateLimit")[0])
+		require.Equal(t, fmt.Sprintf(`"messages";r=0;t=%d`, retryAfterSeconds(t, rr)), rr.Header().Values("RateLimit")[1])
+	})
+}
+
+func TestServer_RateLimitHeaders_RequestLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// The 429 of the request bucket says 0 remaining until the next token, as Retry-After does
+		c := newTestConfig(t, databaseURL)
+		c.VisitorRequestLimitBurst = 3
+		c.VisitorRequestLimitReplenish = 5 * time.Second
+		s := newTestServer(t, c)
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+		}
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, []string{`"requests";q=3;w=15`}, rr.Header().Values("RateLimit-Policy")) // The handler, and the daily limit, are never reached
+		require.Equal(t, []string{fmt.Sprintf(`"requests";r=0;t=%d`, retryAfterSeconds(t, rr))}, rr.Header().Values("RateLimit"))
+	})
+}
+
+func TestServer_RateLimitHeaders_Exempt(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
+		s := newTestServer(t, c)
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Empty(t, rr.Header().Values("RateLimit-Policy"))
+		require.Empty(t, rr.Header().Values("RateLimit"))
+	})
+}
+
+func TestServer_RateLimitHeaders_NotOnPoll(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+		rr := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Empty(t, rr.Header().Values("RateLimit-Policy"))
+		require.Empty(t, rr.Header().Values("RateLimit"))
+	})
+}
+
+// parseRateLimit parses one RateLimit item, e.g. "messages";r=2;t=3600, into r and t
+func parseRateLimit(t *testing.T, item, name string) (int, float64) {
+	t.Helper()
+	var r, reset int
+	_, err := fmt.Sscanf(item, `"`+name+`";r=%d;t=%d`, &r, &reset)
+	require.NoError(t, err, "invalid RateLimit item: %s", item)
+	return r, float64(reset)
+}
+
 func retryAfterSeconds(t *testing.T, rr *httptest.ResponseRecorder) int {
 	t.Helper()
 	header := rr.Header().Get("Retry-After")

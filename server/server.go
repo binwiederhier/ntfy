@@ -1080,7 +1080,7 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 	return nil
 }
 
-func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Message, error) {
+func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v *visitor) (*model.Message, error) {
 	if s.readOnly.Load() {
 		return nil, errHTTPServiceUnavailableDraining // Read-only; the load balancers stopped sending requests in the drain delay
 	}
@@ -1109,7 +1109,9 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
-		if d := vrate.MessageAllowed(); !d.OK {
+		d := vrate.MessageAllowed()
+		setRateLimitHeaders(w, limit.KindMessages, d)
+		if !d.OK {
 			return nil, errHTTPTooManyRequestsLimitMessages.With(t).RetryAfter(d.RetryAfter)
 		}
 	}
@@ -1207,7 +1209,7 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 }
 
 func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	m, err := s.handlePublishInternal(r, v)
+	m, err := s.handlePublishInternal(w, r, v)
 	if err != nil {
 		metrics.MessagesPublishedFailure.Inc()
 		return err
@@ -1217,7 +1219,7 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request, v *visito
 }
 
 func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	_, err := s.handlePublishInternal(r, v)
+	_, err := s.handlePublishInternal(w, r, v)
 	if err != nil {
 		metrics.MessagesPublishedFailure.Inc()
 		metrics.MatrixPublishedFailure.Inc()
@@ -1259,7 +1261,9 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 		return err
 	}
 	if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
-		if d := vrate.MessageAllowed(); !d.OK {
+		d := vrate.MessageAllowed()
+		setRateLimitHeaders(w, limit.KindMessages, d)
+		if !d.OK {
 			return errHTTPTooManyRequestsLimitMessages.With(t).RetryAfter(d.RetryAfter)
 		}
 	}

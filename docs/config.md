@@ -2046,10 +2046,10 @@ response if no "rate visitor" has been previously registered. This is to avoid b
 The rate visitor stays registered while the subscriber keeps a stream open, and for 24 hours after it was last seen
 (subscribe, poll, or a stream that closed). Messages are counted against the subscriber's account if it has a tier at
 the time of publishing, and against its IP address otherwise. If the topic has had no subscriber for 4 days, publishing
-a UnifiedPush message to it leads to an `HTTP 410 Gone` response instead (error code 41002), which tells app servers such as
-Mastodon to remove the subscription; a Matrix push gateway request to such a topic gets its pushkey rejected. The topic is
-forgotten 7 days after it was last seen, so only pushes in between get the 410. With a user database (`auth-file`
-or `database-url`), the rate visitors are stored there, so they survive a restart, and with PostgreSQL all servers know them.
+a UnifiedPush message to it leads to an `HTTP 410 Gone` response instead (error code 41002), which tells app servers
+such as Mastodon to remove the subscription; a Matrix push gateway request to such a topic gets its pushkey rejected.
+With a user database (`auth-file` or `database-url`), the rate visitors are stored there, so they survive a restart,
+and with PostgreSQL all servers know them.
 
 To enable subscriber-based rate limiting, set `visitor-subscriber-rate-limiting: true`.
 

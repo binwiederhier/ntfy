@@ -200,7 +200,7 @@ func TestService_Allow_N(t *testing.T) {
 	require.Equal(t, 200*time.Millisecond, d.RetryAfter)
 	clock.advance(200 * time.Millisecond)
 	require.True(t, s.Allow("k", rule, 600).OK)
-	require.Equal(t, int64(1200), s.Usage("k").Count(KindBandwidth))
+	require.Equal(t, int64(0), s.Tokens("k", rule))
 
 	// More than the burst can never be allowed, so there is no retry time
 	d = s.Allow("k", rule, 1001)
@@ -271,7 +271,7 @@ func TestService_Allow_Unlimited(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		require.True(t, s.Allow("k", Rule{Kind: KindBandwidth}, 1).OK)
 	}
-	require.Equal(t, int64(1000), s.Usage("k").Count(KindBandwidth))
+	require.Equal(t, Usage{}, s.Usage("k")) // No bucket and no daily count: nothing is kept
 }
 
 func TestService_Allow_NeverRefills(t *testing.T) {
@@ -547,9 +547,9 @@ func TestService_Prune_ForgottenKeyDecidesLikeAFreshOne(t *testing.T) {
 	require.Equal(t, s.Check("fresh", rule), s.Check("k", rule))
 }
 
-func TestService_Prune_BandwidthTallyHoldsKeyUntilPeriodEnd(t *testing.T) {
-	// A big bandwidth bucket refills a small download in milliseconds, but the bytes stay in the
-	// key's usage until its period ends, so the key is kept until then
+func TestService_Prune_BandwidthForgottenOnceRefilled(t *testing.T) {
+	// A big bandwidth bucket refills a small download in milliseconds; a key that is then idle
+	// for settledIdle is forgotten like any other, since its full bucket is a fresh key's
 	s, clock := newTestServiceWithClock(t)
 	burst := int64(15 * 1024 * 1024 * 1024)
 	rule := Rule{
@@ -559,17 +559,14 @@ func TestService_Prune_BandwidthTallyHoldsKeyUntilPeriodEnd(t *testing.T) {
 	}
 	require.True(t, s.Allow("k", rule, 1024*1024).OK)
 	clock.advance(2 * settledIdle)
-	require.Zero(t, s.Prune())
-	require.Equal(t, int64(1024*1024), s.Usage("k").Count(KindBandwidth))
-	require.Equal(t, int64(1024*1024), s.Limiter("k", rule).Value())
-	clock.t = s.ResetAt("k")
 	require.Equal(t, 1, s.Prune())
-	require.Equal(t, Usage{}, s.Usage("k"))
+	require.Zero(t, s.Size())
+	require.Equal(t, burst, s.Tokens("k", rule))
 }
 
 func TestService_Prune_LimiterViewAcrossPrune(t *testing.T) {
-	// A limiter view (e.g. a reader metering an upload) refers to the key, not to its entry: bytes
-	// it charged keep the entry, a revert finds them, and after a prune it charges a fresh entry
+	// A limiter view (e.g. a reader metering an upload) refers to the key, not to its entry: a
+	// revert refills what it charged, and after a prune it charges a fresh entry
 	s, clock := newTestServiceWithClock(t)
 	rule := Rule{
 		Kind:   KindBandwidth,
@@ -578,13 +575,13 @@ func TestService_Prune_LimiterViewAcrossPrune(t *testing.T) {
 	}
 	l := s.Limiter("k", rule)
 	require.True(t, l.AllowN(100))
-	clock.advance(2 * settledIdle)
-	require.Zero(t, s.Prune())
+	require.Equal(t, rule.Burst-100, s.Tokens("k", rule))
 	require.True(t, l.AllowN(-100)) // Revert: the upload failed
-	require.Zero(t, l.Value())
+	require.Equal(t, rule.Burst, s.Tokens("k", rule))
+	clock.advance(2 * settledIdle)
 	require.Equal(t, 1, s.Prune())
 	require.True(t, l.AllowN(50))
-	require.Equal(t, int64(50), l.Value())
+	require.Equal(t, 1, s.Size())
 	require.Equal(t, rule.Burst-50, s.Tokens("k", rule))
 }
 
@@ -721,7 +718,6 @@ func TestService_Allow_ConcurrentBucketOnly(t *testing.T) {
 	close(start)
 	wg.Wait()
 	require.Equal(t, rule.Burst, admitted.Load())
-	require.Equal(t, admitted.Load(), s.Usage("hot").Count(rule.Kind))
 	require.Zero(t, s.Tokens("hot", rule))
 }
 

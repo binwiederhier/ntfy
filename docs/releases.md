@@ -2323,7 +2323,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Behavior changes:**
 
-* The rate limit state of a visitor is forgotten about a minute after it has fully recovered (all buckets refilled, no attachment bandwidth used in its current daily period) instead of after a day without use, which frees the memory of one-off visitors such as floods of new IPs. The `visitors` stat and the `ntfy_visitors_total` metric therefore count the visitors of roughly the last minute, not of the last day ([#2126](https://github.com/binwiederhier/ntfy/pull/2126))
+* The rate limit state of a visitor is forgotten about a minute after it has fully recovered (all buckets refilled) instead of after a day without use, which frees the memory of one-off visitors such as floods of new IPs. The `visitors` stat and the `ntfy_visitors_total` metric therefore count the visitors of roughly the last minute, not of the last day ([#2126](https://github.com/binwiederhier/ntfy/pull/2126))
 
 **Bug fixes + maintenance:**
 

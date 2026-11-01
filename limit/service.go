@@ -250,20 +250,11 @@ func (s *Service) check(key string, rule Rule) Decision {
 // sent. The bucket cannot exceed its burst, and the daily count cannot go below zero.
 func (s *Service) Refund(key string, kind Kind, n int64) {
 	s.refundTokens(key, kind, n)
-	start := periodStart(key, s.now())
 	i := dailyIndex(kind)
 	if i < 0 {
-		if kind != KindBandwidth {
-			return // Not tallied
-		}
-		bs := s.buckets[shardIndex(key)]
-		bs.mu.Lock()
-		defer bs.mu.Unlock()
-		if e, ok := bs.entries[key]; ok && e.periodStart >= start {
-			e.bandwidth = max(0, e.bandwidth-n)
-		}
 		return
 	}
+	start := periodStart(key, s.now())
 	cs := s.counters[shardIndex(key)]
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -272,24 +263,17 @@ func (s *Service) Refund(key string, kind Kind, n int64) {
 	}
 }
 
-// Usage returns the key's counts in its current period, from memory: the daily counts (all
-// nodes' as of the last sync, plus this node's since), and this node's bandwidth. The other kinds
-// are not tallied, so that their use does not keep the key for the rest of its period (see Prune).
+// Usage returns the key's daily counts in its current period, from memory: all nodes' as of the
+// last sync, plus this node's since. The other kinds have only buckets (see Tokens).
 func (s *Service) Usage(key string) Usage {
 	start := periodStart(key, s.now())
 	var u Usage
-	bs := s.buckets[shardIndex(key)]
-	bs.mu.Lock()
-	if e, ok := bs.entries[key]; ok && e.periodStart >= start {
-		u.counts[KindBandwidth] = e.bandwidth
-	}
-	bs.mu.Unlock()
 	cs := s.counters[shardIndex(key)]
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 	if c, ok := cs.counters[key]; ok && c.periodStart >= start {
-		for i, kind := range dailyKinds {
-			u.counts[kind] = c.base[i] + c.unflushed[i]
+		for i := range c.base {
+			u.counts[i] = c.base[i] + c.unflushed[i]
 		}
 	}
 	return u
@@ -310,7 +294,7 @@ func (s *Service) Prune() int {
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
 		for key, e := range bs.entries {
-			if e.seen < cutoff && e.settledNoLock(key, now) {
+			if e.seen < cutoff && e.settledNoLock(now) {
 				delete(bs.entries, key)
 				pruned++
 			}
@@ -528,7 +512,6 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	e := bs.entryNoLock(key, now)
 	e.seen = now.UnixNano()
 	if rule.Burst <= 0 {
-		e.countNoLock(key, rule.Kind, n, now)
 		return Decision{OK: true}
 	}
 	b := e.refillNoLock(rule, now)
@@ -539,7 +522,6 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
-	e.countNoLock(key, rule.Kind, n, now)
 	return b.decision(Decision{OK: true}, rule)
 }
 
@@ -562,9 +544,6 @@ func (s *Service) reset(key string, kind Kind) {
 	bs.mu.Lock()
 	if e, ok := bs.entries[key]; ok {
 		e.buckets[kind].tokens = float64(e.buckets[kind].burst)
-		if kind == KindBandwidth {
-			e.bandwidth = 0
-		}
 	}
 	bs.mu.Unlock()
 	i := dailyIndex(kind)
@@ -603,28 +582,10 @@ func (bs *bucketShard) entryNoLock(key string, now time.Time) *bucketEntry {
 	return e
 }
 
-// countNoLock adds n bytes of bandwidth to the entry's tally of the current period, starting it
-// over if the period has ended; other kinds are counted in the key's counter, or not at all. The
-// caller must hold the shard's lock.
-func (e *bucketEntry) countNoLock(key string, kind Kind, n int64, now time.Time) {
-	if kind != KindBandwidth {
-		return
-	}
-	if start := periodStart(key, now); e.periodStart < start {
-		e.bandwidth = 0
-		e.periodStart = start
-	}
-	e.bandwidth += n
-}
-
-// settledNoLock returns true if forgetting the entry changes nothing: every bucket is full again
-// (a forgotten key comes back with full buckets), and there is no bandwidth tally in the key's
-// current period. The caller must hold the shard's lock.
-func (e *bucketEntry) settledNoLock(key string, now time.Time) bool {
-	if now.UnixNano() < e.full {
-		return false
-	}
-	return e.bandwidth == 0 || e.periodStart < periodStart(key, now)
+// settledNoLock returns true if forgetting the entry changes nothing: every bucket is full again,
+// and a forgotten key comes back with full buckets. The caller must hold the shard's lock.
+func (e *bucketEntry) settledNoLock(now time.Time) bool {
+	return now.UnixNano() >= e.full
 }
 
 // refillNoLock refills the entry's bucket for the rule and notes when it is full again: the rule

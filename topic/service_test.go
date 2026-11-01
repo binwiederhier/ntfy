@@ -380,6 +380,18 @@ func TestService_WithoutStore(t *testing.T) {
 	s.Close()
 }
 
+func TestService_WithoutStore_NothingWaitsToBeWritten(t *testing.T) {
+	// Without a store nothing is ever written, so nothing may wait to be: pruned topics are gone for good
+	s, clock := newTestServiceWithClock(t)
+	s.Note("upA")
+	s.Touch("upB")
+	s.SetRateVisitor("upC", ipRateVisitor())
+	clock.advance(pruneAfter + time.Hour)
+	s.sync()
+	require.Equal(t, 0, s.Size())
+	require.Empty(t, s.dirty)
+}
+
 func TestService_Close_CancelsStalledLoad(t *testing.T) {
 	// Close does not wait for a startup load stuck on the database
 	store := NewSQLiteStore(newTestUserDB(t))

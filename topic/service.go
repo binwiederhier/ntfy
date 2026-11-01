@@ -186,7 +186,7 @@ func (s *Service) Note(topic string) {
 		updatedAt:   now,
 		write:       writeTouch,
 	}
-	s.dirty[topic] = struct{}{}
+	s.markDirtyNoLock(topic)
 	s.noted++
 }
 
@@ -240,7 +240,7 @@ func (s *Service) SetForTest(topic string, t *State) {
 	}
 	e.updatedAt = now
 	e.write = max(e.write, writeTouch)
-	s.dirty[topic] = struct{}{}
+	s.markDirtyNoLock(topic)
 	s.countNotedNoLock()
 }
 
@@ -458,8 +458,16 @@ func (s *Service) touchNoLock(topic string, now int64) *entry {
 	e.subscribedAt = max(e.subscribedAt, now)
 	e.updatedAt = max(e.updatedAt, now)
 	e.write = max(e.write, writeTouch)
-	s.dirty[topic] = struct{}{}
+	s.markDirtyNoLock(topic)
 	return e
+}
+
+// markDirtyNoLock marks the topic to be written. Without a store nothing is ever written, so
+// nothing is marked (the set would only grow). The caller must hold s.mu.
+func (s *Service) markDirtyNoLock(topic string) {
+	if s.store != nil {
+		s.dirty[topic] = struct{}{}
+	}
 }
 
 // entryNoLock returns the topic's entry, creating it as first seen at now if needed. The caller

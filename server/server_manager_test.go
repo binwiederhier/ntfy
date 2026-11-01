@@ -1,8 +1,11 @@
 package server
 
 import (
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
+	tp "heckel.io/ntfy/v2/topic"
 	"testing"
 	"time"
 )
@@ -102,4 +105,13 @@ func TestServer_Manager_MessagesTotalSumsAcrossNodes(t *testing.T) {
 		require.Equal(t, int64(3), s1.messages)
 		require.Equal(t, int64(3), s2.messages)
 	})
+}
+
+func TestServer_Manager_TopicStatesGauge(t *testing.T) {
+	// The manager exports how many topic states the node keeps in memory, to watch their memory
+	s := newTestServer(t, newTestConfig(t, ""))
+	s.topicService.SetRateVisitor("upAAAAAAAAAAAA", &tp.RateVisitor{IP: "1.2.3.4"})
+	s.topicService.Note("upBBBBBBBBBBBB")
+	s.execManager()
+	require.Equal(t, float64(2), testutil.ToFloat64(metrics.TopicStates))
 }

@@ -75,6 +75,9 @@ var (
 	Topics = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_topics_total",
 	})
+	TopicStates = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_topic_states_total",
+	})
 	HTTPRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ntfy_http_requests_total",
 	}, []string{"http_code", "ntfy_code", "http_method"})
@@ -158,6 +161,7 @@ func init() {
 		Users,
 		Subscribers,
 		Topics,
+		TopicStates,
 		HTTPRequests,
 		dbPools,
 	)

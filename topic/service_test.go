@@ -200,14 +200,26 @@ func TestService_Persist_SurvivesRestart(t *testing.T) {
 	})
 }
 
-func TestService_Persist_StartFailsIfLoadFails(t *testing.T) {
-	// A start does not serve without the topics: if they cannot be loaded, it fails
+func TestService_Persist_StartServesIfLoadFails(t *testing.T) {
+	// A start whose load fails serves anyway, so a slow database does not fail the node; the
+	// worker loads every row, however old, once the store is readable
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
-		s := newService(newStore(), time.Now)
+		clock := newTestClock()
+		a := startTestService(t, newStore(), clock.now)
+		a.SetRateVisitor("upA", "", "1.2.3.4")
+		a.sync()
+		clock.advance(3 * 24 * time.Hour)
+		s := newService(newStore(), clock.now)
+		s.interval = time.Hour
+		t.Cleanup(s.Close)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		require.ErrorContains(t, s.Start(ctx), "cannot load topics")
-		s.Close()
+		require.Nil(t, s.Start(ctx))
+		require.Nil(t, s.State("upA"))
+		require.NotNil(t, s.Note("upB"))
+		s.sync()
+		require.Equal(t, "1.2.3.4", s.State("upA").RateVisitorIP)
+		require.Equal(t, 2, s.Size())
 	})
 }
 

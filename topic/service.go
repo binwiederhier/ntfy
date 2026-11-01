@@ -9,7 +9,6 @@ package topic
 
 import (
 	"context"
-	"fmt"
 	"maps"
 	"slices"
 	"sync"
@@ -50,7 +49,7 @@ type Service struct {
 	entries   map[string]*State // By topic
 	pending   map[string]State  // Rows to write, by topic; always empty without a store
 	noted     int               // Entries without subscriber activity, capped at maxNoted
-	watermark int64             // Time of the last read; the worker's only
+	watermark int64             // Time of the last read, 0 until loaded; the worker's only
 	prunedAt  int64             // Time of the last prune; the worker's only
 	ctx       context.Context   // Done on Close, so Close never waits on a stuck store call
 	cancel    context.CancelFunc
@@ -76,19 +75,21 @@ func newService(store *Store, now func() time.Time) *Service {
 	return s
 }
 
-// Start loads the rows from the store, if there is one, and starts the sync worker
+// Start loads the rows from the store, if there is one, and starts the sync worker. A failed load
+// is left to the worker, so a slow database does not fail the node; until then pushes are refused.
 func (s *Service) Start(ctx context.Context) error {
 	if s.store != nil {
 		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
 		defer cancel()
 		started := time.Now()
 		now := s.now().Unix()
-		n, err := s.read(ctx, now-int64(pruneAfter/time.Second))
-		if err != nil {
-			return fmt.Errorf("cannot load topics: %w", err)
+		s.prunedAt = now
+		if n, err := s.read(ctx, now-int64(pruneAfter/time.Second)); err != nil {
+			log.Tag(tag).Err(err).Warn("Cannot load topics; retrying in the next round")
+		} else {
+			s.watermark = now
+			log.Tag(tag).Info("Loaded %d topic(s) in %v", n, time.Since(started).Round(time.Millisecond))
 		}
-		s.watermark, s.prunedAt = now, now
-		log.Tag(tag).Info("Loaded %d topic(s) in %v", n, time.Since(started).Round(time.Millisecond))
 	}
 	s.wg.Add(1)
 	go s.runSync()
@@ -211,8 +212,12 @@ func (s *Service) sync() {
 		ctx, cancel := context.WithTimeout(s.ctx, statementTimeout)
 		s.write(ctx)
 		cancel()
-		ctx, cancel = context.WithTimeout(s.ctx, statementTimeout)
-		_, err := s.read(ctx, s.watermark-int64(readOverlap/time.Second))
+		since, timeout := s.watermark-int64(readOverlap/time.Second), statementTimeout
+		if s.watermark == 0 {
+			since, timeout = now-int64(pruneAfter/time.Second), loadTimeout // The start could not load them
+		}
+		ctx, cancel = context.WithTimeout(s.ctx, timeout)
+		_, err := s.read(ctx, since)
 		cancel()
 		if err != nil {
 			log.Tag(tag).Err(err).Warn("Cannot read topics; those of other nodes are stale until the next round")

@@ -2005,11 +2005,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 			}
 		}
 	}
-	return s.setRateVisitors(r, v, writableRateTopics)
-}
-
-func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
-	for _, t := range rateTopics {
+	for _, t := range writableRateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).

@@ -1763,7 +1763,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
-		s.touchTopics(topics) // The subscriber was last seen now
+		s.maybeTouchTopics(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1923,7 +1923,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
-		s.touchTopics(topics) // The subscriber was last seen now
+		s.maybeTouchTopics(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1984,7 +1984,7 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 	if len(eligibleRateTopics) == 0 {
 		return nil
 	}
-	s.touchTopics(eligibleRateTopics)
+	s.maybeTouchTopics(eligibleRateTopics)
 
 	// If access controls are turned off, v has access to everything, and we can set the rate visitor
 	if s.userManager == nil {
@@ -2020,7 +2020,7 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		s.topicService.SetRateVisitor(t.ID, v.MaybeUserID(), v.maskedIP())
+		s.topicService.SetRateVisitor(t.ID, v.MaybeUserID(), v.MaskedIP())
 		t.Keepalive()
 	}
 	return nil

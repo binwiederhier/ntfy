@@ -73,9 +73,9 @@ func (s *Server) unifiedPushTopicAbandoned(r *http.Request, t *topic) bool {
 	return state != nil && topicAbandoned(state)
 }
 
-// touchTopics records subscriber activity on the UnifiedPush topics now, e.g. a stream that
+// maybeTouchTopics records subscriber activity on the UnifiedPush topics now, e.g. a stream that
 // closed, keeping their rate visitors
-func (s *Server) touchTopics(topics []*topic) {
+func (s *Server) maybeTouchTopics(topics []*topic) {
 	if !s.config.VisitorSubscriberRateLimiting {
 		return
 	}

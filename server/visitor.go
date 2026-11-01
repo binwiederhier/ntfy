@@ -297,9 +297,9 @@ func (v *visitor) IP() netip.Addr {
 	return v.ip
 }
 
-// maskedIP returns the visitor's IP masked to the configured prefix bits, which is what a rate
+// MaskedIP returns the visitor's IP masked to the configured prefix bits, which is what a rate
 // visitor keeps of a subscriber
-func (v *visitor) maskedIP() string {
+func (v *visitor) MaskedIP() string {
 	return vis.Mask(v.ip, v.env.limitsConfig).String()
 }
 

@@ -250,13 +250,17 @@ type Config struct {
 // DefaultListenAdminUnix returns the default admin socket path. On Windows there is none: unix socket
 // file permissions do not protect it there, so the CLI uses the database or --server instead.
 func DefaultListenAdminUnix() string {
-	switch runtime.GOOS {
+	return defaultListenAdminUnixFor(runtime.GOOS)
+}
+
+func defaultListenAdminUnixFor(goos string) string {
+	switch goos {
 	case "windows":
 		return ""
-	case "darwin":
-		return "/var/run/ntfy/admin.sock"
+	case "linux":
+		return "/run/ntfy/admin.sock"
 	}
-	return "/run/ntfy/admin.sock"
+	return "/var/run/ntfy/admin.sock" // macOS and the BSDs have no /run
 }
 
 // NewConfig instantiates a default new server config
@@ -268,7 +272,7 @@ func NewConfig() *Config {
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,
-		ListenAdminUnix:                      DefaultListenAdminUnix(),
+		ListenAdminUnix:                      "", // Experimental, off unless configured
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",

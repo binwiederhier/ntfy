@@ -107,13 +107,21 @@ func newService(conf *Config, now func() time.Time) *Service {
 // bucket is charged first and handed back if the daily cap denies, so the two locks are taken
 // one after the other, never nested.
 func (s *Service) Allow(key string, rule Rule, n int64) Decision {
+	d := s.allow(key, rule, n)
+	d.Kind = rule.Kind
+	return d
+}
+
+// allow is Allow, without naming the decision's kind
+func (s *Service) allow(key string, rule Rule, n int64) Decision {
 	now := s.now()
-	if d := s.takeTokens(key, &rule, n, now); !d.OK {
+	d := s.takeTokens(key, &rule, n, now)
+	if !d.OK {
 		return d
 	}
 	i := dailyIndex(rule.Kind)
 	if i < 0 {
-		return Decision{OK: true}
+		return d
 	}
 	start := periodStart(key, now)
 	cs := s.counters[shardIndex(key)]
@@ -126,14 +134,33 @@ func (s *Service) Allow(key string, rule Rule, n int64) Decision {
 		if rule.Burst > 0 {
 			s.refundTokens(key, rule.Kind, n)
 		}
-		return Decision{RetryAfter: end.Sub(now)}
+		return dailyDecision(false, rule.Daily, total, end.Sub(now))
 	}
 	c.unflushed[i] += n
 	if rule.Threshold == 0 || total+n >= rule.Threshold {
 		c.promoted = true
 	}
+	end := time.Unix(c.periodStart+daySeconds, 0)
 	cs.mu.Unlock()
-	return Decision{OK: true}
+	if rule.Daily <= 0 {
+		return d
+	}
+	return dailyDecision(true, rule.Daily, total+n, end.Sub(now))
+}
+
+// dailyDecision describes the daily cap after used units, with reset until the period ends
+func dailyDecision(ok bool, daily, used int64, reset time.Duration) Decision {
+	d := Decision{
+		OK:        ok,
+		Quota:     daily,
+		Window:    oneDay,
+		Remaining: max(0, daily-used),
+		Reset:     reset,
+	}
+	if !ok {
+		d.RetryAfter = reset
+	}
+	return d
 }
 
 // Start loads the current counts from the store, if there is one, and starts the sync worker.
@@ -188,6 +215,36 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 	}
 	b := e.refillNoLock(&rule, now)
 	return int64(math.Max(0, math.Floor(b.tokens)))
+}
+
+// Check decides like Allow whether the key's bucket for the rule has one unit now, without using
+// it. Like Tokens, a rule without a bucket admits nothing. It is for "may I try" checks that charge
+// only on failure, and still need to tell the client how long to wait.
+func (s *Service) Check(key string, rule Rule) Decision {
+	d := s.check(key, rule)
+	d.Kind = rule.Kind
+	return d
+}
+
+// check is Check, without naming the decision's kind
+func (s *Service) check(key string, rule Rule) Decision {
+	if rule.Burst <= 0 {
+		return Decision{}
+	}
+	now := s.now()
+	bs := s.buckets[shardIndex(key)]
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+	e, ok := bs.entries[key]
+	if !ok {
+		return Decision{OK: true} // A fresh bucket is full
+	}
+	b := &e.buckets[rule.Kind]
+	b.refill(now, &rule)
+	if b.tokens < 1 {
+		return Decision{RetryAfter: b.wait(1, &rule)}
+	}
+	return Decision{OK: true}
 }
 
 // Refund hands n units of the kind back to the key, e.g. for bytes that were reserved but not
@@ -477,14 +534,14 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b := e.refillNoLock(rule, now)
 	if n > rule.Burst {
-		return Decision{} // Can never fit, so there is no time to wait for
+		return b.decision(Decision{}, rule) // Can never fit, so there is no time to wait for
 	} else if b.tokens < float64(n) {
-		return Decision{RetryAfter: b.wait(n, rule)}
+		return b.decision(Decision{RetryAfter: b.wait(n, rule)}, rule)
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
 	e.countNoLock(key, rule.Kind, n, now)
-	return Decision{OK: true}
+	return b.decision(Decision{OK: true}, rule)
 }
 
 // refundTokens hands n tokens back to the key's bucket of the kind, up to its burst
@@ -619,6 +676,16 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 		b.last = nowNanos
 	}
 	b.burst = rule.Burst
+}
+
+// decision adds the bucket's quota to d: the whole tokens left, and the time until the next one,
+// within which the client can use no more than those (the "t" of the RateLimit header)
+func (b *bucket) decision(d Decision, rule *Rule) Decision {
+	d.Quota = rule.Burst
+	d.Window = time.Duration(rule.Burst) * rule.Refill
+	d.Remaining = max(0, int64(math.Floor(b.tokens)))
+	d.Reset = b.wait(d.Remaining+1, rule)
+	return d
 }
 
 // wait returns how long until the bucket has n tokens, or 0 if it never will (no refill)

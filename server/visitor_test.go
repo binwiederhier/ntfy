@@ -27,10 +27,10 @@ func TestVisitor_TierUserDoesNotGetAnonymousUsage(t *testing.T) {
 	require.Nil(t, err)
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	for i := 0; i < 3; i++ {
-		require.True(t, v.MessageAllowed())
+		require.True(t, v.MessageAllowed().OK)
 	}
 	vu := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-	require.True(t, vu.RequestAllowed())
+	require.True(t, vu.RequestAllowed().OK)
 	require.Equal(t, int64(0), vu.Stats().Messages)
 	require.Equal(t, int64(3), v.Stats().Messages)
 }
@@ -47,8 +47,8 @@ func TestVisitor_BandwidthRefund(t *testing.T) {
 	require.False(t, l.AllowN(200))
 	require.True(t, l.AllowN(-500))
 	require.True(t, l.AllowN(200))
-	require.False(t, v.BandwidthAllowed(500))
-	require.True(t, v.BandwidthAllowed(400))
+	require.False(t, v.BandwidthAllowed(500).OK)
+	require.True(t, v.BandwidthAllowed(400).OK)
 }
 
 func TestVisitor_TierChangeKeepsBuckets(t *testing.T) {
@@ -203,9 +203,9 @@ func TestVisitor_ZeroLimitsAdmitNothing(t *testing.T) {
 		u, err := s.userManager.User("phil")
 		require.Nil(t, err)
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		require.False(t, v.MessageAllowed())
-		require.False(t, v.CallAllowed())
-		require.False(t, v.BandwidthAllowed(1))
+		require.False(t, v.MessageAllowed().OK)
+		require.False(t, v.CallAllowed().OK)
+		require.False(t, v.BandwidthAllowed(1).OK)
 		require.False(t, v.BandwidthLimiter().AllowN(1))
 	})
 }
@@ -231,9 +231,9 @@ func TestVisitor_UserIsPerRequest(t *testing.T) {
 	require.Equal(t, u.ID, authedAgain.User().ID)
 
 	// Limits are still shared per IP: requests and the node-local subscription gauge
-	for authed.RequestAllowed() {
+	for authed.RequestAllowed().OK {
 	}
-	require.False(t, anon.RequestAllowed())
+	require.False(t, anon.RequestAllowed().OK)
 	for authed.SubscriptionAllowed() {
 	}
 	require.False(t, anon.SubscriptionAllowed())
@@ -292,11 +292,11 @@ func TestVisitor_AuthLimiter_NotBypassedByConcurrentLogin(t *testing.T) {
 	// The user logs in between the guesser's lookup and each failed guess
 	for i := 0; i < 3; i++ {
 		s.visitor(ip, u)
-		require.True(t, vip.AuthAllowed())
+		require.True(t, vip.AuthAllowed().OK)
 		vip.AuthFailed()
 	}
 	s.visitor(ip, u)
-	require.False(t, vip.AuthAllowed())
+	require.False(t, vip.AuthAllowed().OK)
 }
 
 func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
@@ -310,7 +310,7 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 	vip := s.visitor(ip, nil)
 
 	s.visitor(ip, u)
-	require.True(t, vip.AccountActionAllowed())
+	require.True(t, vip.AccountActionAllowed().OK)
 }
 
 func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
@@ -339,10 +339,10 @@ func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-	require.True(t, v.AccountActionAllowed())
-	require.True(t, v.AuthAllowed())
+	require.True(t, v.AccountActionAllowed().OK)
+	require.True(t, v.AuthAllowed().OK)
 	v.AuthFailed()
-	require.False(t, v.AuthAllowed())
+	require.False(t, v.AuthAllowed().OK)
 }
 
 func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
@@ -363,10 +363,10 @@ func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 		v2 := s.visitor(netip.MustParseAddr("2.2.2.2"), u)
 		require.Equal(t, v1.key, v2.key)
 		for i := 0; i < 3; i++ {
-			require.True(t, v1.MessageAllowed())
+			require.True(t, v1.MessageAllowed().OK)
 		}
 		for i := 0; i < 2; i++ {
-			require.True(t, v2.MessageAllowed())
+			require.True(t, v2.MessageAllowed().OK)
 		}
 		require.Equal(t, int64(5), v1.Stats().Messages)
 		require.Equal(t, int64(5), v2.Stats().Messages)
@@ -381,9 +381,9 @@ func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
 		require.Equal(t, int64(5), account.Stats.Messages)
 		require.Equal(t, int64(5), account.Stats.MessagesRemaining)
 		for i := 0; i < 5; i++ {
-			require.True(t, v2.MessageAllowed())
+			require.True(t, v2.MessageAllowed().OK)
 		}
-		require.False(t, v1.MessageAllowed())
+		require.False(t, v1.MessageAllowed().OK)
 	})
 }
 
@@ -403,8 +403,8 @@ func TestVisitor_RequestLimiterZeroBurstAdmitsNothing(t *testing.T) {
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
 	ip := netip.MustParseAddr("9.9.9.9")
-	require.False(t, s.visitor(ip, nil).RequestAllowed())
-	require.False(t, s.visitor(ip, u).RequestAllowed())
+	require.False(t, s.visitor(ip, nil).RequestAllowed().OK)
+	require.False(t, s.visitor(ip, u).RequestAllowed().OK)
 }
 
 func TestVisitor_TopicCreationLimiterDisabledByZero(t *testing.T) {
@@ -417,9 +417,9 @@ func TestVisitor_TopicCreationLimiterDisabledByZero(t *testing.T) {
 		s := newTestServer(t, c)
 		v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		for i := 0; i < 3; i++ {
-			require.True(t, v.TopicCreationAllowed())
+			require.True(t, v.TopicCreationAllowed().OK)
 		}
-		return v.TopicCreationAllowed() // The 4th: denied only if a 3-burst limiter is on
+		return v.TopicCreationAllowed().OK // The 4th: denied only if a 3-burst limiter is on
 	}
 	require.True(t, topicsAllowed(0, time.Hour))
 	require.True(t, topicsAllowed(3, 0))
@@ -447,7 +447,7 @@ func TestVisitor_TierChangeDoesNotReseedCounts(t *testing.T) {
 		ip := netip.MustParseAddr("9.9.9.9")
 		v := s.visitor(ip, u)
 		for i := 0; i < 4; i++ {
-			require.True(t, v.MessageAllowed())
+			require.True(t, v.MessageAllowed().OK)
 		}
 		require.Nil(t, s.userManager.ChangeTier("phil", "large"))
 		u, err = s.userManager.User("phil")
@@ -455,12 +455,12 @@ func TestVisitor_TierChangeDoesNotReseedCounts(t *testing.T) {
 		v = s.visitor(ip, u) // The next request carries the new tier
 		require.Equal(t, int64(4), v.Stats().Messages)
 		for i := 0; i < 6; i++ {
-			require.True(t, v.MessageAllowed())
+			require.True(t, v.MessageAllowed().OK)
 		}
-		require.False(t, v.MessageAllowed())
+		require.False(t, v.MessageAllowed().OK)
 		fresh := s.visitor(ip, u)
 		require.Equal(t, int64(10), fresh.Stats().Messages)
-		require.False(t, fresh.MessageAllowed())
+		require.False(t, fresh.MessageAllowed().OK)
 	})
 }
 
@@ -475,17 +475,17 @@ func TestVisitor_IPPrefixKeying(t *testing.T) {
 	u, err := s.userManager.User("phil")
 	require.Nil(t, err)
 	v := s.visitor(netip.MustParseAddr("1.2.3.4"), nil)
-	require.True(t, v.MessageAllowed())
-	require.True(t, v.MessageAllowed())
+	require.True(t, v.MessageAllowed().OK)
+	require.True(t, v.MessageAllowed().OK)
 	peer := s.visitor(netip.MustParseAddr("1.2.3.200"), nil)
 	require.Equal(t, v.key, peer.key)
 	require.Equal(t, int64(2), peer.Stats().Messages)
-	require.True(t, s.visitor(netip.MustParseAddr("1.2.4.1"), nil).MessageAllowed())
+	require.True(t, s.visitor(netip.MustParseAddr("1.2.4.1"), nil).MessageAllowed().OK)
 	vu := s.visitor(netip.MustParseAddr("1.2.3.77"), u)
 	require.Equal(t, v.key, vu.key)
-	require.True(t, vu.MessageAllowed())
-	require.False(t, vu.MessageAllowed())
-	require.False(t, s.visitor(netip.MustParseAddr("1.2.3.4"), nil).MessageAllowed())
+	require.True(t, vu.MessageAllowed().OK)
+	require.False(t, vu.MessageAllowed().OK)
+	require.False(t, s.visitor(netip.MustParseAddr("1.2.3.4"), nil).MessageAllowed().OK)
 
 	// IPv6: the default /64
 	v6 := s.visitor(netip.MustParseAddr("2001:db8:1:2::1"), nil)
@@ -507,8 +507,8 @@ func TestVisitor_TierDowngradeReturnsToIPBucket(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
 	ip := netip.MustParseAddr("9.9.9.9")
 	anon := s.visitor(ip, nil)
-	require.True(t, anon.MessageAllowed())
-	require.True(t, anon.MessageAllowed())
+	require.True(t, anon.MessageAllowed().OK)
+	require.True(t, anon.MessageAllowed().OK)
 
 	// Up: fresh counts on the user key
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
@@ -518,7 +518,7 @@ func TestVisitor_TierDowngradeReturnsToIPBucket(t *testing.T) {
 	require.NotEqual(t, anon.key, vu.key)
 	require.Equal(t, int64(0), vu.Stats().Messages)
 	for i := 0; i < 5; i++ {
-		require.True(t, vu.MessageAllowed())
+		require.True(t, vu.MessageAllowed().OK)
 	}
 
 	// Down: back on the IP key, with the anonymous usage
@@ -529,8 +529,8 @@ func TestVisitor_TierDowngradeReturnsToIPBucket(t *testing.T) {
 	vd := s.visitor(ip, u)
 	require.Equal(t, anon.key, vd.key)
 	require.Equal(t, int64(2), vd.Stats().Messages)
-	require.True(t, vd.MessageAllowed())
-	require.False(t, vd.MessageAllowed())
+	require.True(t, vd.MessageAllowed().OK)
+	require.False(t, vd.MessageAllowed().OK)
 
 	// Up again: what was spent on the tier stays spent
 	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
@@ -569,7 +569,7 @@ func TestVisitor_ConcurrentSharedKey(t *testing.T) {
 			defer wg.Done()
 			for i := 0; i < iterations; i++ {
 				v := s.visitor(ip, u)
-				if v.MessageAllowed() {
+				if v.MessageAllowed().OK {
 					admitted.Add(1)
 				}
 				v.RequestAllowed()
@@ -611,7 +611,7 @@ func TestVisitor_BandwidthReaderRollback(t *testing.T) {
 	require.ErrorIs(t, err, util.ErrLimitReached)
 	require.Zero(t, n)
 	require.Zero(t, l.Value())
-	require.True(t, v.BandwidthAllowed(10))
+	require.True(t, v.BandwidthAllowed(10).OK)
 	require.False(t, l.Allow())
 }
 
@@ -662,9 +662,9 @@ func TestVisitor_EmailsWithoutTierHaveDailyCap(t *testing.T) {
 	s := newTestServer(t, c)
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	for i := 0; i < 24; i++ {
-		require.True(t, v.EmailAllowed(), "email %d", i)
+		require.True(t, v.EmailAllowed().OK, "email %d", i)
 	}
-	require.False(t, v.EmailAllowed())
+	require.False(t, v.EmailAllowed().OK)
 }
 
 func TestVisitor_EmailsWithoutTierAllowedWithSlowRefill(t *testing.T) {
@@ -675,9 +675,9 @@ func TestVisitor_EmailsWithoutTierAllowedWithSlowRefill(t *testing.T) {
 	c.VisitorEmailLimitReplenish = 48 * time.Hour
 	s := newTestServer(t, c)
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	require.True(t, v.EmailAllowed())
-	require.True(t, v.EmailAllowed())
-	require.False(t, v.EmailAllowed())
+	require.True(t, v.EmailAllowed().OK)
+	require.True(t, v.EmailAllowed().OK)
+	require.False(t, v.EmailAllowed().OK)
 }
 
 func TestVisitor_LoggedInUserWrittenFromFirstMessage(t *testing.T) {
@@ -689,8 +689,8 @@ func TestVisitor_LoggedInUserWrittenFromFirstMessage(t *testing.T) {
 	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
 	u, err := s.userManager.User("ben")
 	require.Nil(t, err)
-	require.True(t, s.visitor(netip.MustParseAddr("1.1.1.1"), u).MessageAllowed())
-	require.True(t, s.visitor(netip.MustParseAddr("2.2.2.2"), nil).MessageAllowed())
+	require.True(t, s.visitor(netip.MustParseAddr("1.1.1.1"), u).MessageAllowed().OK)
+	require.True(t, s.visitor(netip.MustParseAddr("2.2.2.2"), nil).MessageAllowed().OK)
 	s.Stop()
 	s = newTestServer(t, c)
 	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.1.1.1"), u).Stats().Messages)

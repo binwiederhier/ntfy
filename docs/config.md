@@ -919,27 +919,22 @@ defines access tokens for these users. `phil` has a token `tk_3gd7d2yftt4b8ixyfe
 has a token `tk_f099we8uzj7xi5qshzajwp6jffvkz` with the label "Backup script".
 
 ### Admin socket
-The `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` commands talk to the running ntfy server through a local
-admin socket, by default `/run/ntfy/admin.sock` (`/var/run/ntfy/admin.sock` on macOS). That way, changes take effect
-immediately: a removed user is disconnected right away, a new tier applies to the user's next request, and there is no
-delay until the server reloads its access control list.
+!!! warning
+    The admin socket is **experimental**. Options and behavior may still change between releases. The `ntfy user`,
+    `ntfy access`, `ntfy token` and `ntfy tier` commands do not use it yet; they still write to the database directly.
+
+ntfy can serve its admin API on a local unix socket, set with `experimental-listen-admin-unix` (e.g.
+`/run/ntfy/admin.sock`). It is off by default.
 
 The socket needs no password or token: **being able to open the socket is the authorization**. It is created with
 mode `0660` in a directory with mode `0750`, both owned by the user ntfy runs as, so only that user, members of its group
 and `root` can use it. With the Debian/Ubuntu/Fedora packages, the shipped systemd unit creates `/run/ntfy` (via
-`RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group just work.
+`RuntimeDirectory=ntfy`), so a socket there just works.
 
 The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`). If the
-server cannot create the socket, it logs a warning at startup and runs without it:
-
-```
-WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
-```
-
-To change the path, set `listen-admin-unix` in the `server.yml` file; the commands read it from there, too. To disable the
-socket, set `listen-admin-unix: "-"`. The admin socket is not available on Windows. If you change the path, pick a
-directory that only the ntfy user can write to; otherwise the server logs a warning at startup, since other users may be
-able to use or replace the socket.
+server cannot create the socket, it logs a warning at startup and runs without it. The admin socket is not available on
+Windows. Pick a directory that only the ntfy user can write to; otherwise the server logs a warning at startup, since
+other users may be able to use or replace the socket.
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,
@@ -1928,6 +1923,21 @@ There are various limits and rate limits in place that you can use to configure 
 During normal usage, you shouldn't encounter these limits at all, and even if you burst a few requests or emails
 (e.g. when you reconnect after a connection drop), it shouldn't have any effect.
 
+When a rate limit is hit, the server responds with HTTP 429 (Too Many Requests). If the server knows when the request
+would be allowed again, the response carries a `Retry-After` header with the number of seconds to wait: until the
+visitor's bucket has refilled enough (e.g. for the request, e-mail or topic creation limits), or until the visitor's
+day is over for a daily limit (e.g. messages, e-mails, phone calls or attachment bandwidth). Limits without a known
+wait, such as the subscription limit or the global topic limit, do not send the header.
+
+Publish responses, and every 429 caused by one of these limits, also carry the `RateLimit-Policy` and `RateLimit` headers of the IETF draft
+[RateLimit header fields for HTTP](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/)
+(draft-ietf-httpapi-ratelimit-headers-11), so clients can slow down before they hit a limit. There is one policy for the
+request limit (`q` is the burst, `r` the requests left, `t` the seconds until the next request is refilled) and one for
+the daily message limit (`q` is the daily limit, `r` the messages left today, `t` the seconds until the visitor's day is
+over), e.g. `RateLimit-Policy: "messages";q=250;w=86400` and `RateLimit: "messages";r=249;t=3600`. Exempt visitors (see
+`visitor-request-limit-exempt-hosts`) and unlimited limits do not get a policy. With multiple ntfy nodes, the remaining
+daily messages are the answering node's view, which may lag the others' by a few seconds.
+
 ### General limits
 Let's do the easy limits first:
 
@@ -2546,7 +2556,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`                                       | -                 | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                                       |
 | `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*                                          | -                 | Path to a Unix socket to listen on                                                                                                                                                                                                      |
 | `listen-unix-mode`                         | `NTFY_LISTEN_UNIX_MODE`                         | *file mode*                                         | *system default*  | File mode of the Unix socket, e.g. 0700 or 0777                                                                                                                                                                                         |
-| `listen-admin-unix`                        | `NTFY_LISTEN_ADMIN_UNIX`                        | *filename*                                          | `/run/ntfy/admin.sock` | Path of the local [admin socket](#admin-socket) the `ntfy user/access/token/tier` commands use; `"-"` disables it. Only opened if auth is configured; not available on Windows                                                           |
+| `experimental-listen-admin-unix`           | `NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX`           | *filename*                                          | -                 | Experimental. Path of the local [admin socket](#admin-socket), e.g. `/run/ntfy/admin.sock`; off if empty or `"-"`. Only opened if auth is configured; not available on Windows |
 | `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*                                          | -                 | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
@@ -2669,7 +2679,7 @@ OPTIONS:
    --listen-https value, --listen_https value, -L value                                                                   ip:port used as HTTPS listen address [$NTFY_LISTEN_HTTPS]
    --listen-unix value, --listen_unix value, -U value                                                                     listen on unix socket path [$NTFY_LISTEN_UNIX]
    --listen-unix-mode value, --listen_unix_mode value                                                                     file permissions of unix socket, e.g. 0700 (default: system default) [$NTFY_LISTEN_UNIX_MODE]
-   --listen-admin-unix value, --listen_admin_unix value                                                                   unix socket path for credential-less local admin access (ntfy user/access/token/tier); "-" disables it (default: /run/ntfy/admin.sock (empty on Windows)) [$NTFY_LISTEN_ADMIN_UNIX]
+   --experimental-listen-admin-unix value, --experimental_listen_admin_unix value                                         experimental: unix socket path for credential-less local admin API access, e.g. /run/ntfy/admin.sock; empty or "-" disables it [$NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX]
    --key-file value, --key_file value, -K value                                                                           private key file, if listen-https is set [$NTFY_KEY_FILE]
    --cert-file value, --cert_file value, -E value                                                                         certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --firebase-key-file value, --firebase_key_file value, -F value                                                         Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]

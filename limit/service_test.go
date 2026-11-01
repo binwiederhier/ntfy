@@ -117,6 +117,62 @@ func TestService_Allow_BucketAndDaily(t *testing.T) {
 	require.Equal(t, int64(3), s.Usage("k").Count(KindEmails))
 }
 
+func TestService_Allow_QuotaBucket(t *testing.T) {
+	// The decision describes the bucket: whole tokens left, and the time to the next token
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  3,
+		Refill: 100 * time.Millisecond,
+	}
+	expected := Decision{
+		OK:        true,
+		Kind:      KindRequests,
+		Quota:     3,
+		Window:    300 * time.Millisecond,
+		Remaining: 2,
+		Reset:     100 * time.Millisecond,
+	}
+	require.Equal(t, expected, s.Allow("k", rule, 1))
+	s.Allow("k", rule, 1)
+	expected.Remaining = 0
+	require.Equal(t, expected, s.Allow("k", rule, 1))
+	clock.advance(40 * time.Millisecond)
+	expected = Decision{
+		RetryAfter: 60 * time.Millisecond,
+		Kind:       KindRequests,
+		Quota:      3,
+		Window:     300 * time.Millisecond,
+		Remaining:  0,
+		Reset:      60 * time.Millisecond, // Matches RetryAfter
+	}
+	require.Equal(t, expected, s.Allow("k", rule, 1))
+}
+
+func TestService_Allow_QuotaDaily(t *testing.T) {
+	// The decision describes the daily cap: units left, and the time until the period ends
+	s, _ := newTestServiceWithClock(t) // Noon UTC; "k" resets at 03:48:26 UTC
+	rule := Rule{
+		Kind:  KindMessages,
+		Daily: 2,
+	}
+	reset := 15*time.Hour + 48*time.Minute + 26*time.Second
+	expected := Decision{
+		OK:        true,
+		Kind:      KindMessages,
+		Quota:     2,
+		Window:    24 * time.Hour,
+		Remaining: 1,
+		Reset:     reset,
+	}
+	require.Equal(t, expected, s.Allow("k", rule, 1))
+	expected.Remaining = 0
+	require.Equal(t, expected, s.Allow("k", rule, 1))
+	expected.OK = false
+	expected.RetryAfter = reset
+	require.Equal(t, expected, s.Allow("k", rule, 1))
+}
+
 func TestService_Allow_DailyDenialKeepsTokens(t *testing.T) {
 	// A call the daily cap denies does not spend the bucket's tokens
 	s, _ := newTestServiceWithClock(t)
@@ -269,6 +325,26 @@ func TestService_Tokens_DoesNotConsume(t *testing.T) {
 	require.True(t, s.Allow("k", rule, 2).OK)
 	require.Equal(t, int64(3), s.Tokens("k", rule))
 	require.Equal(t, int64(0), s.Tokens("k", Rule{Kind: KindAuth})) // No bucket, no tokens
+}
+
+func TestService_Check(t *testing.T) {
+	// Check answers like Allow would for one unit, including the wait, but uses nothing
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindAuth,
+		Burst:  2,
+		Refill: time.Minute,
+	}
+	require.Equal(t, Decision{OK: true, Kind: KindAuth}, s.Check("k", rule)) // A fresh bucket is full
+	require.True(t, s.Allow("k", rule, 2).OK)
+	require.Equal(t, Decision{RetryAfter: time.Minute, Kind: KindAuth}, s.Check("k", rule))
+	clock.advance(20 * time.Second)
+	require.Equal(t, Decision{RetryAfter: 40 * time.Second, Kind: KindAuth}, s.Check("k", rule))
+	require.Equal(t, int64(0), s.Tokens("k", rule)) // Checking did not take anything
+	clock.advance(40 * time.Second)
+	require.Equal(t, Decision{OK: true, Kind: KindAuth}, s.Check("k", rule))
+	require.Equal(t, int64(1), s.Tokens("k", rule))
+	require.Equal(t, Decision{Kind: KindAuth}, s.Check("k", Rule{Kind: KindAuth})) // No bucket admits nothing, as Tokens says 0
 }
 
 func TestService_Prune(t *testing.T) {

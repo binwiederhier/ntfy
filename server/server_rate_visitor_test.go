@@ -267,8 +267,7 @@ func TestServer_MatrixGateway_AbandonedTopicRejectsPushKey(t *testing.T) {
 
 func TestServer_UnifiedPush_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	// A topic keeps its rate visitor for as long as the subscriber is around, not for as long as its
-	// limiter key is in use: the limiter forgetting the key must not drop it, and publishers
-	// charging the key must not keep it
+	// limiter key is in use: publishers charging the key must not keep it
 	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
@@ -276,7 +275,6 @@ func TestServer_UnifiedPush_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 		r.RemoteAddr = "1.2.3.4:1234"
 	})
 	require.Equal(t, 200, rr.Code)
-	s.limiter.Prune(0) // The key is gone, the subscriber is not
 	rateVisitor := rateVisitorOf(t, s, "upAAAAAAAAAAAA")
 	require.NotNil(t, rateVisitor)
 	ageTopic(t, "upAAAAAAAAAAAA", 2*rateVisitorLiveFor, s) // The subscriber is gone

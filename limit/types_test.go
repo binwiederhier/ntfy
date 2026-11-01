@@ -30,10 +30,16 @@ func TestUsage_Count(t *testing.T) {
 		Burst:  100,
 		Refill: time.Second,
 	}, 42).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindRequests,
+		Burst:  100,
+		Refill: time.Second,
+	}, 1).OK)
 	u := s.Usage("k")
 	require.Equal(t, int64(3), u.Count(KindMessages))
-	require.Equal(t, int64(42), u.Count(KindBandwidth)) // In memory only, but counted
 	require.Equal(t, int64(0), u.Count(KindEmails))
+	require.Equal(t, int64(0), u.Count(KindBandwidth)) // No daily count, so that it does not hold the key (see Prune)
+	require.Equal(t, int64(0), u.Count(KindRequests))
 }
 
 func TestLimiter_Value_Bandwidth(t *testing.T) {
@@ -44,9 +50,12 @@ func TestLimiter_Value_Bandwidth(t *testing.T) {
 		Refill: time.Second,
 	})
 	require.True(t, l.AllowN(300))
-	require.Equal(t, int64(300), l.Value())
-	require.True(t, l.AllowN(-100))
-	require.Equal(t, int64(200), l.Value())
+	require.Zero(t, l.Value()) // No daily count; the bucket is what limits it
+	require.Equal(t, int64(700), s.Tokens("k", Rule{
+		Kind:   KindBandwidth,
+		Burst:  1000,
+		Refill: time.Second,
+	}))
 }
 
 func TestLimiter_AllowNRefundsNegative(t *testing.T) {

@@ -16,11 +16,6 @@ const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
-	// forgotten (see Server.pruneVisitors). This number has to be very high to prevent e-mail abuse,
-	// but it doesn't really affect the other limits anyway, since they are replenished faster (typically).
-	visitorExpungeAfter = oneDay
-
 	// promoteRate is the divisor of the daily message cap (cap / promoteRate, i.e. 10%) from which
 	// the count of a visitor without a user is written to the usage table; below it, a restart
 	// forgets it, and N nodes may admit up to N x (threshold - 1) without a row. A larger

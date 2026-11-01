@@ -3445,9 +3445,8 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		require.Equal(t, int64(0), publisher.Stats().Messages)
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 
-		// Expire visitor: its subscriber has been gone for a day, and its key is pruned after a day without use
+		// Expire visitor: its subscriber has been gone for a day
 		ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
-		s.limiter.Prune(-time.Hour) // Everything is idle for longer than -1h
 
 		// Publish message again, observe that the rate visitor is not used anymore
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)

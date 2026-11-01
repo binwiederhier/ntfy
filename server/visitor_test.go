@@ -593,7 +593,7 @@ func TestVisitor_BandwidthReaderRollback(t *testing.T) {
 	n, err := r.Read(make([]byte, 8))
 	require.ErrorIs(t, err, util.ErrLimitReached)
 	require.Zero(t, n)
-	require.Zero(t, l.Value())
+	require.Equal(t, int64(10), s.limiter.Tokens(v.key, v.bandwidthRule())) // Refunded in full
 	require.True(t, v.BandwidthAllowed(10).OK)
 	require.False(t, l.Allow())
 }

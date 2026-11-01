@@ -21,8 +21,8 @@ func (s *Server) limitRequests(next handleFunc) handleFunc {
 	return func(w http.ResponseWriter, r *http.Request, v *visitor) error {
 		if util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 			return next(w, r, v)
-		} else if !v.RequestAllowed() {
-			return errHTTPTooManyRequestsLimitRequests
+		} else if d := v.RequestAllowed(); !d.OK {
+			return errHTTPTooManyRequestsLimitRequests.RetryAfter(d.RetryAfter)
 		}
 		return next(w, r, v)
 	}
@@ -45,8 +45,8 @@ func (s *Server) limitRequestsWithTopic(next handleFunc) handleFunc {
 		})
 		if util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 			return next(w, r, v)
-		} else if !vrate.RequestAllowed() {
-			return errHTTPTooManyRequestsLimitRequests
+		} else if d := vrate.RequestAllowed(); !d.OK {
+			return errHTTPTooManyRequestsLimitRequests.RetryAfter(d.RetryAfter)
 		}
 		return next(w, r, v)
 	}

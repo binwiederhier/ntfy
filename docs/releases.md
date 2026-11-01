@@ -2319,6 +2319,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Features:**
 
 * With `visitor-subscriber-rate-limiting`, the subscriber of a UnifiedPush topic (who pays for its pushes) is kept in the user database and shared by all servers, so a push to any server is billed to the subscriber instead of answered with 507 (see [subscriber-based rate limiting](config.md#subscriber-based-rate-limiting))
+* Send a `Retry-After` header with HTTP 429 responses that are caused by a rate limit with a known wait, e.g. the request, e-mail or daily message limits (see [rate limiting](config.md#rate-limiting))
 
 **Behavior changes:**
 

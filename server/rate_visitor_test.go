@@ -285,7 +285,7 @@ func TestServer_UnifiedPush_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	rateVisitor := s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"))
 	require.NotNil(t, rateVisitor)
 	ageTopic(s, "upAAAAAAAAAAAA", 2*rateVisitorLiveFor) // The subscriber is gone
-	require.True(t, rateVisitor.MessageAllowed())       // A publisher charges the key
+	require.True(t, rateVisitor.MessageAllowed().OK)    // A publisher charges the key
 	require.Nil(t, s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA")))
 }
 

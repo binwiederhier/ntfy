@@ -727,6 +727,9 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, v *visitor,
 	isRateLimiting := util.Contains(rateLimitingErrorCodes, httpErr.HTTPCode)
 	isNormalError := strings.Contains(err.Error(), "i/o timeout") || util.Contains(normalErrorCodes, httpErr.HTTPCode) ||
 		httpErr.Code == errHTTPServiceUnavailableDraining.Code // A draining node rejects every new subscription, by design
+	if retryAfter := httpErr.retryAfterSeconds(); retryAfter != "" {
+		w.Header().Set("Retry-After", retryAfter)
+	}
 	ev := logvr(v, r).Err(err)
 	if websocket.IsWebSocketUpgrade(r) {
 		ev.Tag(tagWebsocket).Fields(websocketErrorContext(err))
@@ -1045,8 +1048,8 @@ func (s *Server) handleFile(w http.ResponseWriter, r *http.Request, v *visitor) 
 	} else if m.Sender.IsValid() {
 		bandwidthVisitor = s.visitor(m.Sender, nil)
 	}
-	if !bandwidthVisitor.BandwidthAllowed(size) {
-		return errHTTPTooManyRequestsLimitAttachmentBandwidth.With(m)
+	if d := bandwidthVisitor.BandwidthAllowed(size); !d.OK {
+		return errHTTPTooManyRequestsLimitAttachmentBandwidth.With(m).RetryAfter(d.RetryAfter)
 	}
 	// Actually send file
 	if m.Attachment.Name != "" {
@@ -1137,16 +1140,18 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 			s.topicService.Note(t.ID) // Starts the countdown to the 404 of a topic nobody ever subscribed to
 		}
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
-	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) && !vrate.MessageAllowed() {
-		return nil, errHTTPTooManyRequestsLimitMessages.With(t)
+	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
+		if d := vrate.MessageAllowed(); !d.OK {
+			return nil, errHTTPTooManyRequestsLimitMessages.With(t).RetryAfter(d.RetryAfter)
+		}
 	}
 	if email != "" {
 		var httpErr *errHTTP
 		email, httpErr = s.convertEmailAddress(v.User(), email)
 		if httpErr != nil {
 			return nil, httpErr.With(t)
-		} else if !vrate.EmailAllowed() {
-			return nil, errHTTPTooManyRequestsLimitEmails.With(t)
+		} else if d := vrate.EmailAllowed(); !d.OK {
+			return nil, errHTTPTooManyRequestsLimitEmails.With(t).RetryAfter(d.RetryAfter)
 		}
 	}
 	if call != "" {
@@ -1154,8 +1159,8 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		call, httpErr = s.convertPhoneNumber(v.User(), call)
 		if httpErr != nil {
 			return nil, httpErr.With(t)
-		} else if !vrate.CallAllowed() {
-			return nil, errHTTPTooManyRequestsLimitCalls.With(t)
+		} else if d := vrate.CallAllowed(); !d.OK {
+			return nil, errHTTPTooManyRequestsLimitCalls.With(t).RetryAfter(d.RetryAfter)
 		}
 	}
 	if m.PollID != "" {
@@ -1282,8 +1287,10 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		return err
 	}
-	if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) && !vrate.MessageAllowed() {
-		return errHTTPTooManyRequestsLimitMessages.With(t)
+	if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
+		if d := vrate.MessageAllowed(); !d.OK {
+			return errHTTPTooManyRequestsLimitMessages.With(t).RetryAfter(d.RetryAfter)
+		}
 	}
 	sequenceID, e := s.sequenceIDFromPath(r.URL.Path)
 	if e != nil {
@@ -1723,8 +1730,10 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		// Charge the encoded length, i.e. what actually goes over the wire. Charge before writing,
 		// so an exhausted budget fails the first message and surfaces as a clean 429 with nothing
 		// written.
-		if meterPollBandwidth && !v.BandwidthAllowed(int64(len(encoded))) {
-			return errHTTPTooManyRequestsLimitAttachmentBandwidth
+		if meterPollBandwidth {
+			if d := v.BandwidthAllowed(int64(len(encoded))); !d.OK {
+				return errHTTPTooManyRequestsLimitAttachmentBandwidth.RetryAfter(d.RetryAfter)
+			}
 		}
 		wlock.Lock()
 		defer wlock.Unlock()
@@ -2176,8 +2185,10 @@ func (s *Server) topicsFromIDs(v *visitor, ids ...string) ([]*topic, error) {
 			if len(s.topics) >= s.config.TotalTopicLimit {
 				return nil, errHTTPTooManyRequestsLimitTotalTopics
 			}
-			if v != nil && !v.TopicCreationAllowed() {
-				return nil, errHTTPTooManyRequestsLimitTopicCreation
+			if v != nil {
+				if d := v.TopicCreationAllowed(); !d.OK {
+					return nil, errHTTPTooManyRequestsLimitTopicCreation.RetryAfter(d.RetryAfter)
+				}
 			}
 			s.topics[id] = newTopic(id)
 		}

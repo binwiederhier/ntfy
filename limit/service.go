@@ -187,6 +187,29 @@ func (s *Service) Tokens(key string, rule Rule) int64 {
 	return int64(math.Max(0, math.Floor(b.tokens)))
 }
 
+// Check decides like Allow whether the key's bucket for the rule has one unit now, without using
+// it. Like Tokens, a rule without a bucket admits nothing. It is for "may I try" checks that charge
+// only on failure, and still need to tell the client how long to wait.
+func (s *Service) Check(key string, rule Rule) Decision {
+	if rule.Burst <= 0 {
+		return Decision{}
+	}
+	now := s.now()
+	bs := s.buckets[shardIndex(key)]
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+	e, ok := bs.entries[key]
+	if !ok {
+		return Decision{OK: true} // A fresh bucket is full
+	}
+	b := &e.buckets[rule.Kind]
+	b.refill(now, &rule)
+	if b.tokens < 1 {
+		return Decision{RetryAfter: b.wait(1, &rule)}
+	}
+	return Decision{OK: true}
+}
+
 // Refund hands n units of the kind back to the key, e.g. for bytes that were reserved but not
 // sent. The bucket cannot exceed its burst, and the daily count cannot go below zero.
 func (s *Service) Refund(key string, kind Kind, n int64) {

@@ -3610,7 +3610,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	require.True(t, s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA")).MessageAllowed())
+	require.True(t, s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA")).MessageAllowed().OK)
 	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionRead))
 
 	// Bob takes the topic with a poll, and is gone a day later
@@ -5658,6 +5658,130 @@ func TestServer_HandleError_SkipsWriteHeaderOnHijackedConnection(t *testing.T) {
 			require.True(t, mock.writeHeaderHit, "WriteHeader should be called for error: %s", err.Error())
 		}
 	})
+}
+
+func TestServer_HandleError_RetryAfter(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A 429 with a known wait carries Retry-After in whole seconds, rounded up; one without
+		// (e.g. the subscription gauge) carries none
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		r, _ := http.NewRequest("GET", "/mytopic/json", nil)
+		v := newVisitor(s.visitors, netip.MustParseAddr("1.2.3.4"), nil)
+		rr := httptest.NewRecorder()
+		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitRequests.RetryAfter(1500*time.Millisecond))
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, "2", rr.Header().Get("Retry-After"))
+		require.Equal(t, 42901, toHTTPError(t, rr.Body.String()).Code)
+
+		rr = httptest.NewRecorder()
+		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitRequests.RetryAfter(time.Millisecond))
+		require.Equal(t, "1", rr.Header().Get("Retry-After"))
+
+		rr = httptest.NewRecorder()
+		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitSubscriptions)
+		require.Equal(t, 429, rr.Code)
+		require.Empty(t, rr.Header().Get("Retry-After"))
+	})
+}
+
+func TestServer_RetryAfter_RequestLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorRequestLimitBurst = 3
+		c.VisitorRequestLimitReplenish = 5 * time.Second
+		s := newTestServer(t, c)
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+		}
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42901, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr)
+		require.GreaterOrEqual(t, retryAfter, 1)
+		require.LessOrEqual(t, retryAfter, 5)
+	})
+}
+
+func TestServer_RetryAfter_DailyMessageLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorMessageDailyLimit = 2
+		s := newTestServer(t, c)
+		for i := 0; i < 2; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+		}
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42908, toHTTPError(t, rr.Body.String()).Code)
+		resetAt := s.limiter.ResetAt(s.visitor(netip.MustParseAddr("9.9.9.9"), nil).key)
+		require.InDelta(t, time.Until(resetAt).Seconds(), retryAfterSeconds(t, rr), 2) // The wait is until the key's period ends
+	})
+}
+
+func TestServer_RetryAfter_EmailLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorEmailLimitBurst = 1
+		c.VisitorEmailLimitReplenish = time.Hour
+		s := newTestServer(t, c)
+		s.mailer = &testMailer{}
+		headers := map[string]string{
+			"E-Mail": "test@example.com",
+		}
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", headers).Code)
+		rr := request(t, s, "PUT", "/mytopic", "hi", headers)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42902, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr)
+		require.Greater(t, retryAfter, 3500)
+		require.LessOrEqual(t, retryAfter, 3600)
+	})
+}
+
+func TestServer_RetryAfter_AuthFailureLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.VisitorAuthFailureLimitBurst = 2
+		c.VisitorAuthFailureLimitReplenish = time.Minute
+		s := newTestServer(t, c)
+		headers := map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		}
+		for i := 0; i < 2; i++ {
+			require.Equal(t, 401, request(t, s, "PUT", "/announcements", "test", headers).Code)
+		}
+		rr := request(t, s, "PUT", "/announcements", "test", headers)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42909, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr)
+		require.Greater(t, retryAfter, 50)
+		require.LessOrEqual(t, retryAfter, 60)
+	})
+}
+
+func TestServer_RetryAfter_TopicCreationLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorTopicCreationLimitBurst = 1
+		c.VisitorTopicCreationLimitReplenish = time.Minute
+		s := newTestServer(t, c)
+		require.Equal(t, 200, request(t, s, "PUT", "/fresh-topic-1", "hi", nil).Code)
+		rr := request(t, s, "PUT", "/fresh-topic-2", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42911, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr)
+		require.Greater(t, retryAfter, 50)
+		require.LessOrEqual(t, retryAfter, 60)
+	})
+}
+
+func retryAfterSeconds(t *testing.T, rr *httptest.ResponseRecorder) int {
+	t.Helper()
+	header := rr.Header().Get("Retry-After")
+	require.NotEmpty(t, header, "Retry-After header missing")
+	seconds, err := strconv.Atoi(header)
+	require.NoError(t, err)
+	return seconds
 }
 
 func TestServer_Publish_InvalidUTF8InBody(t *testing.T) {

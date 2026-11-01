@@ -38,8 +38,8 @@ func (s *Server) maybeAuthenticate(r *http.Request) (*http.Request, *visitor, er
 		return r, vip, nil
 	}
 	// If we're trying to auth, check the rate limiter first
-	if !vip.AuthAllowed() {
-		return r, vip, errHTTPTooManyRequestsLimitAuthFailure // Always return visitor, even when error occurs!
+	if d := vip.AuthAllowed(); !d.OK {
+		return r, vip, errHTTPTooManyRequestsLimitAuthFailure.RetryAfter(d.RetryAfter) // Always return visitor, even when error occurs!
 	}
 	u, err := s.authenticate(r, header)
 	if err != nil {

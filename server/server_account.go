@@ -30,8 +30,8 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 		} else if u != nil {
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
-		if !v.AccountActionAllowed() {
-			return errHTTPTooManyRequestsLimitAccountActions
+		if d := v.AccountActionAllowed(); !d.OK {
+			return errHTTPTooManyRequestsLimitAccountActions.RetryAfter(d.RetryAfter)
 		}
 	}
 	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit, false)
@@ -710,8 +710,8 @@ func (s *Server) handleAccountEmailAdd(w http.ResponseWriter, r *http.Request, v
 		return errHTTPConflictEmailExists
 	}
 	// Rate limit (counts against the user's email quota)
-	if !v.EmailAllowed() {
-		return errHTTPTooManyRequestsLimitEmails
+	if d := v.EmailAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitEmails.RetryAfter(d.RetryAfter)
 	}
 	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Starting email verification")
 	if err := s.enqueueEmailVerification(u.ID, req.Email); err != nil {
@@ -803,8 +803,8 @@ func (s *Server) handleAccountEmailResend(w http.ResponseWriter, r *http.Request
 	} else if !util.Contains(pending, req.Email) {
 		return errHTTPBadRequestEmailAddressInvalid
 	}
-	if !v.EmailAllowed() {
-		return errHTTPTooManyRequestsLimitEmails
+	if d := v.EmailAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitEmails.RetryAfter(d.RetryAfter)
 	}
 	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Resending email verification")
 	if err := s.enqueueEmailVerification(u.ID, req.Email); err != nil {
@@ -838,8 +838,8 @@ func (s *Server) handleAccountPasswordResetRequest(w http.ResponseWriter, r *htt
 		return err
 	}
 	// Rate limit via the shared per-visitor account-creation bucket (no new limiter/config)
-	if !v.AccountActionAllowed() {
-		return errHTTPTooManyRequestsLimitAccountActions
+	if d := v.AccountActionAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitAccountActions.RetryAfter(d.RetryAfter)
 	}
 	v.AccountActionPerformed() // Consume a token on every request (including no-match), to throttle probing
 	identifier := strings.TrimSpace(req.Identifier)

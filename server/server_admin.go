@@ -58,11 +58,16 @@ func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request, v *visito
 }
 
 func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visitor) error {
-	users, err := s.userManager.Users()
-	if err != nil {
-		return err
+	var (
+		users  []*user.User
+		grants map[string][]user.Grant
+		err    error
+	)
+	if username := r.URL.Query().Get("username"); username != "" {
+		users, grants, err = s.readUserAndGrants(username)
+	} else {
+		users, grants, err = s.readAllUsersAndGrants()
 	}
-	grants, err := s.userManager.AllGrants()
 	if err != nil {
 		return err
 	}
@@ -91,6 +96,32 @@ func (s *Server) handleUsersGet(w http.ResponseWriter, r *http.Request, v *visit
 		}
 	}
 	return s.writeJSON(w, usersResponse)
+}
+
+// readUserAndGrants returns one user, with its grants keyed by user ID, like readAllUsersAndGrants
+func (s *Server) readUserAndGrants(username string) ([]*user.User, map[string][]user.Grant, error) {
+	u, err := s.userManager.User(username)
+	if err != nil {
+		return nil, nil, mapUserErrorToHTTP(err)
+	}
+	grants, err := s.userManager.Grants(username)
+	if err != nil {
+		return nil, nil, err
+	}
+	return []*user.User{u}, map[string][]user.Grant{u.ID: grants}, nil
+}
+
+// readAllUsersAndGrants returns all users, with their grants keyed by user ID
+func (s *Server) readAllUsersAndGrants() ([]*user.User, map[string][]user.Grant, error) {
+	users, err := s.userManager.Users()
+	if err != nil {
+		return nil, nil, err
+	}
+	grants, err := s.userManager.AllGrants()
+	if err != nil {
+		return nil, nil, err
+	}
+	return users, grants, nil
 }
 
 func (s *Server) handleUsersAdd(w http.ResponseWriter, r *http.Request, v *visitor) error {
@@ -212,10 +243,10 @@ func (s *Server) handleUsersDelete(w http.ResponseWriter, r *http.Request, v *vi
 	u, err := s.userManager.User(req.Username)
 	if err != nil {
 		return mapUserErrorToHTTP(err)
-	} else if !u.IsUser() && !isAdminSocketRequest(r) {
-		return errHTTPUnauthorized.Wrap("can only remove regular users from API")
 	} else if u.Name == user.Everyone {
 		return errHTTPBadRequest.Wrap("cannot remove the everyone user")
+	} else if !u.IsUser() && !isAdminSocketRequest(r) {
+		return errHTTPForbiddenAdminSocketOnly
 	}
 	adminLog(v, r).Info("Removing user %s", req.Username)
 	if err := s.userManager.RemoveUser(req.Username); err != nil {
@@ -495,8 +526,9 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 }
 
 // listenAdminSocket creates the socket's directory, removes a stale socket file (one with no
-// server behind it) and listens. A socket that answers belongs to another running server; in
-// that case this one does not take it over.
+// server behind it) and listens. Anything at the path that is not a socket is left alone, in case
+// experimental-listen-admin-unix points somewhere it should not (e.g. at the database). A socket that answers
+// belongs to another running server; in that case this one does not take it over.
 func (s *Server) listenAdminSocket() (net.Listener, error) {
 	path := s.config.ListenAdminUnix
 	if err := os.MkdirAll(filepath.Dir(path), adminSocketDirMode); err != nil {
@@ -509,9 +541,15 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 	if conn, err := net.DialTimeout("unix", path, adminSocketDialTimeout); err == nil {
 		conn.Close()
 		return nil, fmt.Errorf("another server is listening on %s", path)
+	} else if errors.Is(err, fs.ErrPermission) {
+		return nil, fmt.Errorf("%s belongs to a server of another user, set experimental-listen-admin-unix to a path of your own", path)
 	}
-	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, err
+	if stat, err := os.Lstat(path); err == nil {
+		if stat.Mode().Type() != fs.ModeSocket {
+			return nil, fmt.Errorf("%s exists and is not a socket, refusing to replace it", path)
+		} else if err := os.Remove(path); err != nil {
+			return nil, err
+		}
 	}
 	listener, err := net.Listen("unix", path)
 	if err != nil {

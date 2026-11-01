@@ -271,6 +271,26 @@ func TestService_Tokens_DoesNotConsume(t *testing.T) {
 	require.Equal(t, int64(0), s.Tokens("k", Rule{Kind: KindAuth})) // No bucket, no tokens
 }
 
+func TestService_Check(t *testing.T) {
+	// Check answers like Allow would for one unit, including the wait, but uses nothing
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindAuth,
+		Burst:  2,
+		Refill: time.Minute,
+	}
+	require.Equal(t, Decision{OK: true}, s.Check("k", rule)) // A fresh bucket is full
+	require.True(t, s.Allow("k", rule, 2).OK)
+	require.Equal(t, Decision{RetryAfter: time.Minute}, s.Check("k", rule))
+	clock.advance(20 * time.Second)
+	require.Equal(t, Decision{RetryAfter: 40 * time.Second}, s.Check("k", rule))
+	require.Equal(t, int64(0), s.Tokens("k", rule)) // Checking did not take anything
+	clock.advance(40 * time.Second)
+	require.Equal(t, Decision{OK: true}, s.Check("k", rule))
+	require.Equal(t, int64(1), s.Tokens("k", rule))
+	require.Equal(t, Decision{}, s.Check("k", Rule{Kind: KindAuth})) // No bucket admits nothing, as Tokens says 0
+}
+
 func TestService_Prune(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
 	rule := Rule{

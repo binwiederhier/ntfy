@@ -427,8 +427,7 @@ func createUsageStore(pool, userDB *db.DB) *limit.Store {
 	return nil
 }
 
-// createTopicStore returns the store of the topic table, which is part of the user schema like
-// the usage table (see createUsageStore). Without a user database, the topics are kept in memory only.
+// createTopicStore returns the store of the topic table (user schema, like createUsageStore), or nil for memory only
 func createTopicStore(pool, userDB *db.DB) *tp.Store {
 	if pool != nil {
 		return tp.NewPostgresStore(pool)
@@ -1131,8 +1130,6 @@ func (s *Server) handlePublishInternal(r *http.Request, v *visitor) (*model.Mess
 		// app server that removes it on a 404 also does on a 410, and some (Misskey and its forks) only on a 410.
 		if s.unifiedPushTopicAbandoned(r, t) {
 			return nil, errHTTPGoneUnifiedPushTopicAbandoned.With(t)
-		} else if isUnifiedPushTopic(t.ID) {
-			s.topicService.Note(t.ID) // Starts the countdown to the 404 of a topic nobody ever subscribed to
 		}
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
@@ -1248,9 +1245,8 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		metrics.MessagesPublishedFailure.Inc()
 		metrics.MatrixPublishedFailure.Inc()
-		// An abandoned topic (see unifiedPushTopicAbandoned) gets its pushkey rejected, so the Matrix
-		// server stops sending to it; everything else, including a topic nobody subscribed to yet, is
-		// the error as it is (a 507 is transient to the Matrix server)
+		// An abandoned topic (see unifiedPushTopicAbandoned) gets its pushkey rejected, so the Matrix server
+		// stops sending to it; anything else is returned as is (a 507 is transient to the Matrix server)
 		if e, ok := err.(*errHTTP); ok && e.Code == errHTTPGoneUnifiedPushTopicAbandoned.Code {
 			pushKey, err := fromContext[string](r, contextMatrixPushKey)
 			if err != nil {
@@ -2028,10 +2024,7 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		s.topicService.SetRateVisitor(t.ID, &tp.RateVisitor{
-			UserID: v.MaybeUserID(),
-			IP:     v.maskedIP(),
-		})
+		s.topicService.SetRateVisitor(t.ID, v.MaybeUserID(), v.maskedIP())
 		t.Keepalive()
 	}
 	return nil

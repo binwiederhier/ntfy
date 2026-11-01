@@ -14,42 +14,35 @@ import (
 
 const (
 	// unifiedPushAbandonedAfter is how long a UnifiedPush topic may go without subscriber activity
-	// (subscribe, poll, open stream) before a push to it answers 404 instead of 507: RFC 8030
-	// section 7.3 signals an expired subscription with 404, and app servers like Mastodon then
-	// delete it (#664). It is long enough for a phone that is offline for a few days. A topic
-	// that never had a subscriber counts from its first refused push.
+	// before a push to it is told to go away (410), so app servers like Mastodon delete the
+	// subscription (#664); long enough for a phone offline for a few days
 	unifiedPushAbandonedAfter = 7 * oneDay
 
-	// rateVisitorLiveFor is how long a topic's rate visitor pays for its pushes after the
-	// subscriber was last active on any node (see Server.rateVisitor); a stream open here keeps
-	// it live regardless
+	// rateVisitorLiveFor is how long a rate visitor pays after its subscriber was last active on
+	// any node; a stream open here keeps it live regardless
 	rateVisitorLiveFor = oneDay
 )
 
-// rateVisitor returns the visitor the topic's pushes are charged to, or nil if the topic has no
-// live rate visitor. A rate visitor is live while the topic has a stream open here, or for
-// rateVisitorLiveFor after the subscriber was last active on any node (the manager of a node
-// with an open stream keeps it active). It is charged like the subscriber would be now: on its
-// user key with its tier's limits if the user has a tier, else on its IP key with the anonymous
-// limits. The user is read like an authenticated publish reads its own; a deleted user is
-// charged on the IP, and a failed read is an error, so the publisher retries.
+// rateVisitor returns the visitor the topic's pushes are charged to, or nil if it has no live
+// rate visitor. The user is read on every push, like an authenticated publish reads its own: a
+// tier change applies right away, a deleted user's IP pays, and a failed read is an error.
 func (s *Server) rateVisitor(t *topic) (*visitor, error) {
 	if !s.config.VisitorSubscriberRateLimiting || !isUnifiedPushTopic(t.ID) {
 		return nil, nil
 	}
 	state := s.topicService.State(t.ID)
-	if state == nil || state.RateVisitor == nil {
+	if state == nil || state.RateVisitorIP == "" {
 		return nil, nil
-	} else if t.SubscribersCount() == 0 && time.Since(state.SubscribedAt) > rateVisitorLiveFor {
+	} else if t.SubscribersCount() == 0 && time.Since(time.Unix(state.SubscribedAt, 0)) > rateVisitorLiveFor {
 		return nil, nil
 	}
-	ip, err := netip.ParseAddr(state.RateVisitor.IP)
+	ip, err := netip.ParseAddr(state.RateVisitorIP)
 	if err != nil {
 		return nil, nil
 	}
 	var u *user.User
-	if state.RateVisitor.UserID != "" && s.userManager != nil {
-		u, err = s.userManager.UserByID(state.RateVisitor.UserID)
+	if state.RateVisitorUserID != "" && s.userManager != nil {
+		u, err = s.userManager.UserByID(state.RateVisitorUserID)
 		if errors.Is(err, user.ErrUserNotFound) {
 			u = nil // Removed: the IP pays
 		} else if err != nil {
@@ -61,17 +54,16 @@ func (s *Server) rateVisitor(t *topic) (*visitor, error) {
 	return newVisitor(s.visitors, ip, u), nil
 }
 
-// unifiedPushTopicAbandoned returns true if the topic has had no subscriber activity, on any node,
-// for unifiedPushAbandonedAfter, counted from its first refused push if it never had any. Before
-// saying so, it reads the topic's row from the database, since a subscriber may have come back
-// on another node and the row be fresher than what this node has read back; if that read fails,
-// the topic is not abandoned (the publisher retries).
+// unifiedPushTopicAbandoned records a refused push to a UnifiedPush topic (see topic.Service.Note)
+// and returns true if the topic had no subscriber activity, on any node, for
+// unifiedPushAbandonedAfter. Before a yes, it reads the row, which may be fresher than memory; a
+// failed read is a no, so the publisher retries.
 func (s *Server) unifiedPushTopicAbandoned(r *http.Request, t *topic) bool {
-	if !isUnifiedPushTopic(t.ID) || t.SubscribersCount() > 0 {
+	if !isUnifiedPushTopic(t.ID) {
 		return false
 	}
-	state := s.topicService.State(t.ID)
-	if state == nil || !topicAbandoned(state) {
+	state := s.topicService.Note(t.ID)
+	if state == nil || t.SubscribersCount() > 0 || !topicAbandoned(state) {
 		return false
 	}
 	state, err := s.topicService.Refresh(r.Context(), t.ID)
@@ -95,27 +87,10 @@ func (s *Server) touchTopics(topics []*topic) {
 	}
 }
 
-// keepaliveTopics records that the UnifiedPush topics have a stream open here, so the other nodes
-// see their subscribers as active too
-func (s *Server) keepaliveTopics(topics []*topic) {
-	if !s.config.VisitorSubscriberRateLimiting {
-		return
-	}
-	for _, t := range topics {
-		if isUnifiedPushTopic(t.ID) {
-			s.topicService.Keepalive(t.ID)
-		}
-	}
-}
-
 // topicAbandoned returns true if the topic's newest observation (a subscriber, or its first
 // refused push) is older than unifiedPushAbandonedAfter
 func topicAbandoned(state *tp.State) bool {
-	newest := state.FirstSeenAt
-	if state.SubscribedAt.After(newest) {
-		newest = state.SubscribedAt
-	}
-	return time.Since(newest) > unifiedPushAbandonedAfter
+	return time.Since(time.Unix(max(state.FirstSeenAt, state.SubscribedAt), 0)) > unifiedPushAbandonedAfter
 }
 
 // isUnifiedPushTopic returns true if the topic may have a rate visitor: an "up..." topic of the
@@ -124,8 +99,8 @@ func isUnifiedPushTopic(id string) bool {
 	return strings.HasPrefix(id, unifiedPushTopicPrefix) && len(id) == unifiedPushTopicLength
 }
 
-// maskedIP returns the visitor's IP masked to the configured prefix bits, as a string, which is
-// what is kept of a subscriber (see topic.RateVisitor)
+// maskedIP returns the visitor's IP masked to the configured prefix bits, which is what a rate
+// visitor keeps of a subscriber
 func (v *visitor) maskedIP() string {
 	return vis.Mask(v.ip, v.env.limitsConfig).String()
 }

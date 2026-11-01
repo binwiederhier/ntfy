@@ -23,6 +23,10 @@ func (c *testClock) now() time.Time {
 	return c.t
 }
 
+func (c *testClock) unix() int64 {
+	return c.now().Unix()
+}
+
 func (c *testClock) advance(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -36,14 +40,14 @@ func newTestClock() *testClock {
 func newTestServiceWithClock(t *testing.T) (*Service, *testClock) {
 	t.Helper()
 	clock := newTestClock()
-	return newService(&Config{}, clock.now), clock
+	return newService(nil, clock.now), clock
 }
 
 // startTestService starts a service on the store with the given clock, whose worker never ticks
 // on its own: the tests sync by hand. It is closed when the test ends.
 func startTestService(t *testing.T, store *Store, now func() time.Time) *Service {
 	t.Helper()
-	s := newService(&Config{Store: store}, now)
+	s := newService(store, now)
 	s.interval = time.Hour
 	require.Nil(t, s.Start(context.Background()))
 	t.Cleanup(s.Close)
@@ -56,52 +60,60 @@ func TestService_SetTouchNote(t *testing.T) {
 
 	// A refused push makes the topic known: first seen now, never subscribed, no rate visitor; a
 	// second one changes nothing
-	s.Note("upA")
-	noted := clock.now()
+	noted := clock.unix()
+	require.Equal(t, state("upA", noted, 0, "", ""), withoutUpdatedAt(s.Note("upA")))
 	clock.advance(time.Hour)
-	s.Note("upA")
-	require.Equal(t, &State{FirstSeenAt: noted}, s.State("upA"))
+	require.Equal(t, state("upA", noted, 0, "", ""), withoutUpdatedAt(s.Note("upA")))
+	require.Equal(t, state("upA", noted, 0, "", ""), stateOf(s, "upA"))
 
 	// A subscriber becomes the rate visitor, and counts as subscriber activity; the latest one wins
-	s.SetRateVisitor("upA", &RateVisitor{IP: "1.2.3.4"})
-	s.SetRateVisitor("upA", &RateVisitor{UserID: "u_1", IP: "1.2.3.4"})
-	set := clock.now()
-	require.Equal(t, &State{FirstSeenAt: noted, SubscribedAt: set, RateVisitor: userRateVisitor()}, s.State("upA"))
+	s.SetRateVisitor("upA", "", "1.2.3.4")
+	s.SetRateVisitor("upA", "u_1", "1.2.3.4")
+	set := clock.unix()
+	require.Equal(t, state("upA", noted, set, "u_1", "1.2.3.4"), stateOf(s, "upA"))
 
 	// A touch keeps the rate visitor and moves the subscriber activity
 	clock.advance(time.Minute)
 	s.Touch("upA")
-	touched := clock.now()
-	require.Equal(t, &State{FirstSeenAt: noted, SubscribedAt: touched, RateVisitor: userRateVisitor()}, s.State("upA"))
+	touched := clock.unix()
+	require.Equal(t, state("upA", noted, touched, "u_1", "1.2.3.4"), stateOf(s, "upA"))
 
 	// A refused push to a known topic changes nothing, however old its subscriber activity
 	clock.advance(48 * time.Hour)
 	s.Note("upA")
-	require.Equal(t, &State{FirstSeenAt: noted, SubscribedAt: touched, RateVisitor: userRateVisitor()}, s.State("upA"))
+	require.Equal(t, state("upA", noted, touched, "u_1", "1.2.3.4"), stateOf(s, "upA"))
 
 	// A touch or a subscribe of an unknown topic makes it known, first seen and subscribed now
 	s.Touch("upB")
-	require.Equal(t, &State{FirstSeenAt: clock.now(), SubscribedAt: clock.now()}, s.State("upB"))
-	s.SetRateVisitor("upC", &RateVisitor{IP: "1.2.3.4"})
-	require.Equal(t, &State{FirstSeenAt: clock.now(), SubscribedAt: clock.now(), RateVisitor: ipRateVisitor()}, s.State("upC"))
+	require.Equal(t, state("upB", clock.unix(), clock.unix(), "", ""), stateOf(s, "upB"))
+	s.SetRateVisitor("upC", "", "1.2.3.4")
+	require.Equal(t, state("upC", clock.unix(), clock.unix(), "", "1.2.3.4"), stateOf(s, "upC"))
 	require.Equal(t, 3, s.Size())
+}
+
+func TestService_State_ReturnsCopy(t *testing.T) {
+	s, _ := newTestServiceWithClock(t)
+	s.SetRateVisitor("upA", "", "1.2.3.4")
+	s.State("upA").RateVisitorIP = "5.6.7.8"
+	s.Note("upA").RateVisitorIP = "5.6.7.8"
+	require.Equal(t, "1.2.3.4", s.State("upA").RateVisitorIP)
 }
 
 func TestService_Keepalive_Throttled(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
-	s.SetRateVisitor("upA", ipRateVisitor())
-	set := clock.now()
+	s.SetRateVisitor("upA", "", "1.2.3.4")
+	set := clock.unix()
 	clock.advance(keepaliveInterval - time.Second)
 	s.Keepalive("upA")
 	require.Equal(t, set, s.State("upA").SubscribedAt)
 	clock.advance(time.Second)
 	s.Keepalive("upA")
-	require.Equal(t, clock.now(), s.State("upA").SubscribedAt)
-	require.Equal(t, ipRateVisitor(), s.State("upA").RateVisitor)
+	require.Equal(t, clock.unix(), s.State("upA").SubscribedAt)
+	require.Equal(t, "1.2.3.4", s.State("upA").RateVisitorIP)
 
 	// A keepalive of an unknown topic is a touch
 	s.Keepalive("upB")
-	require.Equal(t, &State{FirstSeenAt: clock.now(), SubscribedAt: clock.now()}, s.State("upB"))
+	require.Equal(t, state("upB", clock.unix(), clock.unix(), "", ""), stateOf(s, "upB"))
 }
 
 func TestService_Note_Bounded(t *testing.T) {
@@ -111,23 +123,21 @@ func TestService_Note_Bounded(t *testing.T) {
 		s.Note(fmt.Sprintf("up%012d", i))
 	}
 	require.Equal(t, maxNoted, s.Size())
-	s.Note("upOneTooMany")
+	require.Nil(t, s.Note("upOneTooMany"))
 	require.Nil(t, s.State("upOneTooMany"))
 	s.Touch("up000000000000")
-	s.Note("upOneTooMany")
-	require.NotNil(t, s.State("upOneTooMany"))
-	s.Note("upTwoTooMany")
-	require.Nil(t, s.State("upTwoTooMany"))
+	require.NotNil(t, s.Note("upOneTooMany"))
+	require.Nil(t, s.Note("upTwoTooMany"))
 }
 
 func TestService_Prune(t *testing.T) {
-	// Topics are pruned pruneAfter after their last write, never while they have an unwritten change
+	// Topics are pruned pruneAfter after their last write
 	s, clock := newTestServiceWithClock(t)
 	s.Note("upA")
 	clock.advance(time.Hour)
 	s.Touch("upB")
 	clock.advance(pruneAfter - 30*time.Minute)
-	s.prune(clock.now().Unix() - int64(pruneAfter/time.Second))
+	s.prune(clock.unix() - int64(pruneAfter/time.Second))
 	require.Nil(t, s.State("upA"))
 	require.NotNil(t, s.State("upB"))
 
@@ -135,12 +145,10 @@ func TestService_Prune(t *testing.T) {
 	for i := 0; i < maxNoted; i++ {
 		s.Note(fmt.Sprintf("up%012d", i))
 	}
-	s.Note("upOneTooMany")
-	require.Nil(t, s.State("upOneTooMany"))
+	require.Nil(t, s.Note("upOneTooMany"))
 	clock.advance(pruneAfter + time.Hour)
-	s.prune(clock.now().Unix() - int64(pruneAfter/time.Second))
-	s.Note("upOneTooMany")
-	require.NotNil(t, s.State("upOneTooMany"))
+	s.prune(clock.unix() - int64(pruneAfter/time.Second))
+	require.NotNil(t, s.Note("upOneTooMany"))
 }
 
 func TestService_Prune_AfterTwoWeeks(t *testing.T) {
@@ -156,20 +164,6 @@ func TestService_Prune_AfterTwoWeeks(t *testing.T) {
 	require.NotNil(t, s.State("upB")) // Written 13 days ago
 }
 
-func TestService_SetForTest(t *testing.T) {
-	s, clock := newTestServiceWithClock(t)
-	s.SetRateVisitor("upA", ipRateVisitor())
-	aged := &State{
-		FirstSeenAt:  clock.now().Add(-48 * time.Hour),
-		SubscribedAt: clock.now().Add(-25 * time.Hour),
-		RateVisitor:  ipRateVisitor(),
-	}
-	s.SetForTest("upA", aged)
-	require.Equal(t, aged, s.State("upA"))
-	s.SetForTest("upB", &State{FirstSeenAt: clock.now().Add(-8 * 24 * time.Hour)})
-	require.Equal(t, &State{FirstSeenAt: clock.now().Add(-8 * 24 * time.Hour)}, s.State("upB"))
-}
-
 func TestService_Persist_SharedAcrossNodes(t *testing.T) {
 	// A rate visitor set on one node is the rate visitor on the other after a sync; a touch on the
 	// other node moves the subscriber activity for both, and keeps the rate visitor
@@ -177,16 +171,16 @@ func TestService_Persist_SharedAcrossNodes(t *testing.T) {
 		clock := newTestClock()
 		a := startTestService(t, newStore(), clock.now)
 		b := startTestService(t, newStore(), clock.now)
-		a.SetRateVisitor("upA", userRateVisitor())
-		set := clock.now()
+		a.SetRateVisitor("upA", "u_1", "1.2.3.4")
+		set := clock.unix()
 		a.sync()
 		b.sync()
-		require.Equal(t, &State{FirstSeenAt: set, SubscribedAt: set, RateVisitor: userRateVisitor()}, b.State("upA"))
+		require.Equal(t, state("upA", set, set, "u_1", "1.2.3.4"), stateOf(b, "upA"))
 		clock.advance(time.Hour)
 		b.Touch("upA")
 		b.sync()
 		a.sync()
-		require.Equal(t, &State{FirstSeenAt: set, SubscribedAt: clock.now(), RateVisitor: userRateVisitor()}, a.State("upA"))
+		require.Equal(t, state("upA", set, clock.unix(), "u_1", "1.2.3.4"), stateOf(a, "upA"))
 		require.Equal(t, a.State("upA"), b.State("upA"))
 	})
 }
@@ -196,13 +190,24 @@ func TestService_Persist_SurvivesRestart(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
 		clock := newTestClock()
 		s := startTestService(t, newStore(), clock.now)
-		s.SetRateVisitor("upA", ipRateVisitor())
+		s.SetRateVisitor("upA", "", "1.2.3.4")
 		s.Note("upB")
 		s.Close()
 		s = startTestService(t, newStore(), clock.now)
-		require.Equal(t, &State{FirstSeenAt: clock.now(), SubscribedAt: clock.now(), RateVisitor: ipRateVisitor()}, s.State("upA"))
-		require.Equal(t, &State{FirstSeenAt: clock.now()}, s.State("upB"))
+		require.Equal(t, state("upA", clock.unix(), clock.unix(), "", "1.2.3.4"), stateOf(s, "upA"))
+		require.Equal(t, state("upB", clock.unix(), 0, "", ""), stateOf(s, "upB"))
 		require.Equal(t, 2, s.Size())
+	})
+}
+
+func TestService_Persist_StartFailsIfLoadFails(t *testing.T) {
+	// A start does not serve without the topics: if they cannot be loaded, it fails
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		s := newService(newStore(), time.Now)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		require.ErrorContains(t, s.Start(ctx), "cannot load topics")
+		s.Close()
 	})
 }
 
@@ -213,8 +218,8 @@ func TestService_Persist_NoteDoesNotReviveRateVisitor(t *testing.T) {
 		clock := newTestClock()
 		a := startTestService(t, newStore(), clock.now)
 		b := startTestService(t, newStore(), clock.now)
-		a.SetRateVisitor("upA", userRateVisitor())
-		set := clock.now()
+		a.SetRateVisitor("upA", "u_1", "1.2.3.4")
+		set := clock.unix()
 		a.sync()
 		clock.advance(25 * time.Hour)
 		b.Note("upA") // b has not read a's row yet
@@ -222,7 +227,7 @@ func TestService_Persist_NoteDoesNotReviveRateVisitor(t *testing.T) {
 		a.sync()
 		b.sync()
 		for _, s := range []*Service{a, b} {
-			require.Equal(t, &State{FirstSeenAt: set, SubscribedAt: set, RateVisitor: userRateVisitor()}, s.State("upA"))
+			require.Equal(t, state("upA", set, set, "u_1", "1.2.3.4"), stateOf(s, "upA"))
 		}
 	})
 }
@@ -234,16 +239,18 @@ func TestService_Persist_TouchAfterPruneRestoresRow(t *testing.T) {
 		clock := newTestClock()
 		store := newStore()
 		s := startTestService(t, store, clock.now)
-		s.SetRateVisitor("upA", userRateVisitor())
-		set := clock.now()
+		s.SetRateVisitor("upA", "u_1", "1.2.3.4")
+		set := clock.unix()
 		s.sync()
-		deleted, err := store.prune(context.Background(), clock.now().Unix()+1)
+		deleted, err := store.prune(context.Background(), clock.unix()+1)
 		require.Nil(t, err)
 		require.Equal(t, int64(1), deleted)
 		clock.advance(time.Hour)
 		s.Touch("upA")
 		s.sync()
-		require.Equal(t, row{topic: "upA", firstSeenAt: set.Unix(), subscribedAt: clock.now().Unix(), userID: "u_1", ip: "1.2.3.4", updatedAt: clock.now().Unix()}, readAll(t, store, 0)["upA"])
+		expected := state("upA", set, clock.unix(), "u_1", "1.2.3.4")
+		expected.UpdatedAt = clock.unix()
+		require.Equal(t, *expected, readAll(t, store, 0)["upA"])
 	})
 }
 
@@ -254,15 +261,15 @@ func TestService_Persist_ReadBackKeepsUnwrittenRateVisitor(t *testing.T) {
 		clock := newTestClock()
 		a := startTestService(t, newStore(), clock.now)
 		b := startTestService(t, newStore(), clock.now)
-		a.SetRateVisitor("upA", ipRateVisitor())
+		a.SetRateVisitor("upA", "", "1.2.3.4")
 		a.sync()
-		b.SetRateVisitor("upA", &RateVisitor{IP: "5.6.7.8"})
+		b.SetRateVisitor("upA", "", "5.6.7.8")
 		_, err := b.read(context.Background(), 0)
 		require.Nil(t, err)
-		require.Equal(t, &RateVisitor{IP: "5.6.7.8"}, b.State("upA").RateVisitor)
+		require.Equal(t, "5.6.7.8", b.State("upA").RateVisitorIP)
 		b.sync()
 		a.sync()
-		require.Equal(t, &RateVisitor{IP: "5.6.7.8"}, a.State("upA").RateVisitor)
+		require.Equal(t, "5.6.7.8", a.State("upA").RateVisitorIP)
 	})
 }
 
@@ -274,15 +281,15 @@ func TestService_Persist_MergesFirstSeenAndSubscribed(t *testing.T) {
 		a := startTestService(t, newStore(), clock.now)
 		b := startTestService(t, newStore(), clock.now)
 		a.Note("upA")
-		noted := clock.now()
+		noted := clock.unix()
 		clock.advance(time.Hour)
 		b.Touch("upA")
-		touched := clock.now()
+		touched := clock.unix()
 		b.sync()
 		a.sync()
 		b.sync()
 		for _, s := range []*Service{a, b} {
-			require.Equal(t, &State{FirstSeenAt: noted, SubscribedAt: touched}, s.State("upA"))
+			require.Equal(t, state("upA", noted, touched, "", ""), stateOf(s, "upA"))
 		}
 	})
 }
@@ -294,14 +301,14 @@ func TestService_Persist_Refresh(t *testing.T) {
 		clock := newTestClock()
 		a := startTestService(t, newStore(), clock.now)
 		b := startTestService(t, newStore(), clock.now)
-		a.SetRateVisitor("upA", ipRateVisitor())
-		set := clock.now()
+		a.SetRateVisitor("upA", "", "1.2.3.4")
+		set := clock.unix()
 		a.sync()
 		require.Nil(t, b.State("upA"))
 		topic, err := b.Refresh(context.Background(), "upA")
 		require.Nil(t, err)
-		require.Equal(t, &State{FirstSeenAt: set, SubscribedAt: set, RateVisitor: ipRateVisitor()}, topic)
 		require.Equal(t, topic, b.State("upA"))
+		require.Equal(t, state("upA", set, set, "", "1.2.3.4"), withoutUpdatedAt(topic))
 
 		// A fresher row replaces what b knows
 		clock.advance(time.Hour)
@@ -309,8 +316,8 @@ func TestService_Persist_Refresh(t *testing.T) {
 		a.sync()
 		topic, err = b.Refresh(context.Background(), "upA")
 		require.Nil(t, err)
-		require.Equal(t, clock.now(), topic.SubscribedAt)
-		require.Equal(t, clock.now(), b.State("upA").SubscribedAt)
+		require.Equal(t, clock.unix(), topic.SubscribedAt)
+		require.Equal(t, clock.unix(), b.State("upA").SubscribedAt)
 
 		// An unknown topic stays unknown; a failed read is an error
 		topic, err = b.Refresh(context.Background(), "upB")
@@ -328,16 +335,36 @@ func TestService_Persist_WriteFailureRetries(t *testing.T) {
 		clock := newTestClock()
 		store := newStore()
 		s := startTestService(t, store, clock.now)
-		s.SetRateVisitor("upA", ipRateVisitor())
+		s.SetRateVisitor("upA", "", "1.2.3.4")
 		writeChunk := store.writeChunk
-		store.writeChunk = func(ctx context.Context, rows []row, now int64) error {
+		store.writeChunk = func(ctx context.Context, rows []State, now int64) error {
 			return errors.New("database is down")
 		}
 		s.sync()
 		require.Empty(t, readAll(t, store, 0))
 		store.writeChunk = writeChunk
 		s.sync()
-		require.Equal(t, "1.2.3.4", readAll(t, store, 0)["upA"].ip)
+		require.Equal(t, "1.2.3.4", readAll(t, store, 0)["upA"].RateVisitorIP)
+	})
+}
+
+func TestService_Persist_WriteFailureKeepsNewerChange(t *testing.T) {
+	// A change made while a write fails is not undone by the failed rows: it is the one retried
+	forEachBackend(t, func(t *testing.T, newStore func() *Store) {
+		clock := newTestClock()
+		store := newStore()
+		s := startTestService(t, store, clock.now)
+		s.SetRateVisitor("upA", "", "1.2.3.4")
+		writeChunk := store.writeChunk
+		store.writeChunk = func(ctx context.Context, rows []State, now int64) error {
+			s.SetRateVisitor("upA", "", "5.6.7.8")
+			return errors.New("database is down")
+		}
+		s.sync()
+		store.writeChunk = writeChunk
+		s.sync()
+		require.Equal(t, "5.6.7.8", readAll(t, store, 0)["upA"].RateVisitorIP)
+		require.Equal(t, "5.6.7.8", s.State("upA").RateVisitorIP)
 	})
 }
 
@@ -355,18 +382,19 @@ func TestService_Persist_PrunesTableAndMemory(t *testing.T) {
 		require.NotNil(t, s.State("upB"))
 		require.Equal(t, []string{"upB"}, topicsOf(readAll(t, store, 0)))
 
-		// A topic with an unwritten change is never pruned from memory, however old its last write
-		s.SetRateVisitor("upC", ipRateVisitor())
-		store.writeChunk = func(ctx context.Context, rows []row, now int64) error {
+		// A topic not written for pruneAfter is pruned with its unwritten change
+		s.SetRateVisitor("upC", "", "1.2.3.4")
+		store.writeChunk = func(ctx context.Context, rows []State, now int64) error {
 			return errors.New("database is down")
 		}
 		s.sync()
 		s.mu.Lock()
-		s.entries["upC"].updatedAt = 1
+		s.entries["upC"].UpdatedAt = 1
 		s.mu.Unlock()
 		clock.advance(pruneInterval)
 		s.sync()
-		require.NotNil(t, s.State("upC"))
+		require.Nil(t, s.State("upC"))
+		require.Empty(t, s.pending)
 	})
 }
 
@@ -385,51 +413,33 @@ func TestService_WithoutStore_NothingWaitsToBeWritten(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
 	s.Note("upA")
 	s.Touch("upB")
-	s.SetRateVisitor("upC", ipRateVisitor())
+	s.SetRateVisitor("upC", "", "1.2.3.4")
 	clock.advance(pruneAfter + time.Hour)
 	s.sync()
 	require.Equal(t, 0, s.Size())
-	require.Empty(t, s.dirty)
+	require.Empty(t, s.pending)
 }
 
-func TestService_Close_CancelsStalledLoad(t *testing.T) {
-	// Close does not wait for a startup load stuck on the database
-	store := NewSQLiteStore(newTestUserDB(t))
-	pool := store.db.Primary()
-	pool.SetMaxOpenConns(1)
-	conn, err := pool.Conn(context.Background()) // Holds the only connection: the load waits for it
-	require.Nil(t, err)
-	defer conn.Close()
-	s := newService(&Config{Store: store}, time.Now)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	require.Nil(t, s.Start(ctx))
-	require.Eventually(t, func() bool {
-		return pool.Stats().WaitCount > 0
-	}, time.Second, time.Millisecond)
-	closed := make(chan struct{})
-	go func() {
-		s.Close()
-		close(closed)
-	}()
-	select {
-	case <-closed:
-	case <-time.After(time.Second):
-		t.Fatal("Close waits for the stalled load")
+// state returns the state of a topic as the tests expect it, without its write time
+func state(topic string, firstSeenAt, subscribedAt int64, userID, ip string) *State {
+	return &State{
+		Topic:             topic,
+		FirstSeenAt:       firstSeenAt,
+		SubscribedAt:      subscribedAt,
+		RateVisitorUserID: userID,
+		RateVisitorIP:     ip,
 	}
 }
 
-// userRateVisitor returns the rate visitor of user u_1 at 1.2.3.4
-func userRateVisitor() *RateVisitor {
-	return &RateVisitor{
-		UserID: "u_1",
-		IP:     "1.2.3.4",
-	}
+// stateOf returns the topic's state without its write time, which most tests do not check
+func stateOf(s *Service, topic string) *State {
+	return withoutUpdatedAt(s.State(topic))
 }
 
-// ipRateVisitor returns the rate visitor of the anonymous subscriber at 1.2.3.4
-func ipRateVisitor() *RateVisitor {
-	return &RateVisitor{
-		IP: "1.2.3.4",
+// withoutUpdatedAt clears the state's write time, if there is a state
+func withoutUpdatedAt(st *State) *State {
+	if st != nil {
+		st.UpdatedAt = 0
 	}
+	return st
 }

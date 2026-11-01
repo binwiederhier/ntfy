@@ -48,8 +48,8 @@ func (s *Server) execManager() {
 						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, util.FormatTime(lastAccess))
 					}
 					t.ExpireDelivered()
-					if subs > 0 {
-						s.keepaliveTopics([]*topic{t}) // An open stream keeps the rate visitor live on the other nodes too
+					if subs > 0 && s.config.VisitorSubscriberRateLimiting && isUnifiedPushTopic(t.ID) {
+						s.topicService.Keepalive(t.ID) // An open stream keeps the rate visitor live on the other nodes too
 					}
 					subscribers += subs
 				}

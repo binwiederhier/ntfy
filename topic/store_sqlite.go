@@ -7,8 +7,8 @@ import (
 	"heckel.io/ntfy/v2/db"
 )
 
-// Same as the Postgres queries (see there), one row per statement: SQLite is a local file, so
-// a prepared statement per row in one transaction costs no round trips
+// Same as the Postgres queries, one row per statement: SQLite is a local file, so a prepared
+// statement per row in one transaction costs no round trips
 const (
 	sqliteSelectSinceQuery = `SELECT topic, first_seen_at, subscribed_at, rate_visitor_user_id, rate_visitor_ip, updated_at FROM topic WHERE updated_at >= ?`
 	sqliteSelectOneQuery   = `SELECT topic, first_seen_at, subscribed_at, rate_visitor_user_id, rate_visitor_ip, updated_at FROM topic WHERE topic = ?`
@@ -25,15 +25,13 @@ const (
 	sqlitePruneQuery = `DELETE FROM topic WHERE updated_at < ?1 AND topic IN (SELECT topic FROM topic WHERE updated_at < ?1 LIMIT ?2)`
 )
 
-// NewSQLiteStore returns the store on the user database (auth-file), which holds the topic
-// table (see package user, which creates and migrates it)
+// NewSQLiteStore returns the store on the user database (auth-file); package user creates and migrates the table
 func NewSQLiteStore(d *db.DB) *Store {
 	s := &Store{
 		db: d,
 		queries: &queries{
 			selectSince: sqliteSelectSinceQuery,
 			selectOne:   sqliteSelectOneQuery,
-			upsert:      sqliteUpsertQuery,
 			prune:       sqlitePruneQuery,
 		},
 	}
@@ -42,15 +40,15 @@ func NewSQLiteStore(d *db.DB) *Store {
 }
 
 // writeSQLite writes the rows in one transaction, one prepared statement per row
-func (s *Store) writeSQLite(ctx context.Context, rows []row, now int64) error {
+func (s *Store) writeSQLite(ctx context.Context, rows []State, now int64) error {
 	return db.ExecTx(s.db, func(tx *sql.Tx) error {
-		stmt, err := tx.PrepareContext(ctx, s.queries.upsert)
+		stmt, err := tx.PrepareContext(ctx, sqliteUpsertQuery)
 		if err != nil {
 			return err
 		}
 		defer stmt.Close()
 		for _, r := range rows {
-			if _, err := stmt.ExecContext(ctx, r.topic, r.firstSeenAt, r.subscribedAt, r.userID, r.ip, now); err != nil {
+			if _, err := stmt.ExecContext(ctx, r.Topic, r.FirstSeenAt, r.SubscribedAt, r.RateVisitorUserID, r.RateVisitorIP, now); err != nil {
 				return err
 			}
 		}

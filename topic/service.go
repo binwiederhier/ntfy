@@ -1,28 +1,17 @@
-// Package topic keeps the cluster-wide state of a topic that every node needs but no node owns:
-// when it was first seen, when a subscriber was last active, and who pays for the pushes to it
-// (its rate visitor; see package server for the UnifiedPush rules built on it). Each is a
-// per-topic fact with a merge rule, so the nodes can write it in any order: the earliest first
-// observation, the latest subscriber activity, and the last written rate visitor.
+// Package topic keeps the cluster-wide state of the UnifiedPush topics: when each was first seen,
+// when a subscriber was last active, and who pays for its pushes (its rate visitor). Every node
+// keeps it in memory and syncs it through the store, merging by per-field rules (earliest first
+// observation, latest subscriber activity, last written rate visitor), so writes may land in any
+// order. Timestamps are the nodes' clocks, so the nodes must keep them in sync (NTP).
 //
-// With a store, a sync worker writes the topics changed here (a dirty set, so a round costs
-// what changed, not the table) every syncInterval and reads back the rows changed since the last
-// round, applying the same merge rules in memory; at startup it loads every row. A publish
-// never reads the database (State is memory only); Refresh is the one cold-path read, for a
-// decision too final to make from a stale row. Rows not written for pruneAfter are pruned from
-// the table and from memory alike.
-//
-// The worker is the service's own, not the usage counters' (package limit): a stuck topic sync
-// must not stall the daily limits. Timestamps are the node's clock (unix seconds), so the nodes
-// must keep their clocks in sync (NTP); a skew beyond readOverlap may skip rows in the read-back.
-//
-// The live topics of a node (its subscribers and the delivery to them, server.topic and the
-// server's topics map today) are meant to move into this package too, as topic.Topic and
-// topic.Subscriber, with Subscribe and Unsubscribe calling SetRateVisitor, Touch and Keepalive
-// themselves. Until then, put new per-topic state here rather than in the server.
+// The live topics (server.topic and the server's topics map) are meant to move here later.
 package topic
 
 import (
 	"context"
+	"fmt"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -32,99 +21,81 @@ import (
 const (
 	tag = "topic"
 
-	// syncInterval is how often a node writes its changed topics and reads the others'; a change
-	// reaches the other nodes within about two intervals (one to be written, one to be read)
+	// syncInterval is how often a node writes its changed topics and reads the others'
 	syncInterval = 5 * time.Second
 
-	// statementTimeout bounds each store call of a sync. A row's updated_at is the writing node's
-	// time before its statement, so it may commit up to this much later; reads re-read readOverlap
-	// behind the watermark so such a row (or one stamped by a node clock a little behind ours) is
-	// not skipped (the merge rules make a re-read harmless).
+	// statementTimeout bounds each store call. A row may commit up to that long after its
+	// updated_at, so reads re-read readOverlap behind the watermark; re-reading is harmless.
 	statementTimeout = 5 * time.Second
 	readOverlap      = statementTimeout + time.Second
+	loadTimeout      = 2 * time.Minute
 
-	// loadWait is how long Start waits for the startup load before serving from memory, while
-	// the load goes on in the background; loadTimeout bounds one load attempt
-	loadWait    = 30 * time.Second
-	loadTimeout = 2 * time.Minute
-
-	// pruneInterval is how often a node deletes rows not written for pruneAfter, from the table
-	// and from memory. pruneAfter must be well above the server's 410 threshold for an abandoned
-	// UnifiedPush topic (7 days), so the row that starts the countdown is still there when the
-	// threshold is reached: a pruned row restarts the countdown on the next push, so a topic
-	// pushed to less often than every pruneAfter never gets its 404.
+	// pruneAfter must stay well above the server's 410 threshold (7 days), so the row that
+	// starts the countdown is still there when it is reached
 	pruneInterval = time.Hour
 	pruneAfter    = 14 * 24 * time.Hour
 
-	// keepaliveInterval is how often an open stream's subscriber activity is recorded at most
-	// (see Keepalive), so a long-lived stream costs one write per interval, not one per call
+	// keepaliveInterval is how often an open stream writes its subscriber activity at most
 	keepaliveInterval = 5 * time.Minute
 
-	// maxNoted caps the topics known only from refused pushes (see Note), so a flood of pushes to
-	// topics nobody subscribed to cannot fill the memory of every node, or the table. Such a topic
-	// is only an entry of ~100 bytes, but it is kept for pruneAfter.
+	// maxNoted caps the topics known only from refused pushes, so a push flood cannot fill memory
 	maxNoted = 100_000
 )
 
-// Service keeps the topics' state in memory and syncs it through the store; see the package comment
+// Service keeps the topics' state in memory and syncs it through the store
 type Service struct {
-	conf      *Config
-	now       func() time.Time    // Injectable clock, for tests
-	store     *Store              // Nil: memory only
-	entries   map[string]*entry   // By topic
-	dirty     map[string]struct{} // Topics with an unwritten change
-	noted     int                 // Entries without subscriber activity so far, capped at maxNoted
-	watermark int64               // Time of the last read, unix seconds; the sync worker's only
-	prunedAt  int64               // Time of the last prune, unix seconds; the sync worker's only
-	interval  time.Duration       // How often the worker syncs (syncInterval); tests change it
-	ctx       context.Context     // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
+	store     *Store            // Nil: memory only
+	now       func() time.Time  // Injectable clock, for tests
+	interval  time.Duration     // How often the worker syncs; tests change it
+	entries   map[string]*State // By topic
+	pending   map[string]State  // Rows to write, by topic; always empty without a store
+	noted     int               // Entries without subscriber activity, capped at maxNoted
+	watermark int64             // Time of the last read; the worker's only
+	prunedAt  int64             // Time of the last prune; the worker's only
+	ctx       context.Context   // Done on Close, so Close never waits on a stuck store call
 	cancel    context.CancelFunc
 	closeOnce sync.Once
 	wg        sync.WaitGroup
-	mu        sync.Mutex // Protects entries, dirty and noted
+	mu        sync.Mutex // Protects entries, pending and noted
 }
 
 // New creates the service
 func New(conf *Config) *Service {
-	return newService(conf, time.Now)
+	return newService(conf.Store, time.Now)
 }
 
-func newService(conf *Config, now func() time.Time) *Service {
+func newService(store *Store, now func() time.Time) *Service {
 	s := &Service{
-		conf:     conf,
+		store:    store,
 		now:      now,
-		store:    conf.Store,
-		entries:  make(map[string]*entry),
-		dirty:    make(map[string]struct{}),
 		interval: syncInterval,
+		entries:  make(map[string]*State),
+		pending:  make(map[string]State),
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	return s
 }
 
-// Start loads the current rows from the store, if there is one, and starts the sync worker. It
-// returns once the load is done, or after loadWait (or when ctx is done), whichever is first;
-// the load then goes on in the background while the service serves from memory.
+// Start loads the rows from the store, if there is one, and starts the sync worker
 func (s *Service) Start(ctx context.Context) error {
-	loaded := make(chan struct{})
+	if s.store != nil {
+		ctx, cancel := context.WithTimeout(ctx, loadTimeout)
+		defer cancel()
+		started := time.Now()
+		now := s.now().Unix()
+		n, err := s.read(ctx, now-int64(pruneAfter/time.Second))
+		if err != nil {
+			return fmt.Errorf("cannot load topics: %w", err)
+		}
+		s.watermark, s.prunedAt = now, now
+		log.Tag(tag).Info("Loaded %d topic(s) in %v", n, time.Since(started).Round(time.Millisecond))
+	}
 	s.wg.Add(1)
-	go s.runSync(loaded)
-	if s.store == nil {
-		return nil
-	}
-	select {
-	case <-loaded:
-	case <-time.After(loadWait):
-		log.Tag(tag).Warn("Loading topics takes longer than %v; serving from memory, loading in the background", loadWait)
-	case <-ctx.Done():
-		log.Tag(tag).Warn("Loading topics was not done in time; serving from memory, loading in the background")
-	}
+	go s.runSync()
 	return nil
 }
 
-// Close stops the sync worker, cancelling its store call (a stuck load or sync), and writes what
-// is unwritten. The store's database is its owner's to close (the user manager's, or the shared
-// pool), after this.
+// Close stops the sync worker and writes what is unwritten; the store's database is its owner's to close
 func (s *Service) Close() {
 	s.closeOnce.Do(func() {
 		s.cancel()
@@ -138,68 +109,62 @@ func (s *Service) Close() {
 	})
 }
 
-// SetRateVisitor makes rv the topic's rate visitor and records subscriber activity now. The last
-// one set, on any node, wins.
-func (s *Service) SetRateVisitor(topic string, rv *RateVisitor) {
-	now := s.now().Unix()
+// SetRateVisitor makes the subscriber the topic's rate visitor and records subscriber activity
+// now; the last one set, on any node, wins
+func (s *Service) SetRateVisitor(topic, userID, ip string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	e := s.touchNoLock(topic, now)
-	e.userID, e.ip = rv.UserID, rv.IP
-	e.write = writeRateVisitor
+	e := s.touchNoLock(topic)
+	e.RateVisitorUserID, e.RateVisitorIP = userID, ip
+	s.addPendingNoLock(e)
 }
 
-// Touch records subscriber activity on the topic now (a subscribe or poll by someone who may not
-// pay, or a stream that closed), keeping its rate visitor
+// Touch records subscriber activity on the topic now, keeping its rate visitor
 func (s *Service) Touch(topic string) {
-	now := s.now().Unix()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.touchNoLock(topic, now)
+	s.addPendingNoLock(s.touchNoLock(topic))
 }
 
-// Keepalive records that a stream is still open on the topic, as a Touch at most once per
-// keepaliveInterval, so the other nodes see the subscriber as active up to that much late
+// Keepalive records that a stream is open on the topic, as a Touch at most once per keepaliveInterval
 func (s *Service) Keepalive(topic string) {
-	now := s.now().Unix()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e, ok := s.entries[topic]; ok && now-e.subscribedAt < int64(keepaliveInterval/time.Second) {
+	if e, ok := s.entries[topic]; ok && s.now().Unix()-e.SubscribedAt < int64(keepaliveInterval/time.Second) {
 		return
 	}
-	s.touchNoLock(topic, now)
+	s.addPendingNoLock(s.touchNoLock(topic))
 }
 
-// Note makes a topic this node does not know yet known, as first seen now, e.g. on a refused
-// push, so that an abandoned topic can be told apart from a new one. It is insert-only: a known
-// topic is left alone, so a push never counts as subscriber activity and never revives a
-// rate visitor. At most maxNoted such topics are kept.
-func (s *Service) Note(topic string) {
-	now := s.now().Unix()
+// Note records a refused push and returns the topic's state. An unknown topic becomes known as
+// first seen now (unless maxNoted are, then it stays unknown); a known one is left alone, since
+// a push is not subscriber activity.
+func (s *Service) Note(topic string) *State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.entries[topic]; ok || s.noted >= maxNoted {
-		return
+	if _, ok := s.entries[topic]; !ok && s.noted < maxNoted {
+		now := s.now().Unix()
+		e := &State{
+			Topic:       topic,
+			FirstSeenAt: now,
+			UpdatedAt:   now,
+		}
+		s.entries[topic] = e
+		s.noted++
+		s.addPendingNoLock(e)
 	}
-	s.entries[topic] = &entry{
-		firstSeenAt: now,
-		updatedAt:   now,
-		write:       writeTouch,
-	}
-	s.markDirtyNoLock(topic)
-	s.noted++
+	return s.stateNoLock(topic)
 }
 
-// State returns the topic's state as this node knows it, from memory, or nil if it is unknown
+// State returns a copy of the topic's state from memory, or nil if it is unknown
 func (s *Service) State(topic string) *State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.stateNoLock(topic)
 }
 
-// Refresh reads the topic's row from the store (a primary key read, with the caller's context),
-// merges it into memory, and returns the topic's state like State. It is for a decision too final
-// to make from a stale row, on a cold path only. Without a store it is State.
+// Refresh reads the topic's row from the store, merges it into memory, and returns the state like
+// State. It is for decisions too final to make from a stale row; without a store it is State.
 func (s *Service) Refresh(ctx context.Context, topic string) (*State, error) {
 	if s.store == nil {
 		return s.State(topic), nil
@@ -223,40 +188,9 @@ func (s *Service) Size() int {
 	return len(s.entries)
 }
 
-// SetForTest replaces the topic's state with the given one, as if it had been observed here, and
-// has it written. It exists so tests can age a topic; it is not used in production code.
-func (s *Service) SetForTest(topic string, t *State) {
-	now := s.now().Unix()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	e := s.entryNoLock(topic, now)
-	e.firstSeenAt, e.subscribedAt = t.FirstSeenAt.Unix(), 0
-	if !t.SubscribedAt.IsZero() {
-		e.subscribedAt = t.SubscribedAt.Unix()
-	}
-	e.userID, e.ip = "", ""
-	if t.RateVisitor != nil {
-		e.userID, e.ip = t.RateVisitor.UserID, t.RateVisitor.IP
-	}
-	e.updatedAt = now
-	e.write = max(e.write, writeTouch)
-	s.markDirtyNoLock(topic)
-	s.countNotedNoLock()
-}
-
-// runSync loads the current rows (if there is a store), retrying until it succeeds, then syncs
-// every interval until Close. It is the only caller of the store's writes, so writes and reads
-// never interleave.
-func (s *Service) runSync(loaded chan struct{}) {
+// runSync syncs every interval until Close; it is the only writer, so writes and reads never interleave
+func (s *Service) runSync() {
 	defer s.wg.Done()
-	for s.store != nil && !s.load() {
-		select {
-		case <-s.ctx.Done():
-			return
-		case <-time.After(s.interval):
-		}
-	}
-	close(loaded)
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 	for {
@@ -269,25 +203,8 @@ func (s *Service) runSync(loaded chan struct{}) {
 	}
 }
 
-// load reads every row not pruned yet, and reports whether it succeeded
-func (s *Service) load() bool {
-	ctx, cancel := context.WithTimeout(s.ctx, loadTimeout)
-	defer cancel()
-	started := time.Now()
-	now := s.now().Unix()
-	n, err := s.read(ctx, now-int64(pruneAfter/time.Second))
-	if err != nil {
-		log.Tag(tag).Err(err).Warn("Cannot load topics; retrying in %v", s.interval)
-		return false
-	}
-	s.watermark, s.prunedAt = now, now
-	log.Tag(tag).Info("Loaded %d topic(s) in %v", n, time.Since(started).Round(time.Millisecond))
-	return true
-}
-
-// sync is one round of the sync worker: write the topics changed here, read back the rows changed
-// since the last round, and prune once in a while, in memory and (with a store) in the table.
-// Every error is logged and leaves the state as it was, for the next round.
+// sync writes the pending rows, reads back the rows changed since the last round, and prunes once
+// in a while. Errors are logged and retried in the next round.
 func (s *Service) sync() {
 	now := s.now().Unix()
 	if s.store != nil {
@@ -322,193 +239,117 @@ func (s *Service) sync() {
 	}
 }
 
-// write writes the topics changed here, as full rows. A failed write marks them changed again,
-// for the next round; rows are state, not deltas, so rewriting the ones that were written is
-// harmless.
+// write writes the pending rows outside the lock. Failed rows are pending again unless the topic
+// changed meanwhile; rows are state, not deltas, so rewriting them is harmless.
 func (s *Service) write(ctx context.Context) {
-	rows := s.dirtyRows()
+	s.mu.Lock()
+	rows := slices.Collect(maps.Values(s.pending))
+	clear(s.pending)
+	s.mu.Unlock()
 	if len(rows) == 0 {
 		return
 	}
 	now := s.now().Unix()
-	if err := s.store.write(ctx, rows, now); err != nil {
-		s.markDirty(rows)
+	err := s.store.write(ctx, rows, now)
+	if err != nil {
 		log.Tag(tag).Err(err).Warn("Cannot write %d topic(s); retrying in the next round", len(rows))
-		return
 	}
-	s.markWritten(rows, now)
-}
-
-// dirtyRows returns the rows of the topics changed here, and marks them written
-func (s *Service) dirtyRows() []row {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rows := make([]row, 0, len(s.dirty))
-	for topic := range s.dirty {
-		e, ok := s.entries[topic]
-		if !ok {
-			continue
-		}
-		rows = append(rows, row{
-			topic:        topic,
-			firstSeenAt:  e.firstSeenAt,
-			subscribedAt: e.subscribedAt,
-			userID:       e.userID,
-			ip:           e.ip,
-		})
-		e.write = writeNone
-	}
-	clear(s.dirty)
-	return rows
-}
-
-// markDirty marks the topics of rows that failed to write as changed again. A row with a rate
-// visitor is marked as if it were set here, so the read-back keeps it until it is written.
-func (s *Service) markDirty(rows []row) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, r := range rows {
-		e, ok := s.entries[r.topic]
-		if !ok {
+		if _, ok := s.pending[r.Topic]; ok {
 			continue
-		}
-		write := writeTouch
-		if r.ip != "" {
-			write = writeRateVisitor
-		}
-		e.write = max(e.write, write)
-		s.dirty[r.topic] = struct{}{}
-	}
-}
-
-// markWritten stamps the written rows' topics with the write time, which the prune goes by
-func (s *Service) markWritten(rows []row, now int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, r := range rows {
-		if e, ok := s.entries[r.topic]; ok && e.updatedAt < now {
-			e.updatedAt = now
+		} else if err != nil {
+			s.pending[r.Topic] = r
+		} else if e, ok := s.entries[r.Topic]; ok {
+			e.UpdatedAt = max(e.UpdatedAt, now)
 		}
 	}
 }
 
-// read applies the rows written since the given time to memory, and returns how many it applied
+// read merges the rows written since the given time into memory, and returns how many it read
 func (s *Service) read(ctx context.Context, since int64) (int, error) {
-	applied := 0
-	err := s.store.readSince(ctx, since, func(r *row) {
+	n := 0
+	err := s.store.readSince(ctx, since, func(r *State) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		s.applyNoLock(r)
-		applied++
+		n++
 	})
-	return applied, err
+	return n, err
 }
 
-// applyNoLock merges a row read from the store into memory, by the store's own rules: the earliest
-// first observation, the latest subscriber activity, the row's rate visitor unless it has none or
-// one was set here and not written yet (that one is newer). The caller must hold s.mu.
-func (s *Service) applyNoLock(r *row) {
-	e, ok := s.entries[r.topic]
+// applyNoLock merges a row read from the store into memory by the store's rules, except that a
+// pending rate visitor is newer than the stored one. The caller must hold s.mu.
+func (s *Service) applyNoLock(r *State) {
+	e, ok := s.entries[r.Topic]
 	if !ok {
-		e = &entry{firstSeenAt: r.firstSeenAt}
-		s.entries[r.topic] = e
-		if r.subscribedAt == 0 {
-			s.noted++
+		e = &State{
+			Topic:       r.Topic,
+			FirstSeenAt: r.FirstSeenAt,
 		}
-	} else if r.firstSeenAt < e.firstSeenAt {
-		e.firstSeenAt = r.firstSeenAt
+		s.entries[r.Topic] = e
+		s.noted++
 	}
-	if r.subscribedAt > e.subscribedAt {
-		if e.subscribedAt == 0 && ok {
-			s.noted--
-		}
-		e.subscribedAt = r.subscribedAt
+	if e.SubscribedAt == 0 && r.SubscribedAt != 0 {
+		s.noted--
 	}
-	if r.ip != "" && e.write != writeRateVisitor {
-		e.userID, e.ip = r.userID, r.ip
-	}
-	if r.updatedAt > e.updatedAt {
-		e.updatedAt = r.updatedAt
+	e.FirstSeenAt = min(e.FirstSeenAt, r.FirstSeenAt)
+	e.SubscribedAt = max(e.SubscribedAt, r.SubscribedAt)
+	e.UpdatedAt = max(e.UpdatedAt, r.UpdatedAt)
+	if _, pending := s.pending[r.Topic]; r.RateVisitorIP != "" && !pending {
+		e.RateVisitorUserID, e.RateVisitorIP = r.RateVisitorUserID, r.RateVisitorIP
 	}
 }
 
-// prune forgets the topics not written since the given time (unix seconds), unless they have an
-// unwritten change (without a store, nothing is ever written, so there is nothing to wait for)
+// prune forgets the topics not written since the given time, along with their unwritten changes
 func (s *Service) prune(before int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.noted = 0
 	for topic, e := range s.entries {
-		if (e.write == writeNone || s.store == nil) && e.updatedAt < before {
+		if e.UpdatedAt < before {
 			delete(s.entries, topic)
+			delete(s.pending, topic)
+		} else if e.SubscribedAt == 0 {
+			s.noted++
 		}
 	}
-	s.countNotedNoLock()
 }
 
-// touchNoLock records subscriber activity on the topic at now, creating the entry if needed, and
-// returns the entry, marked to be written. The caller must hold s.mu.
-func (s *Service) touchNoLock(topic string, now int64) *entry {
+// touchNoLock records subscriber activity on the topic now, creating its entry if needed. The
+// caller must hold s.mu.
+func (s *Service) touchNoLock(topic string) *State {
+	now := s.now().Unix()
 	e, ok := s.entries[topic]
 	if !ok {
-		e = &entry{firstSeenAt: now}
+		e = &State{
+			Topic:       topic,
+			FirstSeenAt: now,
+		}
 		s.entries[topic] = e
-	} else if e.subscribedAt == 0 {
+	} else if e.SubscribedAt == 0 {
 		s.noted-- // Known from pushes only until now
 	}
-	e.subscribedAt = max(e.subscribedAt, now)
-	e.updatedAt = max(e.updatedAt, now)
-	e.write = max(e.write, writeTouch)
-	s.markDirtyNoLock(topic)
+	e.SubscribedAt = max(e.SubscribedAt, now)
+	e.UpdatedAt = max(e.UpdatedAt, now)
 	return e
 }
 
-// markDirtyNoLock marks the topic to be written. Without a store nothing is ever written, so
-// nothing is marked (the set would only grow). The caller must hold s.mu.
-func (s *Service) markDirtyNoLock(topic string) {
+// addPendingNoLock has the entry's row written. Without a store nothing is ever written, so
+// nothing is kept for it. The caller must hold s.mu.
+func (s *Service) addPendingNoLock(e *State) {
 	if s.store != nil {
-		s.dirty[topic] = struct{}{}
+		s.pending[e.Topic] = *e
 	}
 }
 
-// entryNoLock returns the topic's entry, creating it as first seen at now if needed. The caller
-// must hold s.mu.
-func (s *Service) entryNoLock(topic string, now int64) *entry {
-	e, ok := s.entries[topic]
-	if !ok {
-		e = &entry{firstSeenAt: now}
-		s.entries[topic] = e
-	}
-	return e
-}
-
-// stateNoLock returns the topic's state, or nil if it is unknown. The caller must hold s.mu.
+// stateNoLock returns a copy of the topic's state, or nil if it is unknown. The caller must hold s.mu.
 func (s *Service) stateNoLock(topic string) *State {
 	e, ok := s.entries[topic]
 	if !ok {
 		return nil
 	}
-	t := &State{
-		FirstSeenAt: time.Unix(e.firstSeenAt, 0).UTC(),
-	}
-	if e.subscribedAt != 0 {
-		t.SubscribedAt = time.Unix(e.subscribedAt, 0).UTC()
-	}
-	if e.ip != "" {
-		t.RateVisitor = &RateVisitor{
-			UserID: e.userID,
-			IP:     e.ip,
-		}
-	}
-	return t
-}
-
-// countNotedNoLock recounts the topics known from pushes only, after a change that may have
-// made or unmade several at once (a prune, SetForTest). The caller must hold s.mu.
-func (s *Service) countNotedNoLock() {
-	s.noted = 0
-	for _, e := range s.entries {
-		if e.subscribedAt == 0 {
-			s.noted++
-		}
-	}
+	c := *e
+	return &c
 }

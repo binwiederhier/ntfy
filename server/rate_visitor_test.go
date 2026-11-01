@@ -94,12 +94,11 @@ func TestServer_UnifiedPush_StreamOnOtherNodeKeepsRateVisitor(t *testing.T) {
 		})
 
 		// A day later, the stream is still open on s1
-		ageTopic(s1, "upAAAAAAAAAAAA", 25*time.Hour)
-		ageTopic(s2, "upAAAAAAAAAAAA", 25*time.Hour)
+		ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s1, s2)
 		require.Equal(t, 507, request(t, s2, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil).Code)
 		s1.execManager()
 		waitForWithMaxWait(t, 3*syncWait, func() bool {
-			return time.Since(s2.topicService.State("upAAAAAAAAAAAA").SubscribedAt) < time.Hour
+			return time.Since(time.Unix(s2.topicService.State("upAAAAAAAAAAAA").SubscribedAt, 0)) < time.Hour
 		})
 		response := request(t, s2, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 		require.Equal(t, 200, response.Code)
@@ -123,9 +122,9 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers410(t *testing.T) {
 
 		// Never subscribed: 507 for a week from the first push, then 410
 		require.Equal(t, 50701, push().Code)
-		ageTopic(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter-time.Hour)
+		ageTopic(t, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter-time.Hour, s)
 		require.Equal(t, 50701, push().Code)
-		ageTopic(s, "upAAAAAAAAAAAA", 2*time.Hour)
+		ageTopic(t, "upAAAAAAAAAAAA", 2*time.Hour, s)
 		require.Equal(t, 41002, push().Code)
 		require.Equal(t, 410, push().HTTPCode)
 
@@ -135,9 +134,9 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers410(t *testing.T) {
 		})
 		require.Equal(t, 200, rr.Code)
 		require.Nil(t, push())
-		ageTopic(s, "upAAAAAAAAAAAA", 2*oneDay)
+		ageTopic(t, "upAAAAAAAAAAAA", 2*oneDay, s)
 		require.Equal(t, 50701, push().Code)
-		ageTopic(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter)
+		ageTopic(t, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter, s)
 		require.Equal(t, 41002, push().Code)
 
 		// An open stream keeps the topic, however long ago it was seen otherwise
@@ -152,7 +151,7 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers410(t *testing.T) {
 		waitFor(t, func() bool {
 			return lockedTopic(s, "upAAAAAAAAAAAA").SubscribersCount() == 1
 		})
-		ageTopic(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
+		ageTopic(t, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour, s)
 		require.Nil(t, push())
 	})
 }
@@ -164,16 +163,15 @@ func TestServer_UnifiedPush_AbandonedTopicReadsRowBeforeAnswering410(t *testing.
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
-		ageTopic(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
-		now := time.Now().Unix()
-		execUserDB(t, c, fmt.Sprintf(`INSERT INTO topic (topic, first_seen_at, subscribed_at, rate_visitor_user_id, rate_visitor_ip, updated_at) VALUES ('upAAAAAAAAAAAA', %d, %d, '', '1.2.3.4', 1)`, now-2*int64(oneDay/time.Second), now-2*int64(oneDay/time.Second)))
+		ageTopic(t, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour, s)
+		subscribed := time.Now().Add(-2 * oneDay).Unix()
+		execUserDB(t, c, fmt.Sprintf(`UPDATE topic SET subscribed_at = %d, rate_visitor_ip = '1.2.3.4', updated_at = 1`, subscribed)) // Not read back: written "long ago"
 		response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 		require.Equal(t, 507, response.Code)
-		require.WithinDuration(t, time.Now().Add(-2*oneDay), s.topicService.State("upAAAAAAAAAAAA").SubscribedAt, time.Minute)
+		require.Equal(t, subscribed, s.topicService.State("upAAAAAAAAAAAA").SubscribedAt)
 
 		// Known as abandoned, and so is the row: 410
-		ageTopic(s, "upAAAAAAAAAAAA", 6*oneDay)
-		execUserDB(t, c, fmt.Sprintf(`UPDATE topic SET subscribed_at = %d, first_seen_at = %d`, now-8*int64(oneDay/time.Second), now-8*int64(oneDay/time.Second)))
+		ageTopic(t, "upAAAAAAAAAAAA", 6*oneDay, s)
 		response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 		require.Equal(t, 410, response.Code)
 	})
@@ -185,7 +183,7 @@ func TestServer_UnifiedPush_AbandonedTopicAnswers507IfRowReadFails(t *testing.T)
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
-		ageTopic(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
+		ageTopic(t, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour, s)
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 		response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil, func(r *http.Request) {
@@ -226,7 +224,7 @@ func TestServer_UnifiedPush_RefusedPushDoesNotReviveRateVisitor(t *testing.T) {
 			r.RemoteAddr = "1.2.3.4:1234"
 		})
 		require.Equal(t, 200, rr.Code)
-		ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
+		ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 		subscribed := s.topicService.State("upAAAAAAAAAAAA").SubscribedAt
 		for i := 0; i < 3; i++ {
 			require.Equal(t, 507, request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil).Code)
@@ -235,7 +233,7 @@ func TestServer_UnifiedPush_RefusedPushDoesNotReviveRateVisitor(t *testing.T) {
 		s.Stop() // Writes the topic
 		var subscribedAt int64
 		queryUserDB(t, c, `SELECT subscribed_at FROM topic WHERE topic = 'upAAAAAAAAAAAA'`, &subscribedAt)
-		require.Equal(t, subscribed.Unix(), subscribedAt)
+		require.Equal(t, subscribed, subscribedAt)
 	})
 }
 
@@ -252,7 +250,7 @@ func TestServer_UnifiedPush_NonUnifiedPushTopicIsNotAbandoned(t *testing.T) {
 func TestServer_MatrixGateway_AbandonedTopicRejectsPushKey(t *testing.T) {
 	// The Matrix gateway answers an abandoned topic with a rejected pushkey, not with the 410; a
 	// topic without a subscriber for less than that is a 507, however long the node has known it
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	notification := `{"notification":{"devices":[{"pushkey":"http://127.0.0.1:12345/upAAAAAAAAAAAA?up=1"}]}}`
@@ -261,7 +259,7 @@ func TestServer_MatrixGateway_AbandonedTopicRejectsPushKey(t *testing.T) {
 	lockedTopic(s, "upAAAAAAAAAAAA").lastAccess = time.Now().Add(-13 * time.Hour)
 	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 507, response.Code)
-	ageTopic(s, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", unifiedPushAbandonedAfter+time.Hour, s)
 	response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, `{"rejected":["http://127.0.0.1:12345/upAAAAAAAAAAAA?up=1"]}`, strings.TrimSpace(response.Body.String()))
@@ -271,7 +269,7 @@ func TestServer_UnifiedPush_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	// A topic keeps its rate visitor for as long as the subscriber is around, not for as long as its
 	// limiter key is in use: the limiter forgetting the key must not drop it, and publishers
 	// charging the key must not keep it
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, func(r *http.Request) {
@@ -281,8 +279,8 @@ func TestServer_UnifiedPush_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	s.limiter.Prune(0) // The key is gone, the subscriber is not
 	rateVisitor := rateVisitorOf(t, s, "upAAAAAAAAAAAA")
 	require.NotNil(t, rateVisitor)
-	ageTopic(s, "upAAAAAAAAAAAA", 2*rateVisitorLiveFor) // The subscriber is gone
-	require.True(t, rateVisitor.MessageAllowed().OK)    // A publisher charges the key
+	ageTopic(t, "upAAAAAAAAAAAA", 2*rateVisitorLiveFor, s) // The subscriber is gone
+	require.True(t, rateVisitor.MessageAllowed().OK)       // A publisher charges the key
 	require.Nil(t, rateVisitorOf(t, s, "upAAAAAAAAAAAA"))
 }
 
@@ -410,18 +408,32 @@ func rateVisitorKey(s *Server, topic string) string {
 	return ""
 }
 
-// ageTopic makes the topic look as if its subscriber activity and first observation were d
-// earlier than they are; an unknown topic becomes one first seen d ago
-func ageTopic(s *Server, topic string, d time.Duration) {
-	t := s.topicService.State(topic)
-	if t == nil {
-		t = &tp.State{FirstSeenAt: time.Now()}
+// ageTopic moves the topic's first observation and subscriber activity d back, as the servers see
+// it after loading the aged row: it writes their topics, ages the row (an unknown topic becomes
+// one first seen d ago), and restarts their topic services on it
+func ageTopic(t *testing.T, topic string, d time.Duration, servers ...*Server) {
+	t.Helper()
+	for _, s := range servers {
+		s.topicService.Close()
 	}
-	t.FirstSeenAt = t.FirstSeenAt.Add(-d)
-	if !t.SubscribedAt.IsZero() {
-		t.SubscribedAt = t.SubscribedAt.Add(-d)
+	c := servers[0].config
+	now, secs := time.Now().Unix(), int64(d/time.Second)
+	execUserDB(t, c, fmt.Sprintf(`INSERT INTO topic (topic, first_seen_at, subscribed_at, rate_visitor_user_id, rate_visitor_ip, updated_at) VALUES ('%s', %d, 0, '', '', %d) ON CONFLICT (topic) DO NOTHING`, topic, now, now))
+	execUserDB(t, c, fmt.Sprintf(`UPDATE topic SET first_seen_at = first_seen_at - %d, subscribed_at = CASE WHEN subscribed_at = 0 THEN 0 ELSE subscribed_at - %d END, updated_at = %d WHERE topic = '%s'`, secs, secs, now, topic))
+	for _, s := range servers {
+		userDB := openUserDB(t, c)
+		store := tp.NewSQLiteStore(userDB)
+		if c.DatabaseURL != "" {
+			store = tp.NewPostgresStore(userDB)
+		}
+		topicService := tp.New(&tp.Config{Store: store})
+		require.Nil(t, topicService.Start(context.Background()))
+		s.topicService = topicService
+		t.Cleanup(func() {
+			topicService.Close() // Before the database closes; the server's Stop closes it again, a no-op
+			userDB.Close()
+		})
 	}
-	s.topicService.SetForTest(topic, t)
 }
 
 // execUserDB runs the query on the config's user database: the auth-file, or the Postgres schema

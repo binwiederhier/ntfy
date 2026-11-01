@@ -3424,7 +3424,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 
 func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorRequestLimitBurst = 3
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
@@ -3445,7 +3445,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 
 		// Expire visitor: its subscriber has been gone for a day, and its key is pruned after a day without use
-		ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
+		ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 		s.limiter.Prune(-time.Hour) // Everything is idle for longer than -1h
 
 		// Publish message again, observe that the rate visitor is not used anymore
@@ -3459,7 +3459,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T) {
 	// A poll from the subscriber of an open stream sets its own visitor on the topic; the open stream
 	// must keep that one alive too, or UnifiedPush publishes fail a day after the poll
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	subscriberFn := func(r *http.Request) {
@@ -3482,14 +3482,14 @@ func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T
 	require.Equal(t, 200, rr.Code)
 
 	// A day later, the stream is still there and keeps the topic's rate visitor
-	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 }
 
 func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testing.T) {
 	// A subscriber that only polls stays the topic's rate visitor for as long as it keeps polling
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	subscriberFn := func(r *http.Request) {
@@ -3499,16 +3499,16 @@ func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testin
 	require.Equal(t, 200, rr.Code)
 
 	// Polled 23 hours ago; polling again keeps it the rate visitor for another day
-	ageTopic(s, "upAAAAAAAAAAAA", 23*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 23*time.Hour, s)
 	rr = request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
-	require.WithinDuration(t, time.Now(), s.topicService.State("upAAAAAAAAAAAA").SubscribedAt, time.Minute)
+	require.WithinDuration(t, time.Now(), time.Unix(s.topicService.State("upAAAAAAAAAAAA").SubscribedAt, 0), time.Minute)
 }
 
 func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testing.T) {
 	// Two streams from the same subscriber overlap (e.g. a reconnect), and the newer one closes: the
 	// older one must keep the topic's rate visitor alive, though the topic holds the newer one
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	subscriberFn := func(r *http.Request) {
@@ -3542,7 +3542,7 @@ func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testi
 	<-doneB
 
 	// A day later, stream A is still there
-	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 }
@@ -3550,7 +3550,7 @@ func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testi
 func TestServer_SubscriberRateLimiting_OpenStreamKeepsPollerAsRateVisitor(t *testing.T) {
 	// A poll from another key (e.g. the same device over IPv4) takes the topic from an open stream
 	// (IPv6). While the stream is open, the topic keeps billing the poller, even a day later.
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -3571,7 +3571,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsPollerAsRateVisitor(t *tes
 	require.Equal(t, 200, rr.Code)
 
 	// A day later, only the stream is still there; the publish is billed to the poller's key
-	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
@@ -3618,7 +3618,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 		r.RemoteAddr = "2.2.2.2:1234"
 	})
 	require.Equal(t, 200, response.Code)
-	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 
 	// Alice's open stream keeps the topic alive, but it is still billed to Bob
 	response = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", bobHeaders, func(r *http.Request) {
@@ -3630,7 +3630,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalives(t *testing.T) {
 	// A topic is billed to its subscriber for as long as a stream is open on it, however long ago
 	// the subscriber was last seen otherwise
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	c.KeepaliveInterval = time.Hour // No keepalives during the test
 	s := newTestServer(t, c)
@@ -3646,7 +3646,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalive
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
@@ -3655,7 +3655,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalive
 func TestServer_SubscriberRateLimiting_ClosedStreamIsLastSeen(t *testing.T) {
 	// When the last stream closes, the subscriber counts as seen then: the topic keeps billing it
 	// for another day, and not longer
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	c.KeepaliveInterval = time.Hour // No keepalives during the test
 	s := newTestServer(t, c)
@@ -3672,14 +3672,14 @@ func TestServer_SubscriberRateLimiting_ClosedStreamIsLastSeen(t *testing.T) {
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour) // Subscribed more than a day ago
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s) // Subscribed more than a day ago
 	cancel()
 	<-done
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 
 	// A day after the stream closed, the subscriber is gone
-	ageTopic(s, "upAAAAAAAAAAAA", 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 507, response.Code)
 }

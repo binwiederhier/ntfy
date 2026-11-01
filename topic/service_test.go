@@ -156,19 +156,6 @@ func TestService_Prune_AfterTwoWeeks(t *testing.T) {
 	require.NotNil(t, s.State("upB")) // Written 13 days ago
 }
 
-func TestService_RateVisitorUserIDs(t *testing.T) {
-	s, clock := newTestServiceWithClock(t)
-	s.SetRateVisitor("upA", &RateVisitor{UserID: "u_1", IP: "1.2.3.4"})
-	s.SetRateVisitor("upB", &RateVisitor{IP: "1.2.3.4"})
-	s.SetRateVisitor("upC", &RateVisitor{UserID: "u_2", IP: "5.6.7.8"})
-	s.SetRateVisitor("upD", &RateVisitor{UserID: "u_1", IP: "5.6.7.8"})
-	s.Note("upE")
-	clock.advance(25 * time.Hour)
-	s.Touch("upA")
-	require.Equal(t, []string{"u_1"}, s.RateVisitorUserIDs(clock.now().Add(-24*time.Hour)))
-	require.Equal(t, []string{"u_1", "u_2"}, s.RateVisitorUserIDs(clock.now().Add(-48*time.Hour)))
-}
-
 func TestService_SetForTest(t *testing.T) {
 	s, clock := newTestServiceWithClock(t)
 	s.SetRateVisitor("upA", ipRateVisitor())

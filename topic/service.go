@@ -23,7 +23,6 @@ package topic
 
 import (
 	"context"
-	"slices"
 	"sync"
 	"time"
 
@@ -215,26 +214,6 @@ func (s *Service) Refresh(ctx context.Context, topic string) (*State, error) {
 		s.applyNoLock(r)
 	}
 	return s.stateNoLock(topic), nil
-}
-
-// RateVisitorUserIDs returns the distinct user IDs of the rate visitors of the topics with
-// subscriber activity since the given time, sorted, e.g. to refresh their users' tiers
-func (s *Service) RateVisitorUserIDs(since time.Time) []string {
-	cutoff := since.Unix()
-	ids := make(map[string]struct{})
-	s.mu.Lock()
-	for _, e := range s.entries {
-		if e.userID != "" && e.subscribedAt >= cutoff {
-			ids[e.userID] = struct{}{}
-		}
-	}
-	s.mu.Unlock()
-	sorted := make([]string, 0, len(ids))
-	for id := range ids {
-		sorted = append(sorted, id)
-	}
-	slices.Sort(sorted)
-	return sorted
 }
 
 // Size returns the number of topics the service knows

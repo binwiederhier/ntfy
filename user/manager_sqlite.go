@@ -31,12 +31,6 @@ const (
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.id = ?
 	`
-	sqliteSelectUsersByIDsQuery = `
-		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
-		FROM user u
-		LEFT JOIN tier t on t.id = u.tier_id
-		WHERE u.id IN (SELECT value FROM json_each(?))
-	`
 	sqliteSelectUserByNameQuery = `
 		SELECT u.id, u.user, u.pass, u.role, u.prefs, u.sync_topic, u.provisioned, u.stripe_customer_id, u.stripe_subscription_id, u.stripe_subscription_status, u.stripe_subscription_interval, u.stripe_subscription_paid_until, u.stripe_subscription_cancel_at, deleted, t.id, t.code, t.name, t.messages_limit, t.messages_expiry_duration, t.emails_limit, t.calls_limit, t.reservations_limit, t.attachment_file_size_limit, t.attachment_total_size_limit, t.attachment_expiry_duration, t.attachment_bandwidth_limit, t.stripe_monthly_price_id, t.stripe_yearly_price_id
 		FROM user u
@@ -261,7 +255,6 @@ const (
 
 var sqliteQueries = queries{
 	selectUserByID:                 sqliteSelectUserByIDQuery,
-	selectUsersByIDs:               sqliteSelectUsersByIDsQuery,
 	selectUserByName:               sqliteSelectUserByNameQuery,
 	selectUserByNameOrPrimaryEmail: sqliteSelectUserByNameOrPrimaryEmailQuery,
 	selectUserByToken:              sqliteSelectUserByTokenQuery,

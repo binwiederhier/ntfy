@@ -3610,7 +3610,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	require.True(t, s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA")).MessageAllowed().OK)
+	require.True(t, rateVisitorOf(t, s, "upAAAAAAAAAAAA").MessageAllowed().OK)
 	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionRead))
 
 	// Bob takes the topic with a poll, and is gone a day later

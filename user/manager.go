@@ -26,7 +26,6 @@ const (
 	syncTopicPrefix                 = "st_"
 	syncTopicLength                 = 16
 	userIDPrefix                    = "u_"
-	usersByIDsChunk                 = 1000 // IDs per statement of UsersByIDs
 	userIDLength                    = 12
 	userAuthIntentionalSlowDownHash = "$2a$10$YFCQvqQDwIIwnJM1xkAYOeih0dg17UVGanaTStnrSzC8NCWxcLDwy" // Cost should match DefaultUserPasswordBcryptCost
 	userHardDeleteAfterDuration     = 7 * 24 * time.Hour
@@ -456,29 +455,6 @@ func (a *Manager) UserByID(id string) (*User, error) {
 		return nil, err
 	}
 	return a.readUser(rows)
-}
-
-// UsersByIDs returns the users with the given IDs, in chunks of usersByIDsChunk, skipping the IDs
-// that do not exist. Deleted users are returned as such; the caller decides what to do with them.
-// The IDs are passed as one JSON array, which both dialects unpack, so the statement is fixed.
-func (a *Manager) UsersByIDs(ids []string) ([]*User, error) {
-	users := make([]*User, 0, len(ids))
-	for chunk := range slices.Chunk(ids, usersByIDsChunk) {
-		param, err := json.Marshal(chunk)
-		if err != nil {
-			return nil, err
-		}
-		rows, err := a.db.Query(a.queries.selectUsersByIDs, string(param))
-		if err != nil {
-			return nil, err
-		}
-		chunkUsers, err := a.readUsers(rows)
-		if err != nil {
-			return nil, err
-		}
-		users = append(users, chunkUsers...)
-	}
-	return users, nil
 }
 
 // UserByEmailOrUsername resolves an identifier to a single user, trying it first as a primary

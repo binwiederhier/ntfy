@@ -66,11 +66,10 @@ type Server struct {
 	smtpServerBackend *smtpBackend
 	mailer            mail.Sender
 	topics            map[string]*topic
-	limiter           *limit.Service        // Decides on and counts the visitors' usage, keyed by visitor key
-	visitors          *visitorEnv           // Shared by all visitors, which are built per request
-	topicService      *tp.Service           // Cluster-wide topic state: subscriber activity and rate visitors of the UnifiedPush topics
-	rateVisitorUsers  *rateVisitorUserCache // Users of the live rate visitors, by ID, refreshed by the manager
-	ban               *ban.Service          // Abuse ban-feed; nil when the feature is disabled (no ban file)
+	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
+	visitors          *visitorEnv    // Shared by all visitors, which are built per request
+	topicService      *tp.Service    // Cluster-wide topic state: subscriber activity and rate visitors of the UnifiedPush topics
+	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
@@ -366,10 +365,6 @@ func New(conf *Config) (*Server, error) {
 	s.topicService = tp.New(&tp.Config{
 		Store: createTopicStore(pool, userDB),
 	})
-	s.rateVisitorUsers = newRateVisitorUserCache(nil)
-	if userManager != nil {
-		s.rateVisitorUsers.lookup = userManager.UsersByIDs
-	}
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
@@ -403,7 +398,6 @@ func New(conf *Config) (*Server, error) {
 	if err := s.topicService.Start(context.Background()); err != nil {
 		return nil, err
 	}
-	s.refreshRateVisitorUsers() // The loaded rate visitors' tiers apply from the start, not from the first manager run
 	return s, nil
 }
 
@@ -2038,9 +2032,6 @@ func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topi
 			UserID: v.MaybeUserID(),
 			IP:     v.maskedIP(),
 		})
-		if u := v.User(); u != nil {
-			s.rateVisitorUsers.Put(u) // Its tier applies to the pushes right away, not from the next refresh
-		}
 		t.Keepalive()
 	}
 	return nil

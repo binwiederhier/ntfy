@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/netip"
@@ -40,9 +39,9 @@ func TestServer_UnifiedPush_RateVisitorOnOtherNode(t *testing.T) {
 	})
 }
 
-func TestServer_UnifiedPush_RateVisitorOnOtherNodeUsesTierAfterRefresh(t *testing.T) {
-	// The other node knows the subscriber's user ID from the row, but its tier only once the
-	// background refresh has looked it up: until then, the subscriber's IP is charged
+func TestServer_UnifiedPush_RateVisitorOnOtherNodeUsesTier(t *testing.T) {
+	// The other node knows the subscriber's user ID from the row, and looks up its tier on the
+	// push, like an authenticated publish loads its user
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
@@ -62,12 +61,10 @@ func TestServer_UnifiedPush_RateVisitorOnOtherNodeUsesTierAfterRefresh(t *testin
 			r.RemoteAddr = "1.2.3.4:1234"
 		})
 		require.Equal(t, 200, rr.Code)
-		require.Equal(t, "user:"+phil.ID, rateVisitorKey(s1, "upAAAAAAAAAAAA")) // The subscribe primes the cache
+		require.Equal(t, "user:"+phil.ID, rateVisitorKey(s1, "upAAAAAAAAAAAA"))
 		waitForWithMaxWait(t, 3*syncWait, func() bool {
 			return s2.topicService.State("upAAAAAAAAAAAA") != nil
 		})
-		require.Equal(t, "ip:1.2.3.4", rateVisitorKey(s2, "upAAAAAAAAAAAA"))
-		s2.execManager() // Refreshes the rate visitors' users
 		require.Equal(t, "user:"+phil.ID, rateVisitorKey(s2, "upAAAAAAAAAAAA"))
 	})
 }
@@ -282,16 +279,16 @@ func TestServer_UnifiedPush_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
 	})
 	require.Equal(t, 200, rr.Code)
 	s.limiter.Prune(0) // The key is gone, the subscriber is not
-	rateVisitor := s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"))
+	rateVisitor := rateVisitorOf(t, s, "upAAAAAAAAAAAA")
 	require.NotNil(t, rateVisitor)
 	ageTopic(s, "upAAAAAAAAAAAA", 2*rateVisitorLiveFor) // The subscriber is gone
 	require.True(t, rateVisitor.MessageAllowed().OK)    // A publisher charges the key
-	require.Nil(t, s.rateVisitor(lockedTopic(s, "upAAAAAAAAAAAA")))
+	require.Nil(t, rateVisitorOf(t, s, "upAAAAAAAAAAAA"))
 }
 
-func TestServer_UnifiedPush_TierChangeAppliesAfterRefresh(t *testing.T) {
-	// Pushes are billed with the subscriber's current tier, as of the last background refresh of
-	// the rate visitors' users; a push never looks a user up
+func TestServer_UnifiedPush_TierChangeAppliesRightAway(t *testing.T) {
+	// Pushes are billed with the subscriber's tier as of the push: the user is looked up on every
+	// push, so a tier change applies to the next one
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
@@ -310,31 +307,21 @@ func TestServer_UnifiedPush_TierChangeAppliesAfterRefresh(t *testing.T) {
 			"Authorization": util.BasicAuth("phil", "phil"),
 		})
 		require.Equal(t, 200, rr.Code)
-		lookups := 0
-		s.rateVisitorUsers.lookup = func(ids []string) ([]*user.User, error) {
-			lookups++
-			return s.userManager.UsersByIDs(ids)
-		}
 		push := func() int {
 			return request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil).Code
 		}
 		require.Equal(t, 200, push())
 		require.Equal(t, 429, push())
 
-		// The new tier applies once the users were refreshed
+		// The new tier applies to the next push
 		require.Nil(t, s.userManager.ChangeTier("phil", "large"))
-		require.Equal(t, 429, push())
-		require.Equal(t, 0, lookups)
-		s.execManager()
-		require.Equal(t, 1, lookups)
 		require.Equal(t, 200, push())
-		require.Equal(t, 1, lookups)
 	})
 }
 
 func TestServer_UnifiedPush_TierDowngradeChargesIP(t *testing.T) {
 	// A subscriber that loses its tier is charged on its IP like an anonymous one, with the
-	// anonymous limits, from the next refresh; the user key stops being charged
+	// anonymous limits, from the next push; the user key stops being charged
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
@@ -357,7 +344,6 @@ func TestServer_UnifiedPush_TierDowngradeChargesIP(t *testing.T) {
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("9.9.9.9"), phil).Stats().Messages)
 		require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 		require.Nil(t, s.userManager.ResetTier("phil"))
-		s.execManager()
 		require.Equal(t, "ip:1.2.3.4", rateVisitorKey(s, "upAAAAAAAAAAAA"))
 		require.Equal(t, 200, request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil).Code)
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("9.9.9.9"), phil).Stats().Messages)
@@ -397,7 +383,6 @@ func TestServer_UnifiedPush_DeletedSubscriberChargesIP(t *testing.T) {
 		// Alice deletes her account (soft delete), bob is removed by an admin (hard delete)
 		require.Nil(t, s.userManager.MarkUserRemoved(alice))
 		require.Nil(t, s.userManager.RemoveUser("bob"))
-		s.execManager()
 		require.Equal(t, "ip:1.2.3.4", rateVisitorKey(s, "upAAAAAAAAAAAA"))
 		require.Equal(t, "ip:5.6.7.8", rateVisitorKey(s, "upBBBBBBBBBBBB"))
 		for _, topic := range []string{"upAAAAAAAAAAAA", "upBBBBBBBBBBBB"} {
@@ -406,63 +391,6 @@ func TestServer_UnifiedPush_DeletedSubscriberChargesIP(t *testing.T) {
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("5.6.7.8"), nil).Stats().Messages)
 	})
-}
-
-func TestServer_UnifiedPush_RateVisitorUserRefreshFailureKeepsCachedUsers(t *testing.T) {
-	// If the users cannot be refreshed, pushes keep using what was cached, rather than failing or
-	// falling back to the IP
-	c := newTestConfigWithAuthFile(t, "")
-	c.VisitorSubscriberRateLimiting = true
-	s := newTestServer(t, c)
-	require.Nil(t, s.userManager.AddTier(&user.Tier{
-		Code:         "pro",
-		MessageLimit: 10,
-	}))
-	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
-	require.Nil(t, s.userManager.ChangeTier("alice", "pro"))
-	alice, err := s.userManager.User("alice")
-	require.Nil(t, err)
-	rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", map[string]string{
-		"Authorization": util.BasicAuth("alice", "alice"),
-	})
-	require.Equal(t, 200, rr.Code)
-	s.rateVisitorUsers.lookup = func(ids []string) ([]*user.User, error) {
-		return nil, errors.New("database is down")
-	}
-	s.execManager()
-	require.Equal(t, "user:"+alice.ID, rateVisitorKey(s, "upAAAAAAAAAAAA"))
-	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
-	require.Equal(t, 200, response.Code)
-	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("9.9.9.9"), alice).Stats().Messages)
-}
-
-func TestServer_UnifiedPush_RateVisitorUsersAreOnlyTheLiveOnes(t *testing.T) {
-	// The refresh looks up the users of the live rate visitors only, and drops the others
-	c := newTestConfigWithAuthFile(t, "")
-	c.VisitorSubscriberRateLimiting = true
-	s := newTestServer(t, c)
-	require.Nil(t, s.userManager.AddUser("alice", "alice", user.RoleUser, false))
-	require.Nil(t, s.userManager.AddUser("bob", "bob", user.RoleUser, false))
-	alice, err := s.userManager.User("alice")
-	require.Nil(t, err)
-	bob, err := s.userManager.User("bob")
-	require.Nil(t, err)
-	for name, topic := range map[string]string{"alice": "upAAAAAAAAAAAA", "bob": "upBBBBBBBBBBBB"} {
-		rr := request(t, s, "GET", "/"+topic+"/json?poll=1", "", map[string]string{
-			"Authorization": util.BasicAuth(name, name),
-		})
-		require.Equal(t, 200, rr.Code)
-	}
-	ageTopic(s, "upBBBBBBBBBBBB", 2*rateVisitorLiveFor)
-	var looked []string
-	s.rateVisitorUsers.lookup = func(ids []string) ([]*user.User, error) {
-		looked = ids
-		return s.userManager.UsersByIDs(ids)
-	}
-	s.execManager()
-	require.Equal(t, []string{alice.ID}, looked)
-	require.NotNil(t, s.rateVisitorUsers.User(alice.ID))
-	require.Nil(t, s.rateVisitorUsers.User(bob.ID))
 }
 
 // syncWait is how long a topic takes at most to reach another node in healthy operation: one
@@ -476,7 +404,7 @@ func rateVisitorKey(s *Server, topic string) string {
 	if err != nil {
 		return ""
 	}
-	if v := s.rateVisitor(to); v != nil {
+	if v, err := s.rateVisitor(to); err == nil && v != nil {
 		return v.key
 	}
 	return ""
@@ -523,4 +451,11 @@ func openUserDB(t *testing.T, c *Config) *db.DB {
 	d, err := user.OpenSQLite(c.AuthFile)
 	require.Nil(t, err)
 	return d
+}
+
+// rateVisitorOf returns the visitor the topic's pushes are charged to, or nil if none
+func rateVisitorOf(t *testing.T, s *Server, topic string) *visitor {
+	v, err := s.rateVisitor(lockedTopic(s, topic))
+	require.Nil(t, err)
+	return v
 }

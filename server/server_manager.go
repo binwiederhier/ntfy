@@ -14,7 +14,6 @@ func (s *Server) execManager() {
 	// database (and the web push job, which also sends expiry warnings) run on the cluster
 	// leader only. Without clustering, IsLeader is always true.
 	s.pruneVisitors()
-	s.refreshRateVisitorUsers()
 	if s.cluster.IsLeader() {
 		s.pruneTokens()
 		s.pruneAttachments()

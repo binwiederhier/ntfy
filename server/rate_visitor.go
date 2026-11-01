@@ -1,13 +1,12 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"net/netip"
 	"strings"
-	"sync"
 	"time"
 
-	"heckel.io/ntfy/v2/log"
 	tp "heckel.io/ntfy/v2/topic"
 	"heckel.io/ntfy/v2/user"
 	vis "heckel.io/ntfy/v2/visitor"
@@ -27,47 +26,39 @@ const (
 	rateVisitorLiveFor = oneDay
 )
 
-// rateVisitorUserCache holds the users of the live rate visitors by ID, so a push never reads the
-// user database: the server refreshes them in the background (see Server.refreshRateVisitorUsers),
-// and a subscribe puts the subscriber's user in right away
-type rateVisitorUserCache struct {
-	lookup func(ids []string) ([]*user.User, error) // userManager.UsersByIDs, nil without a user manager; replaced in tests
-	users  map[string]*user.User                    // By ID; a deleted user is not in here
-	mu     sync.Mutex                               // Protects users
-}
-
-func newRateVisitorUserCache(lookup func(ids []string) ([]*user.User, error)) *rateVisitorUserCache {
-	return &rateVisitorUserCache{
-		lookup: lookup,
-		users:  make(map[string]*user.User),
-	}
-}
-
 // rateVisitor returns the visitor the topic's pushes are charged to, or nil if the topic has no
 // live rate visitor. A rate visitor is live while the topic has a stream open here, or for
 // rateVisitorLiveFor after the subscriber was last active on any node (the manager of a node
 // with an open stream keeps it active). It is charged like the subscriber would be now: on its
-// user key with its tier's limits if the user has a tier (as of the last refresh), else on its
-// IP key with the anonymous limits. A deleted user, or one not looked up yet, is charged on the IP.
-func (s *Server) rateVisitor(t *topic) *visitor {
+// user key with its tier's limits if the user has a tier, else on its IP key with the anonymous
+// limits. The user is read like an authenticated publish reads its own; a deleted user is
+// charged on the IP, and a failed read is an error, so the publisher retries.
+func (s *Server) rateVisitor(t *topic) (*visitor, error) {
 	if !s.config.VisitorSubscriberRateLimiting || !isUnifiedPushTopic(t.ID) {
-		return nil
+		return nil, nil
 	}
 	state := s.topicService.State(t.ID)
 	if state == nil || state.RateVisitor == nil {
-		return nil
+		return nil, nil
 	} else if t.SubscribersCount() == 0 && time.Since(state.SubscribedAt) > rateVisitorLiveFor {
-		return nil
+		return nil, nil
 	}
 	ip, err := netip.ParseAddr(state.RateVisitor.IP)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 	var u *user.User
-	if state.RateVisitor.UserID != "" {
-		u = s.rateVisitorUsers.User(state.RateVisitor.UserID)
+	if state.RateVisitor.UserID != "" && s.userManager != nil {
+		u, err = s.userManager.UserByID(state.RateVisitor.UserID)
+		if errors.Is(err, user.ErrUserNotFound) {
+			u = nil // Removed: the IP pays
+		} else if err != nil {
+			return nil, err
+		} else if u.Deleted {
+			u = nil // Marked deleted: the IP pays
+		}
 	}
-	return newVisitor(s.visitors, ip, u)
+	return newVisitor(s.visitors, ip, u), nil
 }
 
 // unifiedPushTopicAbandoned returns true if the topic has had no subscriber activity, on any node,
@@ -115,55 +106,6 @@ func (s *Server) keepaliveTopics(topics []*topic) {
 			s.topicService.Keepalive(t.ID)
 		}
 	}
-}
-
-// refreshRateVisitorUsers looks up the users of the live rate visitors again, so a tier change (or
-// a deleted account) applies to the pushes within a manager interval
-func (s *Server) refreshRateVisitorUsers() {
-	if !s.config.VisitorSubscriberRateLimiting || s.userManager == nil {
-		return
-	}
-	ids := s.topicService.RateVisitorUserIDs(time.Now().Add(-rateVisitorLiveFor))
-	if err := s.rateVisitorUsers.Refresh(ids); err != nil {
-		log.Tag(tagManager).Err(err).Warn("Cannot refresh the users of %d rate visitor(s); keeping the cached ones", len(ids))
-	}
-}
-
-// User returns the cached user with the given ID, or nil if it is not cached (not a live rate
-// visitor's, not looked up yet, or deleted)
-func (c *rateVisitorUserCache) User(id string) *user.User {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.users[id]
-}
-
-// Put caches the user, e.g. the subscriber's on a subscribe, so its pushes are charged with its
-// tier before the next refresh
-func (c *rateVisitorUserCache) Put(u *user.User) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.users[u.ID] = u
-}
-
-// Refresh replaces the cached users with fresh lookups of the given IDs, dropping the others. On
-// an error the cache is left as it is: stale users are better than none.
-func (c *rateVisitorUserCache) Refresh(ids []string) error {
-	users := make(map[string]*user.User, len(ids))
-	if len(ids) > 0 && c.lookup != nil {
-		looked, err := c.lookup(ids)
-		if err != nil {
-			return err
-		}
-		for _, u := range looked {
-			if !u.Deleted {
-				users[u.ID] = u
-			}
-		}
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.users = users
-	return nil
 }
 
 // topicAbandoned returns true if the topic's newest observation (a subscriber, or its first

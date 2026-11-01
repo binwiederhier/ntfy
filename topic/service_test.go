@@ -72,8 +72,8 @@ func TestService_SetTouchNote(t *testing.T) {
 	set := clock.unix()
 	require.Equal(t, state("upA", noted, set, "u_1", "1.2.3.4"), stateOf(s, "upA"))
 
-	// A touch keeps the rate visitor and moves the subscriber activity
-	clock.advance(time.Minute)
+	// A touch keeps the rate visitor and moves the subscriber activity (see Touch_Throttled)
+	clock.advance(touchInterval)
 	s.Touch("upA")
 	touched := clock.unix()
 	require.Equal(t, state("upA", noted, touched, "u_1", "1.2.3.4"), stateOf(s, "upA"))
@@ -99,21 +99,26 @@ func TestService_State_ReturnsCopy(t *testing.T) {
 	require.Equal(t, "1.2.3.4", s.State("upA").RateVisitorIP)
 }
 
-func TestService_Keepalive_Throttled(t *testing.T) {
+func TestService_Touch_Throttled(t *testing.T) {
+	// A touch moves subscriber activity at most once per touchInterval, so an open stream the
+	// manager touches every minute costs a write every few minutes only
 	s, clock := newTestServiceWithClock(t)
 	s.SetRateVisitor("upA", "", "1.2.3.4")
 	set := clock.unix()
-	clock.advance(keepaliveInterval - time.Second)
-	s.Keepalive("upA")
+	clock.advance(touchInterval - time.Second)
+	s.Touch("upA")
 	require.Equal(t, set, s.State("upA").SubscribedAt)
 	clock.advance(time.Second)
-	s.Keepalive("upA")
+	s.Touch("upA")
 	require.Equal(t, clock.unix(), s.State("upA").SubscribedAt)
 	require.Equal(t, "1.2.3.4", s.State("upA").RateVisitorIP)
 
-	// A keepalive of an unknown topic is a touch
-	s.Keepalive("upB")
+	// A touch of an unknown topic, or of one known from refused pushes only, is never throttled
+	s.Touch("upB")
 	require.Equal(t, state("upB", clock.unix(), clock.unix(), "", ""), stateOf(s, "upB"))
+	s.Note("upC")
+	s.Touch("upC")
+	require.Equal(t, clock.unix(), s.State("upC").SubscribedAt)
 }
 
 func TestService_Note_Bounded(t *testing.T) {
@@ -296,8 +301,7 @@ func TestService_Persist_TouchKeepsNewerRateVisitor(t *testing.T) {
 		b := startTestService(t, newStore(), clock.now)
 		a.SetRateVisitor("upA", "", "1.1.1.1")
 		a.sync()
-		clock.advance(keepaliveInterval)
-		a.Keepalive("upA")
+		clock.advance(touchInterval)
 		a.Touch("upA")
 		b.SetRateVisitor("upA", "u_2", "2.2.2.2")
 		b.sync()

@@ -49,7 +49,7 @@ func (s *Server) execManager() {
 					}
 					t.ExpireDelivered()
 					if subs > 0 && s.config.VisitorSubscriberRateLimiting && isUnifiedPushTopic(t.ID) {
-						s.topicService.Keepalive(t.ID) // An open stream keeps the rate visitor live on the other nodes too
+						s.topicService.Touch(t.ID) // An open stream keeps the rate visitor live on the other nodes too
 					}
 					subscribers += subs
 				}

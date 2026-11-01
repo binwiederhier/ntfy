@@ -34,8 +34,9 @@ const (
 	pruneInterval = time.Hour
 	pruneAfter    = 7 * 24 * time.Hour
 
-	// keepaliveInterval is how often an open stream writes its subscriber activity at most
-	keepaliveInterval = 5 * time.Minute
+	// touchInterval is how often a touch moves a topic's subscriber activity at most, so an open
+	// stream, touched by the manager every minute, writes only every few minutes
+	touchInterval = 5 * time.Minute
 
 	// maxNoted caps the topics known only from refused pushes, so a push flood cannot fill memory;
 	// rows read from other nodes count too, so it is effectively cluster-wide
@@ -122,18 +123,12 @@ func (s *Service) SetRateVisitor(topic, userID, ip string) {
 	s.addPendingNoLock(e, true)
 }
 
-// Touch records subscriber activity on the topic now, keeping its rate visitor
+// Touch records subscriber activity on the topic now (a subscribe, a poll, an open or closing
+// stream), keeping its rate visitor, at most once per touchInterval
 func (s *Service) Touch(topic string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.addPendingNoLock(s.touchNoLock(topic), false)
-}
-
-// Keepalive records that a stream is open on the topic, as a Touch at most once per keepaliveInterval
-func (s *Service) Keepalive(topic string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if e, ok := s.entries[topic]; ok && s.now().Unix()-e.SubscribedAt < int64(keepaliveInterval/time.Second) {
+	if e, ok := s.entries[topic]; ok && e.SubscribedAt != 0 && s.now().Unix()-e.SubscribedAt < int64(touchInterval/time.Second) {
 		return
 	}
 	s.addPendingNoLock(s.touchNoLock(topic), false)

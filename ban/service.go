@@ -20,9 +20,9 @@ const (
 	pruneInterval = 10 * time.Minute
 	writeInterval = 3 * time.Second
 
-	// strikeUnits is how finely strikes are counted: weights go down to 0.01 (e.g. 0.05 = 20 hits
+	// strikeUnits is how finely strikes are counted: weights go down to 0.001 (e.g. 0.05 = 20 hits
 	// make one strike), and the token bucket only takes whole tokens
-	strikeUnits = 100
+	strikeUnits = 1000
 )
 
 // Config is the Service's config, kept separate from server.Config to avoid an import cycle.

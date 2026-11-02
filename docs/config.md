@@ -2221,7 +2221,7 @@ every line is already a confirmed offender, the fail2ban jail can ban on first s
   ntfy error code (`42909`), a code family (`429*`, `403*`, `4*`), a bare HTTP status (`403`, short for
   `403*`), or `*`. The longest matching key wins. A weight of `0` exempts a code entirely (it never
   counts toward a ban), useful to spare a specific code from a `*` catch-all. Heavier weights ban faster;
-  weights may be fractional down to `0.01` (e.g. `0.05`: 20 rejections make one strike). If you do not
+  weights may be fractional down to `0.001` (e.g. `0.05`: 20 rejections make one strike). If you do not
   include a `*` rule, any code that matches nothing defaults to weight `1` (i.e. it can be banned);
   set `*:0` to exempt everything that is not explicitly weighted.
 

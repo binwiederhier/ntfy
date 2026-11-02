@@ -44,7 +44,10 @@ func TestParseWeights_Fractional(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 0.05, weights.WeightFor(50701))
 	require.Equal(t, 2.0, weights.WeightFor(42909))
-	_, err = ParseWeights([]string{"50701:0.001"}) // Below the 0.01 resolution
+	weights, err = ParseWeights([]string{"50701:0.001"})
+	require.Nil(t, err)
+	require.Equal(t, 0.001, weights.WeightFor(50701))
+	_, err = ParseWeights([]string{"50701:0.0001"}) // Below the 0.001 resolution
 	require.Error(t, err)
 }
 

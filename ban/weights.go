@@ -12,7 +12,7 @@ type Weights map[string]float64
 
 // ParseWeights normalizes a list like ["42909:10","403:2","50701:0.05","*:1"] into a Weights map. A key is an
 // exact ntfy code, a family ("429*"), a bare HTTP status ("403" -> "403*"), or "*"; weights are ints
-// >= 0 in steps of 0.01 (0 = exempt). Malformed entries are rejected so misconfiguration fails at startup.
+// >= 0 in steps of 0.001 (0 = exempt). Malformed entries are rejected so misconfiguration fails at startup.
 func ParseWeights(entries []string) (Weights, error) {
 	out := make(Weights, len(entries))
 	for _, entry := range entries {

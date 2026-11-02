@@ -36,11 +36,11 @@ const (
 	pruneAfter    = 7 * 24 * time.Hour
 
 	// touchInterval is how often a touch moves a topic's subscriber activity at most, so an open
-	// stream, touched by the manager every minute, writes about once an hour. Each topic has its own
-	// interval between half of it and all of it (touchIntervalFor), so topics touched together,
-	// like the streams that reconnect after a restart, are not written together again. Hourly is
+	// stream, touched by the manager every minute, writes every one to two hours. Each topic has its
+	// own interval between half of it and all of it (touchIntervalFor), so topics touched together,
+	// like the streams that reconnect after a restart, are not written together again. Two hours is
 	// plenty for the rate visitor's day (rateVisitorLiveFor) and the 410's four days.
-	touchInterval = time.Hour
+	touchInterval = 2 * time.Hour
 
 	// maxRefused caps the topics known only from refused pushes, so a push flood cannot fill memory;
 	// rows read from other nodes count too, so it is effectively cluster-wide

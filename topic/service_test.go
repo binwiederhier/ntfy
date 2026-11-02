@@ -101,7 +101,7 @@ func TestService_State_ReturnsCopy(t *testing.T) {
 
 func TestService_Touch_Throttled(t *testing.T) {
 	// A touch moves subscriber activity at most once per the topic's own touch interval, so an open
-	// stream the manager touches every minute costs a write about once an hour only
+	// stream the manager touches every minute costs a write every one to two hours only
 	s, clock := newTestServiceWithClock(t)
 	s.SetRateVisitor("upA", "", "1.2.3.4")
 	set := clock.unix()

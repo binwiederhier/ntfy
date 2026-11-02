@@ -6,11 +6,38 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.36.0 | Oct 31, 2026  |
+| ntfy server      | v2.37.0 | Nov 2, 2026   |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.37.0
+Released November 2, 2026
+
+This release makes UnifiedPush work across several servers: the subscriber who pays for a topic's pushes is shared through
+the database, and app servers are told with `410 Gone` when a subscription has been abandoned for 4 days. It also adds
+`Retry-After` and the draft `RateLimit` headers to rate limit responses, and frees the memory of one-off visitors sooner.
+
+**Features:**
+
+* With `visitor-subscriber-rate-limiting`, the subscriber of a UnifiedPush topic (who pays for its pushes) is kept in the user database and shared by all servers, so a push to any server is billed to the subscriber instead of answered with 507 (see [subscriber-based rate limiting](config.md#subscriber-based-rate-limiting))
+* Send a `Retry-After` header with HTTP 429 responses that are caused by a rate limit with a known wait, e.g. the request, e-mail or daily message limits (see [rate limiting](config.md#rate-limiting))
+* Send the IETF draft `RateLimit-Policy` and `RateLimit` headers with publish responses (and with every 429 caused by a limit with a quota), for the request and daily message limits (see [rate limiting](config.md#rate-limiting))
+* New metric `ntfy_topics_unifiedpush_total`: the UnifiedPush topics whose subscriber state a server keeps in memory
+
+**Behavior changes:**
+
+* With `visitor-subscriber-rate-limiting`, a UnifiedPush push to a topic that has had no subscriber (subscribe, poll or open stream) for 4 days is answered with `410` (error code 41002) instead of `507`, so app servers like Mastodon remove the expired subscription ([#664](https://github.com/binwiederhier/ntfy/issues/664)); a Matrix push to such a topic gets its pushkey rejected (before: after 12 hours without a subscriber on the server that got the push)
+* With `visitor-subscriber-rate-limiting`, UnifiedPush messages are counted against the subscriber's account only while it has a tier, and against the subscriber's IP address otherwise (also after the account lost its tier or was deleted); a tier change applies to the next message
+* Ban feed: weights may be fractional (down to `0.001`), auth failures (`42909`) now weigh 2 instead of 10, and a UnifiedPush push without a subscriber (`50701`) or to an abandoned topic (`41002`) weighs 0.05, so app servers pushing to many offline phones are not banned for it
+* The rate limit state of a visitor is forgotten about a minute after it has fully recovered (all buckets refilled) instead of after a day without use, which frees the memory of one-off visitors such as floods of new IPs. The `visitors` stat and the `ntfy_visitors_total` metric therefore count the visitors of roughly the last minute, not of the last day ([#2126](https://github.com/binwiederhier/ntfy/pull/2126))
+* Topics without subscribers are dropped from memory after 6 hours without use instead of 16; a publish to such a topic recreates it (and counts against `visitor-topic-creation-limit-burst`)
+
+**Bug fixes + maintenance:**
+
+* With PostgreSQL and several servers, daily usage a server counted in the last seconds of a visitor's 24-hour period is no longer added to the next period (a double count); it is dropped instead
+* Cluster: a forwarded message for a topic without subscribers on the receiving node now counts as wasted (`ntfy_cluster_messages_wasted_total`) and no longer keeps that idle topic in memory
 
 ## ntfy server v2.36.0
 Released October 31, 2026
@@ -2313,26 +2340,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.36.1 (UNRELEASED)
-
-**Features:**
-
-* With `visitor-subscriber-rate-limiting`, the subscriber of a UnifiedPush topic (who pays for its pushes) is kept in the user database and shared by all servers, so a push to any server is billed to the subscriber instead of answered with 507 (see [subscriber-based rate limiting](config.md#subscriber-based-rate-limiting))
-* Send a `Retry-After` header with HTTP 429 responses that are caused by a rate limit with a known wait, e.g. the request, e-mail or daily message limits (see [rate limiting](config.md#rate-limiting))
-* Send the IETF draft `RateLimit-Policy` and `RateLimit` headers with publish responses, for the request and daily message limits (see [rate limiting](config.md#rate-limiting))
-
-**Behavior changes:**
-
-* With `visitor-subscriber-rate-limiting`, a UnifiedPush push to a topic that has had no subscriber (subscribe, poll or open stream) for 4 days is answered with `410` (error code 41002) instead of `507`, so app servers like Mastodon remove the expired subscription ([#664](https://github.com/binwiederhier/ntfy/issues/664)); a Matrix push to such a topic gets its pushkey rejected (before: after 12 hours without a subscriber on the server that got the push)
-* With `visitor-subscriber-rate-limiting`, UnifiedPush messages are counted against the subscriber's account only while it has a tier, and against the subscriber's IP address otherwise (also after the account lost its tier or was deleted); a tier change applies to the next message
-* Ban feed: weights may be fractional (down to `0.001`), auth failures (`42909`) now weigh 2 instead of 10, and a UnifiedPush push without a subscriber (`50701`) weighs 0.05, so app servers pushing to many offline phones are not banned for it
-* The rate limit state of a visitor is forgotten about a minute after it has fully recovered (all buckets refilled) instead of after a day without use, which frees the memory of one-off visitors such as floods of new IPs. The `visitors` stat and the `ntfy_visitors_total` metric therefore count the visitors of roughly the last minute, not of the last day ([#2126](https://github.com/binwiederhier/ntfy/pull/2126))
-
-**Bug fixes + maintenance:**
-
-* With PostgreSQL and several servers, daily usage a server counted in the last seconds of a visitor's 24-hour period is no longer added to the next period (a double count); it is dropped instead
-* Cluster: a forwarded message for a topic without subscribers on the receiving node now counts as wasted (`ntfy_cluster_messages_wasted_total`) and no longer keeps that idle topic in memory
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

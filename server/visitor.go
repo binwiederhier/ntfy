@@ -16,10 +16,6 @@ const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter is how long a topic keeps a rate visitor whose subscriber is gone. The
-	// limiter forgets a key on its own, once forgetting it changes nothing (see limit.Service.Prune).
-	visitorExpungeAfter = oneDay
-
 	// promoteRate is the divisor of the daily message cap (cap / promoteRate, i.e. 10%) from which
 	// the count of a visitor without a user is written to the usage table; below it, a restart
 	// forgets it, and N nodes may admit up to N x (threshold - 1) without a row. A larger
@@ -294,6 +290,12 @@ func (v *visitor) User() *user.User {
 // IP returns the visitor IP address
 func (v *visitor) IP() netip.Addr {
 	return v.ip
+}
+
+// MaskedIP returns the visitor's IP masked to the configured prefix bits, which is what a rate
+// visitor keeps of a subscriber
+func (v *visitor) MaskedIP() string {
+	return vis.Mask(v.ip, v.env.limitsConfig).String()
 }
 
 // Authenticated returns true if a user successfully authenticated

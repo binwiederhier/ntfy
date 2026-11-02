@@ -48,6 +48,9 @@ func (s *Server) execManager() {
 						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, util.FormatTime(lastAccess))
 					}
 					t.ExpireDelivered()
+					if subs > 0 && s.config.VisitorSubscriberRateLimiting && isUnifiedPushTopic(t.ID) {
+						s.topicService.Touch(t.ID) // An open stream keeps the rate visitor live on the other nodes too
+					}
 					subscribers += subs
 				}
 			}
@@ -81,6 +84,7 @@ func (s *Server) execManager() {
 
 	// Update stats
 	s.updateAndWriteStats(messagesCount)
+	topicsUnifiedPush := s.topicService.Size() // UnifiedPush topics this node keeps, to watch their memory
 
 	// Log stats
 	log.
@@ -89,6 +93,7 @@ func (s *Server) execManager() {
 			"messages_published":      messagesCount,
 			"messages_cached":         messagesCached,
 			"topics_active":           topicsCount,
+			"topics_unifiedpush":      topicsUnifiedPush,
 			"subscribers":             subscribers,
 			"visitors":                visitorsCount,
 			"users":                   usersCount,
@@ -105,6 +110,7 @@ func (s *Server) execManager() {
 	metrics.Users.Set(float64(usersCount))
 	metrics.Subscribers.Set(float64(subscribers))
 	metrics.Topics.Set(float64(topicsCount))
+	metrics.TopicsUnifiedPush.Set(float64(topicsUnifiedPush))
 	if s.attachment != nil {
 		metrics.AttachmentsTotalSize.Set(float64(s.attachment.Size()))
 	}

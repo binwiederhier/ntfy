@@ -146,15 +146,34 @@ const (
 	`
 )
 
+// The topic table is the topics' cluster-wide state (see package topic, which reads and writes it)
+const (
+	postgresCreateTopicTableQuery = `
+		CREATE TABLE IF NOT EXISTS topic (
+			topic TEXT NOT NULL PRIMARY KEY,
+			rate_visitor_user_id TEXT NOT NULL,
+			rate_visitor_ip TEXT NOT NULL,
+			first_seen_at BIGINT NOT NULL,
+			subscribed_at BIGINT NOT NULL,
+			updated_at BIGINT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_topic_updated_at ON topic (updated_at);
+	`
+
+	// 10 -> 11: The topic table
+	postgresMigrate10To11UpdateQueries = postgresCreateTopicTableQuery
+)
+
 var (
-	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries + postgresCreateUsageTableQuery)
+	postgresCreateTables = schema.AsMigrateFunc(postgresCreateTablesQueries + postgresCreateUsageTableQuery + postgresCreateTopicTableQuery)
 
 	// postgresMigrations maps a schema version to the migration upgrading it to the next
 	// version. Always append migrations at the end, never insert in the middle.
 	postgresMigrations = schema.Migrations{
-		{From: 6, To: 7}:  schema.Query(postgresMigrate6To7UpdateQueries),
-		{From: 7, To: 8}:  schema.Query(postgresMigrate7To8UpdateQueries),
-		{From: 8, To: 9}:  schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
-		{From: 9, To: 10}: schema.Query(postgresMigrate9To10UpdateQueries),
+		{From: 6, To: 7}:   schema.Query(postgresMigrate6To7UpdateQueries),
+		{From: 7, To: 8}:   schema.Query(postgresMigrate7To8UpdateQueries),
+		{From: 8, To: 9}:   schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
+		{From: 9, To: 10}:  schema.Query(postgresMigrate9To10UpdateQueries),
+		{From: 10, To: 11}: schema.Query(postgresMigrate10To11UpdateQueries),
 	}
 )

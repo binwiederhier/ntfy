@@ -100,7 +100,7 @@ func TestStore_WriteAddsSamePeriodReplacesNewer(t *testing.T) {
 			counts:      [numDaily]int64{4, 0, 0},
 		}, rows["user:u_1"])
 
-		// A leftover of an older period lands in the stored, newer one instead of taking the row back
+		// A leftover of an older period is dropped: it is the old day's usage, not the new one's
 		_, err = s.write(ctx, []usageRow{
 			{
 				key:         "user:u_1",
@@ -112,7 +112,7 @@ func TestStore_WriteAddsSamePeriodReplacesNewer(t *testing.T) {
 		require.Equal(t, usageRow{
 			key:         "user:u_1",
 			periodStart: 1000 + daySeconds,
-			counts:      [numDaily]int64{6, 0, 0},
+			counts:      [numDaily]int64{4, 0, 0},
 		}, readAll(t, s, 0)["user:u_1"])
 	})
 }

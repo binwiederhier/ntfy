@@ -2052,6 +2052,14 @@ If this setting is enabled, publishing to UnifiedPush topics will lead to an `HT
 response if no "rate visitor" has been previously registered. This is to avoid burning the publisher's 
 `visitor-message-daily-limit`.
 
+The rate visitor stays registered while the subscriber keeps a stream open, and for 24 hours after it was last seen
+(subscribe, poll, or a stream that closed). Messages are counted against the subscriber's account if it has a tier at
+the time of publishing, and against its IP address otherwise. If the topic has had no subscriber for 4 days, publishing
+a UnifiedPush message to it leads to an `HTTP 410 Gone` response instead (error code 41002), which tells app servers
+such as Mastodon to remove the subscription; a Matrix push gateway request to such a topic gets its pushkey rejected.
+With a user database (`auth-file` or `database-url`), the rate visitors are stored there, so they survive a restart,
+and with PostgreSQL all servers know them.
+
 To enable subscriber-based rate limiting, set `visitor-subscriber-rate-limiting: true`.
 
 !!! info
@@ -2248,6 +2256,7 @@ applies the prefix):
     ban-weights:
       - "42909:2"      # too many auth failures -> brute force, ban at half the threshold
       - "50701:0.05"   # UnifiedPush push without a subscriber -> app servers with many offline phones
+      - "41002:0.05"   # UnifiedPush topic abandoned (410 Gone) -> the same app servers
       # everything else 4xx/5xx defaults to weight 1
     ```
 
@@ -2623,7 +2632,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `ban-file`                                 | `NTFY_BAN_FILE`                                 | *filename*                                          | -                 | Abuse ban-feed: file confirmed abusive visitor IPs are appended to, for fail2ban to tail. Empty disables the feature. See [Banning bad actors](#banning-bad-actors-fail2ban)                                                             |
 | `ban-window`                               | `NTFY_BAN_WINDOW`                               | *duration*                                          | 10m               | Abuse ban-feed: rolling window over which weighted strikes are counted, per IP prefix                                                                                                                                                     |
 | `ban-threshold`                            | `NTFY_BAN_THRESHOLD`                            | *number*                                            | 100               | Abuse ban-feed: weighted strikes per `ban-window` before a prefix is written to `ban-file`                                                                                                                                             |
-| `ban-weights`                              | `NTFY_BAN_WEIGHTS`                              | *list of KEY:WEIGHT*                                | `42909:2`, `50701:0.05`| Abuse ban-feed: per-code strike weights (exact code, family `429*`, or `*`; longest match wins; `0` exempts). See [Banning bad actors](#banning-bad-actors-fail2ban)                                                                     |
+| `ban-weights`                              | `NTFY_BAN_WEIGHTS`                              | *list of KEY:WEIGHT*                                | `42909:2`, `50701:0.05`, `41002:0.05`| Abuse ban-feed: per-code strike weights (exact code, family `429*`, or `*`; longest match wins; `0` exempts). See [Banning bad actors](#banning-bad-actors-fail2ban)                                                                     |
 | `web-root`                                 | `NTFY_WEB_ROOT`                                 | *path*, e.g. `/` or `/app`, or `disable`            | `/`               | Sets root of the web app (e.g. /, or /app), or disables it entirely (disable)                                                                                                                                                           |
 | `enable-signup`                            | `NTFY_ENABLE_SIGNUP`                            | *boolean* (`true` or `false`)                       | `false`           | Allows users to sign up via the web app, or API                                                                                                                                                                                         |
 | `enable-login`                             | `NTFY_ENABLE_LOGIN`                             | *boolean* (`true` or `false`)                       | `false`           | Allows users to log in via the web app, or API                                                                                                                                                                                          |

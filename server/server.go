@@ -43,6 +43,7 @@ import (
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/payments"
+	tp "heckel.io/ntfy/v2/topic"
 	"heckel.io/ntfy/v2/twilio"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
@@ -67,6 +68,7 @@ type Server struct {
 	topics            map[string]*topic
 	limiter           *limit.Service // Decides on and counts the visitors' usage, keyed by visitor key
 	visitors          *visitorEnv    // Shared by all visitors, which are built per request
+	topicService      *tp.Service    // Cluster-wide topic state: subscriber activity and rate visitors of the UnifiedPush topics
 	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
 	twilio            *twilio.Client
@@ -356,10 +358,9 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
-	s.limiter = limit.New(&limit.Config{
-		Store: createUsageStore(pool, userDB),
-	})
+	s.limiter = limit.New(createUsageStore(pool, userDB))
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
+	s.topicService = tp.New(createTopicStore(pool, userDB))
 	s.firebaseClient = firebaseClient
 	if pool != nil {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
@@ -390,6 +391,9 @@ func New(conf *Config) (*Server, error) {
 	if err := s.limiter.Start(context.Background()); err != nil {
 		return nil, err
 	}
+	if err := s.topicService.Start(context.Background()); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -415,6 +419,16 @@ func createUsageStore(pool, userDB *db.DB) *limit.Store {
 		return limit.NewPostgresStore(pool)
 	} else if userDB != nil {
 		return limit.NewSQLiteStore(userDB)
+	}
+	return nil
+}
+
+// createTopicStore returns the store of the topic table (user schema, like createUsageStore), or nil for memory only
+func createTopicStore(pool, userDB *db.DB) *tp.Store {
+	if pool != nil {
+		return tp.NewPostgresStore(pool)
+	} else if userDB != nil {
+		return tp.NewSQLiteStore(userDB)
 	}
 	return nil
 }
@@ -641,7 +655,8 @@ func (s *Server) stop() {
 	if s.cluster != nil {
 		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
 	}
-	s.limiter.Close() // Writes the unflushed daily counts, before the databases close under it
+	s.limiter.Close()      // Writes the unflushed daily counts, before the databases close under it
+	s.topicService.Close() // Likewise, the changed topics
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
@@ -1105,11 +1120,16 @@ func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v
 	if e != nil {
 		return nil, e.With(t)
 	}
-	if unifiedpush && s.config.VisitorSubscriberRateLimiting && t.RateVisitor() == nil {
+	if unifiedpush && s.config.VisitorSubscriberRateLimiting && vrate == v { // No rate visitor, see limitRequestsWithTopic
 		// UnifiedPush clients must subscribe before publishing to allow proper subscriber-based rate limiting.
 		// The 5xx response is because some app servers (in particular Mastodon) will remove
 		// the subscription as invalid if any 400-499 code (except 429/408) is returned.
 		// See https://github.com/mastodon/mastodon/blob/730bb3e211a84a2f30e3e2bbeae3f77149824a68/app/workers/web/push_notification_worker.rb#L35-L46
+		// A topic abandoned for unifiedPushAbandonedAfter gets a 410 instead, so the subscription is removed: every
+		// app server that removes it on a 404 also does on a 410, and some (Misskey and its forks) only on a 410.
+		if s.unifiedPushTopicAbandoned(r, t) {
+			return nil, errHTTPGoneUnifiedPushTopicAbandoned.With(t)
+		}
 		return nil, errHTTPInsufficientStorageUnifiedPush.With(t)
 	} else if !util.ContainsIP(s.config.VisitorRequestExemptPrefixes, v.ip) {
 		d := vrate.MessageAllowed()
@@ -1226,18 +1246,14 @@ func (s *Server) handlePublishMatrix(w http.ResponseWriter, r *http.Request, v *
 	if err != nil {
 		metrics.MessagesPublishedFailure.Inc()
 		metrics.MatrixPublishedFailure.Inc()
-		if e, ok := err.(*errHTTP); ok && e.HTTPCode == errHTTPInsufficientStorageUnifiedPush.HTTPCode {
-			topic, err := fromContext[*topic](r, contextTopic)
-			if err != nil {
-				return err
-			}
+		// An abandoned topic (see unifiedPushTopicAbandoned) gets its pushkey rejected, so the Matrix server
+		// stops sending to it; anything else is returned as is (a 507 is transient to the Matrix server)
+		if e, ok := err.(*errHTTP); ok && e.Code == errHTTPGoneUnifiedPushTopicAbandoned.Code {
 			pushKey, err := fromContext[string](r, contextMatrixPushKey)
 			if err != nil {
 				return err
 			}
-			if time.Since(topic.LastAccess()) > matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter {
-				return writeMatrixResponse(w, pushKey)
-			}
+			return writeMatrixResponse(w, pushKey)
 		}
 		return err
 	}
@@ -1754,6 +1770,7 @@ func (s *Server) handleSubscribeHTTP(w http.ResponseWriter, r *http.Request, v *
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
+		s.maybeTouchTopics(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1913,6 +1930,7 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		for i, subscriberID := range subscriberIDs {
 			topics[i].Unsubscribe(subscriberID) // Order!
 		}
+		s.maybeTouchTopics(topics) // The subscriber was last seen now
 	}()
 	if err := s.authorizeSubscribed(v, topics); err != nil {
 		return err
@@ -1948,7 +1966,7 @@ func parseSubscribeParams(r *http.Request) (poll bool, since model.SinceMarker, 
 	return
 }
 
-// maybeSetRateVisitors sets the rate visitor on a topic (v.SetRateVisitor), indicating that all messages published
+// maybeSetRateVisitors makes v the rate visitor of a topic (topic.Service.SetRateVisitor), indicating that all messages published
 // to that topic will be rate limited against the rate visitor instead of the publishing visitor.
 //
 // Setting the rate visitor is ony allowed if the `visitor-subscriber-rate-limiting` setting is enabled, AND
@@ -1963,52 +1981,46 @@ func (s *Server) maybeSetRateVisitors(r *http.Request, v *visitor, topics []*top
 		return nil
 	}
 
-	// Make a list of topics that we'll actually set the RateVisitor on
+	// Make a list of topics that we'll actually set the rate visitor on; the others count as subscriber activity only
 	eligibleRateTopics := make([]*topic, 0)
 	for _, t := range topics {
-		if strings.HasPrefix(t.ID, unifiedPushTopicPrefix) && len(t.ID) == unifiedPushTopicLength {
+		if isUnifiedPushTopic(t.ID) {
 			eligibleRateTopics = append(eligibleRateTopics, t)
 		}
 	}
 	if len(eligibleRateTopics) == 0 {
 		return nil
 	}
+	s.maybeTouchTopics(eligibleRateTopics)
 
-	// If access controls are turned off, v has access to everything, and we can set the rate visitor
-	if s.userManager == nil {
-		return s.setRateVisitors(r, v, eligibleRateTopics)
-	}
-
-	// If access controls are enabled, only set rate visitor if
-	// - topic is reserved, and v.user is the owner
-	// - topic is not reserved, and v.user has write access
-	writableRateTopics := make([]*topic, 0)
-	for _, t := range topics {
-		if !util.Contains(eligibleRateTopics, t) {
-			continue
-		}
-		ownerUserID, err := s.userManager.ReservationOwner(t.ID)
-		if err != nil {
-			return err
-		}
-		if ownerUserID == "" {
-			if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite); err == nil {
+	// With access control, set the rate visitor only if the topic is reserved and v.user is the
+	// owner, or not reserved and v.user has write access; without it, v may write to everything
+	writableRateTopics := eligibleRateTopics
+	if s.userManager != nil {
+		writableRateTopics = make([]*topic, 0)
+		for _, t := range eligibleRateTopics {
+			ownerUserID, err := s.userManager.ReservationOwner(t.ID)
+			if err != nil {
+				return err
+			}
+			if ownerUserID == "" {
+				if err := s.userManager.Authorize(v.User(), t.ID, user.PermissionWrite); err == nil {
+					writableRateTopics = append(writableRateTopics, t)
+				}
+			} else if ownerUserID == v.MaybeUserID() {
 				writableRateTopics = append(writableRateTopics, t)
 			}
-		} else if ownerUserID == v.MaybeUserID() {
-			writableRateTopics = append(writableRateTopics, t)
 		}
 	}
-	return s.setRateVisitors(r, v, writableRateTopics)
-}
 
-func (s *Server) setRateVisitors(r *http.Request, v *visitor, rateTopics []*topic) error {
-	for _, t := range rateTopics {
+	// Make v the rate visitor of the topics it may write to
+	for _, t := range writableRateTopics {
 		logvr(v, r).
 			Tag(tagSubscribe).
 			With(t).
 			Debug("Setting visitor as rate visitor for topic %s", t.ID)
-		t.SetRateVisitor(v)
+		s.topicService.SetRateVisitor(t.ID, v.MaybeUserID(), v.MaskedIP())
+		t.Keepalive()
 	}
 	return nil
 }

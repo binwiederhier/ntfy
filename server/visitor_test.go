@@ -2,7 +2,6 @@ package server
 
 import (
 	"io"
-	"net/http/httptest"
 	"net/netip"
 	"strings"
 	"sync"
@@ -313,22 +312,6 @@ func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
 	require.True(t, vip.AccountActionAllowed().OK)
 }
 
-func TestVisitor_RateVisitorKeptForExemptSubscriber(t *testing.T) {
-	// A subscriber from a request-limit-exempt prefix spends nothing before it becomes a topic's
-	// rate visitor; the topic must still keep it. Fails if a new rate visitor counts as stale.
-	c := newTestConfig(t, "")
-	c.VisitorSubscriberRateLimiting = true
-	c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.0/24")}
-	s := newTestServer(t, c)
-	_, err := s.topicsFromIDs(s.visitor(netip.MustParseAddr("1.2.3.4"), nil), "mytopic") // The topic exists already
-	require.Nil(t, err)
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	topics, err := s.topicsFromIDs(v, "mytopic")
-	require.Nil(t, err)
-	s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics)
-	require.NotNil(t, topics[0].RateVisitor())
-}
-
 func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
 	// The auth and account limits are per key and do not look at the user (as on main since #2119):
 	// a logged-in user may request a password reset, and is charged like everyone on the key
@@ -634,23 +617,6 @@ func TestVisitor_TierWithoutEmailsAdmitsNone(t *testing.T) {
 	})
 	require.Equal(t, 429, response.Code)
 	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
-}
-
-func TestVisitor_RateVisitorLivenessIsTheSubscribers(t *testing.T) {
-	// A topic keeps its rate visitor for as long as the subscriber is around (its keepalive), not
-	// for as long as its limiter key is in use: publishers charging the key must not keep it. The
-	// limiter forgetting the key cannot drop it either, since the topic never asks the limiter.
-	c := newTestConfig(t, "")
-	c.VisitorSubscriberRateLimiting = true
-	s := newTestServer(t, c)
-	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
-	topics, err := s.topicsFromIDs(v, "mytopic")
-	require.Nil(t, err)
-	s.setRateVisitors(httptest.NewRequest("GET", "/mytopic/json", nil), v, topics)
-	require.NotNil(t, topics[0].RateVisitor())
-	ageRateVisitor(topics[0], 2*visitorExpungeAfter)               // The subscriber is gone
-	require.True(t, s.limiter.Allow(v.key, v.messageRule(), 1).OK) // A publisher charges the key
-	require.Nil(t, topics[0].RateVisitor())
 }
 
 func TestVisitor_EmailsWithoutTierHaveDailyCap(t *testing.T) {

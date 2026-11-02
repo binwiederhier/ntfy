@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -700,8 +701,8 @@ func TestCLI_Serve_ClusterValidation(t *testing.T) {
 
 func TestCLI_Serve_AttachmentExpiryLongerThanCacheDurationWarning(t *testing.T) {
 	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
+	buf := &syncBuffer{}          // Background goroutines of other tests' servers may log meanwhile, too
+	log.SetOutput(buf)
 	defer log.SetOutput(os.Stderr)
 
 	// An invalid auth-default-access fails right after validation, before the server starts
@@ -740,6 +741,30 @@ func newEmptyFile(t *testing.T) string {
 	filename := filepath.Join(t.TempDir(), "empty")
 	require.Nil(t, os.WriteFile(filename, []byte{}, 0600))
 	return filename
+}
+
+// syncBuffer is a bytes.Buffer that the log package and a test can use at the same time
+type syncBuffer struct {
+	buf bytes.Buffer
+	mu  sync.Mutex
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func (b *syncBuffer) Reset() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.buf.Reset()
 }
 
 func TestCLI_Serve_BanThresholdTooLarge(t *testing.T) {

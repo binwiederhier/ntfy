@@ -6,11 +6,21 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.37.0 | Nov 2, 2026   |
+| ntfy server      | v2.37.1 | Nov 2, 2026   |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.37.1
+Released November 2, 2026
+
+This release fixes a database slowdown in v2.37.0 when using `visitor-subscriber-rate-limiting` with a user database:
+the subscriber activity of UnifiedPush topics was written far too often.
+
+**Bug fixes + maintenance:**
+
+* With `visitor-subscriber-rate-limiting` and a user database, write a UnifiedPush topic's subscriber activity every one to two hours instead of every 5 minutes, spread over time, and not at all when a poll or reconnect only repeats the same subscriber; on ntfy.sh, v2.37.0's writes of ~45k topics every 5 minutes, all due in the same minute, slowed down the database ([#2151](https://github.com/binwiederhier/ntfy/pull/2151))
 
 ## ntfy server v2.37.0
 Released November 2, 2026
@@ -2340,12 +2350,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.37.1 (UNRELEASED)
-
-**Bug fixes + maintenance:**
-
-* With `visitor-subscriber-rate-limiting` and a user database, write a UnifiedPush topic's subscriber activity every one to two hours instead of every 5 minutes, spread over time, and not at all when a poll or reconnect only repeats the same subscriber; on ntfy.sh, v2.37.0's writes of ~45k topics every 5 minutes, all due in the same minute, slowed down the database ([#2151](https://github.com/binwiederhier/ntfy/pull/2151))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

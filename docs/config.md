@@ -2228,7 +2228,8 @@ every line is already a confirmed offender, the fail2ban jail can ban on first s
 - `ban-weights` assigns a strike weight per matcher key, formatted as `KEY:WEIGHT`. A key is an exact
   ntfy error code (`42909`), a code family (`429*`, `403*`, `4*`), a bare HTTP status (`403`, short for
   `403*`), or `*`. The longest matching key wins. A weight of `0` exempts a code entirely (it never
-  counts toward a ban), useful to spare a specific code from a `*` catch-all. Heavier weights ban faster. If you do not
+  counts toward a ban), useful to spare a specific code from a `*` catch-all. Heavier weights ban faster;
+  weights may be fractional down to `0.001` (e.g. `0.05`: 20 rejections make one strike). If you do not
   include a `*` rule, any code that matches nothing defaults to weight `1` (i.e. it can be banned);
   set `*:0` to exempt everything that is not explicitly weighted.
 
@@ -2253,7 +2254,8 @@ applies the prefix):
     ban-window: "10m"
     ban-threshold: 100
     ban-weights:
-      - "42909:10"   # too many auth failures -> brute force, ban fast
+      - "42909:2"      # too many auth failures -> brute force, ban at half the threshold
+      - "50701:0.05"   # UnifiedPush push without a subscriber -> app servers with many offline phones
       # everything else 4xx/5xx defaults to weight 1
     ```
 
@@ -2629,7 +2631,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `ban-file`                                 | `NTFY_BAN_FILE`                                 | *filename*                                          | -                 | Abuse ban-feed: file confirmed abusive visitor IPs are appended to, for fail2ban to tail. Empty disables the feature. See [Banning bad actors](#banning-bad-actors-fail2ban)                                                             |
 | `ban-window`                               | `NTFY_BAN_WINDOW`                               | *duration*                                          | 10m               | Abuse ban-feed: rolling window over which weighted strikes are counted, per IP prefix                                                                                                                                                     |
 | `ban-threshold`                            | `NTFY_BAN_THRESHOLD`                            | *number*                                            | 100               | Abuse ban-feed: weighted strikes per `ban-window` before a prefix is written to `ban-file`                                                                                                                                             |
-| `ban-weights`                              | `NTFY_BAN_WEIGHTS`                              | *list of KEY:WEIGHT*                                | `42909:10`| Abuse ban-feed: per-code strike weights (exact code, family `429*`, or `*`; longest match wins; `0` exempts). See [Banning bad actors](#banning-bad-actors-fail2ban)                                                                     |
+| `ban-weights`                              | `NTFY_BAN_WEIGHTS`                              | *list of KEY:WEIGHT*                                | `42909:2`, `50701:0.05`| Abuse ban-feed: per-code strike weights (exact code, family `429*`, or `*`; longest match wins; `0` exempts). See [Banning bad actors](#banning-bad-actors-fail2ban)                                                                     |
 | `web-root`                                 | `NTFY_WEB_ROOT`                                 | *path*, e.g. `/` or `/app`, or `disable`            | `/`               | Sets root of the web app (e.g. /, or /app), or disables it entirely (disable)                                                                                                                                                           |
 | `enable-signup`                            | `NTFY_ENABLE_SIGNUP`                            | *boolean* (`true` or `false`)                       | `false`           | Allows users to sign up via the web app, or API                                                                                                                                                                                         |
 | `enable-login`                             | `NTFY_ENABLE_LOGIN`                             | *boolean* (`true` or `false`)                       | `false`           | Allows users to log in via the web app, or API                                                                                                                                                                                          |

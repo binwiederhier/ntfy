@@ -766,3 +766,14 @@ func (b *syncBuffer) Reset() {
 	defer b.mu.Unlock()
 	b.buf.Reset()
 }
+
+func TestCLI_Serve_BanThresholdTooLarge(t *testing.T) {
+	// Strikes are counted in thousandths, so a huge threshold would overflow and never ban; an
+	// invalid auth-default-access fails right after the checks, so the server never starts
+	configFile := newEmptyFile(t)
+	app, _, _, _ := newTestApp()
+	banFile := filepath.Join(t.TempDir(), "ban.log")
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--ban-file=" + banFile, "--ban-threshold=10000000000000000", "--auth-default-access=invalid"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ban-threshold")
+}

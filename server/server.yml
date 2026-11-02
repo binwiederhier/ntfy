@@ -70,10 +70,17 @@
 #
 # database-url: <connection-string>
 
+# Optional PostgreSQL read replicas, used for read queries to take load off the primary. Requires
+# "database-url". The same URL parameters as for "database-url" apply.
+#
+# database-replica-urls:
+#   - "postgres://user:pass@replica1:5432/ntfy"
+#   - "postgres://user:pass@replica2:5432/ntfy"
+
 # EXPERIMENTAL: Clustering options. Setting "experimental-cluster-listen" runs this server as one
 # node of a cluster that shares a PostgreSQL database. This is not ready for production: dropped
-# node-to-node batches are not recovered yet, and rate limits and quotas are enforced per node,
-# not across the cluster. The "experimental-" prefix means these option names may still change.
+# node-to-node batches are not recovered yet, and request rate limits are enforced per node, not across
+# the cluster (daily message, e-mail and phone call limits are shared through the database). The "experimental-" prefix means these option names may still change.
 #
 # - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes
 #   talk to. Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners
@@ -442,7 +449,9 @@
 # - ban-weights assigns a strike weight to a matcher KEY (KEY:WEIGHT). A KEY is an exact ntfy code
 #   ("42909"), a prefix family ("429*"), a bare HTTP status ("403", shorthand for "403*"), or "*".
 #   Longest match wins. A weight of 0 exempts a code (never contributes to a ban), so the legit quota
-#   429s can be carved out from a "*" catch-all. Heavier weights ban faster (auth-failure floods).
+#   429s can be carved out from a "*" catch-all. Heavier weights ban faster (auth-failure floods);
+#   weights may be fractional down to 0.001 (e.g. 0.05: 20 rejections make one strike). Codes that
+#   match no key weigh 1.
 #
 # Each appended line has the exact format
 #   "<RFC3339-UTC-timestamp> <ip> <prefix> <http-code> <ntfy-code>", for example:
@@ -452,15 +461,12 @@
 # unit a fail2ban jail should ban, so a whole IPv6 subnet is banned as one.
 #
 # ban-file: "/var/log/ntfy-ban.log"
-# ban-window: "1m"
+# ban-window: "10m"
 # ban-threshold: 100
 # ban-weights:
-#   - "42909:10"   # auth-failure flood: bans in ~10
-#   - "42908:0"    # daily message quota reached -> legit, never counts
-#   - "42903:0"    # subscription limit -> legit
-#   - "42905:0"    # daily bandwidth reached -> legit
-#   - "42910:0"    # daily phone call quota reached -> legit
-#   - "*:1"        # everything else 4xx/5xx
+#   - "42909:2"      # auth-failure flood: bans at half the threshold
+#   - "50701:0.05"   # UnifiedPush push without a subscriber: app servers with many offline phones
+#   - "41002:0.05"   # abandoned UnifiedPush topic (410 Gone): the same app servers
 
 # Rate limiting: IPv4/IPv6 address prefix bits used for rate limiting
 # - visitor-prefix-bits-ipv4: number of bits of the IPv4 address to use for rate limiting (default: 32, full address)

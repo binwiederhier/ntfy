@@ -5,7 +5,12 @@ on:
   pull_request:
 jobs:
   test:
+    name: test (${{ matrix.part }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [checks, server, rest] # In parallel: the server package takes as long as all others together
     services:
       postgres:
         image: postgres:17
@@ -44,6 +49,11 @@ jobs:
       - name: Build web app (required for tests)
         run: make web
       - name: Run web tests, formatting, vetting and linting
-        run: make web-test web-fmt-check fmt-check vet web-lint lint staticcheck template-check go-check # The Go tests run once, with -race, in coverage
-      - name: Run Go tests (race detector, coverage)
-        run: make coverage
+        if: matrix.part == 'checks'
+        run: make web-test web-fmt-check fmt-check vet web-lint lint staticcheck template-check go-check
+      - name: Run Go tests of the server package (race detector)
+        if: matrix.part == 'server'
+        run: go test -race ./server
+      - name: Run Go tests of all other packages (race detector)
+        if: matrix.part == 'rest'
+        run: go test -race $(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools|web|server)$')

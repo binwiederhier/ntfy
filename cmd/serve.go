@@ -439,6 +439,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if ban-file is set, ban-window must be greater than zero")
 	} else if banFile != "" && banThreshold <= 0 {
 		return errors.New("if ban-file is set, ban-threshold must be greater than zero")
+	} else if banFile != "" && banThreshold > ban.MaxThreshold {
+		return fmt.Errorf("if ban-file is set, ban-threshold must be at most %d", ban.MaxThreshold)
 	} else if banFile != "" && len(banWeights) == 0 {
 		return errors.New("if ban-file is set, ban-weights must not be empty")
 	} else if banFile != "" && !util.FileExists(filepath.Dir(banFile)) {

@@ -53,3 +53,13 @@ func TestServer_BanFeed_DisabledByDefault(t *testing.T) {
 	response := request(t, s, "PUT", "/mytopic", "", reject) // guarded callsite, no Record
 	require.Equal(t, 400, response.Code)
 }
+
+func TestServer_BanFeed_DefaultWeights(t *testing.T) {
+	// Auth-failure floods still ban faster than other rejections, and a refused UnifiedPush push
+	// counts for little: a big app server pushing to many offline phones is not banned for it
+	weights, err := ban.ParseWeights(DefaultBanWeights)
+	require.Nil(t, err)
+	require.Equal(t, 2.0, weights.WeightFor(errHTTPTooManyRequestsLimitAuthFailure.Code))
+	require.Equal(t, 0.05, weights.WeightFor(errHTTPInsufficientStorageUnifiedPush.Code))
+	require.Equal(t, 1.0, weights.WeightFor(errHTTPTooManyRequestsLimitRequests.Code))
+}

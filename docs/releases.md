@@ -2323,6 +2323,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Behavior changes:**
 
+* Ban feed: weights may be fractional (down to `0.001`), auth failures (`42909`) now weigh 2 instead of 10, and a UnifiedPush push without a subscriber (`50701`) weighs 0.05, so app servers pushing to many offline phones are not banned for it
 * The rate limit state of a visitor is forgotten about a minute after it has fully recovered (all buckets refilled) instead of after a day without use, which frees the memory of one-off visitors such as floods of new IPs. The `visitors` stat and the `ntfy_visitors_total` metric therefore count the visitors of roughly the last minute, not of the last day ([#2126](https://github.com/binwiederhier/ntfy/pull/2126))
 
 **Bug fixes + maintenance:**

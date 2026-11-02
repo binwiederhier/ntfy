@@ -110,7 +110,7 @@ func TestServer_Manager_TopicsUnifiedPushGauge(t *testing.T) {
 	// The manager exports how many UnifiedPush topics the node keeps in memory, to watch their memory
 	s := newTestServer(t, newTestConfig(t, ""))
 	s.topicService.SetRateVisitor("upAAAAAAAAAAAA", "", "1.2.3.4")
-	s.topicService.RecordRefused("upBBBBBBBBBBBB")
+	s.topicService.Refused("upBBBBBBBBBBBB")
 	s.execManager()
 	require.Equal(t, float64(2), testutil.ToFloat64(metrics.TopicsUnifiedPush))
 }

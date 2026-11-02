@@ -53,7 +53,7 @@ func (s *Server) rateVisitor(t *topic) (*visitor, error) {
 	return newVisitor(s.visitors, ip, u), nil
 }
 
-// unifiedPushTopicAbandoned records a refused push to a UnifiedPush topic (see topic.Service.RecordRefused)
+// unifiedPushTopicAbandoned records a refused push to a UnifiedPush topic (see topic.Service.Refused)
 // and returns true if the topic had no subscriber activity, on any node, for
 // unifiedPushAbandonedAfter. Before a yes, it reads the row, which may be fresher than memory; a
 // failed read is a no, so the publisher retries.
@@ -61,7 +61,7 @@ func (s *Server) unifiedPushTopicAbandoned(r *http.Request, t *topic) bool {
 	if !isUnifiedPushTopic(t.ID) {
 		return false
 	}
-	state := s.topicService.RecordRefused(t.ID)
+	state := s.topicService.Refused(t.ID)
 	if state == nil || t.SubscribersCount() > 0 || !topicAbandoned(state) {
 		return false
 	}

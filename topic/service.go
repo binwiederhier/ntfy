@@ -134,10 +134,10 @@ func (s *Service) Touch(topic string) {
 	s.addPendingNoLock(s.touchNoLock(topic), false)
 }
 
-// RecordRefused records a refused push and returns the topic's state. An unknown topic becomes known as
+// Refused records a refused push and returns the topic's state. An unknown topic becomes known as
 // first seen now (unless maxRefused are, then it stays unknown); a known one is left alone, since
 // a push is not subscriber activity.
-func (s *Service) RecordRefused(topic string) *State {
+func (s *Service) Refused(topic string) *State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.entries[topic]; !ok && s.refused < maxRefused {

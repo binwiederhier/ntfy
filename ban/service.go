@@ -25,6 +25,13 @@ const (
 	strikeUnits = 1000
 )
 
+// Strikes are counted in thousandths of a strike, so these bounds keep the counts far from
+// overflowing; any weight above the threshold bans on the first hit anyway
+const (
+	MaxWeight    = 1_000_000
+	MaxThreshold = 1_000_000_000
+)
+
 // Config is the Service's config, kept separate from server.Config to avoid an import cycle.
 type Config struct {
 	File           string        // Ban file that fail2ban tails (must be non-empty; the caller decides whether the feature is enabled)

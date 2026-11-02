@@ -25,6 +25,8 @@ func ParseWeights(entries []string) (Weights, error) {
 			return nil, fmt.Errorf("invalid ban-weight value in %q, want a non-negative number", entry)
 		} else if weight > 0 && weight < 1.0/strikeUnits {
 			return nil, fmt.Errorf("invalid ban-weight value in %q, want 0 or at least %g", entry, 1.0/strikeUnits)
+		} else if weight > MaxWeight {
+			return nil, fmt.Errorf("invalid ban-weight value in %q, want at most %d", entry, MaxWeight)
 		}
 		key = strings.TrimSpace(key)
 		if !validWeightKey(key) {

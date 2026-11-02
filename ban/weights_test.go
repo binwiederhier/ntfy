@@ -49,6 +49,8 @@ func TestParseWeights_Fractional(t *testing.T) {
 	require.Equal(t, 0.001, weights.WeightFor(50701))
 	_, err = ParseWeights([]string{"50701:0.0001"}) // Below the 0.001 resolution
 	require.Error(t, err)
+	_, err = ParseWeights([]string{"42909:1e16"}) // Would overflow once counted in thousandths
+	require.Error(t, err)
 }
 
 func TestWeights_WeightFor(t *testing.T) {

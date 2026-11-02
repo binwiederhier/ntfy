@@ -79,8 +79,9 @@
 
 # EXPERIMENTAL: Clustering options. Setting "experimental-cluster-listen" runs this server as one
 # node of a cluster that shares a PostgreSQL database. Messages a node misses (e.g. a dropped
-# node-to-node batch) are recovered from the database. Request rate limits are enforced per node, not
-# across the cluster (daily message, e-mail and phone call limits are shared through the database). The "experimental-" prefix means these option names may still change.
+# node-to-node batch) are recovered from the database. Request rate limits are enforced per node,
+# not across the cluster; daily message, e-mail and phone call limits are shared through the
+# database. The "experimental-" prefix means these option names may still change.
 #
 # - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes
 #   talk to. Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners

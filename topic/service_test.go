@@ -100,12 +100,12 @@ func TestService_State_ReturnsCopy(t *testing.T) {
 }
 
 func TestService_Touch_Throttled(t *testing.T) {
-	// A touch moves subscriber activity at most once per touchInterval, so an open stream the
-	// manager touches every minute costs a write every few minutes only
+	// A touch moves subscriber activity at most once per the topic's own touch interval, so an open
+	// stream the manager touches every minute costs a write every one to two hours only
 	s, clock := newTestServiceWithClock(t)
 	s.SetRateVisitor("upA", "", "1.2.3.4")
 	set := clock.unix()
-	clock.advance(touchInterval - time.Second)
+	clock.advance(touchIntervalFor("upA") - time.Second)
 	s.Touch("upA")
 	require.Equal(t, set, s.State("upA").SubscribedAt)
 	clock.advance(time.Second)
@@ -119,6 +119,55 @@ func TestService_Touch_Throttled(t *testing.T) {
 	s.Refused("upC")
 	s.Touch("upC")
 	require.Equal(t, clock.unix(), s.State("upC").SubscribedAt)
+}
+
+func TestService_Touch_SpreadOverTime(t *testing.T) {
+	// Topics touched together, like the streams that all reconnect after a restart, are written
+	// again spread over the second half of touchInterval, not all in the same minute
+	s, clock := newTestServiceWithClock(t)
+	topics := make([]string, 1000)
+	for i := range topics {
+		topics[i] = fmt.Sprintf("up%012d", i)
+		s.Touch(topics[i])
+	}
+	lastWritten := make(map[string]int64)
+	for _, topic := range topics {
+		lastWritten[topic] = clock.unix()
+	}
+	rewritten := make(map[string]bool)
+	for minute := 1; minute <= int(touchInterval/time.Minute); minute++ {
+		clock.advance(time.Minute)
+		written := 0
+		for _, topic := range topics {
+			s.Touch(topic) // The manager touches every topic with an open stream every minute
+			if s.State(topic).SubscribedAt == clock.unix() {
+				written++
+				require.GreaterOrEqual(t, clock.unix()-lastWritten[topic], int64(touchInterval/2/time.Second), "%s written again before half of touchInterval", topic)
+				lastWritten[topic] = clock.unix()
+				rewritten[topic] = true
+			}
+		}
+		require.LessOrEqual(t, written, len(topics)/15, "minute %d: %d of %d topics written at once", minute, written, len(topics))
+	}
+	require.Len(t, rewritten, len(topics), "every topic written again within touchInterval")
+}
+
+func TestService_SetRateVisitor_UnchangedThrottled(t *testing.T) {
+	// A subscribe or poll that only repeats the same rate visitor counts as a touch, so a client
+	// polling every minute does not write every minute; a new rate visitor is written right away
+	s, clock := newTestServiceWithClock(t)
+	s.SetRateVisitor("upA", "u_1", "1.2.3.4")
+	set := clock.unix()
+	clock.advance(time.Minute)
+	s.SetRateVisitor("upA", "u_1", "1.2.3.4")
+	require.Equal(t, set, s.State("upA").SubscribedAt)
+
+	s.SetRateVisitor("upA", "", "5.6.7.8")
+	require.Equal(t, state("upA", set, clock.unix(), "", "5.6.7.8"), stateOf(s, "upA"))
+
+	clock.advance(touchInterval)
+	s.SetRateVisitor("upA", "", "5.6.7.8")
+	require.Equal(t, clock.unix(), s.State("upA").SubscribedAt)
 }
 
 func TestService_Refused_Bounded(t *testing.T) {
@@ -139,7 +188,7 @@ func TestService_Prune(t *testing.T) {
 	// Topics are pruned pruneAfter after their last write
 	s, clock := newTestServiceWithClock(t)
 	s.Refused("upA")
-	clock.advance(time.Hour)
+	clock.advance(touchIntervalFor("upB"))
 	s.Touch("upB")
 	clock.advance(pruneAfter - 30*time.Minute)
 	s.prune(clock.unix() - int64(pruneAfter/time.Second))
@@ -181,7 +230,7 @@ func TestService_Persist_SharedAcrossNodes(t *testing.T) {
 		a.sync()
 		b.sync()
 		require.Equal(t, state("upA", set, set, "u_1", "1.2.3.4"), stateOf(b, "upA"))
-		clock.advance(time.Hour)
+		clock.advance(touchIntervalFor("upA"))
 		b.Touch("upA")
 		b.sync()
 		a.sync()
@@ -262,7 +311,7 @@ func TestService_Persist_TouchAfterPruneRecreatesRow(t *testing.T) {
 		deleted, err := store.prune(context.Background(), clock.unix()+1)
 		require.Nil(t, err)
 		require.Equal(t, int64(1), deleted)
-		clock.advance(time.Hour)
+		clock.advance(touchIntervalFor("upA"))
 		s.Touch("upA")
 		s.sync()
 		expected := state("upA", set, clock.unix(), "", "")
@@ -325,7 +374,7 @@ func TestService_Persist_MergesFirstSeenAndSubscribed(t *testing.T) {
 		b := startTestService(t, newStore(), clock.now)
 		a.Refused("upA")
 		noted := clock.unix()
-		clock.advance(time.Hour)
+		clock.advance(touchIntervalFor("upA"))
 		b.Touch("upA")
 		touched := clock.unix()
 		b.sync()
@@ -354,7 +403,7 @@ func TestService_Persist_Refresh(t *testing.T) {
 		require.Equal(t, state("upA", set, set, "", "1.2.3.4"), withoutUpdatedAt(topic))
 
 		// A fresher row replaces what b knows
-		clock.advance(time.Hour)
+		clock.advance(touchIntervalFor("upA"))
 		a.Touch("upA")
 		a.sync()
 		topic, err = b.Refresh(context.Background(), "upA")

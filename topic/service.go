@@ -9,6 +9,7 @@ package topic
 
 import (
 	"context"
+	"hash/fnv"
 	"maps"
 	"slices"
 	"sync"
@@ -35,8 +36,11 @@ const (
 	pruneAfter    = 7 * 24 * time.Hour
 
 	// touchInterval is how often a touch moves a topic's subscriber activity at most, so an open
-	// stream, touched by the manager every minute, writes only every few minutes
-	touchInterval = 5 * time.Minute
+	// stream, touched by the manager every minute, writes every one to two hours. Each topic has its
+	// own interval between half of it and all of it (touchIntervalFor), so topics touched together,
+	// like the streams that reconnect after a restart, are not written together again. Two hours is
+	// plenty for the rate visitor's day (rateVisitorLiveFor) and the 410's four days.
+	touchInterval = 2 * time.Hour
 
 	// maxRefused caps the topics known only from refused pushes, so a push flood cannot fill memory;
 	// rows read from other nodes count too, so it is effectively cluster-wide
@@ -118,6 +122,9 @@ func (s *Service) Close() {
 func (s *Service) SetRateVisitor(topic, userID, ip string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if e, ok := s.entries[topic]; ok && e.RateVisitorUserID == userID && e.RateVisitorIP == ip && s.touchedRecentlyNoLock(e) {
+		return // The same rate visitor again (a poll, a reconnect) is a touch
+	}
 	e := s.touchNoLock(topic)
 	e.RateVisitorUserID, e.RateVisitorIP = userID, ip
 	s.addPendingNoLock(e, true)
@@ -128,7 +135,7 @@ func (s *Service) SetRateVisitor(topic, userID, ip string) {
 func (s *Service) Touch(topic string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if e, ok := s.entries[topic]; ok && e.SubscribedAt != 0 && s.now().Unix()-e.SubscribedAt < int64(touchInterval/time.Second) {
+	if e, ok := s.entries[topic]; ok && s.touchedRecentlyNoLock(e) {
 		return
 	}
 	s.addPendingNoLock(s.touchNoLock(topic), false)
@@ -354,6 +361,12 @@ func (s *Service) addPendingNoLock(e *State, rateVisitor bool) {
 	s.pending[e.Topic] = &r
 }
 
+// touchedRecentlyNoLock returns true if the topic's subscriber activity was recorded within its own
+// touch interval. The caller must hold s.mu.
+func (s *Service) touchedRecentlyNoLock(e *State) bool {
+	return e.SubscribedAt != 0 && s.now().Unix()-e.SubscribedAt < int64(touchIntervalFor(e.Topic)/time.Second)
+}
+
 // stateNoLock returns a copy of the topic's state, or nil if it is unknown. The caller must hold s.mu.
 func (s *Service) stateNoLock(topic string) *State {
 	e, ok := s.entries[topic]
@@ -362,4 +375,13 @@ func (s *Service) stateNoLock(topic string) *State {
 	}
 	c := *e
 	return &c
+}
+
+// touchIntervalFor returns the topic's own touch interval, between half of touchInterval and all
+// of it, the same on every node and after a restart
+func touchIntervalFor(topic string) time.Duration {
+	h := fnv.New32a()
+	h.Write([]byte(topic))
+	half := touchInterval / 2
+	return half + time.Duration(h.Sum32()%uint32(half/time.Second))*time.Second
 }

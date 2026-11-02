@@ -5980,9 +5980,9 @@ func TestServer_BanFeed_RateLimitedIPBanned(t *testing.T) {
 	c := newTestConfig(t, "")
 	c.BanFile = banFile
 	c.BanWindow = time.Minute
-	c.BanThreshold = 2                    // Ban after the weighted budget of 2 is exhausted
-	c.BanWeights = map[string]int{"*": 1} // Every rejection costs 1 strike
-	c.VisitorRequestLimitBurst = 2        // 429 quickly
+	c.BanThreshold = 2                        // Ban after the weighted budget of 2 is exhausted
+	c.BanWeights = map[string]float64{"*": 1} // Every rejection costs 1 strike
+	c.VisitorRequestLimitBurst = 2            // 429 quickly
 	s := newTestServer(t, c)
 	got429 := 0
 	for i := 0; i < 10; i++ {
@@ -6004,9 +6004,9 @@ func TestServer_BanFeed_SuccessfulRequestsNotBanned(t *testing.T) {
 	c := newTestConfig(t, "")
 	c.BanFile = banFile
 	c.BanWindow = time.Minute
-	c.BanThreshold = 3                    // Low threshold that would catch 200s if 2xx were not skipped
-	c.BanWeights = map[string]int{"*": 1} // Every rejection costs 1 strike
-	c.VisitorRequestLimitBurst = 100      // Stay under the request limit so every request is 200
+	c.BanThreshold = 3                        // Low threshold that would catch 200s if 2xx were not skipped
+	c.BanWeights = map[string]float64{"*": 1} // Every rejection costs 1 strike
+	c.VisitorRequestLimitBurst = 100          // Stay under the request limit so every request is 200
 	s := newTestServer(t, c)
 	for i := 0; i < 10; i++ {
 		rr := request(t, s, "PUT", "/mytopic", fmt.Sprintf("m%d", i), nil)

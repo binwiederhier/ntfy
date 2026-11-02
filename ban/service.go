@@ -5,6 +5,7 @@ package ban
 
 import (
 	"fmt"
+	"math"
 	"net/netip"
 	"os"
 	"sync"
@@ -18,6 +19,10 @@ const (
 	tag           = "ban"
 	pruneInterval = 10 * time.Minute
 	writeInterval = 3 * time.Second
+
+	// strikeUnits is how finely strikes are counted: weights go down to 0.01 (e.g. 0.05 = 20 hits
+	// make one strike), and the token bucket only takes whole tokens
+	strikeUnits = 100
 )
 
 // Config is the Service's config, kept separate from server.Config to avoid an import cycle.
@@ -81,11 +86,12 @@ func (s *Service) Record(ip netip.Addr, httpCode, errorCode int) {
 	defer s.mu.Unlock()
 	t := s.trackers[prefix]
 	if t == nil {
-		t = &tracker{limiter: rate.NewLimiter(rate.Limit(float64(s.conf.Threshold)/s.conf.Window.Seconds()), s.conf.Threshold)}
+		budget := s.conf.Threshold * strikeUnits
+		t = &tracker{limiter: rate.NewLimiter(rate.Limit(float64(budget)/s.conf.Window.Seconds()), budget)}
 		s.trackers[prefix] = t
 	}
 	t.seen = now
-	if t.limiter.AllowN(now, weight) {
+	if t.limiter.AllowN(now, int(math.Round(weight*strikeUnits))) {
 		return // Within the strike budget, no breach
 	}
 	if !t.emitted.IsZero() && now.Sub(t.emitted) < s.conf.Window {

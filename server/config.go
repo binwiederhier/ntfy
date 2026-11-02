@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"reflect"
 	"runtime"
+	"strconv"
 	"text/template"
 	"time"
 
@@ -56,16 +57,17 @@ const (
 	DefaultBanThreshold = 100 // Weighted strikes per BanWindow before a prefix is banned
 )
 
-// DefaultBanWeights is the ban-feed's default per-code strike weights: the auth-failure flood bans fast,
-// and everything else defaults to weight 1 (no "*" rule needed; see BanWeights.WeightFor).
+// DefaultBanWeights is the ban-feed's default per-code strike weights; everything else defaults to
+// weight 1 (no "*" rule needed; see BanWeights.WeightFor).
 var DefaultBanWeights = []string{
-	banWeight(errHTTPTooManyRequestsLimitAuthFailure, 10), // brute-force auth flood -> ban fast
+	banWeight(errHTTPTooManyRequestsLimitAuthFailure, 2),   // Brute-force auth flood: bans at half the threshold
+	banWeight(errHTTPInsufficientStorageUnifiedPush, 0.05), // An app server pushing to many offline phones is not an attack
 }
 
 // banWeight formats a "CODE:WEIGHT" ban-feed default from an ntfy error, so the codes stay in sync with
 // the errHTTP definitions instead of being duplicated as string literals.
-func banWeight(err *errHTTP, weight int) string {
-	return fmt.Sprintf("%d:%d", err.Code, weight)
+func banWeight(err *errHTTP, weight float64) string {
+	return fmt.Sprintf("%d:%s", err.Code, strconv.FormatFloat(weight, 'f', -1, 64))
 }
 
 // Defines all global and per-visitor limits

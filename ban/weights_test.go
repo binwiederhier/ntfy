@@ -39,18 +39,27 @@ func TestParseWeights(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestParseWeights_Fractional(t *testing.T) {
+	weights, err := ParseWeights([]string{"50701:0.05", "42909:2"})
+	require.Nil(t, err)
+	require.Equal(t, 0.05, weights.WeightFor(50701))
+	require.Equal(t, 2.0, weights.WeightFor(42909))
+	_, err = ParseWeights([]string{"50701:0.001"}) // Below the 0.01 resolution
+	require.Error(t, err)
+}
+
 func TestWeights_WeightFor(t *testing.T) {
 	weights, err := ParseWeights([]string{"42908:0", "42903:0", "42905:0", "42910:0", "42909:10", "429*:1", "403*:2", "4*:1", "5*:1"})
 	require.NoError(t, err)
 	// Longest-match-wins: exact 5-digit beats "429*" beats "4*" beats "*".
-	require.Equal(t, 0, weights.WeightFor(42908))
-	require.Equal(t, 10, weights.WeightFor(42909))
-	require.Equal(t, 1, weights.WeightFor(42901))
-	require.Equal(t, 2, weights.WeightFor(40311))
-	require.Equal(t, 1, weights.WeightFor(40011))
-	require.Equal(t, 1, weights.WeightFor(50312))
+	require.Equal(t, 0.0, weights.WeightFor(42908))
+	require.Equal(t, 10.0, weights.WeightFor(42909))
+	require.Equal(t, 1.0, weights.WeightFor(42901))
+	require.Equal(t, 2.0, weights.WeightFor(40311))
+	require.Equal(t, 1.0, weights.WeightFor(40011))
+	require.Equal(t, 1.0, weights.WeightFor(50312))
 	// No rule matches (this config has 4*/5* but no "*"), so the implied default weight 1 applies.
-	require.Equal(t, 1, weights.WeightFor(30012))
+	require.Equal(t, 1.0, weights.WeightFor(30012))
 }
 
 func TestWeights_WeightFor_NoStarRuleImpliesWeight1(t *testing.T) {
@@ -58,16 +67,16 @@ func TestWeights_WeightFor_NoStarRuleImpliesWeight1(t *testing.T) {
 	// feature can't be silently turned into a no-op by forgetting "*". Explicit codes still win.
 	weights, err := ParseWeights([]string{"42908:0", "42909:10"})
 	require.NoError(t, err)
-	require.Equal(t, 0, weights.WeightFor(42908))  // explicitly exempt
-	require.Equal(t, 10, weights.WeightFor(42909)) // explicit
-	require.Equal(t, 1, weights.WeightFor(42901))  // unmatched -> implied 1
-	require.Equal(t, 1, weights.WeightFor(40001))  // unmatched -> implied 1
+	require.Equal(t, 0.0, weights.WeightFor(42908))  // explicitly exempt
+	require.Equal(t, 10.0, weights.WeightFor(42909)) // explicit
+	require.Equal(t, 1.0, weights.WeightFor(42901))  // unmatched -> implied 1
+	require.Equal(t, 1.0, weights.WeightFor(40001))  // unmatched -> implied 1
 }
 
 func TestWeights_WeightFor_ExplicitStarZeroExemptsAll(t *testing.T) {
 	// An explicit "*:0" is the opt-out: exempt everything not otherwise weighted.
 	weights, err := ParseWeights([]string{"42909:10", "*:0"})
 	require.NoError(t, err)
-	require.Equal(t, 10, weights.WeightFor(42909)) // explicit
-	require.Equal(t, 0, weights.WeightFor(42901))  // *:0 -> exempt everything else
+	require.Equal(t, 10.0, weights.WeightFor(42909)) // explicit
+	require.Equal(t, 0.0, weights.WeightFor(42901))  // *:0 -> exempt everything else
 }

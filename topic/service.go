@@ -38,9 +38,9 @@ const (
 	// stream, touched by the manager every minute, writes only every few minutes
 	touchInterval = 5 * time.Minute
 
-	// maxNoted caps the topics known only from refused pushes, so a push flood cannot fill memory;
+	// maxRefused caps the topics known only from refused pushes, so a push flood cannot fill memory;
 	// rows read from other nodes count too, so it is effectively cluster-wide
-	maxNoted = 100_000
+	maxRefused = 100_000
 )
 
 // Service keeps the topics' state in memory and syncs it through the store
@@ -50,14 +50,14 @@ type Service struct {
 	interval  time.Duration     // How often the worker syncs; tests change it
 	entries   map[string]*State // By topic
 	pending   map[string]*State // Rows to write, by topic; always empty without a store
-	noted     int               // Entries without subscriber activity, capped at maxNoted
+	refused   int               // Entries without subscriber activity, capped at maxRefused
 	watermark int64             // Time of the last read, 0 until loaded; the worker's only
 	prunedAt  int64             // Time of the last prune; the worker's only
 	ctx       context.Context   // Done on Close, so Close never waits on a stuck store call
 	cancel    context.CancelFunc
 	closeOnce sync.Once
 	wg        sync.WaitGroup
-	mu        sync.Mutex // Protects entries, pending and noted
+	mu        sync.Mutex // Protects entries, pending and refused
 }
 
 // New creates the service; the store shares the rows with the other nodes and keeps them across
@@ -134,13 +134,13 @@ func (s *Service) Touch(topic string) {
 	s.addPendingNoLock(s.touchNoLock(topic), false)
 }
 
-// Note records a refused push and returns the topic's state. An unknown topic becomes known as
-// first seen now (unless maxNoted are, then it stays unknown); a known one is left alone, since
+// RecordRefused records a refused push and returns the topic's state. An unknown topic becomes known as
+// first seen now (unless maxRefused are, then it stays unknown); a known one is left alone, since
 // a push is not subscriber activity.
-func (s *Service) Note(topic string) *State {
+func (s *Service) RecordRefused(topic string) *State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.entries[topic]; !ok && s.noted < maxNoted {
+	if _, ok := s.entries[topic]; !ok && s.refused < maxRefused {
 		now := s.now().Unix()
 		e := &State{
 			Topic:       topic,
@@ -148,7 +148,7 @@ func (s *Service) Note(topic string) *State {
 			UpdatedAt:   now,
 		}
 		s.entries[topic] = e
-		s.noted++
+		s.refused++
 		s.addPendingNoLock(e, false)
 	}
 	return s.stateNoLock(topic)
@@ -293,10 +293,10 @@ func (s *Service) applyNoLock(r *State) {
 			FirstSeenAt: r.FirstSeenAt,
 		}
 		s.entries[r.Topic] = e
-		s.noted++
+		s.refused++
 	}
 	if e.SubscribedAt == 0 && r.SubscribedAt != 0 {
-		s.noted--
+		s.refused--
 	}
 	e.FirstSeenAt = min(e.FirstSeenAt, r.FirstSeenAt)
 	e.SubscribedAt = max(e.SubscribedAt, r.SubscribedAt)
@@ -310,13 +310,13 @@ func (s *Service) applyNoLock(r *State) {
 func (s *Service) prune(before int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.noted = 0
+	s.refused = 0
 	for topic, e := range s.entries {
 		if e.UpdatedAt < before {
 			delete(s.entries, topic)
 			delete(s.pending, topic)
 		} else if e.SubscribedAt == 0 {
-			s.noted++
+			s.refused++
 		}
 	}
 }
@@ -333,7 +333,7 @@ func (s *Service) touchNoLock(topic string) *State {
 		}
 		s.entries[topic] = e
 	} else if e.SubscribedAt == 0 {
-		s.noted-- // Known from pushes only until now
+		s.refused-- // Known from pushes only until now
 	}
 	e.SubscribedAt = max(e.SubscribedAt, now)
 	e.UpdatedAt = max(e.UpdatedAt, now)

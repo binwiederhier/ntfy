@@ -61,5 +61,6 @@ func TestServer_BanFeed_DefaultWeights(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, 2.0, weights.WeightFor(errHTTPTooManyRequestsLimitAuthFailure.Code))
 	require.Equal(t, 0.05, weights.WeightFor(errHTTPInsufficientStorageUnifiedPush.Code))
+	require.Equal(t, 0.05, weights.WeightFor(errHTTPGoneUnifiedPushTopicAbandoned.Code))
 	require.Equal(t, 1.0, weights.WeightFor(errHTTPTooManyRequestsLimitRequests.Code))
 }

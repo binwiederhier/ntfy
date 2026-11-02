@@ -62,6 +62,7 @@ const (
 var DefaultBanWeights = []string{
 	banWeight(errHTTPTooManyRequestsLimitAuthFailure, 2),   // Brute-force auth flood: bans at half the threshold
 	banWeight(errHTTPInsufficientStorageUnifiedPush, 0.05), // An app server pushing to many offline phones is not an attack
+	banWeight(errHTTPGoneUnifiedPushTopicAbandoned, 0.05),  // The same app servers, told a subscription is gone
 }
 
 // banWeight formats a "CODE:WEIGHT" ban-feed default from an ntfy error, so the codes stay in sync with

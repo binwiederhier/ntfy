@@ -2345,7 +2345,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
-* With `visitor-subscriber-rate-limiting` and a user database, write a UnifiedPush topic's subscriber activity about once an hour instead of every 5 minutes, spread over time, and not at all when a poll or reconnect only repeats the same subscriber; on ntfy.sh, v2.37.0's writes of ~45k topics every 5 minutes, all due in the same minute, slowed down the database
+* With `visitor-subscriber-rate-limiting` and a user database, write a UnifiedPush topic's subscriber activity about once an hour instead of every 5 minutes, spread over time, and not at all when a poll or reconnect only repeats the same subscriber; on ntfy.sh, v2.37.0's writes of ~45k topics every 5 minutes, all due in the same minute, slowed down the database ([#2151](https://github.com/binwiederhier/ntfy/pull/2151))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

@@ -40,7 +40,7 @@ func NewSQLiteStore(d *db.DB) *Store {
 }
 
 // writeSQLite writes the rows in one transaction, one prepared statement per row
-func (s *Store) writeSQLite(ctx context.Context, rows []State, now int64) error {
+func (s *Store) writeSQLite(ctx context.Context, rows []*State, now int64) error {
 	return db.ExecTx(s.db, func(tx *sql.Tx) error {
 		stmt, err := tx.PrepareContext(ctx, sqliteUpsertQuery)
 		if err != nil {

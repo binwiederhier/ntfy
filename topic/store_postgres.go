@@ -40,7 +40,7 @@ func NewPostgresStore(d *db.DB) *Store {
 }
 
 // writePostgres writes the rows in one statement, as arrays
-func (s *Store) writePostgres(ctx context.Context, rows []State, now int64) error {
+func (s *Store) writePostgres(ctx context.Context, rows []*State, now int64) error {
 	topics, userIDs, ips := make([]string, len(rows)), make([]string, len(rows)), make([]string, len(rows))
 	firstSeenAts, subscribedAts := make([]int64, len(rows)), make([]int64, len(rows))
 	for i, r := range rows {

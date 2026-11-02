@@ -267,7 +267,7 @@ func TestService_Persist_TouchAfterPruneRecreatesRow(t *testing.T) {
 		s.sync()
 		expected := state("upA", set, clock.unix(), "", "")
 		expected.UpdatedAt = clock.unix()
-		require.Equal(t, *expected, readAll(t, store, 0)["upA"])
+		require.Equal(t, expected, readAll(t, store, 0)["upA"])
 		require.Equal(t, "1.2.3.4", s.State("upA").RateVisitorIP)
 	})
 }
@@ -380,7 +380,7 @@ func TestService_Persist_WriteFailureRetries(t *testing.T) {
 		s := startTestService(t, store, clock.now)
 		s.SetRateVisitor("upA", "", "1.2.3.4")
 		writeChunk := store.writeChunk
-		store.writeChunk = func(ctx context.Context, rows []State, now int64) error {
+		store.writeChunk = func(ctx context.Context, rows []*State, now int64) error {
 			return errors.New("database is down")
 		}
 		s.sync()
@@ -399,7 +399,7 @@ func TestService_Persist_WriteFailureKeepsNewerChange(t *testing.T) {
 		s := startTestService(t, store, clock.now)
 		s.SetRateVisitor("upA", "", "1.2.3.4")
 		writeChunk := store.writeChunk
-		store.writeChunk = func(ctx context.Context, rows []State, now int64) error {
+		store.writeChunk = func(ctx context.Context, rows []*State, now int64) error {
 			s.SetRateVisitor("upA", "", "5.6.7.8")
 			return errors.New("database is down")
 		}
@@ -419,7 +419,7 @@ func TestService_Persist_WriteFailureKeepsUnwrittenRateVisitor(t *testing.T) {
 		s := startTestService(t, store, clock.now)
 		s.SetRateVisitor("upA", "u_1", "1.2.3.4")
 		writeChunk := store.writeChunk
-		store.writeChunk = func(ctx context.Context, rows []State, now int64) error {
+		store.writeChunk = func(ctx context.Context, rows []*State, now int64) error {
 			s.Touch("upA")
 			return errors.New("database is down")
 		}
@@ -447,7 +447,7 @@ func TestService_Persist_PrunesTableAndMemory(t *testing.T) {
 
 		// A topic not written for pruneAfter is pruned with its unwritten change
 		s.SetRateVisitor("upC", "", "1.2.3.4")
-		store.writeChunk = func(ctx context.Context, rows []State, now int64) error {
+		store.writeChunk = func(ctx context.Context, rows []*State, now int64) error {
 			return errors.New("database is down")
 		}
 		s.sync()

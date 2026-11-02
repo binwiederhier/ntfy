@@ -49,7 +49,7 @@ type Service struct {
 	now       func() time.Time  // Injectable clock, for tests
 	interval  time.Duration     // How often the worker syncs; tests change it
 	entries   map[string]*State // By topic
-	pending   map[string]State  // Rows to write, by topic; always empty without a store
+	pending   map[string]*State // Rows to write, by topic; always empty without a store
 	noted     int               // Entries without subscriber activity, capped at maxNoted
 	watermark int64             // Time of the last read, 0 until loaded; the worker's only
 	prunedAt  int64             // Time of the last prune; the worker's only
@@ -72,7 +72,7 @@ func newService(store *Store, now func() time.Time) *Service {
 		now:      now,
 		interval: syncInterval,
 		entries:  make(map[string]*State),
-		pending:  make(map[string]State),
+		pending:  make(map[string]*State),
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	return s
@@ -261,7 +261,6 @@ func (s *Service) write(ctx context.Context) {
 	for _, r := range rows {
 		if p, ok := s.pending[r.Topic]; ok && err != nil && p.RateVisitorIP == "" && r.RateVisitorIP != "" {
 			p.RateVisitorUserID, p.RateVisitorIP = r.RateVisitorUserID, r.RateVisitorIP // A touch since then does not drop it
-			s.pending[r.Topic] = p
 		} else if ok {
 			continue
 		} else if err != nil {
@@ -348,11 +347,11 @@ func (s *Service) addPendingNoLock(e *State, rateVisitor bool) {
 	if s.store == nil {
 		return
 	}
-	r := *e
+	r := *e // A copy: the entry changes on, the row to write does not
 	if p, ok := s.pending[e.Topic]; !rateVisitor && (!ok || p.RateVisitorIP == "") {
 		r.RateVisitorUserID, r.RateVisitorIP = "", ""
 	}
-	s.pending[e.Topic] = r
+	s.pending[e.Topic] = &r
 }
 
 // stateNoLock returns a copy of the topic's state, or nil if it is unknown. The caller must hold s.mu.

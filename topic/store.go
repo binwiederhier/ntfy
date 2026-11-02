@@ -19,7 +19,7 @@ const (
 type Store struct {
 	db         *db.DB
 	queries    *queries
-	writeChunk func(ctx context.Context, rows []State, now int64) error // Dialect specific: unnest on Postgres, a transaction on SQLite
+	writeChunk func(ctx context.Context, rows []*State, now int64) error // Dialect specific: unnest on Postgres, a transaction on SQLite
 }
 
 // queries are the dialect's SQL statements
@@ -31,8 +31,8 @@ type queries struct {
 
 // write merges the rows into the table (see the upsert queries), stamped with now. Rows are
 // sorted by topic, so two nodes lock overlapping topics in the same order.
-func (s *Store) write(ctx context.Context, rows []State, now int64) error {
-	slices.SortFunc(rows, func(a, b State) int {
+func (s *Store) write(ctx context.Context, rows []*State, now int64) error {
+	slices.SortFunc(rows, func(a, b *State) int {
 		return strings.Compare(a.Topic, b.Topic)
 	})
 	for chunk := range slices.Chunk(rows, writeChunkRows) {

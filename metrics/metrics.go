@@ -6,6 +6,7 @@ package metrics
 import (
 	"database/sql"
 	"sync/atomic"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -173,6 +174,8 @@ type DBPool struct {
 	Addr  string // "host:port"
 	Up    bool   // The last health check of the pool's database succeeded
 	Stats sql.DBStats
+
+	PingDuration time.Duration // How long the last health check ping took
 }
 
 // SetDBPoolsFunc sets the function that the ntfy_db_* metrics read their values from on
@@ -204,6 +207,9 @@ func newDBPoolCollector() *dbPoolCollector {
 					return 1
 				}
 				return 0
+			}),
+			newDBPoolMetric("ntfy_db_ping_seconds", "How long the last health check ping took (every 30s), including any wait for a free connection, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return pool.PingDuration.Seconds()
 			}),
 			newDBPoolMetric("ntfy_db_pool_connections_max", "Maximum open database connections (pool_max_conns), per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
 				return float64(pool.Stats.MaxOpenConnections)

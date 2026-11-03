@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"crypto/rand"
 	"fmt"
+	"net"
 	"net/http"
 	"net/netip"
 	"strings"
+	"syscall"
 	"testing"
 
 	"heckel.io/ntfy/v2/user"
@@ -163,4 +165,27 @@ func TestVisitorID(t *testing.T) {
 
 	require.Equal(t, "ip:1.2.0.0", vis.Key(netip.MustParseAddr("1.2.3.4"), nil, visitorConfigFrom(confWithShortenedPrefixes)))
 	require.Equal(t, "ip:2a01:599:b26:2300::", vis.Key(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), nil, visitorConfigFrom(confWithShortenedPrefixes)))
+}
+
+func TestListenTCP_NoKeepAliveProbes(t *testing.T) {
+	// Go turns on TCP keep-alive probes every 15s on accepted connections by default; to an idle phone
+	// that is a radio wake-up every 15s on top of ntfy's own keepalive event every 45s
+	ln, err := listenTCP("127.0.0.1:0")
+	require.Nil(t, err)
+	defer ln.Close()
+	client, err := net.Dial("tcp", ln.Addr().String())
+	require.Nil(t, err)
+	defer client.Close()
+	conn, err := ln.Accept()
+	require.Nil(t, err)
+	defer conn.Close()
+	raw, err := conn.(*net.TCPConn).SyscallConn()
+	require.Nil(t, err)
+	var keepAlive int
+	var sockErr error
+	require.Nil(t, raw.Control(func(fd uintptr) {
+		keepAlive, sockErr = syscall.GetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_KEEPALIVE)
+	}))
+	require.Nil(t, sockErr)
+	require.Equal(t, 0, keepAlive, "accepted connections send TCP keep-alive probes")
 }

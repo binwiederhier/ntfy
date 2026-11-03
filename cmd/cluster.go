@@ -132,20 +132,17 @@ func clusterStatusBaseURL(listen string) (string, error) {
 }
 
 func printClusterStatus(w io.Writer, status *cluster.Status) {
-	leader, healthy := "not leader", "healthy"
+	// This node first, then its peers; the link columns are the peers' only
+	self, live := string(status.NodeID)+" (this node)", "yes"
 	if status.Leader {
-		leader = "leader"
+		self = string(status.NodeID) + " (this node, leader)"
 	}
 	if !status.Healthy {
-		healthy = "NOT healthy (registry heartbeat stale)"
-	}
-	fmt.Fprintf(w, "Node %s: %s, %s, %s\n\n", status.NodeID, status.Role, leader, healthy)
-	if len(status.Peers) == 0 {
-		fmt.Fprintln(w, "No peers.")
-		return
+		live = "no"
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "PEER\tROLE\tLIVE\tHEARTBEAT\tSENT OK\tFAILED\tQUEUED\tDROPPED\tLAST SENT\tRECEIVED\tLAST RECEIVED")
+	fmt.Fprintln(tw, "NODE\tROLE\tLIVE\tHEARTBEAT\tSENT OK\tFAILED\tQUEUED\tDROPPED\tLAST SENT\tRECEIVED\tLAST RECEIVED")
+	fmt.Fprintf(tw, "%s\t%s\t%s\t-\t-\t-\t-\t-\t-\t-\t-\n", self, status.Role, live)
 	for _, p := range status.Peers {
 		live, heartbeat := "no", "last seen "+clusterStatusAge(status.Time, p.LastSeen)
 		if p.Live {
@@ -156,6 +153,9 @@ func printClusterStatus(w io.Writer, status *cluster.Status) {
 	}
 	tw.Flush()
 	problems := clusterStatusProblems(status, "")
+	if !status.Healthy {
+		problems = append([]string{fmt.Sprintf("%s (this node): not healthy, its registry heartbeat is stale", status.NodeID)}, problems...)
+	}
 	if len(problems) == 0 {
 		return
 	}

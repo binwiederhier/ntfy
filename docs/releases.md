@@ -2351,6 +2351,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.37.2 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Do not send TCP keep-alive probes on the client listeners (`listen-http`, `listen-https`): Go sends one every 15 seconds on an idle connection by default, which, without a proxy in front of ntfy, woke phones holding a stream three times as often as ntfy's own keepalive event
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

@@ -402,10 +402,11 @@ func (s *Server) dbPoolStats() []*metrics.DBPool {
 	pools := make([]*metrics.DBPool, 0)
 	for _, p := range s.db.Stats() {
 		pools = append(pools, &metrics.DBPool{
-			Role:  p.Role,
-			Addr:  p.Addr,
-			Up:    p.Healthy,
-			Stats: p.Stats,
+			Role:         p.Role,
+			Addr:         p.Addr,
+			Up:           p.Healthy,
+			Stats:        p.Stats,
+			PingDuration: p.PingDuration,
 		})
 	}
 	return pools

@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"sync/atomic"
+	"time"
 )
 
 // Beginner is an interface for types that can begin a database transaction.
@@ -22,6 +23,7 @@ type Host struct {
 	Addr    string // "host:port"
 	DB      *sql.DB
 	healthy atomic.Bool
+	ping    atomic.Int64 // Duration of the last health check ping, in nanoseconds
 }
 
 // Roles of a connection pool, see PoolStats
@@ -36,4 +38,8 @@ type PoolStats struct {
 	Addr    string // "host:port"
 	Healthy bool   // The last health check (a ping) succeeded
 	Stats   sql.DBStats
+
+	// PingDuration is how long the last health check ping took, including any wait for a free
+	// connection, so a stalled database shows even when its pool is idle; 0 before the first check
+	PingDuration time.Duration
 }

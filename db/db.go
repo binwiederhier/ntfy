@@ -17,8 +17,8 @@ const (
 )
 
 // DB wraps a primary *sql.DB and optional read replicas. All standard query/exec methods
-// delegate to the primary. The ReadOnly() method returns a *sql.DB from a healthy replica
-// (round-robin), falling back to the primary if no replicas are configured or all are unhealthy.
+// delegate to the primary. The ReadOnly() method returns a *sql.DB from the least busy healthy
+// replica, falling back to the primary if none is configured, healthy, or has a free connection.
 type DB struct {
 	primary  *Host
 	replicas []*Host
@@ -92,38 +92,54 @@ func (d *DB) Primary() *sql.DB {
 func (d *DB) Stats() []*PoolStats {
 	stats := []*PoolStats{
 		{
-			Role:    PoolRolePrimary,
-			Addr:    d.primary.Addr,
-			Healthy: d.primary.healthy.Load(),
-			Stats:   d.primary.DB.Stats(),
+			Role:         PoolRolePrimary,
+			Addr:         d.primary.Addr,
+			Healthy:      d.primary.healthy.Load(),
+			Stats:        d.primary.DB.Stats(),
+			PingDuration: time.Duration(d.primary.ping.Load()),
 		},
 	}
 	for _, r := range d.replicas {
 		stats = append(stats, &PoolStats{
-			Role:    PoolRoleReplica,
-			Addr:    r.Addr,
-			Healthy: r.healthy.Load(),
-			Stats:   r.DB.Stats(),
+			Role:         PoolRoleReplica,
+			Addr:         r.Addr,
+			Healthy:      r.healthy.Load(),
+			Stats:        r.DB.Stats(),
+			PingDuration: time.Duration(r.ping.Load()),
 		})
 	}
 	return stats
 }
 
-// ReadOnly returns a *sql.DB suitable for read-only queries. It round-robins across healthy
-// replicas. If all replicas are unhealthy or none are configured, the primary is returned.
+// ReadOnly returns a *sql.DB suitable for read-only queries: the healthy replica with the fewest
+// connections in use, round-robin among equally busy ones. A replica that stalls piles up
+// connections and stops getting new reads. If no replica is healthy or every replica's pool is
+// full (a read would wait for a connection), the primary is returned.
 func (d *DB) ReadOnly() *sql.DB {
 	if len(d.replicas) == 0 {
 		return d.primary.DB
 	}
 	n := len(d.replicas)
 	start := int(d.counter.Add(1) - 1)
+	var best *Host
+	bestInUse := 0
 	for i := 0; i < n; i++ {
 		r := d.replicas[(start+i)%n]
-		if r.healthy.Load() {
-			return r.DB
+		if !r.healthy.Load() {
+			continue
+		}
+		stats := r.DB.Stats()
+		if stats.MaxOpenConnections > 0 && stats.InUse >= stats.MaxOpenConnections {
+			continue
+		}
+		if best == nil || stats.InUse < bestInUse {
+			best, bestInUse = r, stats.InUse
 		}
 	}
-	return d.primary.DB
+	if best == nil {
+		return d.primary.DB
+	}
+	return best.DB
 }
 
 // MarkReplicasHealthyForTest immediately marks all configured replicas as healthy, bypassing the
@@ -175,7 +191,9 @@ func (d *DB) checkHealth(ctx context.Context) {
 func checkHost(ctx context.Context, h *Host, kind string) {
 	wasHealthy := h.healthy.Load()
 	pingCtx, cancel := context.WithTimeout(ctx, healthCheckTimeout)
+	started := time.Now()
 	err := h.DB.PingContext(pingCtx)
+	h.ping.Store(int64(time.Since(started)))
 	cancel()
 	if err != nil {
 		h.healthy.Store(false)

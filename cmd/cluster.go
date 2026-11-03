@@ -33,13 +33,13 @@ func init() {
 var flagsCluster = append(
 	append([]cli.Flag{}, flagsDefault...),
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: server.DefaultConfigFile, DefaultText: server.DefaultConfigFile, Usage: "config file"},
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-listen", Aliases: []string{"experimental_cluster_listen"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_LISTEN"}, Usage: "ip:port of this node's cluster listener"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-secret", Aliases: []string{"experimental_cluster_secret"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_SECRET"}, Usage: "shared secret authenticating cluster requests"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-listen", Aliases: []string{"cluster_listen", "experimental-cluster-listen", "experimental_cluster_listen"}, EnvVars: []string{"NTFY_CLUSTER_LISTEN", "NTFY_EXPERIMENTAL_CLUSTER_LISTEN"}, Usage: "ip:port of this node's cluster listener"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-secret", Aliases: []string{"cluster_secret", "experimental-cluster-secret", "experimental_cluster_secret"}, EnvVars: []string{"NTFY_CLUSTER_SECRET", "NTFY_EXPERIMENTAL_CLUSTER_SECRET"}, Usage: "shared secret authenticating cluster requests"}),
 )
 
 var cmdCluster = &cli.Command{
 	Name:      "cluster",
-	Usage:     "Show the state of an experimental cluster node",
+	Usage:     "Show the state of a cluster node",
 	UsageText: "ntfy cluster status [--all] [--json]",
 	Flags:     flagsCluster,
 	Before:    initConfigFileInputSourceFunc("config", flagsCluster, initLogFunc),
@@ -59,8 +59,8 @@ leadership, and per peer the message batches it sent there and received from the
 
 A link that only works one way (e.g. a firewall dropping the cluster port in one direction)
 shows as failed batches on the sending node and nothing received on the other one; it does
-not show in /v1/health. Run this on the node itself: it reads experimental-cluster-listen and
-experimental-cluster-secret from the server config.
+not show in /v1/health. Run this on the node itself: it reads cluster-listen and
+cluster-secret from the server config.
 
 With --all, it also fetches every live peer's view (from its advertised cluster URL) and shows
 each link between the nodes once, with what the sender sent and what the receiver received.
@@ -82,9 +82,9 @@ type clusterNodeStatus struct {
 }
 
 func execClusterStatus(c *cli.Context) error {
-	listen := c.String("experimental-cluster-listen")
+	listen := c.String("cluster-listen")
 	if listen == "" {
-		return errors.New("clustering is not enabled on this node (experimental-cluster-listen is not set)")
+		return errors.New("clustering is not enabled on this node (cluster-listen is not set)")
 	}
 	baseURL, err := clusterStatusBaseURL(listen)
 	if err != nil {
@@ -92,12 +92,12 @@ func execClusterStatus(c *cli.Context) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), clusterStatusTimeout)
 	defer cancel()
-	status, err := cluster.NewClient(c.String("experimental-cluster-secret"), "").Status(ctx, baseURL)
+	status, err := cluster.NewClient(c.String("cluster-secret"), "").Status(ctx, baseURL)
 	if err != nil {
 		return err
 	}
 	if c.Bool("all") {
-		nodes := fetchClusterNodeStatuses(status, c.String("experimental-cluster-secret"))
+		nodes := fetchClusterNodeStatuses(status, c.String("cluster-secret"))
 		if c.Bool("json") {
 			encoder := json.NewEncoder(c.App.Writer)
 			encoder.SetIndent("", "  ")
@@ -120,7 +120,7 @@ func execClusterStatus(c *cli.Context) error {
 func clusterStatusBaseURL(listen string) (string, error) {
 	host, port, err := net.SplitHostPort(listen)
 	if err != nil {
-		return "", fmt.Errorf("invalid experimental-cluster-listen %q: %w", listen, err)
+		return "", fmt.Errorf("invalid cluster-listen %q: %w", listen, err)
 	}
 	switch host {
 	case "", "0.0.0.0":

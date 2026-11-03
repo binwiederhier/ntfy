@@ -39,20 +39,20 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used as HTTPS listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-unix", Aliases: []string{"listen_unix", "U"}, EnvVars: []string{"NTFY_LISTEN_UNIX"}, Usage: "listen on unix socket path"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "listen-unix-mode", Aliases: []string{"listen_unix_mode"}, EnvVars: []string{"NTFY_LISTEN_UNIX_MODE"}, DefaultText: "system default", Usage: "file permissions of unix socket, e.g. 0700"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-listen-admin-unix", Aliases: []string{"experimental_listen_admin_unix"}, EnvVars: []string{"NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX"}, Usage: "experimental: unix socket path for credential-less local admin API access, e.g. /run/ntfy/admin.sock; empty or \"-\" disables it"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-admin-unix", Aliases: []string{"listen_admin_unix", "experimental-listen-admin-unix", "experimental_listen_admin_unix"}, EnvVars: []string{"NTFY_LISTEN_ADMIN_UNIX", "NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX"}, Usage: "unix socket path for credential-less local admin API access, e.g. /run/ntfy/admin.sock; empty or \"-\" disables it"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"key_file", "K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"cert_file", "E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-node-id", Aliases: []string{"experimental_cluster_node_id"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (required in cluster mode)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-listen", Aliases: []string{"experimental_cluster_listen"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_LISTEN"}, Usage: "ip:port for the dedicated cluster fan-out listener; bind it to the private network (e.g. 10.0.0.5:2587)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-advertise-url", Aliases: []string{"experimental_cluster_advertise_url"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out listener (defaults to http://<experimental-cluster-listen>)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-secret", Aliases: []string{"experimental_cluster_secret"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-role", Aliases: []string{"experimental_cluster_role"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_ROLE"}, Value: string(server.DefaultClusterRole), Usage: "role of this cluster node: active (takes client traffic, may lead) or passive (hidden: never leads, never fences)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-batch-linger", Aliases: []string{"experimental_cluster_batch_linger"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER"}, Value: util.FormatDuration(server.DefaultClusterBatchLinger), Usage: "how long fan-out messages wait to form a batch per peer node (0 = send immediately)"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-drain-delay", Aliases: []string{"experimental_cluster_drain_delay"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY"}, Value: util.FormatDuration(server.DefaultClusterDrainDelay), Usage: "on shutdown (SIGTERM), how long an active cluster node withdraws (not ready, but still serves everything), so the load balancers stop sending it requests before it turns read-only"}),
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-drain-duration", Aliases: []string{"experimental_cluster_drain_duration"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION"}, Value: util.FormatDuration(server.DefaultClusterDrainDuration), Usage: "on shutdown (SIGTERM), how long an active cluster node takes to close its subscriber connections, so they reconnect to the other nodes gradually (0 = all at once)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-node-id", Aliases: []string{"cluster_node_id", "experimental-cluster-node-id", "experimental_cluster_node_id"}, EnvVars: []string{"NTFY_CLUSTER_NODE_ID", "NTFY_EXPERIMENTAL_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (required in cluster mode)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-listen", Aliases: []string{"cluster_listen", "experimental-cluster-listen", "experimental_cluster_listen"}, EnvVars: []string{"NTFY_CLUSTER_LISTEN", "NTFY_EXPERIMENTAL_CLUSTER_LISTEN"}, Usage: "ip:port for the dedicated cluster fan-out listener; bind it to the private network (e.g. 10.0.0.5:2587)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-advertise-url", Aliases: []string{"cluster_advertise_url", "experimental-cluster-advertise-url", "experimental_cluster_advertise_url"}, EnvVars: []string{"NTFY_CLUSTER_ADVERTISE_URL", "NTFY_EXPERIMENTAL_CLUSTER_ADVERTISE_URL"}, Usage: "base URL peer nodes use to reach this node's fan-out listener (defaults to http://<cluster-listen>)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-secret", Aliases: []string{"cluster_secret", "experimental-cluster-secret", "experimental_cluster_secret"}, EnvVars: []string{"NTFY_CLUSTER_SECRET", "NTFY_EXPERIMENTAL_CLUSTER_SECRET"}, Usage: "shared secret authenticating node-to-node fan-out requests"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-role", Aliases: []string{"cluster_role", "experimental-cluster-role", "experimental_cluster_role"}, EnvVars: []string{"NTFY_CLUSTER_ROLE", "NTFY_EXPERIMENTAL_CLUSTER_ROLE"}, Value: string(server.DefaultClusterRole), Usage: "role of this cluster node: active (takes client traffic, may lead) or passive (hidden: never leads, never fences)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-batch-linger", Aliases: []string{"cluster_batch_linger", "experimental-cluster-batch-linger", "experimental_cluster_batch_linger"}, EnvVars: []string{"NTFY_CLUSTER_BATCH_LINGER", "NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER"}, Value: util.FormatDuration(server.DefaultClusterBatchLinger), Usage: "how long fan-out messages wait to form a batch per peer node (0 = send immediately)"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-drain-delay", Aliases: []string{"cluster_drain_delay", "experimental-cluster-drain-delay", "experimental_cluster_drain_delay"}, EnvVars: []string{"NTFY_CLUSTER_DRAIN_DELAY", "NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY"}, Value: util.FormatDuration(server.DefaultClusterDrainDelay), Usage: "on shutdown (SIGTERM), how long an active cluster node withdraws (not ready, but still serves everything), so the load balancers stop sending it requests before it turns read-only"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "cluster-drain-duration", Aliases: []string{"cluster_drain_duration", "experimental-cluster-drain-duration", "experimental_cluster_drain_duration"}, EnvVars: []string{"NTFY_CLUSTER_DRAIN_DURATION", "NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION"}, Value: util.FormatDuration(server.DefaultClusterDrainDuration), Usage: "on shutdown (SIGTERM), how long an active cluster node takes to close its subscriber connections, so they reconnect to the other nodes gradually (0 = all at once)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-file", Aliases: []string{"cache_file", "C"}, EnvVars: []string{"NTFY_CACHE_FILE"}, Usage: "cache file used for message caching"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cache-duration", Aliases: []string{"cache_duration", "b"}, EnvVars: []string{"NTFY_CACHE_DURATION"}, Value: util.FormatDuration(server.DefaultCacheDuration), Usage: "buffer messages for this time to allow `since` requests"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "cache-batch-size", Aliases: []string{"cache_batch_size"}, EnvVars: []string{"NTFY_BATCH_SIZE"}, Usage: "max size of messages to batch together when writing to message cache (if zero, writes are synchronous)"}),
@@ -162,20 +162,20 @@ func execServe(c *cli.Context) error {
 	listenHTTPS := c.String("listen-https")
 	listenUnix := c.String("listen-unix")
 	listenUnixMode := c.Int("listen-unix-mode")
-	listenAdminUnix := c.String("experimental-listen-admin-unix")
+	listenAdminUnix := c.String("listen-admin-unix")
 	keyFile := c.String("key-file")
 	certFile := c.String("cert-file")
 	firebaseKeyFile := c.String("firebase-key-file")
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
-	clusterNodeID := c.String("experimental-cluster-node-id")
-	clusterListen := c.String("experimental-cluster-listen")
-	clusterAdvertiseURL := c.String("experimental-cluster-advertise-url")
-	clusterSecret := c.String("experimental-cluster-secret")
-	clusterBatchLingerStr := c.String("experimental-cluster-batch-linger")
-	clusterRoleStr := c.String("experimental-cluster-role")
-	clusterDrainDelayStr := c.String("experimental-cluster-drain-delay")
-	clusterDrainDurationStr := c.String("experimental-cluster-drain-duration")
+	clusterNodeID := c.String("cluster-node-id")
+	clusterListen := c.String("cluster-listen")
+	clusterAdvertiseURL := c.String("cluster-advertise-url")
+	clusterSecret := c.String("cluster-secret")
+	clusterBatchLingerStr := c.String("cluster-batch-linger")
+	clusterRoleStr := c.String("cluster-role")
+	clusterDrainDelayStr := c.String("cluster-drain-delay")
+	clusterDrainDurationStr := c.String("cluster-drain-duration")
 	webPushPrivateKey := c.String("web-push-private-key")
 	webPushPublicKey := c.String("web-push-public-key")
 	webPushFile := c.String("web-push-file")
@@ -285,7 +285,7 @@ func execServe(c *cli.Context) error {
 	}
 	clusterRole := cluster.Role(clusterRoleStr)
 	if !clusterRole.Valid() {
-		return fmt.Errorf("invalid experimental-cluster-role: %s (must be %s or %s)", clusterRoleStr, cluster.RoleActive, cluster.RolePassive)
+		return fmt.Errorf("invalid cluster-role: %s (must be %s or %s)", clusterRoleStr, cluster.RoleActive, cluster.RolePassive)
 	}
 	managerInterval, err := util.ParseDuration(managerIntervalStr)
 	if err != nil {
@@ -368,15 +368,15 @@ func execServe(c *cli.Context) error {
 	} else if len(databaseReplicaURLs) > 0 && databaseURL == "" {
 		return errors.New("database-replica-urls can only be used if database-url is also set")
 	} else if clusterListen != "" && databaseURL == "" {
-		return errors.New("experimental-cluster-listen requires database-url to be set")
+		return errors.New("cluster-listen requires database-url to be set")
 	} else if clusterListen != "" && clusterSecret == "" {
-		return errors.New("experimental-cluster-listen requires experimental-cluster-secret to be set")
+		return errors.New("cluster-listen requires cluster-secret to be set")
 	} else if clusterListen != "" && clusterNodeID == "" {
-		return errors.New("experimental-cluster-listen requires experimental-cluster-node-id to be set")
+		return errors.New("cluster-listen requires cluster-node-id to be set")
 	} else if clusterListen == "" && clusterSecret != "" {
-		return errors.New("experimental-cluster-secret can only be used if experimental-cluster-listen is set")
+		return errors.New("cluster-secret can only be used if cluster-listen is set")
 	} else if clusterListen != "" && clusterAdvertiseURL == "" && wildcardAddr(clusterListen) {
-		return errors.New("experimental-cluster-advertise-url must be set if experimental-cluster-listen binds a wildcard address")
+		return errors.New("cluster-advertise-url must be set if cluster-listen binds a wildcard address")
 	} else if firebaseKeyFile != "" && !util.FileExists(firebaseKeyFile) {
 		return errors.New("if set, FCM key file must exist")
 	} else if firebaseKeyFile != "" && !server.FirebaseAvailable {

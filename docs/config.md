@@ -923,7 +923,7 @@ has a token `tk_f099we8uzj7xi5qshzajwp6jffvkz` with the label "Backup script".
     The admin socket is **experimental**. Options and behavior may still change between releases. The `ntfy user`,
     `ntfy access`, `ntfy token` and `ntfy tier` commands do not use it yet; they still write to the database directly.
 
-ntfy can serve its admin API on a local unix socket, set with `experimental-listen-admin-unix` (e.g.
+ntfy can serve its admin API on a local unix socket, set with `listen-admin-unix` (e.g.
 `/run/ntfy/admin.sock`). It is off by default.
 
 The socket needs no password or token: **being able to open the socket is the authorization**. It is created with
@@ -2307,24 +2307,25 @@ subscribers on all of them. It requires **PostgreSQL** as the database backend (
 the tables the nodes coordinate through. If you use [attachments](#attachments), the nodes also need shared attachment
 storage, since a node's local cache directory cannot serve files uploaded via another node.
 
-Clustering is enabled by setting `experimental-cluster-listen`. Nodes find each other through the shared database and
+Clustering is enabled by setting `cluster-listen`. (Before v2.38.0 the cluster options were prefixed with
+`experimental-`, e.g. `experimental-cluster-listen`; the old names still work.) Nodes find each other through the shared database and
 forward published messages to each other over a private HTTP listener. Every node also reads new messages from the
 database and delivers those its subscribers have not had yet, so a message a peer failed to forward still arrives, a
 little later. Scheduled (delayed) messages are claimed by one node, so each is sent once, and jobs that must run only
 once (pruning, web push expiry warnings, the published-messages total) run on the cluster leader only.
 
-Example config for a node (all nodes are identical except `experimental-cluster-node-id`, `experimental-cluster-listen`
-and `experimental-cluster-advertise-url`):
+Example config for a node (all nodes are identical except `cluster-node-id`, `cluster-listen`
+and `cluster-advertise-url`):
 
 ``` yaml
 base-url: "https://ntfy.example.com"
 database-url: "postgres://user:pass@dbhost:5432/ntfy"
 
-experimental-cluster-node-id: "node-1"                       # stable identity, e.g. the hostname
-experimental-cluster-listen: "10.0.0.5:2587"                 # private network interface
-experimental-cluster-advertise-url: "http://10.0.0.5:2587"   # how the other nodes reach this one
-experimental-cluster-secret: "long-random-shared-secret"     # must match on all nodes
-experimental-cluster-role: "active"                          # or "passive", see below
+cluster-node-id: "node-1"                       # stable identity, e.g. the hostname
+cluster-listen: "10.0.0.5:2587"                 # private network interface
+cluster-advertise-url: "http://10.0.0.5:2587"   # how the other nodes reach this one
+cluster-secret: "long-random-shared-secret"     # must match on all nodes
+cluster-role: "active"                          # or "passive", see below
 ```
 
 A few important notes:
@@ -2332,7 +2333,7 @@ A few important notes:
 * **The cluster listener must not be publicly reachable.** It accepts messages from anyone with the shared secret, so
   bind it to a private network interface. Every node must reach every other node's listener: a firewall that drops the
   cluster port in one direction delays all messages that way to the database read (see [cluster status](#cluster-status)).
-* `experimental-cluster-node-id` must be **stable across restarts** (use the hostname).
+* `cluster-node-id` must be **stable across restarts** (use the hostname).
 * **Active and passive nodes:** an `active` node serves clients behind the load balancer and can become the leader. A
   `passive` node never leads and never becomes ready, so it stays out of the load balancer; use it for test clients
   only, since while it is cut off from the database, its clients can miss messages published elsewhere.
@@ -2350,11 +2351,11 @@ Restarting a node drops all of its subscriber connections at once, and all of it
 in one burst. To avoid that, an active node that gets `SIGTERM` while another active node is up **drains** before it
 exits, moving its clients to the other nodes gradually, and without failed requests:
 
-1. **Withdrawing** (`experimental-cluster-drain-delay`, default 15 seconds): `/v1/ready` fails at once, so your load
+1. **Withdrawing** (`cluster-drain-delay`, default 15 seconds): `/v1/ready` fails at once, so your load
    balancer stops sending the node new requests, but the node still serves everything, so requests already on their
    way succeed. In the cluster, the node acts as passive from now on: another node takes over the leader's jobs, and
    it sends no scheduled (delayed) messages.
-2. **Read-only** (`experimental-cluster-drain-duration`, default 1 minute): new subscriptions and publishes get HTTP
+2. **Read-only** (`cluster-drain-duration`, default 1 minute): new subscriptions and publishes get HTTP
    503 (incoming email gets a temporary SMTP error, so mail servers retry), and the open subscriber connections are
    closed evenly over the duration (all at once with `0`). The clients reconnect, through the load balancer, to the
    other nodes, and catch up on what they missed. Once no connections are left, the node exits.
@@ -2376,7 +2377,7 @@ once.
 `/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,
 e.g. because a firewall drops the cluster port one way, keeps both nodes healthy while messages published on one of them
 reach the other only late, through the database. To see each node's view of its peers, run `ntfy cluster status` on the
-node. It reads `experimental-cluster-listen` and `experimental-cluster-secret` from the server config, and shows per
+node. It reads `cluster-listen` and `cluster-secret` from the server config, and shows per
 peer the message batches sent there and received from there:
 
 ```
@@ -2567,19 +2568,19 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`                                       | -                 | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                                       |
 | `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*                                          | -                 | Path to a Unix socket to listen on                                                                                                                                                                                                      |
 | `listen-unix-mode`                         | `NTFY_LISTEN_UNIX_MODE`                         | *file mode*                                         | *system default*  | File mode of the Unix socket, e.g. 0700 or 0777                                                                                                                                                                                         |
-| `experimental-listen-admin-unix`           | `NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX`           | *filename*                                          | -                 | Experimental. Path of the local [admin socket](#admin-socket), e.g. `/run/ntfy/admin.sock`; off if empty or `"-"`. Only opened if auth is configured; not available on Windows |
+| `listen-admin-unix`           | `NTFY_LISTEN_ADMIN_UNIX`           | *filename*                                          | -                 | Experimental. Path of the local [admin socket](#admin-socket), e.g. `/run/ntfy/admin.sock`; off if empty or `"-"`. Only opened if auth is configured; not available on Windows |
 | `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*                                          | -                 | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
 | `database-url`                             | `NTFY_DATABASE_URL`                             | *string (connection URL)*                           | -                 | PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/ntfy`). If set, uses PostgreSQL for all database-backed stores (message cache, user manager, web push) instead of SQLite. See [database options](#database-options). |
-| `experimental-cluster-node-id`             | `NTFY_EXPERIMENTAL_CLUSTER_NODE_ID`             | *string*                                            | -                 | Experimental, not ready for production. Stable per-node identifier (e.g. the hostname).                                                                                                                                                 |
-| `experimental-cluster-listen`              | `NTFY_EXPERIMENTAL_CLUSTER_LISTEN`              | `[host]:port`                                       | -                 | Experimental, not ready for production. Private listen address for node-to-node traffic; setting it enables clustering (requires `database-url`).                                                                                        |
-| `experimental-cluster-advertise-url`       | `NTFY_EXPERIMENTAL_CLUSTER_ADVERTISE_URL`       | *URL*                                               | `http://<experimental-cluster-listen>` | Experimental, not ready for production. URL under which other nodes reach this node's cluster listener.                                                                                             |
-| `experimental-cluster-secret`              | `NTFY_EXPERIMENTAL_CLUSTER_SECRET`              | *string*                                            | -                 | Experimental, not ready for production. Shared secret authenticating node-to-node traffic; must match on all nodes.                                                                                                                      |
-| `experimental-cluster-batch-linger`        | `NTFY_EXPERIMENTAL_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
-| `experimental-cluster-role`                | `NTFY_EXPERIMENTAL_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
-| `experimental-cluster-drain-delay`         | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY`         | *duration*                                          | `15s`             | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long a node withdraws: it is not ready but still serves everything, so the load balancer stops sending it requests before the node turns read-only. |
-| `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` closes them all at once. The service manager's stop timeout must be longer than the delay plus this. |
+| `cluster-node-id`             | `NTFY_CLUSTER_NODE_ID`             | *string*                                            | -                 | Experimental, not ready for production. Stable per-node identifier (e.g. the hostname).                                                                                                                                                 |
+| `cluster-listen`              | `NTFY_CLUSTER_LISTEN`              | `[host]:port`                                       | -                 | Experimental, not ready for production. Private listen address for node-to-node traffic; setting it enables clustering (requires `database-url`).                                                                                        |
+| `cluster-advertise-url`       | `NTFY_CLUSTER_ADVERTISE_URL`       | *URL*                                               | `http://<cluster-listen>` | Experimental, not ready for production. URL under which other nodes reach this node's cluster listener.                                                                                             |
+| `cluster-secret`              | `NTFY_CLUSTER_SECRET`              | *string*                                            | -                 | Experimental, not ready for production. Shared secret authenticating node-to-node traffic; must match on all nodes.                                                                                                                      |
+| `cluster-batch-linger`        | `NTFY_CLUSTER_BATCH_LINGER`        | *duration*                                          | `500ms`           | Experimental, not ready for production. How long messages wait to form a node-to-node delivery batch; `0` sends immediately.                                                                                                             |
+| `cluster-role`                | `NTFY_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
+| `cluster-drain-delay`         | `NTFY_CLUSTER_DRAIN_DELAY`         | *duration*                                          | `15s`             | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long a node withdraws: it is not ready but still serves everything, so the load balancer stops sending it requests before the node turns read-only. |
+| `cluster-drain-duration`      | `NTFY_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` closes them all at once. The service manager's stop timeout must be longer than the delay plus this. |
 | `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |
@@ -2690,7 +2691,7 @@ OPTIONS:
    --listen-https value, --listen_https value, -L value                                                                   ip:port used as HTTPS listen address [$NTFY_LISTEN_HTTPS]
    --listen-unix value, --listen_unix value, -U value                                                                     listen on unix socket path [$NTFY_LISTEN_UNIX]
    --listen-unix-mode value, --listen_unix_mode value                                                                     file permissions of unix socket, e.g. 0700 (default: system default) [$NTFY_LISTEN_UNIX_MODE]
-   --experimental-listen-admin-unix value, --experimental_listen_admin_unix value                                         experimental: unix socket path for credential-less local admin API access, e.g. /run/ntfy/admin.sock; empty or "-" disables it [$NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX]
+   --listen-admin-unix value, --listen_admin_unix value                                         experimental: unix socket path for credential-less local admin API access, e.g. /run/ntfy/admin.sock; empty or "-" disables it [$NTFY_LISTEN_ADMIN_UNIX]
    --key-file value, --key_file value, -K value                                                                           private key file, if listen-https is set [$NTFY_KEY_FILE]
    --cert-file value, --cert_file value, -E value                                                                         certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --firebase-key-file value, --firebase_key_file value, -F value                                                         Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]

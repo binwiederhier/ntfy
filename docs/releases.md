@@ -2356,6 +2356,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Bug fixes + maintenance:**
 
 * Do not send TCP keep-alive probes on the client listeners (`listen-http`, `listen-https`): Go sends one every 15 seconds on an idle connection by default, which, without a proxy in front of ntfy, woke phones holding a stream three times as often as ntfy's own keepalive event ([#2152](https://github.com/binwiederhier/ntfy/pull/2152))
+* The cluster and admin socket options lost their `experimental-` prefix, e.g. `cluster-listen` instead of `experimental-cluster-listen` (and `NTFY_CLUSTER_LISTEN`); the old names still work
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

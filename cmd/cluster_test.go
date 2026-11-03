@@ -72,7 +72,7 @@ func newTestClusterPair(t *testing.T) (app2Addr string) {
 func TestCLI_Cluster_Status(t *testing.T) {
 	addr := newTestClusterStatusServer(t)
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", addr, "--cluster-secret", "s3cret", "status"}))
 	out := stdout.String()
 	require.Contains(t, out, "nyc3-app-2")
 	require.Contains(t, out, "passive")
@@ -91,7 +91,7 @@ func TestCLI_Cluster_Status_ThisNodeInTheList(t *testing.T) {
 	}}}
 	addr := newTestClusterStatusServerFor(t, func() *cluster.Status { return status })
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", addr, "--cluster-secret", "s3cret", "status"}))
 	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
 	require.True(t, strings.HasPrefix(lines[0], "NODE "), "the table comes first:\n%s", stdout.String())
 	require.Regexp(t, `^nyc3-app-1 \(this node, leader\)\s+active\s+no\s`, lines[1])
@@ -102,7 +102,7 @@ func TestCLI_Cluster_Status_ThisNodeInTheList(t *testing.T) {
 func TestCLI_Cluster_Status_JSON(t *testing.T) {
 	addr := newTestClusterStatusServer(t)
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status", "--json"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", addr, "--cluster-secret", "s3cret", "status", "--json"}))
 	var status cluster.Status
 	require.Nil(t, json.Unmarshal(stdout.Bytes(), &status))
 	require.Equal(t, cluster.NodeID("nyc3-app-2"), status.NodeID)
@@ -114,14 +114,14 @@ func TestCLI_Cluster_Status_WildcardListen(t *testing.T) {
 	addr := newTestClusterStatusServer(t)
 	port := addr[strings.LastIndex(addr, ":"):]
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", port, "--experimental-cluster-secret", "s3cret", "status"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", port, "--cluster-secret", "s3cret", "status"}))
 	require.Contains(t, stdout.String(), "nyc3-app-2")
 }
 
 func TestCLI_Cluster_Status_WrongSecret(t *testing.T) {
 	addr := newTestClusterStatusServer(t)
 	app, _, _, _ := newTestApp()
-	err := app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "wrong", "status"})
+	err := app.Run([]string{"ntfy", "cluster", "--cluster-listen", addr, "--cluster-secret", "wrong", "status"})
 	require.ErrorContains(t, err, "401")
 }
 
@@ -136,7 +136,7 @@ func TestCLI_Cluster_StatusAll(t *testing.T) {
 	// received on the other, from a single command on either node
 	addr := newTestClusterPair(t)
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status", "--all"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", addr, "--cluster-secret", "s3cret", "status", "--all"}))
 	out := stdout.String()
 	require.Regexp(t, `nyc3-app-1\s+active\s+yes`, out) // Leader
 	require.Regexp(t, `nyc3-app-2\s+passive\s+no`, out)
@@ -154,7 +154,7 @@ func TestCLI_Cluster_StatusAll_PeerUnreachable(t *testing.T) {
 		}}}
 	})
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status", "--all"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", addr, "--cluster-secret", "s3cret", "status", "--all"}))
 	out := stdout.String()
 	require.Regexp(t, `nyc3-app-1 -> nyc3-app-2\s+10\s+0\s+1s ago\s+\?`, out)
 	require.Contains(t, out, "nyc3-app-2: cannot fetch its status")
@@ -163,7 +163,7 @@ func TestCLI_Cluster_StatusAll_PeerUnreachable(t *testing.T) {
 func TestCLI_Cluster_StatusAll_JSON(t *testing.T) {
 	addr := newTestClusterPair(t)
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status", "--all", "--json"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", addr, "--cluster-secret", "s3cret", "status", "--all", "--json"}))
 	var nodes []*clusterNodeStatus
 	require.Nil(t, json.Unmarshal(stdout.Bytes(), &nodes))
 	require.Len(t, nodes, 2)
@@ -183,12 +183,12 @@ func TestCLI_Cluster_Status_PeerLeft(t *testing.T) {
 		}
 	}
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", newTestClusterStatusServerFor(t, status(30)), "--experimental-cluster-secret", "s3cret", "status"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", newTestClusterStatusServerFor(t, status(30)), "--cluster-secret", "s3cret", "status"}))
 	require.Contains(t, stdout.String(), "last seen 30s ago")
 	require.Contains(t, stdout.String(), "nyc3-app-2: left the registry 30s ago")
 
 	app, _, stdout, _ = newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", newTestClusterStatusServerFor(t, status(3*3600)), "--experimental-cluster-secret", "s3cret", "status"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--cluster-listen", newTestClusterStatusServerFor(t, status(3*3600)), "--cluster-secret", "s3cret", "status"}))
 	require.Contains(t, stdout.String(), "last seen 3h0m0s ago")
 	require.NotContains(t, stdout.String(), "left the registry")
 }

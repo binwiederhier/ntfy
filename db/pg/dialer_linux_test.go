@@ -3,6 +3,7 @@ package pg
 import (
 	"context"
 	"net"
+	"path/filepath"
 	"syscall"
 	"testing"
 
@@ -52,4 +53,18 @@ func TestParseConnConfig_DialsWithTCPUserTimeout(t *testing.T) {
 	require.Nil(t, err)
 	require.Nil(t, sockErr)
 	require.Equal(t, int(tcpUserTimeout.Milliseconds()), timeout)
+}
+
+func TestParseConnConfig_DialsUnixSocket(t *testing.T) {
+	// TCP_USER_TIMEOUT does not exist for Unix sockets (host=/var/run/postgresql), so the dialer
+	// must not set it there, or every connection fails with "operation not supported"
+	path := filepath.Join(t.TempDir(), ".s.PGSQL.5432")
+	listener, err := net.Listen("unix", path)
+	require.Nil(t, err)
+	defer listener.Close()
+	config, err := parseConnConfig("postgres://user:pass@/db?host=" + filepath.Dir(path))
+	require.Nil(t, err)
+	conn, err := config.DialFunc(context.Background(), "unix", path)
+	require.Nil(t, err)
+	require.Nil(t, conn.Close())
 }

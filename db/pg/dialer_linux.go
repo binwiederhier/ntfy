@@ -2,6 +2,7 @@ package pg
 
 import (
 	"net"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -14,6 +15,9 @@ import (
 func newDialer() *net.Dialer {
 	return &net.Dialer{
 		Control: func(network, address string, c syscall.RawConn) error {
+			if !strings.HasPrefix(network, "tcp") {
+				return nil // Unix sockets (host=/var/run/postgresql) have no TCP_USER_TIMEOUT
+			}
 			var sockErr error
 			err := c.Control(func(fd uintptr) {
 				sockErr = unix.SetsockoptInt(int(fd), syscall.IPPROTO_TCP, unix.TCP_USER_TIMEOUT, int(tcpUserTimeout.Milliseconds()))

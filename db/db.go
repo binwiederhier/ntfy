@@ -18,7 +18,7 @@ const (
 
 // DB wraps a primary *sql.DB and optional read replicas. All standard query/exec methods
 // delegate to the primary. The ReadOnly() method returns a *sql.DB from the least busy healthy
-// replica, falling back to the primary if none is configured, healthy, or has a free connection.
+// replica, falling back to the primary if none is configured or healthy.
 type DB struct {
 	primary  *Host
 	replicas []*Host
@@ -113,8 +113,9 @@ func (d *DB) Stats() []*PoolStats {
 
 // ReadOnly returns a *sql.DB suitable for read-only queries: the healthy replica with the fewest
 // connections in use, round-robin among equally busy ones. A replica that stalls piles up
-// connections and stops getting new reads. If no replica is healthy or every replica's pool is
-// full (a read would wait for a connection), the primary is returned.
+// connections and stops getting new reads. If every replica's pool is full, the read waits for a
+// connection rather than moving to the primary, which takes every write. If no replica is healthy
+// or none is configured, the primary is returned.
 func (d *DB) ReadOnly() *sql.DB {
 	if len(d.replicas) == 0 {
 		return d.primary.DB
@@ -128,12 +129,9 @@ func (d *DB) ReadOnly() *sql.DB {
 		if !r.healthy.Load() {
 			continue
 		}
-		stats := r.DB.Stats()
-		if stats.MaxOpenConnections > 0 && stats.InUse >= stats.MaxOpenConnections {
-			continue
-		}
-		if best == nil || stats.InUse < bestInUse {
-			best, bestInUse = r, stats.InUse
+		inUse := r.DB.Stats().InUse
+		if best == nil || inUse < bestInUse {
+			best, bestInUse = r, inUse
 		}
 	}
 	if best == nil {

@@ -130,19 +130,26 @@ func TestDB_ReadOnly_RoundRobinWhenEquallyBusy(t *testing.T) {
 	require.Equal(t, 5, seen[r2])
 }
 
-func TestDB_ReadOnly_PrimaryWhenReplicaPoolsFull(t *testing.T) {
-	// A read on a full pool would wait for a connection; the primary serves it instead
+func TestDB_ReadOnly_ReplicaWhenReplicaPoolsFull(t *testing.T) {
+	// Full pools wait for a connection on the least busy replica; the primary, which takes every
+	// write, does not take the reads of stalled replicas
 	primary := openSQLite(t, "primary.db", 5)
-	replica := openSQLite(t, "replica.db", 1)
-	d := db.New(&db.Host{DB: primary}, []*db.Host{{DB: replica}})
+	r1 := openSQLite(t, "r1.db", 1)
+	r2 := openSQLite(t, "r2.db", 2)
+	d := db.New(&db.Host{DB: primary}, []*db.Host{{DB: r1}, {DB: r2}})
 	defer d.Close()
 	d.MarkReplicasHealthyForTest()
 
-	require.Same(t, replica, d.ReadOnly())
-	conn, err := replica.Conn(context.Background())
-	require.Nil(t, err)
-	defer conn.Close()
-	require.Same(t, primary, d.ReadOnly())
+	// Fill both pools, r1 with one connection, r2 with two
+	held := []*sql.DB{r1, r2, r2}
+	for _, replica := range held {
+		conn, err := replica.Conn(context.Background())
+		require.Nil(t, err)
+		defer conn.Close()
+	}
+	for i := 0; i < 10; i++ {
+		require.Same(t, r1, d.ReadOnly())
+	}
 }
 
 func TestDB_Stats_PingDuration(t *testing.T) {

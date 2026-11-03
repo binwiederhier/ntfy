@@ -439,8 +439,7 @@ To offload read-heavy queries from the primary database, you can optionally conf
 using the `database-replica-urls` option. When configured, non-critical read-only queries (e.g. fetching messages, checking access permissions, etc)
 go to the replica with the fewest connections in use (round-robin among equally busy ones), while all writes and
 correctness-critical reads continue to go to the primary. A replica that slows down piles up connections and stops
-getting new reads until it catches up. If a replica becomes unhealthy, or every replica's connection pool is full, ntfy
-falls back to the primary.
+getting new reads until it catches up. If every replica becomes unhealthy, ntfy falls back to the primary.
 You can also set this via the environment variable `NTFY_DATABASE_REPLICA_URLS` (comma-separated) or the command line
 flag `--database-replica-urls`.
 

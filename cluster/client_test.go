@@ -113,3 +113,30 @@ func TestClient_Health(t *testing.T) {
 	require.Error(t, err)
 	require.False(t, healthy)
 }
+
+func TestFetchNodeStatuses(t *testing.T) {
+	// The local view plus each live peer's, fetched with the secret; an unreachable peer is listed
+	// with its error, a dead one is skipped
+	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != StatusPath || r.Header.Get("X-Cluster-Secret") != "s3cret" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		require.Nil(t, json.NewEncoder(w).Encode(&Status{NodeID: "node-b", Role: RolePassive}))
+	}))
+	defer peer.Close()
+	local := &Status{NodeID: "node-a", Role: RoleActive, Peers: []*PeerStatus{
+		{NodeID: "node-b", AdvertiseURL: peer.URL, Live: true},
+		{NodeID: "node-c", AdvertiseURL: "http://127.0.0.1:1", Live: true},
+		{NodeID: "node-d", AdvertiseURL: "http://127.0.0.1:1", Live: false},
+	}}
+	nodes := FetchNodeStatuses(context.Background(), local, NewClient("s3cret", "node-a"), time.Second)
+	require.Len(t, nodes, 3)
+	require.Equal(t, NodeID("node-a"), nodes[0].NodeID)
+	require.Same(t, local, nodes[0].Status)
+	require.Equal(t, NodeID("node-b"), nodes[1].NodeID)
+	require.Equal(t, RolePassive, nodes[1].Status.Role)
+	require.Equal(t, NodeID("node-c"), nodes[2].NodeID)
+	require.Nil(t, nodes[2].Status)
+	require.NotEmpty(t, nodes[2].Error)
+}

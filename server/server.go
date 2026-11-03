@@ -127,6 +127,7 @@ var (
 	apiStatsPath                                         = "/v1/stats"
 	apiWebPushPath                                       = "/v1/webpush"
 	apiTiersPath                                         = "/v1/tiers"
+	apiClusterStatusPath                                 = "/v1/cluster/status" // Admin API on the main listener and the admin socket; peers query the cluster listener's own
 	apiUsersPath                                         = "/v1/users"
 	apiUsersAccessPath                                   = "/v1/users/access"
 	apiUsersTokensPath                                   = "/v1/users/tokens"
@@ -809,6 +810,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureAdmin(s.handleUsersTokensDelete)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPasswordResetPath {
 		return s.ensureAdmin(s.handleUsersPasswordReset)(w, r, v)
+	} else if r.Method == http.MethodGet && r.URL.Path == apiClusterStatusPath {
+		return s.ensureAdmin(s.handleClusterStatus)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiTiersPath && v.User().IsAdmin() {
 		return s.ensureAdmin(s.handleAdminTiersGet)(w, r, v) // Non-admins get the billing tiers, see below
 	} else if r.Method == http.MethodPost && r.URL.Path == apiTiersPath {

@@ -122,6 +122,10 @@ func (b *fakeCluster) Peers() cluster.Peers {
 	return b.peers
 }
 
+func (b *fakeCluster) Status() *cluster.Status {
+	return nil // Not served by the fake
+}
+
 func (b *fakeCluster) Members() []cluster.Member {
 	return nil // No test needs members
 }

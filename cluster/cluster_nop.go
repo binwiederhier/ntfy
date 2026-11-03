@@ -47,6 +47,10 @@ func (c *nopCluster) Peers() Peers {
 	return nil // A single node has no peers
 }
 
+func (c *nopCluster) Status() *Status {
+	return nil // A single node is not a cluster
+}
+
 func (c *nopCluster) SetDraining(_ bool) {
 	// Nothing to tell: there are no peers, and a single node never drains
 }

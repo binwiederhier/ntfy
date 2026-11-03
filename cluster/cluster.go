@@ -140,6 +140,9 @@ type Cluster interface {
 	// Peers().HasActive() tells whether there is somewhere for this node's clients to go. None
 	// single-node.
 	Peers() Peers
+	// Status reports this node's view of the cluster: its role and leadership, and per peer the
+	// batches sent there and received from there (see StatusPath). Nil single-node.
+	Status() *Status
 	// Close stops the cluster and releases its resources.
 	Close() error
 }

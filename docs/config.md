@@ -2378,7 +2378,8 @@ once.
 `/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,
 e.g. because a firewall drops the cluster port one way, keeps both nodes healthy while messages published on one of them
 reach the other only late, through the database. To see each node's view of its peers, run `ntfy cluster status` on the
-node. It reads `cluster-listen` and `cluster-secret` from the server config, and lists the
+node, as root or as a member of the server's group (usually `ntfy`). It asks the server over its
+[admin socket](#admin-socket), so `listen-admin-unix` must be set (it is read from the server config), and lists the
 node itself (its role, and whether it leads), then per peer the message batches sent there and received from there:
 
 ```
@@ -2391,7 +2392,7 @@ Problems:
   nyc3-app-1: no batch accepted, 219 failed; last error 10s ago: Post "http://10.108.0.2:2587/v1/cluster/message": context deadline exceeded
 ```
 
-`ntfy cluster status --all` also fetches every live peer's view and lists each link between the nodes once, with what
+`ntfy cluster status --all` has the server also fetch every live peer's view and lists each link between the nodes once, with what
 the sender sent next to what the receiver received, so a one-way link shows from either node:
 
 ```

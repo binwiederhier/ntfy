@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/ban"
+	"heckel.io/ntfy/v2/cluster"
 	dbtest "heckel.io/ntfy/v2/db/test"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
@@ -1658,4 +1659,46 @@ func captureLog(t *testing.T, f func()) string {
 	}()
 	f()
 	return buf.String()
+}
+
+func TestAdminSocket_ClusterStatus(t *testing.T) {
+	// The cluster status is served over the admin socket, without the cluster secret; with all=1,
+	// the node fetches its live peers' views itself
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = "node-a"
+	conf.ClusterListen = "127.0.0.1:0"
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	_, socket := newTestServerWithAdminSocket(t, conf)
+	client := adminSocketClient(socket)
+
+	resp, err := client.Get("http://ntfy/v1/cluster/status")
+	require.Nil(t, err)
+	require.Equal(t, 200, resp.StatusCode)
+	var status cluster.Status
+	require.Nil(t, json.NewDecoder(resp.Body).Decode(&status))
+	resp.Body.Close()
+	require.Equal(t, cluster.NodeID("node-a"), status.NodeID)
+
+	resp, err = client.Get("http://ntfy/v1/cluster/status?all=1")
+	require.Nil(t, err)
+	require.Equal(t, 200, resp.StatusCode)
+	var nodes []*cluster.NodeStatus
+	require.Nil(t, json.NewDecoder(resp.Body).Decode(&nodes))
+	resp.Body.Close()
+	require.Len(t, nodes, 1)
+	require.Equal(t, cluster.NodeID("node-a"), nodes[0].NodeID)
+	require.Equal(t, cluster.NodeID("node-a"), nodes[0].Status.NodeID)
+}
+
+func TestAdminSocket_ClusterStatus_NotClustered(t *testing.T) {
+	_, socket := newTestServerWithAdminSocket(t, newTestConfigWithAuthFile(t, ""))
+	resp, err := adminSocketClient(socket).Get("http://ntfy/v1/cluster/status")
+	require.Nil(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, 400, resp.StatusCode)
+	var apiErr errHTTP
+	require.Nil(t, json.NewDecoder(resp.Body).Decode(&apiErr))
+	require.Equal(t, errHTTPBadRequestClusterNotEnabled.Code, apiErr.Code)
 }

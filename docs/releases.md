@@ -2355,6 +2355,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
+* `ntfy cluster status` asks the server over its admin socket (`listen-admin-unix`) instead of the cluster listener, so it no longer needs the cluster secret or root, only membership in the server's group; with `--all`, the server fetches its peers' views ([#2155](https://github.com/binwiederhier/ntfy/pull/2155))
 * Do not send TCP keep-alive probes on the client listeners (`listen-http`, `listen-https`): Go sends one every 15 seconds on an idle connection by default, which, without a proxy in front of ntfy, woke phones holding a stream three times as often as ntfy's own keepalive event ([#2152](https://github.com/binwiederhier/ntfy/pull/2152))
 * `ntfy cluster status` lists the node itself as the first row of the table (marked "this node", and "leader" if it leads) instead of a line above it ([#2153](https://github.com/binwiederhier/ntfy/pull/2153))
 * The cluster and admin socket options lost their `experimental-` prefix, e.g. `cluster-listen` instead of `experimental-cluster-listen` (and `NTFY_CLUSTER_LISTEN`); the old names still work ([#2154](https://github.com/binwiederhier/ntfy/pull/2154))

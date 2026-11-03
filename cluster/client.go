@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -133,4 +135,38 @@ func statusURL(baseURL string) string {
 // healthURL derives the peer's health endpoint URL from its advertise URL.
 func healthURL(advertiseURL string) string {
 	return strings.TrimRight(advertiseURL, "/") + HealthPath
+}
+
+// FetchNodeStatuses returns every node's view of the cluster: the given local status, and that of
+// each live peer, fetched from its advertise URL with peerTimeout each. A peer that cannot be
+// fetched is listed with the error. Sorted by node ID.
+func FetchNodeStatuses(ctx context.Context, local *Status, client *Client, peerTimeout time.Duration) []*NodeStatus {
+	nodes := []*NodeStatus{{NodeID: local.NodeID, Status: local}}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	for _, p := range local.Peers {
+		if !p.Live || p.AdvertiseURL == "" {
+			continue
+		}
+		wg.Add(1)
+		go func(p *PeerStatus) {
+			defer wg.Done()
+			node := &NodeStatus{NodeID: p.NodeID}
+			ctx, cancel := context.WithTimeout(ctx, peerTimeout)
+			defer cancel()
+			if status, err := client.Status(ctx, p.AdvertiseURL); err != nil {
+				node.Error = err.Error()
+			} else {
+				node.Status = status
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			nodes = append(nodes, node)
+		}(p)
+	}
+	wg.Wait()
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].NodeID < nodes[j].NodeID
+	})
+	return nodes
 }

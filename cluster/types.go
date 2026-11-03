@@ -69,6 +69,13 @@ type Status struct {
 	Peers   []*PeerStatus `json:"peers"`
 }
 
+// NodeStatus is one node's view in a status of all nodes: its status, or why it could not be fetched
+type NodeStatus struct {
+	NodeID NodeID  `json:"node_id"`
+	Status *Status `json:"status,omitempty"`
+	Error  string  `json:"error,omitempty"`
+}
+
 // PeerStatus is one peer as seen from this node: every live peer, plus any peer this node has
 // exchanged batches with since it started (Live false once it left the registry)
 type PeerStatus struct {

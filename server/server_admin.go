@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	apiTierReset           = "-" // Tier value that removes a user's tier (PUT /v1/users); same marker the CLI uses
-	adminSocketDirMode     = fs.FileMode(0750)
-	adminSocketDialTimeout = time.Second // Used to detect a stale socket file (nobody listening)
+	apiTierReset             = "-" // Tier value that removes a user's tier (PUT /v1/users); same marker the CLI uses
+	adminSocketDirMode       = fs.FileMode(0750)
+	adminSocketDialTimeout   = time.Second     // Used to detect a stale socket file (nobody listening)
+	clusterStatusPeerTimeout = 5 * time.Second // How long a node waits for each peer's view in the status of all nodes
 )
 
 var (
@@ -34,6 +35,7 @@ var (
 		apiUsersTokensPath,
 		apiUsersPasswordResetPath,
 		apiTiersPath,
+		apiClusterStatusPath,
 	}
 
 	// adminSocketUser is the synthetic admin every socket request runs as. Its name is one that
@@ -523,6 +525,20 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 		return mapUserErrorToHTTP(err)
 	}
 	return s.writeJSON(w, newSuccessResponse())
+}
+
+// handleClusterStatus returns this node's view of the cluster, or with all=1 every live node's
+// view, fetched from the peers with the cluster secret, so the caller does not need it
+func (s *Server) handleClusterStatus(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+	status := s.cluster.Status()
+	if status == nil {
+		return errHTTPBadRequestClusterNotEnabled
+	}
+	if readBoolParam(r, false, "all") {
+		client := cluster.NewClient(s.config.ClusterSecret, status.NodeID)
+		return s.writeJSON(w, cluster.FetchNodeStatuses(r.Context(), status, client, clusterStatusPeerTimeout))
+	}
+	return s.writeJSON(w, status)
 }
 
 // listenAdminSocket creates the socket's directory, removes a stale socket file (one with no

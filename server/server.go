@@ -505,23 +505,13 @@ func (s *Server) Run() error {
 		httpServer := &http.Server{Addr: addr, Handler: mux}
 		s.httpServers = append(s.httpServers, httpServer)
 		go func() {
-			listener, err := listenTCP(addr)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			errChan <- httpServer.Serve(listener)
+			errChan <- httpServer.ListenAndServe()
 		}()
 	}
 	if s.config.ListenHTTPS != "" {
 		s.httpsServer = &http.Server{Addr: s.config.ListenHTTPS, Handler: mux}
 		go func() {
-			listener, err := listenTCP(s.config.ListenHTTPS)
-			if err != nil {
-				errChan <- err
-				return
-			}
-			errChan <- s.httpsServer.ServeTLS(listener, s.config.CertFile, s.config.KeyFile)
+			errChan <- s.httpsServer.ListenAndServeTLS(s.config.CertFile, s.config.KeyFile)
 		}()
 	}
 	if s.config.ListenUnix != "" {

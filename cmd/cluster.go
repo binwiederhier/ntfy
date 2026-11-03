@@ -28,13 +28,13 @@ func init() {
 var flagsCluster = append(
 	append([]cli.Flag{}, flagsDefault...),
 	&cli.StringFlag{Name: "config", Aliases: []string{"c"}, EnvVars: []string{"NTFY_CONFIG_FILE"}, Value: server.DefaultConfigFile, DefaultText: server.DefaultConfigFile, Usage: "config file"},
-	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-listen-admin-unix", Aliases: []string{"experimental_listen_admin_unix"}, EnvVars: []string{"NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX"}, Usage: "the server's admin socket, which serves the status"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-admin-unix", Aliases: []string{"listen_admin_unix", "experimental-listen-admin-unix", "experimental_listen_admin_unix"}, EnvVars: []string{"NTFY_LISTEN_ADMIN_UNIX", "NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX"}, Usage: "the server's admin socket, which serves the status"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "auth-file", Aliases: []string{"auth_file", "H"}, EnvVars: []string{"NTFY_AUTH_FILE"}, Usage: "auth database file, whose owner may own the admin socket"}),
 )
 
 var cmdCluster = &cli.Command{
 	Name:      "cluster",
-	Usage:     "Show the state of an experimental cluster node",
+	Usage:     "Show the state of a cluster node",
 	UsageText: "ntfy cluster status [--all] [--json]",
 	Flags:     flagsCluster,
 	Before:    initConfigFileInputSourceFunc("config", flagsCluster, initLogFunc),
@@ -55,7 +55,7 @@ leadership, and per peer the message batches it sent there and received from the
 A link that only works one way (e.g. a firewall dropping the cluster port in one direction)
 shows as failed batches on the sending node and nothing received on the other one; it does
 not show in /v1/health. Run this on the node itself, as root or as a member of the server's
-group (usually ntfy): it asks the server over the admin socket (experimental-listen-admin-unix,
+group (usually ntfy): it asks the server over the admin socket (listen-admin-unix,
 read from the server config).
 
 With --all, the server also fetches every live peer's view and shows each link between the
@@ -103,9 +103,9 @@ func execClusterStatus(c *cli.Context) error {
 
 // newClusterStatusClient returns a client for the server's admin socket, which must be enabled
 func newClusterStatusClient(c *cli.Context) (*socketClient, error) {
-	socket := c.String("experimental-listen-admin-unix")
+	socket := c.String("listen-admin-unix")
 	if socket == "" || socket == "-" {
-		return nil, errors.New("the admin socket is not enabled on this server, set experimental-listen-admin-unix in the server config (e.g. /run/ntfy/admin.sock) and restart it")
+		return nil, errors.New("the admin socket is not enabled on this server, set listen-admin-unix in the server config (e.g. /run/ntfy/admin.sock) and restart it")
 	}
 	if err := checkAdminSocketOwner(socket, c.String("auth-file")); err != nil {
 		return nil, err
@@ -115,11 +115,11 @@ func newClusterStatusClient(c *cli.Context) (*socketClient, error) {
 
 // clusterStatusError turns an admin API error into what to do about it
 func clusterStatusError(c *cli.Context, err error) error {
-	socket := c.String("experimental-listen-admin-unix")
+	socket := c.String("listen-admin-unix")
 	var apiErr *apiError
 	switch {
 	case errors.As(err, &apiErr) && apiErr.Code == apiErrCodeClusterNotEnabled:
-		return errors.New("clustering is not enabled on this node (experimental-cluster-listen is not set)")
+		return errors.New("clustering is not enabled on this node (cluster-listen is not set)")
 	case errors.Is(err, fs.ErrPermission):
 		return fmt.Errorf("permission denied on the admin socket %s, run this command as root or as a member of the server's group (usually ntfy)", socket)
 	case errors.Is(err, errSocketUnreachable):
@@ -129,20 +129,17 @@ func clusterStatusError(c *cli.Context, err error) error {
 }
 
 func printClusterStatus(w io.Writer, status *cluster.Status) {
-	leader, healthy := "not leader", "healthy"
+	// This node first, then its peers; the link columns are the peers' only
+	self, live := string(status.NodeID)+" (this node)", "yes"
 	if status.Leader {
-		leader = "leader"
+		self = string(status.NodeID) + " (this node, leader)"
 	}
 	if !status.Healthy {
-		healthy = "NOT healthy (registry heartbeat stale)"
-	}
-	fmt.Fprintf(w, "Node %s: %s, %s, %s\n\n", status.NodeID, status.Role, leader, healthy)
-	if len(status.Peers) == 0 {
-		fmt.Fprintln(w, "No peers.")
-		return
+		live = "no"
 	}
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "PEER\tROLE\tLIVE\tHEARTBEAT\tSENT OK\tFAILED\tQUEUED\tDROPPED\tLAST SENT\tRECEIVED\tLAST RECEIVED")
+	fmt.Fprintln(tw, "NODE\tROLE\tLIVE\tHEARTBEAT\tSENT OK\tFAILED\tQUEUED\tDROPPED\tLAST SENT\tRECEIVED\tLAST RECEIVED")
+	fmt.Fprintf(tw, "%s\t%s\t%s\t-\t-\t-\t-\t-\t-\t-\t-\n", self, status.Role, live)
 	for _, p := range status.Peers {
 		live, heartbeat := "no", "last seen "+clusterStatusAge(status.Time, p.LastSeen)
 		if p.Live {
@@ -153,6 +150,9 @@ func printClusterStatus(w io.Writer, status *cluster.Status) {
 	}
 	tw.Flush()
 	problems := clusterStatusProblems(status, "")
+	if !status.Healthy {
+		problems = append([]string{fmt.Sprintf("%s (this node): not healthy, its registry heartbeat is stale", status.NodeID)}, problems...)
+	}
 	if len(problems) == 0 {
 		return
 	}

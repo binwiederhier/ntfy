@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -85,7 +86,7 @@ func testClusterPairNodes() []*cluster.NodeStatus {
 func TestCLI_Cluster_Status(t *testing.T) {
 	socket := newTestClusterStatusSocket(t)
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", socket, "status"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", socket, "status"}))
 	out := stdout.String()
 	require.Contains(t, out, "nyc3-app-2")
 	require.Contains(t, out, "passive")
@@ -97,10 +98,25 @@ func TestCLI_Cluster_Status(t *testing.T) {
 	require.Contains(t, out, "nyc3-app-1: no batch accepted") // The warning that matters
 }
 
+func TestCLI_Cluster_Status_ThisNodeInTheList(t *testing.T) {
+	// The node itself is the table's first row, not a line above it; a leader and an unhealthy node say so
+	status := &cluster.Status{NodeID: "nyc3-app-1", Role: cluster.RoleActive, Leader: true, Healthy: false, Time: 1792330000, Peers: []*cluster.PeerStatus{{
+		NodeID: "nyc3-app-2", Role: cluster.RolePassive, Live: true, HeartbeatAge: 1, Out: cluster.PeerOutbound{BatchesOK: 7, LastOK: 1792329999},
+	}}}
+	socket := newTestClusterStatusSocketFor(t, func() *cluster.Status { return status }, nil)
+	app, _, stdout, _ := newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", socket, "status"}))
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	require.True(t, strings.HasPrefix(lines[0], "NODE "), "the table comes first:\n%s", stdout.String())
+	require.Regexp(t, `^nyc3-app-1 \(this node, leader\)\s+active\s+no\s`, lines[1])
+	require.Regexp(t, `^nyc3-app-2\s+passive\s+yes\s+1s ago\s+7\s`, lines[2])
+	require.Contains(t, stdout.String(), "nyc3-app-1 (this node): not healthy, its registry heartbeat is stale")
+}
+
 func TestCLI_Cluster_Status_JSON(t *testing.T) {
 	socket := newTestClusterStatusSocket(t)
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", socket, "status", "--json"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", socket, "status", "--json"}))
 	var status cluster.Status
 	require.Nil(t, json.Unmarshal(stdout.Bytes(), &status))
 	require.Equal(t, cluster.NodeID("nyc3-app-2"), status.NodeID)
@@ -116,13 +132,13 @@ func TestCLI_Cluster_Status_AdminSocketNotEnabled(t *testing.T) {
 func TestCLI_Cluster_Status_ClusterNotEnabled(t *testing.T) {
 	socket := newTestClusterStatusSocketFor(t, func() *cluster.Status { return nil }, nil)
 	app, _, _, _ := newTestApp()
-	err := app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", socket, "status"})
+	err := app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", socket, "status"})
 	require.ErrorContains(t, err, "clustering is not enabled")
 }
 
 func TestCLI_Cluster_Status_ServerNotRunning(t *testing.T) {
 	app, _, _, _ := newTestApp()
-	err := app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", filepath.Join(t.TempDir(), "admin.sock"), "status"})
+	err := app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", filepath.Join(t.TempDir(), "admin.sock"), "status"})
 	require.ErrorContains(t, err, "cannot reach the server on its admin socket")
 }
 
@@ -131,7 +147,7 @@ func TestCLI_Cluster_StatusAll(t *testing.T) {
 	// received on the other, from a single command on either node
 	socket := newTestClusterStatusSocketFor(t, func() *cluster.Status { return testClusterStatus }, testClusterPairNodes)
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", socket, "status", "--all"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", socket, "status", "--all"}))
 	out := stdout.String()
 	require.Regexp(t, `nyc3-app-1\s+active\s+yes`, out) // Leader
 	require.Regexp(t, `nyc3-app-2\s+passive\s+no`, out)
@@ -150,7 +166,7 @@ func TestCLI_Cluster_StatusAll_PeerUnreachable(t *testing.T) {
 		return []*cluster.NodeStatus{{NodeID: "nyc3-app-1", Status: app1}, {NodeID: "nyc3-app-2", Error: "connection refused"}}
 	})
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", socket, "status", "--all"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", socket, "status", "--all"}))
 	out := stdout.String()
 	require.Regexp(t, `nyc3-app-1 -> nyc3-app-2\s+10\s+0\s+1s ago\s+\?`, out)
 	require.Contains(t, out, "nyc3-app-2: cannot fetch its status")
@@ -159,7 +175,7 @@ func TestCLI_Cluster_StatusAll_PeerUnreachable(t *testing.T) {
 func TestCLI_Cluster_StatusAll_JSON(t *testing.T) {
 	socket := newTestClusterStatusSocketFor(t, func() *cluster.Status { return testClusterStatus }, testClusterPairNodes)
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", socket, "status", "--all", "--json"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", socket, "status", "--all", "--json"}))
 	var nodes []*cluster.NodeStatus
 	require.Nil(t, json.Unmarshal(stdout.Bytes(), &nodes))
 	require.Len(t, nodes, 2)
@@ -179,12 +195,12 @@ func TestCLI_Cluster_Status_PeerLeft(t *testing.T) {
 		}
 	}
 	app, _, stdout, _ := newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", newTestClusterStatusSocketFor(t, status(30), nil), "status"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", newTestClusterStatusSocketFor(t, status(30), nil), "status"}))
 	require.Contains(t, stdout.String(), "last seen 30s ago")
 	require.Contains(t, stdout.String(), "nyc3-app-2: left the registry 30s ago")
 
 	app, _, stdout, _ = newTestApp()
-	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-listen-admin-unix", newTestClusterStatusSocketFor(t, status(3*3600), nil), "status"}))
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--listen-admin-unix", newTestClusterStatusSocketFor(t, status(3*3600), nil), "status"}))
 	require.Contains(t, stdout.String(), "last seen 3h0m0s ago")
 	require.NotContains(t, stdout.String(), "left the registry")
 }

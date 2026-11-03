@@ -31,7 +31,7 @@
 # listen-unix: <socket-path>
 # listen-unix-mode: <linux permissions, e.g. 0700>
 
-# Experimental: local admin socket that serves the admin API without credentials. Whoever can open the
+# Local admin socket that serves the admin API without credentials. Whoever can open the
 # socket (mode 0660: the ntfy user and group, and root) can manage users without a password. Off by default.
 # The socket is only opened if auth-file or database-url is set. Not available on Windows.
 #
@@ -77,7 +77,7 @@
 #   - "postgres://user:pass@replica1:5432/ntfy"
 #   - "postgres://user:pass@replica2:5432/ntfy"
 
-# EXPERIMENTAL: Clustering options. Setting "cluster-listen" runs this server as one
+# Clustering options. Setting "cluster-listen" runs this server as one
 # node of a cluster that shares a PostgreSQL database. Messages a node misses (e.g. a dropped
 # node-to-node batch) are recovered from the database. Request rate limits are enforced per node,
 # not across the cluster; daily message, e-mail and phone call limits are shared through the

@@ -84,6 +84,21 @@ func TestCLI_Cluster_Status(t *testing.T) {
 	require.Contains(t, out, "nyc3-app-1: no batch accepted") // The warning that matters
 }
 
+func TestCLI_Cluster_Status_ThisNodeInTheList(t *testing.T) {
+	// The node itself is the table's first row, not a line above it; a leader and an unhealthy node say so
+	status := &cluster.Status{NodeID: "nyc3-app-1", Role: cluster.RoleActive, Leader: true, Healthy: false, Time: 1792330000, Peers: []*cluster.PeerStatus{{
+		NodeID: "nyc3-app-2", Role: cluster.RolePassive, Live: true, HeartbeatAge: 1, Out: cluster.PeerOutbound{BatchesOK: 7, LastOK: 1792329999},
+	}}}
+	addr := newTestClusterStatusServerFor(t, func() *cluster.Status { return status })
+	app, _, stdout, _ := newTestApp()
+	require.Nil(t, app.Run([]string{"ntfy", "cluster", "--experimental-cluster-listen", addr, "--experimental-cluster-secret", "s3cret", "status"}))
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	require.True(t, strings.HasPrefix(lines[0], "NODE "), "the table comes first:\n%s", stdout.String())
+	require.Regexp(t, `^nyc3-app-1 \(this node, leader\)\s+active\s+no\s`, lines[1])
+	require.Regexp(t, `^nyc3-app-2\s+passive\s+yes\s+1s ago\s+7\s`, lines[2])
+	require.Contains(t, stdout.String(), "nyc3-app-1 (this node): not healthy, its registry heartbeat is stale")
+}
+
 func TestCLI_Cluster_Status_JSON(t *testing.T) {
 	addr := newTestClusterStatusServer(t)
 	app, _, stdout, _ := newTestApp()

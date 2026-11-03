@@ -2376,15 +2376,14 @@ once.
 `/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,
 e.g. because a firewall drops the cluster port one way, keeps both nodes healthy while messages published on one of them
 reach the other only late, through the database. To see each node's view of its peers, run `ntfy cluster status` on the
-node. It reads `experimental-cluster-listen` and `experimental-cluster-secret` from the server config, and shows per
-peer the message batches sent there and received from there:
+node. It reads `experimental-cluster-listen` and `experimental-cluster-secret` from the server config, and lists the
+node itself (its role, and whether it leads), then per peer the message batches sent there and received from there:
 
 ```
 $ ntfy cluster status
-Node nyc3-app-2: passive, not leader, healthy
-
-PEER        ROLE    LIVE  HEARTBEAT  SENT OK  FAILED  QUEUED  DROPPED  LAST SENT  RECEIVED  LAST RECEIVED
-nyc3-app-1  active  yes   2s ago     0        219     0       0        never      5120      1s ago
+NODE                    ROLE     LIVE  HEARTBEAT  SENT OK  FAILED  QUEUED  DROPPED  LAST SENT  RECEIVED  LAST RECEIVED
+nyc3-app-2 (this node)  passive  yes   -          -        -       -       -        -          -         -
+nyc3-app-1              active   yes   2s ago     0        219     0       0        never      5120      1s ago
 
 Problems:
   nyc3-app-1: no batch accepted, 219 failed; last error 10s ago: Post "http://10.108.0.2:2587/v1/cluster/message": context deadline exceeded

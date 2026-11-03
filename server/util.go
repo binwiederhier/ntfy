@@ -6,12 +6,20 @@ import (
 	"fmt"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"net/netip"
 	"regexp"
 	"strings"
+	"time"
 
 	"heckel.io/ntfy/v2/util"
+)
+
+const (
+	tcpKeepAliveIdleMargin    = 30 * time.Second // How much longer than keepalive-interval a connection is idle before the first probe
+	tcpKeepAliveProbeInterval = 15 * time.Second
+	tcpKeepAliveProbeCount    = 4
 )
 
 var (
@@ -205,4 +213,26 @@ func isMarkdownContentType(contentType string) bool {
 		return strings.ToLower(contentType) == "text/markdown"
 	}
 	return strings.ToLower(mediaType) == "text/markdown"
+}
+
+// listenTCP listens for the clients (listen-http, listen-https) with the probe timing of
+// tcpKeepAliveConfig instead of Go's default (a probe after 15s idle)
+func listenTCP(addr string, keepaliveInterval time.Duration) (net.Listener, error) {
+	lc := &net.ListenConfig{KeepAliveConfig: tcpKeepAliveConfig(keepaliveInterval)}
+	return lc.Listen(context.Background(), "tcp", addr)
+}
+
+// tcpKeepAliveConfig returns TCP keep-alive probes that start only after a connection has been idle
+// for longer than ntfy's keepalive event (keepalive-interval). The kernel counts idle time from the
+// last packet received, so a stream, whose client acknowledges every keepalive event, is never
+// probed: to a phone, each probe would be a radio wake-up. An idle keep-alive connection between
+// two requests still is, so one from a client that silently went away is closed after
+// ~keepalive-interval+90s; ntfy's HTTP servers have no idle timeout that would do it.
+func tcpKeepAliveConfig(keepaliveInterval time.Duration) net.KeepAliveConfig {
+	return net.KeepAliveConfig{
+		Enable:   true,
+		Idle:     keepaliveInterval + tcpKeepAliveIdleMargin,
+		Interval: tcpKeepAliveProbeInterval,
+		Count:    tcpKeepAliveProbeCount,
+	}
 }

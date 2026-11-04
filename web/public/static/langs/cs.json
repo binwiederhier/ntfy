@@ -459,5 +459,10 @@
     "account_basics_emails_dialog_check_inbox": "Zkontrolujte svou schránku a klikněte na ověřovací odkaz pro potvrzení této e-mailové adresy. Dokud tak neučiníte, bude se zobrazovat jako neověřená.",
     "account_basics_tier_provisioned": "Zřízený",
     "account_usage_emails_none": "S tímto účtem nelze odesílat žádná e-mailová oznámení",
-    "prefs_users_dialog_base_url_invalid": "Neplatný formát adresy URL. Musí začínat textem http:// nebo https://"
+    "prefs_users_dialog_base_url_invalid": "Neplatný formát adresy URL. Musí začínat textem http:// nebo https://",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Jméno",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Právní upozornění",
+    "prefs_privacy_policy": "Zásady ochrany osobních údajů"
 }

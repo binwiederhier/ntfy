@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "Kiépített",
     "prefs_users_dialog_base_url_exists": "Már létezik egy felhasználó ehhez a szolgáltatás URL címéhez.",
     "account_usage_emails_none": "Ezzel a fiókkal nem küldhetők e-mail értesítések",
-    "prefs_users_dialog_base_url_invalid": "érvénytelen URL-formátum. http:// vagy https:// előtaggal kell kezdődnie"
+    "prefs_users_dialog_base_url_invalid": "érvénytelen URL-formátum. http:// vagy https:// előtaggal kell kezdődnie",
+    "prefs_legal_contact_title": "Kapcsolat:",
+    "prefs_legal_name": "Név",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Jogi nyilatkozat",
+    "prefs_privacy_policy": "Adatvédelmi szabályzat"
 }

@@ -53,7 +53,10 @@ class VersionChecker {
 
       const data = await response.json();
       const currentHash = data.config_hash;
-
+      if (data.legal_name) localStorage.setItem('operatorName', data.legal_name);
+      if (data.legal_email) localStorage.setItem('operatorEmail', data.legal_email);
+      if (data.privacy_policy_url) localStorage.setItem('privacyUrl', data.privacy_policy_url);
+      if (data.legal_notice_url) localStorage.setItem('imprintUrl', data.legal_notice_url);
       if (currentHash && currentHash !== this.initialConfigHash) {
         console.log("[VersionChecker] Version or config changed, showing banner");
         if (this.listener) {

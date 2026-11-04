@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "Bereitgestellt",
     "account_usage_emails_none": "Mit diesem Konto können keine E-Mail-Benachrichtigungen gesendet werden",
     "prefs_users_dialog_base_url_invalid": "Ungültiges URL-Format. Muss mit http:// oder https:// beginnen",
-    "prefs_users_dialog_base_url_exists": "Für diese Service-URL existiert bereits ein Benutzer"
+    "prefs_users_dialog_base_url_exists": "Für diese Service-URL existiert bereits ein Benutzer",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Name",
+    "prefs_legal_email": "E-Mail",
+    "prefs_legal_notice": "Impressum",
+    "prefs_privacy_policy": "Datenschutzerklärung"
 }

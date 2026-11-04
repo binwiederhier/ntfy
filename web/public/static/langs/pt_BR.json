@@ -460,5 +460,10 @@
     "common_close": "Fechar",
     "reset_password_request_title": "Redefinir senha",
     "account_basics_emails_chip_actions_primary": "E-mail primário, usado como seu endereço de e-mail padrão. Clique para ver ações.",
-    "account_basics_tier_provisioned": "Provisionado"
+    "account_basics_tier_provisioned": "Provisionado",
+    "prefs_legal_contact_title": "Contato:",
+    "prefs_legal_name": "Nome",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Aviso legal",
+    "prefs_privacy_policy": "Política de privacidade"
 }

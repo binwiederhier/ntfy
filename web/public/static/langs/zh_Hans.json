@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "已开通",
     "account_usage_emails_none": "无法向此账户发送邮件通知",
     "prefs_users_dialog_base_url_invalid": "无效的 URL 格式。必须以 http:// 或 https:// 开头",
-    "prefs_users_dialog_base_url_exists": "此服务 URL 已存在一名用户"
+    "prefs_users_dialog_base_url_exists": "此服务 URL 已存在一名用户",
+    "prefs_legal_contact_title": "联系方式：",
+    "prefs_legal_name": "名称",
+    "prefs_legal_email": "电子邮件",
+    "prefs_legal_notice": "法律声明",
+    "prefs_privacy_policy": "隐私政策"
 }

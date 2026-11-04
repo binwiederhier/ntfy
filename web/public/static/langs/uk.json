@@ -460,5 +460,10 @@
     "account_basics_emails_chip_actions_verified": "Можна використовувати для сповіщень. Натисніть, щоб переглянути дії.",
     "account_basics_emails_chip_actions_unverified": "Непідтверджена адреса, перевірте свою поштову скриньку для підтвердження. Натисніть, щоб переглянути дії.",
     "account_basics_emails_unverified": "неперевірена",
-    "account_basics_tier_provisioned": "Створений конфігурацією"
+    "account_basics_tier_provisioned": "Створений конфігурацією",
+    "prefs_legal_contact_title": "Контакт:",
+    "prefs_legal_name": "Ім’я",
+    "prefs_legal_email": "Електронна пошта",
+    "prefs_legal_notice": "Правова інформація",
+    "prefs_privacy_policy": "Політика конфіденційності"
 }

@@ -22,6 +22,7 @@ connection to a database node that went away (e.g. during a resize) fails after 
 **Features:**
 
 * Send read-only queries to the least busy read replica instead of round-robin, so a replica that stalls stops getting new reads; the new `ntfy_db_ping_seconds` metric shows how long each database takes to answer its health check ([#2156](https://github.com/binwiederhier/ntfy/pull/2156))
+* The cluster and admin socket options lost their `experimental-` prefix, e.g. `cluster-listen` instead of `experimental-cluster-listen` (and `NTFY_CLUSTER_LISTEN`); the old names still work ([#2154](https://github.com/binwiederhier/ntfy/pull/2154))
 
 **Bug fixes + maintenance:**
 

@@ -105,7 +105,7 @@ func TestNew_Role(t *testing.T) {
 	conf.Role = "pasive"
 	_, err = New(conf, pool, nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "experimental-cluster-role")
+	require.Contains(t, err.Error(), "cluster-role")
 }
 
 func TestDeliver_LineLimitBelowTheScanBufferIsEnforced(t *testing.T) {

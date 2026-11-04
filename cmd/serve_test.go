@@ -499,7 +499,7 @@ func TestCLI_Serve_ListenAdminUnixDisabled(t *testing.T) {
 	configFile := newEmptyFile(t)
 	go func() {
 		app, _, _, _ := newTestApp()
-		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile, "--auth-file=" + filepath.Join(dir, "user.db"), "--experimental-listen-admin-unix=-"})
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile, "--auth-file=" + filepath.Join(dir, "user.db"), "--listen-admin-unix=-"})
 		require.Nil(t, err)
 	}()
 	for i := 0; i < 40 && !util.FileExists(sockFile); i++ {
@@ -515,7 +515,7 @@ func TestCLI_Serve_ExperimentalListenAdminUnix(t *testing.T) {
 	configFile := newEmptyFile(t)
 	go func() {
 		app, _, _, _ := newTestApp()
-		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + filepath.Join(dir, "ntfy.sock"), "--auth-file=" + filepath.Join(dir, "user.db"), "--experimental-listen-admin-unix=" + adminSockFile})
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + filepath.Join(dir, "ntfy.sock"), "--auth-file=" + filepath.Join(dir, "user.db"), "--listen-admin-unix=" + adminSockFile})
 		require.Nil(t, err)
 	}()
 	for i := 0; i < 40 && !util.FileExists(adminSockFile); i++ {
@@ -644,59 +644,79 @@ func TestIP_Host_Parsing(t *testing.T) {
 	}
 }
 
+func TestCLI_Serve_ClusterFlagsWithoutExperimentalPrefix(t *testing.T) {
+	// The cluster and admin socket flags dropped "experimental-"; the old names keep working on the
+	// command line and in server.yml, so existing configs need no change
+	configFile := newEmptyFile(t)
+	app, _, _, _ := newTestApp()
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=127.0.0.1:2587"})
+	require.ErrorContains(t, err, "cluster-listen requires database-url")
+	require.NotContains(t, err.Error(), "experimental")
+
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587"})
+	require.ErrorContains(t, err, "cluster-listen requires database-url")
+
+	oldConfigFile := filepath.Join(t.TempDir(), "server.yml")
+	require.Nil(t, os.WriteFile(oldConfigFile, []byte("experimental-cluster-listen: \"127.0.0.1:2587\"\n"), 0600))
+	app, _, _, _ = newTestApp()
+	err = app.Run([]string{"ntfy", "serve", "--config=" + oldConfigFile})
+	require.ErrorContains(t, err, "cluster-listen requires database-url")
+}
+
 func TestCLI_Serve_ClusterValidation(t *testing.T) {
 	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
-	// Setting experimental-cluster-listen implicitly enables clustering, which requires
+	// Setting cluster-listen implicitly enables clustering, which requires
 	// database-url; all validation must fail before any database connection is attempted
 	app, _, _, _ := newTestApp()
-	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587"})
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=127.0.0.1:2587"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "database-url")
 	// It also requires a shared secret
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na"})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "experimental-cluster-secret")
+	require.Contains(t, err.Error(), "cluster-secret")
 	// ... and an explicit stable node ID
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=127.0.0.1:2587", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret"})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "experimental-cluster-node-id")
+	require.Contains(t, err.Error(), "cluster-node-id")
 	// A secret without a listen address is a config error: clustering would silently be off
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-secret=s3cret"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-secret=s3cret"})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "experimental-cluster-listen")
+	require.Contains(t, err.Error(), "cluster-listen")
 	// A wildcard bind cannot derive an advertise URL
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret", "--cluster-node-id=node-a"})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "experimental-cluster-advertise-url")
+	require.Contains(t, err.Error(), "cluster-advertise-url")
 	// The linger must not be negative
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-batch-linger=-1s"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-batch-linger=-1s"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster batch linger")
 	// The drain duration must not be negative either (0 disables draining)
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-duration=-1s"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-drain-duration=-1s"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster drain duration")
 	// The drain delay must not be negative either
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-delay=-1s"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-drain-delay=-1s"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cluster drain delay")
 	// 0 is valid (close all at once): the error is about the role, which is checked after the drain duration
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-drain-duration=0", "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a", "--experimental-cluster-role=leader"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-drain-duration=0", "--cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret", "--cluster-node-id=node-a", "--cluster-role=leader"})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "experimental-cluster-role")
+	require.Contains(t, err.Error(), "cluster-role")
 	// The role must be one of the known ones: a typo would make a node half passive
 	app, _, _, _ = newTestApp()
-	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--experimental-cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--experimental-cluster-secret=s3cret", "--experimental-cluster-node-id=node-a", "--experimental-cluster-role=leader"})
+	err = app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--cluster-listen=:2587", "--database-url=postgres://user:pass@localhost:1/na", "--cluster-secret=s3cret", "--cluster-node-id=node-a", "--cluster-role=leader"})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "experimental-cluster-role")
+	require.Contains(t, err.Error(), "cluster-role")
 }
 
 func TestCLI_Serve_AttachmentExpiryLongerThanCacheDurationWarning(t *testing.T) {

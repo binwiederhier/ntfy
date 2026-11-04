@@ -31,11 +31,11 @@
 # listen-unix: <socket-path>
 # listen-unix-mode: <linux permissions, e.g. 0700>
 
-# Experimental: local admin socket that serves the admin API without credentials. Whoever can open the
+# Local admin socket that serves the admin API without credentials. Whoever can open the
 # socket (mode 0660: the ntfy user and group, and root) can manage users without a password. Off by default.
 # The socket is only opened if auth-file or database-url is set. Not available on Windows.
 #
-# experimental-listen-admin-unix: "/run/ntfy/admin.sock"
+# listen-admin-unix: "/run/ntfy/admin.sock"
 
 # Path to the private key & cert file for the HTTPS web server. Not used if "listen-https" is not set.
 #
@@ -77,31 +77,31 @@
 #   - "postgres://user:pass@replica1:5432/ntfy"
 #   - "postgres://user:pass@replica2:5432/ntfy"
 
-# EXPERIMENTAL: Clustering options. Setting "experimental-cluster-listen" runs this server as one
+# Clustering options. Setting "cluster-listen" runs this server as one
 # node of a cluster that shares a PostgreSQL database. Messages a node misses (e.g. a dropped
 # node-to-node batch) are recovered from the database. Request rate limits are enforced per node,
 # not across the cluster; daily message, e-mail and phone call limits are shared through the
-# database. The "experimental-" prefix means these option names may still change.
+# database. The names with an "experimental-" prefix (e.g. experimental-cluster-listen) still work.
 #
-# - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes
+# - cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes
 #   talk to. Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners
 #   never serve the fan-out endpoint. Setting it is what enables clustering.
-# - experimental-cluster-node-id is a stable per-node identifier (e.g. the hostname); required.
-# - experimental-cluster-advertise-url is the base URL peer nodes use to reach this node's
-#   fan-out listener; it defaults to "http://<experimental-cluster-listen>". It must be set
+# - cluster-node-id is a stable per-node identifier (e.g. the hostname); required.
+# - cluster-advertise-url is the base URL peer nodes use to reach this node's
+#   fan-out listener; it defaults to "http://<cluster-listen>". It must be set
 #   explicitly if the listen address binds a wildcard address (e.g. ":2587").
-# - experimental-cluster-secret authenticates node-to-node fan-out requests; it must be
+# - cluster-secret authenticates node-to-node fan-out requests; it must be
 #   identical on all nodes.
-# - experimental-cluster-batch-linger is how long fan-out messages may wait to form a batch per
+# - cluster-batch-linger is how long fan-out messages may wait to form a batch per
 #   peer node, trading up to that much cross-node delivery latency for a bounded request rate
 #   between nodes. Set to 0 to send each message immediately.
-# - experimental-cluster-role is "active" (default) or "passive". A passive node is meant to run
+# - cluster-role is "active" (default) or "passive". A passive node is meant to run
 #   outside the load balancer (e.g. to observe a new node under real load): it receives fan-out
 #   and serves clients that connect to it directly, but it never leads the cluster's singleton
 #   jobs, and it never closes its subscribers to send them elsewhere. Active nodes do not count
 #   it as a place to send theirs either. The member list reports each node's role, so load
 #   balancer agents can route to active nodes only.
-# - experimental-cluster-drain-delay and experimental-cluster-drain-duration control how an active
+# - cluster-drain-delay and cluster-drain-duration control how an active
 #   node drains on shutdown (SIGTERM) if another active node is up, so its clients move to the
 #   other nodes gradually instead of all at once. For the drain delay, the node withdraws: it is not
 #   ready (/v1/ready fails) but still serves everything, so the load balancer can stop sending it
@@ -116,14 +116,14 @@
 # protects it, and it is only served on the dedicated cluster listener -- but you should still
 # make sure that listener is reachable only from the private network (firewall/VPC rules).
 #
-# experimental-cluster-listen: <ip:port>
-# experimental-cluster-node-id: <hostname>
-# experimental-cluster-advertise-url: "http://<ip:port>"
-# experimental-cluster-secret: <secret>
-# experimental-cluster-batch-linger: 500ms
-# experimental-cluster-role: active
-# experimental-cluster-drain-delay: 15s
-# experimental-cluster-drain-duration: 1m
+# cluster-listen: <ip:port>
+# cluster-node-id: <hostname>
+# cluster-advertise-url: "http://<ip:port>"
+# cluster-secret: <secret>
+# cluster-batch-linger: 500ms
+# cluster-role: active
+# cluster-drain-delay: 15s
+# cluster-drain-duration: 1m
 
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.

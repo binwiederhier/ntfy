@@ -2367,6 +2367,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.38.0 (UNRELEASED)
+
+**Features:**
+
+* The cluster and admin socket options lost their `experimental-` prefix, e.g. `cluster-listen` instead of `experimental-cluster-listen` (and `NTFY_CLUSTER_LISTEN`); the old names still work ([#2154](https://github.com/binwiederhier/ntfy/pull/2154))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

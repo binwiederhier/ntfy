@@ -59,7 +59,7 @@ type Server struct {
 	httpsServer       *http.Server
 	httpMetricsServer *http.Server
 	httpProfileServer *http.Server
-	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (cluster-listen)
+	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	unixListener      net.Listener
 	adminUnixListener net.Listener // Serves the admin API on the local admin socket, see handleAdminSocket
 	smtpServer        *smtp.Server
@@ -366,7 +366,7 @@ func New(conf *Config) (*Server, error) {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
-		Enabled:           conf.ClusterListen != "", // Setting cluster-listen implicitly enables clustering
+		Enabled:           conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
 		NodeID:            cluster.NodeID(conf.ClusterNodeID),
 		AdvertiseURL:      advertiseURL,
 		Role:              conf.ClusterRole,

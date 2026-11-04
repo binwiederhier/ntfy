@@ -1943,6 +1943,12 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	err = g.Wait()
+	if err != nil && cancelCtx.Err() != nil {
+		// We closed the connection ourselves (drain, or a canceled subscription), so the reader's
+		// "use of closed network connection" may win the race against the writer's close error
+		logvr(v, r).Tag(tagWebsocket).Err(err).Debug("WebSocket connection closed by server")
+		return nil
+	}
 	if err != nil && websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNoStatusReceived) {
 		logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Trace("WebSocket connection closed")
 		return nil // Normal closures are not errors; note: "1006 (abnormal closure)" is treated as normal, because people disconnect a lot

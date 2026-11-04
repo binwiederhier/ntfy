@@ -2367,6 +2367,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.38.0 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* WebSocket subscribers that a node closes while draining are no longer counted and logged as internal server errors (HTTP 500, ntfy error 50001); on ntfy.sh, each node's drain counted ~18k of them and tripped the 5xx alert, although clients never saw an error ([#2171](https://github.com/binwiederhier/ntfy/pull/2171))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

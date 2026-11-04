@@ -154,15 +154,15 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 		return nil, errors.New("cluster mode requires a PostgreSQL database (set database-url)")
 	}
 	if conf.AdvertiseURL == "" {
-		return nil, errors.New("cluster mode requires an advertise URL (set cluster-advertise-url)")
+		return nil, errors.New("cluster mode requires an advertise URL (set experimental-cluster-advertise-url)")
 	}
 	if conf.NodeID == "" {
-		return nil, errors.New("cluster mode requires a stable node ID (set cluster-node-id)")
+		return nil, errors.New("cluster mode requires a stable node ID (set experimental-cluster-node-id)")
 	}
 	if conf.Role == "" {
 		conf.Role = RoleActive
 	} else if !conf.Role.Valid() {
-		return nil, fmt.Errorf("invalid cluster role %q (set cluster-role to %s or %s)", conf.Role, RoleActive, RolePassive)
+		return nil, fmt.Errorf("invalid cluster role %q (set experimental-cluster-role to %s or %s)", conf.Role, RoleActive, RolePassive)
 	}
 	if conf.HeartbeatInterval == 0 {
 		conf.HeartbeatInterval = defaultHeartbeatInterval

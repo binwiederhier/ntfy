@@ -453,6 +453,44 @@ func TestMesh_TopicAnnouncementInvokesTopicsAddedFunc(t *testing.T) {
 	require.Equal(t, []string{"up123456789012"}, addedB)
 }
 
+func TestMesh_RequestsBroadcastInvokesRequestsFunc(t *testing.T) {
+	// The requests node A admitted per hot visitor key must reach node B's RequestsFunc, which
+	// the server uses to charge them into its own request buckets
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
+	var mu sync.Mutex
+	var requestsB map[string]int64
+
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
+	confB.RequestsFunc = func(requests map[string]int64) {
+		mu.Lock()
+		defer mu.Unlock()
+		requestsB = requests
+	}
+	meshB, err := newMeshCluster(confB, poolB, nil)
+	require.Nil(t, err)
+	defer meshB.Close()
+	srvB := &http.Server{Handler: meshB}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+
+	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil)
+	require.Nil(t, err)
+	defer meshA.Close()
+
+	meshA.BroadcastState(&State{Requests: map[string]int64{"ip:1.2.3.4": 42, "user:u_abc": 7}})
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return requestsB != nil
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, map[string]int64{"ip:1.2.3.4": 42, "user:u_abc": 7}, requestsB)
+}
+
 func TestMesh_IsolatedFuncWhenPeersHealthy(t *testing.T) {
 	// A node that lost its database (registration goes stale) while a peer is still healthy
 	// is isolated: peers stop forwarding to it, so its subscribers would silently receive

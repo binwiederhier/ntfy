@@ -146,9 +146,10 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 
 // BroadcastState tells all live peers about state changes that must not wait: topics that
 // gained their first local subscriber (a hint for peers' cached rate-visitor lookups, never
-// used for routing), changed access entries and deleted users.
+// used for routing), changed access entries, deleted users, and the requests admitted per hot
+// visitor key.
 func (c *meshCluster) BroadcastState(state *State) {
-	if len(state.AddedTopics) == 0 && len(state.DeletedUserIDs) == 0 && !state.AccessChanged {
+	if len(state.AddedTopics) == 0 && len(state.DeletedUserIDs) == 0 && !state.AccessChanged && len(state.Requests) == 0 {
 		return
 	}
 	peers := c.registry.Peers()
@@ -158,6 +159,7 @@ func (c *meshCluster) BroadcastState(state *State) {
 	envelope := &apiState{
 		DeletedUserIDs: state.DeletedUserIDs,
 		AccessChanged:  state.AccessChanged,
+		Requests:       state.Requests,
 	}
 	if len(state.AddedTopics) > 0 {
 		envelope.Topics = &apiStateTopics{Added: state.AddedTopics}
@@ -166,7 +168,11 @@ func (c *meshCluster) BroadcastState(state *State) {
 	if err != nil {
 		return
 	}
-	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d deleted users, access changed: %t) to %d peer(s)", len(state.AddedTopics), len(state.DeletedUserIDs), state.AccessChanged, len(peers))
+	if ev := log.Tag(tag); len(state.AddedTopics) > 0 || len(state.DeletedUserIDs) > 0 || state.AccessChanged {
+		ev.Debug("Broadcasting state (%d new topics, %d deleted users, access changed: %t, %d request keys) to %d peer(s)", len(state.AddedTopics), len(state.DeletedUserIDs), state.AccessChanged, len(state.Requests), len(peers))
+	} else if ev.IsTrace() {
+		ev.Trace("Broadcasting %d request keys to %d peer(s)", len(state.Requests), len(peers)) // Every second, so not at debug
+	}
 	for _, p := range peers {
 		go func(p *registry.Peer) {
 			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {

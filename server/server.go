@@ -375,6 +375,7 @@ func New(conf *Config) (*Server, error) {
 		UsersDeletedFunc:  s.handleUsersDeleted,
 		AccessChangedFunc: s.handlePeerAccessChanged,
 		IsolatedFunc:      s.maybeCloseLocalSubscribers,
+		RequestsFunc:      s.limiter.ChargeRequests,
 		MaxMessageBytes:   int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
@@ -387,6 +388,9 @@ func New(conf *Config) (*Server, error) {
 		}
 		s.tail = tail
 		go s.runTail()
+	}
+	if conf.ClusterListen != "" {
+		s.limiter.ShareRequests() // Counted for gossipRequests
 	}
 	if err := s.limiter.Start(context.Background()); err != nil {
 		return nil, err
@@ -598,6 +602,9 @@ func (s *Server) Run() error {
 	}
 	s.mu.Unlock()
 	go s.runManager()
+	if s.config.ClusterListen != "" {
+		go s.runRequestGossip()
+	}
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
 

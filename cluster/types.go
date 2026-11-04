@@ -23,6 +23,7 @@ type Config struct {
 	AccessChangedFunc AccessChangedFunc // Told that a peer changed access entries; may be nil
 	TopicsAddedFunc   TopicsAddedFunc   // Told about topics that just gained their first subscriber on a peer; may be nil
 	IsolatedFunc      IsolatedFunc      // Called while this node is cut off from the cluster; may be nil
+	RequestsFunc      RequestsFunc      // Told how many requests peers admitted per hot visitor key; may be nil
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The
@@ -31,9 +32,10 @@ type DeliverFunc func(m *model.Message)
 
 // State is a state delta for Cluster.BroadcastState.
 type State struct {
-	AddedTopics    []string // Topics that just gained their first local subscriber on this node
-	DeletedUserIDs []string // Users this node just deleted: peers end their streams
-	AccessChanged  bool     // Access entries changed (written by this node): peers reload their access cache
+	AddedTopics    []string         // Topics that just gained their first local subscriber on this node
+	DeletedUserIDs []string         // Users this node just deleted: peers end their streams
+	AccessChanged  bool             // Access entries changed (written by this node): peers reload their access cache
+	Requests       map[string]int64 // Requests this node admitted per hot visitor key since its last broadcast
 }
 
 // UsersDeletedFunc is called with the IDs of users a peer just deleted (State.DeletedUserIDs). The
@@ -48,6 +50,12 @@ type UsersDeletedFunc func(userIDs []string)
 // those topics; it must not re-broadcast (loop prevention). It is a cache hint only: a lost
 // announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
+
+// RequestsFunc is called with the requests a peer admitted per hot visitor key (State.Requests).
+// The server supplies it to charge them into this node's request buckets, so a client spread
+// over the nodes gets its request limit once, not once per node; it must not re-broadcast.
+// A lost update only makes this node's limit a little more generous for a moment.
+type RequestsFunc func(requests map[string]int64)
 
 // AccessChangedFunc is called when a peer changed access entries (State.AccessChanged). The server
 // supplies it to reload its access cache, which ends the local streams that lost access; it must
@@ -119,11 +127,13 @@ type apiHealth struct {
 }
 
 // apiState is the peer state-exchange envelope. Each concern is an optional section; future
-// concerns (rate limit counters, stats) become siblings of Topics.
+// concerns (stats) become siblings of Topics. A node that does not know a section ignores it,
+// which keeps mixed-version clusters working during rolling deploys.
 type apiState struct {
-	Topics         *apiStateTopics `json:"topics,omitempty"`
-	DeletedUserIDs []string        `json:"deleted_user_ids,omitempty"`
-	AccessChanged  bool            `json:"access_changed,omitempty"`
+	Topics         *apiStateTopics  `json:"topics,omitempty"`
+	DeletedUserIDs []string         `json:"deleted_user_ids,omitempty"`
+	AccessChanged  bool             `json:"access_changed,omitempty"`
+	Requests       map[string]int64 `json:"requests,omitempty"` // Visitor key -> requests admitted since the last broadcast
 }
 
 // apiStateTopics carries topics that just gained their first subscriber on the sending node.

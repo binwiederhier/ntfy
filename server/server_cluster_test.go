@@ -17,6 +17,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
@@ -361,6 +362,52 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, "hello cluster", received[0].Message)
+}
+
+func TestServer_Cluster_RequestLimitAcrossNodes(t *testing.T) {
+	// A client spread over two nodes gets its request limit once, not once per node: the requests
+	// node A admits for its visitor key are charged into node B's bucket for the same key
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestConfig(t, schemaDSN)
+	confB.ClusterNodeID = "node-b"
+	confB.ClusterListen = listenerB.Addr().String()
+	confB.ClusterSecret = "s3cret"
+	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
+	confB.VisitorRequestLimitBurst = 10
+	confB.VisitorRequestLimitReplenish = time.Hour
+	sB := newTestServer(t, confB)
+	srvB := &http.Server{Handler: sB.cluster}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+	confA := newTestConfig(t, schemaDSN)
+	confA.ClusterNodeID = "node-a"
+	confA.ClusterListen = "127.0.0.1:1"
+	confA.ClusterSecret = "s3cret"
+	confA.ClusterAdvertiseURL = "http://127.0.0.1:1"
+	confA.VisitorRequestLimitBurst = 10
+	confA.VisitorRequestLimitReplenish = time.Hour
+	sA := newTestServer(t, confA)
+
+	// One request on node B, nine left there; then the whole burst on node A
+	require.Equal(t, 200, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	for i := 0; i < 10; i++ {
+		require.Equal(t, 200, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	require.Equal(t, 429, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
+
+	// Node A tells node B, which then has no tokens left either (watched without spending any)
+	sA.gossipRequests()
+	rule := limit.Rule{
+		Kind:   limit.KindRequests,
+		Burst:  10,
+		Refill: time.Hour,
+	}
+	waitFor(t, func() bool {
+		return sB.limiter.Tokens("ip:9.9.9.9", rule) == 0
+	})
+	require.Equal(t, 429, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
 }
 
 func TestServer_Cluster_DeliverFromBus(t *testing.T) {

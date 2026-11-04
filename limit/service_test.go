@@ -585,6 +585,95 @@ func TestService_Prune_LimiterViewAcrossPrune(t *testing.T) {
 	require.Equal(t, rule.Burst-50, s.Tokens("k", rule))
 }
 
+func TestService_HotRequests(t *testing.T) {
+	// Only keys whose request bucket is being drained (below half) are shared with the peers;
+	// a key that polls now and then never is. Every call starts the counts over.
+	s := newTestService(t)
+	s.ShareRequests()
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	for i := 0; i < 40; i++ {
+		require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
+	}
+	for i := 0; i < 5; i++ {
+		require.True(t, s.Allow("ip:5.6.7.8", rule, 1).OK)
+	}
+	messages := Rule{
+		Kind:   KindMessages,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	for i := 0; i < 40; i++ {
+		require.True(t, s.Allow("ip:9.9.9.9", messages, 1).OK)
+	}
+	require.Equal(t, map[string]int64{"ip:1.2.3.4": 40}, s.HotRequests())
+	require.Empty(t, s.HotRequests())
+
+	// Still drained: only what was admitted since the last call
+	require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
+	require.Equal(t, map[string]int64{"ip:1.2.3.4": 1}, s.HotRequests())
+}
+
+func TestService_HotRequests_NotCountedWithoutSharing(t *testing.T) {
+	// Without a cluster nothing takes the counts, so they are not kept
+	s := newTestService(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	for i := 0; i < 40; i++ {
+		require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
+	}
+	require.Empty(t, s.HotRequests())
+	for _, bs := range s.buckets {
+		require.Nil(t, bs.requests)
+	}
+}
+
+func TestService_ChargeRequests(t *testing.T) {
+	// What the peers admitted comes off this node's bucket, down to a debt of one burst, so a
+	// burst spread over several nodes cannot lock a key (or the NAT behind it) out for long
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	require.True(t, s.Allow("ip:1.2.3.4", rule, 10).OK)
+	s.ChargeRequests(map[string]int64{"ip:1.2.3.4": 30})
+	require.Equal(t, int64(20), s.Tokens("ip:1.2.3.4", rule))
+
+	s.ChargeRequests(map[string]int64{"ip:1.2.3.4": 1000})
+	require.Equal(t, int64(0), s.Tokens("ip:1.2.3.4", rule))
+	require.False(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
+	clock.advance(5*time.Minute + 5*time.Second) // 61 tokens: the debt of 60, then one
+	require.Equal(t, int64(1), s.Tokens("ip:1.2.3.4", rule))
+
+	// A key this node has not seen is not charged: it is not limited here yet, and when it comes
+	// it gets this node's full burst, as without peers
+	s.ChargeRequests(map[string]int64{"ip:5.6.7.8": 1000})
+	require.Equal(t, int64(60), s.Tokens("ip:5.6.7.8", rule))
+}
+
+func TestService_ChargeRequests_NotShared(t *testing.T) {
+	// Peers' requests are theirs to share: charging them here does not make them this node's
+	s := newTestService(t)
+	s.ShareRequests()
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
+	require.Empty(t, s.HotRequests())
+	s.ChargeRequests(map[string]int64{"ip:1.2.3.4": 50})
+	require.Empty(t, s.HotRequests())
+}
+
 func TestService_Allow_Concurrent(t *testing.T) {
 	s := New(nil)
 	rule := Rule{

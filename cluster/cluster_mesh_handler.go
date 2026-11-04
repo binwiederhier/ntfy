@@ -96,6 +96,10 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 		log.Tag(tag).Debug("Peer %s deleted %d user(s)", origin, len(state.DeletedUserIDs))
 		c.conf.UsersDeletedFunc(state.DeletedUserIDs)
 	}
+	if len(state.Requests) > 0 && c.conf.RequestsFunc != nil {
+		log.Tag(tag).Trace("Received requests of %d visitor key(s) from peer %s", len(state.Requests), origin)
+		c.conf.RequestsFunc(state.Requests)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 

@@ -16,7 +16,7 @@ import (
 )
 
 // The cluster API: every kind of node-to-node communication is a path under /v1/cluster/,
-// served only on the dedicated cluster listener. Future concerns (rate limit counters, stats)
+// served only on the dedicated cluster listener. Future concerns (e.g. stats)
 // become new paths or new sections of the state envelope.
 const (
 	// MessagePath receives batches of published messages (NDJSON, one apiMessage per line).

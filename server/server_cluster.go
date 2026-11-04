@@ -3,9 +3,17 @@ package server
 import (
 	"time"
 
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
+)
+
+const (
+	// requestGossipInterval is how often a node sends its peers the requests it admitted per hot
+	// visitor key. A client spread over the nodes gets at most about one burst per node more than
+	// its limit before the peers know, once; after that, the cluster admits its configured rate.
+	requestGossipInterval = time.Second
 )
 
 // deliverFromBus delivers a message received from a peer node (via the cluster) to this
@@ -49,4 +57,30 @@ func (s *Server) maybeCloseLocalSubscribers() {
 	for _, t := range s.topics {
 		t.CancelAllSubscribers()
 	}
+}
+
+// runRequestGossip sends the peers the requests admitted here every requestGossipInterval, until
+// the server stops
+func (s *Server) runRequestGossip() {
+	for {
+		select {
+		case <-time.After(requestGossipInterval):
+			s.gossipRequests()
+		case <-s.closeChan:
+			return
+		}
+	}
+}
+
+// gossipRequests sends the peers the requests this node admitted per hot visitor key (see
+// limit.Service.HotRequests), which they charge into their own request buckets, so a client spread
+// over the nodes gets its request limit once, not once per node
+func (s *Server) gossipRequests() {
+	requests := s.limiter.HotRequests()
+	if len(requests) == 0 {
+		return
+	}
+	s.cluster.BroadcastState(&cluster.State{
+		Requests: requests,
+	})
 }

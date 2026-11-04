@@ -82,16 +82,18 @@ type bucketEntry struct {
 
 // bucketShard is one independently locked part of the token buckets
 type bucketShard struct {
-	entries map[string]*bucketEntry
-	mu      sync.Mutex // Protects entries and everything inside them
+	entries  map[string]*bucketEntry
+	requests map[string]int64 // Requests admitted here since the last HotRequests, to share with peers; nil unless ShareRequests
+	mu       sync.Mutex       // Protects entries, requests and everything inside them
 }
 
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
 // then start at the rule's burst. Tokens may go negative (debt) when a burst shrinks.
 type bucket struct {
 	tokens float64
-	last   int64 // Unix nanoseconds of the last refill, 0 if never used
-	burst  int64 // Burst of the rule the bucket was last used with; caps refunds and debt
+	last   int64         // Unix nanoseconds of the last refill, 0 if never used
+	burst  int64         // Burst of the rule the bucket was last used with; caps refunds and debt
+	rate   time.Duration // Refill of the rule the bucket was last used with, to charge peers' usage without a rule
 }
 
 // limiter is the util.Limiter view of one key's bucket for one rule (see Service.Limiter)

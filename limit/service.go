@@ -60,6 +60,10 @@ const (
 	// settledIdle is how long a key whose buckets are full again must go unused before Prune
 	// forgets its buckets, so a key in steady use is not dropped and recreated over and over
 	settledIdle = time.Minute
+
+	// hotRequestsMax bounds the keys HotRequests returns per round, so a flood of fresh keys
+	// cannot make one round's message to the peers unbounded (~50 bytes per key on the wire)
+	hotRequestsMax = 10000
 )
 
 // Service decides on usage from memory; see the package comment
@@ -354,6 +358,78 @@ func (s *Service) Size() int {
 	return size
 }
 
+// ShareRequests makes the service count the requests it admits per key, for HotRequests. Only a
+// cluster shares them; without, nothing would ever take the counts.
+func (s *Service) ShareRequests() {
+	for _, bs := range s.buckets {
+		bs.mu.Lock()
+		if bs.requests == nil {
+			bs.requests = make(map[string]int64)
+		}
+		bs.mu.Unlock()
+	}
+}
+
+// HotRequests returns the requests admitted here since the last call, per key whose request bucket
+// is below half its burst, and starts the counts over for every key. A key above half uses less
+// than its refill, or a part of one burst: what the peers would charge for it does not change
+// their decisions, and leaving it out keeps the exchange to the few keys that are being drained
+// (~500 of ~70k keys on ntfy.sh). A key's requests from rounds in which it was not hot are not
+// shared later: the peers then undercount, which is the safe side.
+func (s *Service) HotRequests() map[string]int64 {
+	now := s.now()
+	hot := make(map[string]int64)
+	for _, bs := range s.buckets {
+		bs.mu.Lock()
+		for key, n := range bs.requests {
+			e, ok := bs.entries[key]
+			if !ok || len(hot) >= hotRequestsMax {
+				continue
+			}
+			b := &e.buckets[KindRequests]
+			rule := &Rule{
+				Kind:   KindRequests,
+				Burst:  b.burst,
+				Refill: b.rate,
+			}
+			e.refillNoLock(rule, now)
+			if b.tokens < float64(b.burst)/2 {
+				hot[key] = n
+			}
+		}
+		if bs.requests != nil {
+			bs.requests = make(map[string]int64)
+		}
+		bs.mu.Unlock()
+	}
+	return hot
+}
+
+// ChargeRequests takes the requests that peers admitted (their HotRequests) from the keys' request
+// buckets here, down to a debt of one burst: an abuser spread over the nodes then gets the
+// configured rate from the cluster, while a burst cannot lock a key, or the neighbors behind its
+// NAT, out for longer than one burst takes to refill. Keys without a bucket here are skipped:
+// they are not limited here yet, and when they come, they get this node's burst, as without peers.
+func (s *Service) ChargeRequests(requests map[string]int64) {
+	now := s.now()
+	for key, n := range requests {
+		bs := s.buckets[shardIndex(key)]
+		bs.mu.Lock()
+		if e, ok := bs.entries[key]; ok && e.buckets[KindRequests].last != 0 {
+			b := &e.buckets[KindRequests]
+			rule := &Rule{
+				Kind:   KindRequests,
+				Burst:  b.burst,
+				Refill: b.rate,
+			}
+			e.refillNoLock(rule, now)
+			b.tokens = math.Max(b.tokens-float64(n), -float64(b.burst))
+			e.noteFull(b, rule)
+		}
+		bs.mu.Unlock()
+	}
+}
+
 // runSync loads the current counts, retrying until it succeeds, then syncs every interval until
 // Close. It is the only caller of the store, so writes and reads never interleave.
 func (s *Service) runSync(loaded chan struct{}) {
@@ -521,6 +597,9 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
+	if rule.Kind == KindRequests && bs.requests != nil {
+		bs.requests[key] += n
+	}
 	return b.decision(Decision{OK: true}, rule)
 }
 
@@ -635,6 +714,7 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 		b.last = nowNanos
 	}
 	b.burst = rule.Burst
+	b.rate = rule.Refill
 }
 
 // decision adds the bucket's quota to d: the whole tokens left, and the time until the next one,

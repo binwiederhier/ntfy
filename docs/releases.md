@@ -6,18 +6,18 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.38.0 | Nov 3, 2026   |
+| ntfy server      | v2.37.2 | Nov 3, 2026   |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
 
-## ntfy server v2.38.0
+## ntfy server v2.37.2
 Released November 3, 2026
 
 This release is about running ntfy on PostgreSQL with read replicas: reads go to the least busy replica, and a
 connection to a database node that went away (e.g. during a resize) fails after 30 seconds instead of hanging for
-~15 minutes. The cluster options also lose their `experimental-` prefix.
+~15 minutes.
 
 **Features:**
 

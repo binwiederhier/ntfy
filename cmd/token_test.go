@@ -11,7 +11,7 @@ import (
 )
 
 func TestCLI_Token_AddListRemove(t *testing.T) {
-	s, conf, port := newTestServerWithAuth(t)
+	s, conf, port := newTestServerWithAuth(t, false)
 	defer test.StopServer(t, s, port)
 
 	app, stdin, stdout, _ := newTestApp()

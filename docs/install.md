@@ -431,6 +431,15 @@ ENTRYPOINT ["ntfy", "serve"]
 ```
 This image can be pushed to a container registry and shipped independently. All that's needed when running it is mapping ntfy's port to a host port.
 
+### Deploy with Easypanel
+
+[Easypanel](https://easypanel.io) is a self-hosted Docker deployment platform, and ntfy has a one-click deployment template there:
+
+[![Deploy on Easypanel][easypanel-btn]][easypanel-deploy]
+
+[easypanel-btn]: https://easypanel.io/img/deploy-on-easypanel-40.svg
+[easypanel-deploy]: https://easypanel.io/templates/ntfy
+
 ## Kubernetes
 
 The setup for Kubernetes is very similar to that for Docker, and requires a fairly minimal deployment or pod definition to function. There

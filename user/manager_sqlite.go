@@ -42,7 +42,7 @@ const (
 		FROM user u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.user = ?
-		   OR u.id = (SELECT user_id FROM user_email WHERE email = ? AND is_primary = 1)
+		   OR u.id = (SELECT user_id FROM user_email WHERE LOWER(email) = ? AND is_primary = 1 ORDER BY (email = ?) DESC, email LIMIT 1)
 		ORDER BY CASE WHEN u.user = ? THEN 0 ELSE 1 END
 		LIMIT 1
 	`
@@ -232,7 +232,7 @@ const (
 	sqliteInsertEmailIgnoreQuery       = `INSERT INTO user_email (user_id, email) VALUES (?, ?) ON CONFLICT (user_id, email) DO NOTHING`
 	sqliteDeleteEmailQuery             = `DELETE FROM user_email WHERE user_id = ? AND email = ?`
 	sqliteSelectPrimaryEmailQuery      = `SELECT email FROM user_email WHERE user_id = ? AND is_primary = 1`
-	sqliteSelectUserIDByPrimaryQuery   = `SELECT user_id FROM user_email WHERE email = ? AND is_primary = 1`
+	sqliteSelectUserIDByPrimaryQuery   = `SELECT user_id FROM user_email WHERE LOWER(email) = ? AND is_primary = 1 ORDER BY (email = ?) DESC, email LIMIT 1`
 	sqliteUpdateEmailSetPrimaryQuery   = `UPDATE user_email SET is_primary = 1 WHERE user_id = ? AND email = ?`
 	sqliteUpdateEmailClearPrimaryQuery = `UPDATE user_email SET is_primary = 0 WHERE user_id = ? AND is_primary = 1`
 

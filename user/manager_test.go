@@ -3196,6 +3196,100 @@ func TestManager_Authenticate_ByPrimaryEmail(t *testing.T) {
 	})
 }
 
+// Email addresses are case-insensitive, so an identifier that only differs in case from the
+// verified primary email must resolve to the same account: at login, and when the password reset
+// flow resolves the identifier to an account.
+func TestManager_Authenticate_EmailIdentifierIsCaseInsensitive(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+		phil, err := a.User("phil")
+		require.Nil(t, err)
+
+		// phil verifies phil@example.com -> becomes his primary (recovery) email
+		_, err = a.VerifyEmail(addVerifyLink(t, a, phil.ID, "phil@example.com", 24*time.Hour))
+		require.Nil(t, err)
+
+		// The exact-case address keeps working
+		u, err := a.Authenticate("phil@example.com", "phil")
+		require.Nil(t, err)
+		require.Equal(t, "phil", u.Name)
+
+		// A mixed-case identifier reaches the same account
+		u, err = a.Authenticate("Phil@Example.COM", "phil")
+		require.Nil(t, err)
+		require.Equal(t, "phil", u.Name)
+
+		// The password reset flow resolves the same identifier to the same account
+		userID, err := a.UserIDByPrimaryEmail("PHIL@Example.com")
+		require.Nil(t, err)
+		require.Equal(t, phil.ID, userID)
+
+		// Case-insensitivity does not weaken the match: another address still does not resolve
+		_, err = a.UserIDByPrimaryEmail("nobody@example.com")
+		require.Equal(t, ErrUserNotFound, err)
+	})
+}
+
+// Two accounts can each hold the same address in a different case: the primary-email index is
+// case-sensitive, so both rows are allowed. Both logins must keep working, and a third casing must
+// resolve to a deterministic account instead of failing the lookup entirely.
+func TestManager_Authenticate_EmailCaseTieBreak(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+		require.Nil(t, a.AddUser("phil2", "phil2", RoleUser, false))
+		phil, err := a.User("phil")
+		require.Nil(t, err)
+		phil2, err := a.User("phil2")
+		require.Nil(t, err)
+		require.Nil(t, a.AddEmail(phil.ID, "phil@example.com"))
+		require.Nil(t, a.SetPrimaryEmail(phil.ID, "phil@example.com"))
+		require.Nil(t, a.AddEmail(phil2.ID, "Phil@Example.com"))
+		require.Nil(t, a.SetPrimaryEmail(phil2.ID, "Phil@Example.com"))
+
+		// Each account still logs in with its own casing
+		u, err := a.Authenticate("phil@example.com", "phil")
+		require.Nil(t, err)
+		require.Equal(t, "phil", u.Name)
+		u, err = a.Authenticate("Phil@Example.com", "phil2")
+		require.Nil(t, err)
+		require.Equal(t, "phil2", u.Name)
+
+		// Any other casing still resolves to one of the two accounts, and the reset lookup agrees
+		userID, err := a.UserIDByPrimaryEmail("PHIL@EXAMPLE.COM")
+		require.Nil(t, err)
+		require.Contains(t, []string{phil.ID, phil2.ID}, userID)
+	})
+}
+
+// Verifying an address that another account already owns as primary must not promote it here,
+// even when the casing differs: the check and the lookup have to agree.
+func TestManager_VerifyEmail_PromotionIsCaseInsensitive(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+		require.Nil(t, a.AddUser("phil2", "phil2", RoleUser, false))
+		phil, err := a.User("phil")
+		require.Nil(t, err)
+		phil2, err := a.User("phil2")
+		require.Nil(t, err)
+
+		_, err = a.VerifyEmail(addVerifyLink(t, a, phil.ID, "phil@example.com", 24*time.Hour))
+		require.Nil(t, err)
+		_, err = a.VerifyEmail(addVerifyLink(t, a, phil2.ID, "Phil@Example.com", 24*time.Hour))
+		require.Nil(t, err)
+
+		// Still a verified address on phil2, but not promoted: phil already owns it as primary
+		primary, err := a.PrimaryEmail(phil2.ID)
+		require.Nil(t, err)
+		require.Equal(t, "", primary)
+		emails, err := a.Emails(phil2.ID)
+		require.Nil(t, err)
+		require.True(t, emails.Contains("Phil@Example.com"))
+	})
+}
+
 func TestManager_Authenticate_BySecondaryEmailDenied(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		a := newTestManager(t, newManager, PermissionDenyAll)

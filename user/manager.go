@@ -478,7 +478,7 @@ func (a *Manager) UserByEmailOrUsername(identifier string) (*User, error) {
 // on a password check, returning the username owner here never grants access to the email owner's
 // account. Returns ErrUserNotFound if neither matches.
 func (a *Manager) userByNameOrEmail(identifier string) (*User, error) {
-	rows, err := a.db.Query(a.queries.selectUserByNameOrPrimaryEmail, identifier, identifier, identifier)
+	rows, err := a.db.Query(a.queries.selectUserByNameOrPrimaryEmail, identifier, strings.ToLower(identifier), identifier, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -1492,7 +1492,7 @@ func (a *Manager) PrimaryEmail(userID string) (string, error) {
 // password-reset request flow to resolve an email identifier to a single account.
 func (a *Manager) UserIDByPrimaryEmail(email string) (string, error) {
 	var userID string
-	err := a.db.ReadOnly().QueryRow(a.queries.selectUserIDByPrimary, email).Scan(&userID)
+	err := a.db.ReadOnly().QueryRow(a.queries.selectUserIDByPrimary, strings.ToLower(email), email).Scan(&userID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrUserNotFound
 	} else if err != nil {
@@ -1669,7 +1669,7 @@ func (a *Manager) VerifyEmail(rawToken string) (*MagicLink, error) {
 		}
 		// If the address is already another account's primary, leave it a verified secondary here
 		var ownerUserID string
-		if err = tx.QueryRow(a.queries.selectUserIDByPrimary, m.Email).Scan(&ownerUserID); err == nil {
+		if err = tx.QueryRow(a.queries.selectUserIDByPrimary, strings.ToLower(m.Email), m.Email).Scan(&ownerUserID); err == nil {
 			return nil // Address is primary elsewhere -> not promoted
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err // Real query error

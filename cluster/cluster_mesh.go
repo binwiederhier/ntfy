@@ -27,6 +27,7 @@ const (
 	batchMaxMessages   = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, deleted users)
+	bucketsMaxBytes    = 8 * 1024 * 1024 // Upper bound for a round of buckets: at most limit's 50k keys, ~80 bytes each
 	bucketsSendTimeout = time.Second     // A round of buckets that takes longer is overtaken by the next one
 )
 
@@ -193,17 +194,23 @@ func (c *meshCluster) BroadcastBuckets(buckets limit.SharedBuckets) {
 	if err != nil {
 		return
 	}
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return // Close is waiting for the sends, or done; a send added now would race it
+	}
+	c.bucketSends.Add(len(peers))
+	c.mu.Unlock()
 	if ev := log.Tag(tag); ev.IsTrace() {
 		ev.Trace("Broadcasting buckets of %d visitor key(s) to %d peer(s)", len(buckets), len(peers)) // Every second, so not at debug
 	}
 	for _, p := range peers {
-		c.bucketSends.Add(1)
 		go func(p *registry.Peer) {
 			defer c.bucketSends.Done()
 			ctx, cancel := context.WithTimeout(c.ctx, bucketsSendTimeout)
 			defer cancel()
 			if err := c.client.SendBuckets(ctx, p.AdvertiseURL, body); err != nil && c.ctx.Err() == nil {
-				metrics.ClusterSendErrors.Inc()
+				metrics.ClusterBucketSendErrors.Inc()                                   // Not ClusterSendErrors, which alerts: every restart of a peer fails a few rounds
 				log.Tag(tag).Err(err).Debug("Cannot send buckets to peer %s", p.NodeID) // Every second while it is down, and expected while it restarts
 			}
 		}(p)
@@ -365,12 +372,14 @@ func (c *meshCluster) Ready() bool {
 // Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,
 // and waits for them to exit.
 func (c *meshCluster) Close() error {
+	c.mu.Lock()
+	c.closed = true // No new peer queues or bucket sends from here on
+	c.mu.Unlock()
 	c.bucketSends.Wait() // The server's last round of buckets, so an orderly restart loses none of them
 	c.cancel()           // Stops the heartbeat loop and aborts in-flight peer deliveries
 	// Close the peer queues so their workers flush and exit; final sends are best-effort since
 	// the context is already canceled (parity with fire-and-forget delivery)
 	c.mu.Lock()
-	c.closed = true
 	for nodeID, q := range c.queues {
 		q.queue.Close()
 		delete(c.queues, nodeID)

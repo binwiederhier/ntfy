@@ -21,6 +21,7 @@ var expectedMetricNames = []string{
 	"ntfy_calls_made_failure",
 	"ntfy_calls_made_success",
 	"ntfy_cluster_batches_sent_total",
+	"ntfy_cluster_bucket_send_errors_total",
 	"ntfy_cluster_leader",
 	"ntfy_cluster_messages_forwarded_total",
 	"ntfy_cluster_messages_wasted_total",

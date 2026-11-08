@@ -440,6 +440,38 @@ func TestServer_Cluster_RollingRestartKeepsBuckets(t *testing.T) {
 	require.Equal(t, 429, request(t, nodeB.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
 }
 
+func TestServer_Cluster_StopWithGossipRunning(t *testing.T) {
+	// A node that stops while its gossip loop holds a round it has not sent yet still gets that
+	// round to its peers: the loop is stopped (and finishes its round) before the last round and
+	// before the cluster closes
+	entered, release := make(chan struct{}, 1), make(chan struct{})
+	testHookBucketGossip = func(s *Server, buckets limit.SharedBuckets) {
+		if s.config.ClusterNodeID == "node-a" && len(buckets) > 0 {
+			entered <- struct{}{}
+			<-release
+		}
+	}
+	t.Cleanup(func() {
+		testHookBucketGossip = nil // Registered before the nodes, so it runs after they stopped
+	})
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	nodeB := newTestClusterNode(t, schemaDSN, "node-b", "")
+	nodeA := newTestClusterNode(t, schemaDSN, "node-a", "")
+	for i := 0; i < 10; i++ {
+		require.Equal(t, 200, request(t, nodeA.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	<-entered // The loop took the round, and has not sent it
+	stopped := make(chan struct{})
+	go func() {
+		nodeA.stop()
+		close(stopped)
+	}()
+	time.Sleep(200 * time.Millisecond)
+	close(release)
+	<-stopped
+	require.Equal(t, int64(0), nodeB.s.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule))
+}
+
 func TestServer_Cluster_StopSendsLastBuckets(t *testing.T) {
 	// A node that stops sends what it used since its last gossip round before it goes, so an
 	// orderly restart loses nothing: the burst node A just spent is on node B once A has stopped
@@ -460,42 +492,47 @@ var testClusterRequestRule = limit.Rule{
 	Refill: time.Hour,
 }
 
-// testClusterNode is a cluster node of a test: the server, and its peer API on listen
+// testClusterNode is a cluster node of a test, running (Run) with its peer API on listen
 type testClusterNode struct {
 	s      *Server
 	listen string
-	srv    *http.Server
 }
 
-// newTestClusterNode starts a cluster node with a request burst of 10 (testClusterRequestRule) whose
-// peer API listens on listen, or on a free port if empty
+// newTestClusterNode runs a cluster node with a request burst of 10 (testClusterRequestRule) whose
+// peer API listens on listen, or on a free port if empty, and waits until the peer API answers
 func newTestClusterNode(t *testing.T, schemaDSN, nodeID, listen string) *testClusterNode {
 	t.Helper()
 	if listen == "" {
-		listen = "127.0.0.1:0"
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		require.Nil(t, err)
+		listen = listener.Addr().String()
+		require.Nil(t, listener.Close())
 	}
-	listener, err := net.Listen("tcp", listen)
-	require.Nil(t, err)
 	conf := newTestConfig(t, schemaDSN)
 	conf.ClusterNodeID = nodeID
-	conf.ClusterListen = listener.Addr().String()
+	conf.ClusterListen = listen
 	conf.ClusterSecret = "s3cret"
-	conf.ClusterAdvertiseURL = "http://" + listener.Addr().String()
+	conf.ClusterAdvertiseURL = "http://" + listen
 	conf.VisitorRequestLimitBurst = int(testClusterRequestRule.Burst)
 	conf.VisitorRequestLimitReplenish = testClusterRequestRule.Refill
 	node := &testClusterNode{
 		s:      newTestServer(t, conf),
-		listen: listener.Addr().String(),
+		listen: listen,
 	}
-	node.srv = &http.Server{Handler: node.s.cluster}
-	go node.srv.Serve(listener)
-	t.Cleanup(node.stop)
+	runTestServer(t, node.s)
+	waitFor(t, func() bool {
+		conn, err := net.Dial("tcp", listen)
+		if err != nil {
+			return false
+		}
+		conn.Close()
+		return true
+	})
 	return node
 }
 
-// stop stops the node and its peer API, freeing its address for a restart
+// stop stops the node, freeing its address for a restart
 func (n *testClusterNode) stop() {
-	n.srv.Close()
 	n.s.Stop()
 }
 

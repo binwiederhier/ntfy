@@ -2,6 +2,7 @@ package limit
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -1426,17 +1427,17 @@ func TestService_ChargeBuckets(t *testing.T) {
 		Refill: 5 * time.Second,
 	}
 	require.True(t, s.Allow("ip:1.2.3.4", rule, 10).OK)
-	s.ChargeBuckets(SharedBuckets{"ip:1.2.3.4": {KindRequests: {Used: 30, Burst: 60, Refill: 5 * time.Second}}})
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 30))
 	require.Equal(t, int64(20), s.Tokens("ip:1.2.3.4", rule))
 
-	s.ChargeBuckets(SharedBuckets{"ip:1.2.3.4": {KindRequests: {Used: 1000, Burst: 60, Refill: 5 * time.Second}}})
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 1000))
 	require.Equal(t, int64(0), s.Tokens("ip:1.2.3.4", rule))
 	require.False(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 	clock.advance(5*time.Minute + 5*time.Second) // 61 tokens: the debt of 60, then one
 	require.Equal(t, int64(1), s.Tokens("ip:1.2.3.4", rule))
 
 	// A peer's refund hands tokens back, up to the burst
-	s.ChargeBuckets(SharedBuckets{"ip:1.2.3.4": {KindRequests: {Used: -10, Burst: 60, Refill: 5 * time.Second}}})
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", -10))
 	require.Equal(t, int64(11), s.Tokens("ip:1.2.3.4", rule))
 }
 
@@ -1449,7 +1450,7 @@ func TestService_ChargeBuckets_UnknownKey(t *testing.T) {
 		Burst:  60,
 		Refill: 5 * time.Second,
 	}
-	s.ChargeBuckets(SharedBuckets{"ip:5.6.7.8": {KindRequests: {Used: 50, Burst: 60, Refill: 5 * time.Second}}})
+	s.ChargeBuckets(requestUsage("ip:5.6.7.8", 50))
 	require.Equal(t, int64(10), s.Tokens("ip:5.6.7.8", rule))
 	clock.advance(10 * time.Second)
 	require.Equal(t, int64(12), s.Tokens("ip:5.6.7.8", rule))
@@ -1459,7 +1460,7 @@ func TestService_ChargeBuckets_NotShared(t *testing.T) {
 	// Peers' usage is theirs to share: charging it here does not make it this node's
 	s := newTestService(t)
 	s.ShareBuckets()
-	s.ChargeBuckets(SharedBuckets{"ip:1.2.3.4": {KindRequests: {Used: 50, Burst: 60, Refill: 5 * time.Second}}})
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 50))
 	require.Empty(t, s.BucketDeltas())
 }
 
@@ -1511,6 +1512,19 @@ func TestService_BucketSnapshot_Restore(t *testing.T) {
 	require.Equal(t, int64(6), b.Tokens("ip:1.2.3.4", requests))
 }
 
+// requestUsage is a peer's usage of the key's request bucket (burst 60, one token per 5 s)
+func requestUsage(key string, used float64) SharedBuckets {
+	return SharedBuckets{
+		key: {
+			KindRequests: {
+				Used:   used,
+				Burst:  60,
+				Refill: 5 * time.Second,
+			},
+		},
+	}
+}
+
 // roundUsed rounds the used tokens, which a snapshot taken between refills has fractions of
 func roundUsed(buckets SharedBuckets) SharedBuckets {
 	for _, kinds := range buckets {
@@ -1519,4 +1533,104 @@ func roundUsed(buckets SharedBuckets) SharedBuckets {
 		}
 	}
 	return buckets
+}
+
+func TestService_BucketSnapshot_LeavesOutUnsent(t *testing.T) {
+	// What this node used since its last BucketDeltas is not in its snapshot: the next round sends
+	// it to the restarted peer, which would otherwise count it twice
+	a := newTestService(t)
+	a.ShareBuckets()
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: time.Hour,
+	}
+	require.True(t, a.Allow("ip:1.2.3.4", rule, 10).OK)
+	a.BucketDeltas() // Sent
+	require.True(t, a.Allow("ip:1.2.3.4", rule, 4).OK)
+	snapshot := a.BucketSnapshot()
+	require.Equal(t, 10.0, math.Round(snapshot["ip:1.2.3.4"][KindRequests].Used))
+
+	b := newTestService(t)
+	b.RestoreBuckets(snapshot)
+	b.ChargeBuckets(a.BucketDeltas())
+	require.Equal(t, int64(46), b.Tokens("ip:1.2.3.4", rule))
+}
+
+func TestService_ChargeBuckets_GenerousRule(t *testing.T) {
+	// A bucket known here only from a peer follows the peer's rule when it changes (a tier upgrade
+	// there); of two rules, the more generous one applies, which undercounts rather than locks out
+	s := newTestService(t)
+	slow := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: time.Hour,
+	}
+	fast := Rule{
+		Kind:   KindRequests,
+		Burst:  1000,
+		Refill: time.Second,
+	}
+	s.ChargeBuckets(SharedBuckets{
+		"user:u_abc": {
+			KindRequests: {
+				Used:   50,
+				Burst:  slow.Burst,
+				Refill: slow.Refill,
+			},
+		},
+	})
+	s.ChargeBuckets(SharedBuckets{
+		"user:u_abc": {
+			KindRequests: {
+				Used:   100,
+				Burst:  fast.Burst,
+				Refill: fast.Refill,
+			},
+		},
+	})
+	require.Equal(t, int64(850), s.Tokens("user:u_abc", fast))
+}
+
+func TestService_ChargeBuckets_InvalidRule(t *testing.T) {
+	// A peer's usage with a rule no node would use (a bug, or a bad peer) is ignored rather than
+	// creating a bucket that locks the key out
+	s := newTestService(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	s.ChargeBuckets(SharedBuckets{
+		"ip:1.2.3.4": {
+			KindRequests: {
+				Used:   1e15,
+				Burst:  1e15,
+				Refill: 5 * time.Second,
+			},
+		},
+		"ip:5.6.7.8": {
+			KindRequests: {
+				Used:   50,
+				Burst:  60,
+				Refill: -time.Second,
+			},
+		},
+	})
+	require.Equal(t, int64(60), s.Tokens("ip:1.2.3.4", rule))
+	require.Equal(t, int64(60), s.Tokens("ip:5.6.7.8", rule))
+}
+
+func TestService_ChargeBuckets_UnknownKind(t *testing.T) {
+	// A newer peer's kind is skipped, and the rest of its round still counts
+	s := newTestService(t)
+	var buckets SharedBuckets
+	require.Nil(t, json.Unmarshal([]byte(`{"ip:1.2.3.4":{"requests":{"u":50,"b":60,"r":5000000000},"teleports":{"u":3,"b":5,"r":1000000000}}}`), &buckets))
+	s.ChargeBuckets(buckets)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	require.Equal(t, int64(10), s.Tokens("ip:1.2.3.4", rule))
 }

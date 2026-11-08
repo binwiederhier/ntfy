@@ -94,6 +94,9 @@ var (
 	ClusterSendErrors = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_send_errors_total",
 	})
+	ClusterBucketSendErrors = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_cluster_bucket_send_errors_total",
+	})
 	ClusterQueueDropped = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_queue_dropped_total",
 	})
@@ -149,6 +152,7 @@ func init() {
 		ClusterMessagesForwarded,
 		ClusterBatchesSent,
 		ClusterSendErrors,
+		ClusterBucketSendErrors,
 		ClusterQueueDropped,
 		ClusterMessagesWasted,
 		ClusterLeader,

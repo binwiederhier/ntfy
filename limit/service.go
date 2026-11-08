@@ -64,6 +64,10 @@ const (
 	// bucketDeltasMax bounds the keys BucketDeltas returns per round, so a flood of fresh keys
 	// cannot make one round's message to the peers unbounded (~80 bytes per key on the wire)
 	bucketDeltasMax = 50000
+
+	// sharedBurstMax is the largest burst a peer's usage may carry (10 TB, for bandwidth buckets);
+	// usage with a larger one, or a negative refill, is a bug or a bad peer, and is ignored
+	sharedBurstMax = 10_000_000_000_000
 )
 
 // Service decides on usage from memory; see the package comment
@@ -373,15 +377,26 @@ func (s *Service) ShareBuckets() {
 // BucketDeltas returns the tokens this node used per key and kind since the last call (refunds
 // netted out), each with its bucket's burst and refill, so a peer can charge them without the
 // visitor's rule, and starts over. Every key is in it, not only the ones being drained: spread over
-// N nodes, a client at N times its rate drains no node's bucket on its own.
+// N nodes, a client at N times its rate drains no node's bucket on its own. A lost round undercounts,
+// except for a refund of a charge sent in an earlier round, which then stays charged on the peers
+// until the bucket refills; refunds almost always come in the same round as their charge.
 func (s *Service) BucketDeltas() SharedBuckets {
 	deltas := make(SharedBuckets)
+	dropped := 0
+	defer func() {
+		if dropped > 0 {
+			log.Tag(tag).Warn("Not sharing the buckets of %d key(s) this round, more than %d keys used them", dropped, bucketDeltasMax)
+		}
+	}()
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
 		for key, d := range bs.deltas {
 			e, ok := bs.entries[key]
-			if !ok || len(deltas) >= bucketDeltasMax {
-				continue // Pruned since, or a round that would be too large: the peers undercount
+			if !ok {
+				continue // Pruned since
+			} else if len(deltas) >= bucketDeltasMax {
+				dropped++ // A round that would be too large: the peers undercount
+				continue
 			}
 			for k := range d {
 				if d[k] == 0 {
@@ -413,7 +428,7 @@ func (s *Service) ChargeBuckets(buckets SharedBuckets) {
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
 		for kind, u := range kinds {
-			if b, rule := e.sharedNoLock(kind, u, now); b != nil {
+			if b, rule := e.peerBucketNoLock(kind, u, now); b != nil {
 				b.tokens = math.Min(math.Max(b.tokens-u.Used, -float64(rule.Burst)), float64(rule.Burst))
 				e.noteFull(b, rule)
 			}
@@ -423,7 +438,9 @@ func (s *Service) ChargeBuckets(buckets SharedBuckets) {
 }
 
 // BucketSnapshot returns every bucket that is not full, as the tokens used below its burst, for a
-// peer that restarts (RestoreBuckets). A full bucket is what a fresh node has anyway.
+// peer that restarts (RestoreBuckets). A full bucket is what a fresh node has anyway. What this node
+// used since its last BucketDeltas is left out: the next round sends it to the peer, which would
+// otherwise count it twice.
 func (s *Service) BucketSnapshot() SharedBuckets {
 	now := s.now()
 	snapshot := make(SharedBuckets)
@@ -436,13 +453,17 @@ func (s *Service) BucketSnapshot() SharedBuckets {
 					continue
 				}
 				e.refillNoLock(b.rule(Kind(k)), now)
-				if b.tokens >= float64(b.burst) {
+				used := float64(b.burst) - b.tokens
+				if d, ok := bs.deltas[key]; ok {
+					used -= d[k]
+				}
+				if used <= 0 {
 					continue
 				}
 				if snapshot[key] == nil {
 					snapshot[key] = make(map[Kind]*BucketUsage)
 				}
-				snapshot[key][Kind(k)] = b.usage(float64(b.burst) - b.tokens)
+				snapshot[key][Kind(k)] = b.usage(used)
 			}
 		}
 		bs.mu.Unlock()
@@ -460,7 +481,7 @@ func (s *Service) RestoreBuckets(buckets SharedBuckets) {
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
 		for kind, u := range kinds {
-			if b, rule := e.sharedNoLock(kind, u, now); b != nil && float64(rule.Burst)-b.tokens < u.Used {
+			if b, rule := e.peerBucketNoLock(kind, u, now); b != nil && float64(rule.Burst)-b.tokens < u.Used {
 				b.tokens = math.Max(float64(rule.Burst)-u.Used, -float64(rule.Burst))
 				e.noteFull(b, rule)
 			}
@@ -713,12 +734,14 @@ func (bs *bucketShard) noteDeltaNoLock(key string, kind Kind, n float64) {
 	d[kind] += n
 }
 
-// sharedNoLock refills the entry's bucket of the kind for a peer's usage and returns it with the rule
-// to charge it by: the rule this node last used it with, or the peer's if this node never did. It
-// returns nil for a kind this node does not know (a newer peer) or a usage without a bucket. The
-// caller must hold the shard's lock.
-func (e *bucketEntry) sharedNoLock(kind Kind, u *BucketUsage, now time.Time) (*bucket, *Rule) {
-	if kind >= numKinds || u == nil || u.Burst <= 0 {
+// peerBucketNoLock refills the entry's bucket of the kind for a peer's usage and returns it with the
+// rule to charge it by: the more generous of the peer's rule and the one the bucket was last used
+// with, so a tier upgrade on the peer applies here too, and two rules that disagree undercount rather
+// than lock the key out. When the client comes here, this node's own rule applies again. It returns
+// nil for a kind this node does not know (a newer peer) or a usage without a valid bucket. The caller
+// must hold the shard's lock.
+func (e *bucketEntry) peerBucketNoLock(kind Kind, u *BucketUsage, now time.Time) (*bucket, *Rule) {
+	if kind >= numKinds || u == nil || u.Burst <= 0 || u.Burst > sharedBurstMax || u.Refill < 0 {
 		return nil, nil
 	}
 	b := &e.buckets[kind]
@@ -728,7 +751,10 @@ func (e *bucketEntry) sharedNoLock(kind Kind, u *BucketUsage, now time.Time) (*b
 		Refill: u.Refill,
 	}
 	if b.last != 0 {
-		rule = b.rule(kind)
+		rule.Burst = max(rule.Burst, b.burst)
+		if b.refillTime > 0 && (rule.Refill == 0 || b.refillTime < rule.Refill) {
+			rule.Refill = b.refillTime // A zero refill never refills, so any other is more generous
+		}
 	}
 	e.refillNoLock(rule, now)
 	return b, rule
@@ -788,7 +814,7 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 		b.last = nowNanos
 	}
 	b.burst = rule.Burst
-	b.rate = rule.Refill
+	b.refillTime = rule.Refill
 }
 
 // rule returns the rule the bucket was last used with
@@ -796,7 +822,7 @@ func (b *bucket) rule(kind Kind) *Rule {
 	return &Rule{
 		Kind:   kind,
 		Burst:  b.burst,
-		Refill: b.rate,
+		Refill: b.refillTime,
 	}
 }
 
@@ -805,7 +831,7 @@ func (b *bucket) usage(used float64) *BucketUsage {
 	return &BucketUsage{
 		Used:   used,
 		Burst:  b.burst,
-		Refill: b.rate,
+		Refill: b.refillTime,
 	}
 }
 

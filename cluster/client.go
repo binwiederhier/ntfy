@@ -18,10 +18,9 @@ const (
 	healthMaxBytes = 4 * 1024    // Upper bound for a peer's health response
 	statusMaxBytes = 1024 * 1024 // Upper bound for a node's status response
 
-	// bucketsMaxBytes bounds a bucket exchange either way: a round's deltas (at most
-	// limit's bucketDeltasMax keys) and a starting node's snapshot (every key that is not full,
-	// ~80 bytes each; ~70k keys on ntfy.sh, under 10 MB)
-	bucketsMaxBytes = 64 * 1024 * 1024
+	// bucketSnapshotMaxBytes bounds a peer's bucket snapshot: every key that is not full, ~80 bytes
+	// each (~90k keys on ntfy.sh, ~7 MB; 17 MB at three times that)
+	bucketSnapshotMaxBytes = 64 * 1024 * 1024
 )
 
 // Client speaks the peer API to another node's cluster listener: it builds the requests, sets the
@@ -71,7 +70,7 @@ func (c *Client) SendBuckets(ctx context.Context, baseURL string, body []byte) e
 // Buckets reads a peer's buckets that are not full
 func (c *Client) Buckets(ctx context.Context, baseURL string) (limit.SharedBuckets, error) {
 	var buckets limit.SharedBuckets
-	if err := c.get(ctx, bucketsURL(baseURL), bucketsMaxBytes, &buckets); err != nil {
+	if err := c.get(ctx, bucketsURL(baseURL), bucketSnapshotMaxBytes, &buckets); err != nil {
 		return nil, err
 	}
 	return buckets, nil

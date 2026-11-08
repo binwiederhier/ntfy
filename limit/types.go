@@ -102,10 +102,10 @@ type bucketShard struct {
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
 // then start at the rule's burst. Tokens may go negative (debt) when a burst shrinks.
 type bucket struct {
-	tokens float64
-	last   int64         // Unix nanoseconds of the last refill, 0 if never used
-	burst  int64         // Burst of the rule the bucket was last used with; caps refunds and debt
-	rate   time.Duration // Refill of the rule the bucket was last used with, to charge peers' usage without a rule
+	tokens     float64
+	last       int64         // Unix nanoseconds of the last refill, 0 if never used
+	burst      int64         // Burst of the rule the bucket was last used with; caps refunds and debt
+	refillTime time.Duration // Refill of the rule the bucket was last used with, to charge peers' usage without a rule
 }
 
 // limiter is the util.Limiter view of one key's bucket for one rule (see Service.Limiter)

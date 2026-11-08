@@ -3,16 +3,19 @@ package cluster
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
@@ -83,6 +86,67 @@ func TestMesh_PeerAPI_SelfOrigin(t *testing.T) {
 	mesh.ServeHTTP(rr, req)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, 0, delivered)
+}
+
+func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
+	// A round of deltas is at most ~4 MB (bucketDeltasMax keys); a larger body is refused before it
+	// is decoded into memory, whoever sends it
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	charged := 0
+	conf.BucketsFunc = func(buckets limit.SharedBuckets) {
+		charged += len(buckets)
+	}
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	post := func(keys int) int {
+		var body strings.Builder
+		body.WriteString("{")
+		for i := 0; i < keys; i++ {
+			if i > 0 {
+				body.WriteString(",")
+			}
+			fmt.Fprintf(&body, `"ip:10.%d.%d.%d":{"requests":{"u":1,"b":60,"r":5000000000}}`, i>>16&255, i>>8&255, i&255)
+		}
+		body.WriteString("}")
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", BucketsPath, strings.NewReader(body.String()))
+		req.Header.Set(secretHeader, testSecret)
+		req.Header.Set(originHeader, "node-b")
+		mesh.ServeHTTP(rr, req)
+		return rr.Code
+	}
+	require.Equal(t, http.StatusOK, post(1000))
+	require.Equal(t, 1000, charged)
+	require.Equal(t, http.StatusBadRequest, post(200000)) // ~12 MB
+	require.Equal(t, 1000, charged)
+}
+
+func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
+	// A peer that does not take a round of buckets (it restarts, every deploy) is counted apart from
+	// failed message batches, which alert
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeer(t, pool, "node-b", "http://127.0.0.1:1") // Nothing listens
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:2"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	sendErrors, bucketErrors := testutil.ToFloat64(metrics.ClusterSendErrors), testutil.ToFloat64(metrics.ClusterBucketSendErrors)
+	mesh.BroadcastBuckets(limit.SharedBuckets{
+		"ip:1.2.3.4": {
+			limit.KindRequests: {
+				Used:   1,
+				Burst:  60,
+				Refill: 5 * time.Second,
+			},
+		},
+	})
+	waitFor(t, func() bool {
+		return testutil.ToFloat64(metrics.ClusterBucketSendErrors) == bucketErrors+1
+	})
+	require.Equal(t, sendErrors, testutil.ToFloat64(metrics.ClusterSendErrors))
 }
 
 func TestMesh_HealthEndpoint(t *testing.T) {

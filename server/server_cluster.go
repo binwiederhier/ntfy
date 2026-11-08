@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
@@ -63,6 +64,10 @@ func (s *Server) maybeCloseLocalSubscribers() {
 	}
 }
 
+// testHookBucketGossip, if non-nil, is called by gossipBuckets between taking a round and sending
+// it, so tests can stop a node at that point; it is always nil in production
+var testHookBucketGossip func(s *Server, buckets limit.SharedBuckets)
+
 // restoreBuckets takes the visitors' buckets over from the live peers before this node serves.
 // Every peer holds the whole cluster's buckets (see limit.Service.ChargeBuckets), so a rolling
 // restart, or a crash, forgives nothing as long as one node is up; only what this node used in its
@@ -76,13 +81,14 @@ func (s *Server) restoreBuckets() {
 }
 
 // runBucketGossip sends the peers what this node used of its visitors' buckets every
-// bucketGossipInterval, until the server stops
+// bucketGossipInterval, until stop ends it (before the last round, see stop)
 func (s *Server) runBucketGossip() {
+	defer s.bucketGossip.Done()
 	for {
 		select {
 		case <-time.After(bucketGossipInterval):
 			s.gossipBuckets()
-		case <-s.closeChan:
+		case <-s.bucketGossipStop:
 			return
 		}
 	}
@@ -92,5 +98,9 @@ func (s *Server) runBucketGossip() {
 // (see limit.Service.BucketDeltas), which they charge into their own buckets, so a client spread
 // over the nodes gets its limits once, not once per node
 func (s *Server) gossipBuckets() {
-	s.cluster.BroadcastBuckets(s.limiter.BucketDeltas())
+	buckets := s.limiter.BucketDeltas()
+	if testHookBucketGossip != nil {
+		testHookBucketGossip(s, buckets)
+	}
+	s.cluster.BroadcastBuckets(buckets)
 }

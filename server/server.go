@@ -83,7 +83,9 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
-	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
+	bucketGossipStop  chan struct{}  // Closed by stop to end runBucketGossip; nil single-node
+	bucketGossip      sync.WaitGroup // runBucketGossip, which stop waits for before the last round
+	tail              *message.Tail  // Reads what was written, see runTail; nil without a message cache
 	stopOnce          sync.Once
 	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
 	streams           *streamRegistry // Open subscriber connections, for Drain
@@ -392,13 +394,16 @@ func New(conf *Config) (*Server, error) {
 	}
 	if conf.ClusterListen != "" {
 		s.limiter.ShareBuckets() // Kept for gossipBuckets
-		s.restoreBuckets()
+		s.bucketGossipStop = make(chan struct{})
 	}
 	if err := s.limiter.Start(context.Background()); err != nil {
 		return nil, err
 	}
 	if err := s.topicService.Start(context.Background()); err != nil {
 		return nil, err
+	}
+	if conf.ClusterListen != "" {
+		s.restoreBuckets() // Last, so what the peers send before Run listens is as little as possible
 	}
 	return s, nil
 }
@@ -602,11 +607,12 @@ func (s *Server) Run() error {
 			errChan <- s.runSMTPServer()
 		}()
 	}
-	s.mu.Unlock()
-	go s.runManager()
-	if s.config.ClusterListen != "" {
+	if s.bucketGossipStop != nil {
+		s.bucketGossip.Add(1) // Under the lock, so stop cannot wait before it
 		go s.runBucketGossip()
 	}
+	s.mu.Unlock()
+	go s.runManager()
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
 
@@ -663,6 +669,10 @@ func (s *Server) stop() {
 		s.tail.Close() // Before the databases close under it
 	}
 	if s.cluster != nil {
+		if s.bucketGossipStop != nil {
+			close(s.bucketGossipStop)
+			s.bucketGossip.Wait() // Its round, if it took one, is sent before the last one
+		}
 		s.gossipBuckets() // The last round, after the listeners closed; Close waits for it
 		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
 	}

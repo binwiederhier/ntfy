@@ -10,9 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/metrics"
 )
 
 func TestServer_Drain_ClosesStreamsGradually(t *testing.T) {
@@ -190,6 +193,41 @@ func TestServer_Drain_ZeroDurationClosesAllAtOnce(t *testing.T) {
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
 	require.True(t, cl.draining)
+}
+
+func TestServer_Drain_ClosedWebSocketsAreNotErrors(t *testing.T) {
+	// Closing a WebSocket subscriber during a drain is by design: it must not count as a 500. Many
+	// connections, because the error that wins the race between reader and writer varies.
+	s, _ := newDrainTestServer(t, 0, true)
+	s.config.VisitorSubscriptionLimit = 100
+	httpServer := httptest.NewServer(http.HandlerFunc(s.handle))
+	defer httpServer.Close()
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/mytopic/ws"
+	conns := make([]*websocket.Conn, 0)
+	for i := 0; i < 50; i++ {
+		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		require.Nil(t, err)
+		defer conn.Close()
+		conns = append(conns, conn)
+	}
+	waitFor(t, func() bool {
+		return s.streams.Len() == 50
+	})
+	internalErrors := metrics.HTTPRequests.WithLabelValues("500", "50001", "GET")
+	before := testutil.ToFloat64(internalErrors)
+	s.Drain(context.Background())
+	for _, conn := range conns {
+		for {
+			if _, _, err := conn.NextReader(); err != nil {
+				break // The open message comes first, then the close
+			}
+		}
+	}
+	waitFor(t, func() bool {
+		return s.streams.Len() == 0
+	})
+	time.Sleep(100 * time.Millisecond) // The handlers log and count after they deregister their stream
+	require.Equal(t, before, testutil.ToFloat64(internalErrors))
 }
 
 func TestServer_Drain_SkippedOnPassiveNode(t *testing.T) {

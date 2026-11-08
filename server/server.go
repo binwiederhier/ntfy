@@ -59,7 +59,7 @@ type Server struct {
 	httpsServer       *http.Server
 	httpMetricsServer *http.Server
 	httpProfileServer *http.Server
-	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (cluster-listen)
+	httpClusterServer *http.Server // Dedicated private listener for node-to-node fan-out (experimental-cluster-listen)
 	unixListener      net.Listener
 	adminUnixListener net.Listener // Serves the admin API on the local admin socket, see handleAdminSocket
 	smtpServer        *smtp.Server
@@ -366,7 +366,7 @@ func New(conf *Config) (*Server, error) {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
-		Enabled:           conf.ClusterListen != "", // Setting cluster-listen implicitly enables clustering
+		Enabled:           conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
 		NodeID:            cluster.NodeID(conf.ClusterNodeID),
 		AdvertiseURL:      advertiseURL,
 		Role:              conf.ClusterRole,
@@ -1950,6 +1950,12 @@ func (s *Server) handleSubscribeWS(w http.ResponseWriter, r *http.Request, v *vi
 		return err
 	}
 	err = g.Wait()
+	if err != nil && cancelCtx.Err() != nil {
+		// We closed the connection ourselves (drain, or a canceled subscription), so the reader's
+		// "use of closed network connection" may win the race against the writer's close error
+		logvr(v, r).Tag(tagWebsocket).Err(err).Debug("WebSocket connection closed by server")
+		return nil
+	}
 	if err != nil && websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure, websocket.CloseNoStatusReceived) {
 		logvr(v, r).Tag(tagWebsocket).Err(err).Fields(websocketErrorContext(err)).Trace("WebSocket connection closed")
 		return nil // Normal closures are not errors; note: "1006 (abnormal closure)" is treated as normal, because people disconnect a lot

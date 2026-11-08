@@ -6,11 +6,27 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.37.1 | Nov 2, 2026   |
+| ntfy server      | v2.37.2 | Nov 3, 2026   |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.37.2
+Released November 3, 2026
+
+This release is about running ntfy on PostgreSQL with read replicas: reads go to the least busy replica, and a
+connection to a database node that went away (e.g. during a resize) fails after 30 seconds instead of hanging for
+~15 minutes.
+
+**Features:**
+
+* Send read-only queries to the least busy read replica instead of round-robin, so a replica that stalls stops getting new reads; the new `ntfy_db_ping_seconds` metric shows how long each database takes to answer its health check ([#2156](https://github.com/binwiederhier/ntfy/pull/2156))
+
+**Bug fixes + maintenance:**
+
+* PostgreSQL connections give up after 30 seconds without an answer from the database server (`TCP_USER_TIMEOUT`, Linux only), instead of hanging for ~15 minutes when a node goes away during a resize or failover ([#2159](https://github.com/binwiederhier/ntfy/pull/2159))
+* `ntfy cluster status` lists the node itself as the first row of the table (marked "this node", and "leader" if it leads) instead of a line above it ([#2153](https://github.com/binwiederhier/ntfy/pull/2153))
 
 ## ntfy server v2.37.1
 Released November 2, 2026
@@ -2355,10 +2371,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Bug fixes + maintenance:**
 
-* `ntfy cluster status` lists the node itself as the first row of the table (marked "this node", and "leader" if it leads) instead of a line above it ([#2153](https://github.com/binwiederhier/ntfy/pull/2153))
-* The cluster and admin socket options lost their `experimental-` prefix, e.g. `cluster-listen` instead of `experimental-cluster-listen` (and `NTFY_CLUSTER_LISTEN`); the old names still work ([#2154](https://github.com/binwiederhier/ntfy/pull/2154))
-* Send read-only queries to the least busy read replica instead of round-robin, so a replica that stalls stops getting new reads; the new `ntfy_db_ping_seconds` metric shows how long each database takes to answer its health check ([#2156](https://github.com/binwiederhier/ntfy/pull/2156))
-* PostgreSQL connections give up after 30 seconds without an answer from the database server (`TCP_USER_TIMEOUT`, Linux only), instead of hanging for ~15 minutes when a node goes away during a resize or failover ([#2159](https://github.com/binwiederhier/ntfy/pull/2159))
+* WebSocket subscribers that a node closes while draining are no longer counted and logged as internal server errors (HTTP 500, ntfy error 50001); on ntfy.sh, each node's drain counted ~18k of them and tripped the 5xx alert, although clients never saw an error ([#2171](https://github.com/binwiederhier/ntfy/pull/2171))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

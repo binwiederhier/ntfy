@@ -527,7 +527,7 @@ func (s *Server) handleAdminTiersDelete(w http.ResponseWriter, r *http.Request, 
 
 // listenAdminSocket creates the socket's directory, removes a stale socket file (one with no
 // server behind it) and listens. Anything at the path that is not a socket is left alone, in case
-// listen-admin-unix points somewhere it should not (e.g. at the database). A socket that answers
+// experimental-listen-admin-unix points somewhere it should not (e.g. at the database). A socket that answers
 // belongs to another running server; in that case this one does not take it over.
 func (s *Server) listenAdminSocket() (net.Listener, error) {
 	path := s.config.ListenAdminUnix
@@ -542,7 +542,7 @@ func (s *Server) listenAdminSocket() (net.Listener, error) {
 		conn.Close()
 		return nil, fmt.Errorf("another server is listening on %s", path)
 	} else if errors.Is(err, fs.ErrPermission) {
-		return nil, fmt.Errorf("%s belongs to a server of another user, set listen-admin-unix to a path of your own", path)
+		return nil, fmt.Errorf("%s belongs to a server of another user, set experimental-listen-admin-unix to a path of your own", path)
 	}
 	if stat, err := os.Lstat(path); err == nil {
 		if stat.Mode().Type() != fs.ModeSocket {

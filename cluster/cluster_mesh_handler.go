@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
@@ -96,11 +97,35 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 		log.Tag(tag).Debug("Peer %s deleted %d user(s)", origin, len(state.DeletedUserIDs))
 		c.conf.UsersDeletedFunc(state.DeletedUserIDs)
 	}
-	if len(state.Requests) > 0 && c.conf.RequestsFunc != nil {
-		log.Tag(tag).Trace("Received requests of %d visitor key(s) from peer %s", len(state.Requests), origin)
-		c.conf.RequestsFunc(state.Requests)
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleBuckets receives what a peer used of its visitors' buckets and hands it to the server
+func (c *meshCluster) handleBuckets(origin NodeID, w http.ResponseWriter, r *http.Request) {
+	var buckets limit.SharedBuckets
+	if err := json.NewDecoder(io.LimitReader(r.Body, bucketsMaxBytes)).Decode(&buckets); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if ev := log.Tag(tag); ev.IsTrace() {
+		ev.Trace("Received buckets of %d visitor key(s) from peer %s", len(buckets), origin)
+	}
+	if c.conf.BucketsFunc != nil {
+		c.conf.BucketsFunc(buckets)
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// handleBucketSnapshot serves this node's buckets that are not full to a starting peer
+func (c *meshCluster) handleBucketSnapshot(w http.ResponseWriter, _ *http.Request) {
+	buckets := limit.SharedBuckets{}
+	if c.conf.BucketSnapshotFunc != nil {
+		buckets = c.conf.BucketSnapshotFunc()
+	}
+	w.Header().Set("Content-Type", contentTypeJSON)
+	if err := json.NewEncoder(w).Encode(buckets); err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot write buckets")
+	}
 }
 
 // handleMembers lists the live cluster members for the load balancers' agents

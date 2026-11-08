@@ -61,9 +61,9 @@ const (
 	// forgets its buckets, so a key in steady use is not dropped and recreated over and over
 	settledIdle = time.Minute
 
-	// hotRequestsMax bounds the keys HotRequests returns per round, so a flood of fresh keys
-	// cannot make one round's message to the peers unbounded (~50 bytes per key on the wire)
-	hotRequestsMax = 10000
+	// bucketDeltasMax bounds the keys BucketDeltas returns per round, so a flood of fresh keys
+	// cannot make one round's message to the peers unbounded (~80 bytes per key on the wire)
+	bucketDeltasMax = 50000
 )
 
 // Service decides on usage from memory; see the package comment
@@ -358,73 +358,112 @@ func (s *Service) Size() int {
 	return size
 }
 
-// ShareRequests makes the service count the requests it admits per key, for HotRequests. Only a
-// cluster shares them; without, nothing would ever take the counts.
-func (s *Service) ShareRequests() {
+// ShareBuckets makes the service keep what it uses of each key's buckets, for BucketDeltas. Only a
+// cluster shares them; without, nothing would ever take the deltas.
+func (s *Service) ShareBuckets() {
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
-		if bs.requests == nil {
-			bs.requests = make(map[string]int64)
+		if bs.deltas == nil {
+			bs.deltas = make(map[string]*[numKinds]float64)
 		}
 		bs.mu.Unlock()
 	}
 }
 
-// HotRequests returns the requests admitted here since the last call, per key whose request bucket
-// is below half its burst, and starts the counts over for every key. A key above half uses less
-// than its refill, or a part of one burst: what the peers would charge for it does not change
-// their decisions, and leaving it out keeps the exchange to the few keys that are being drained
-// (~500 of ~70k keys on ntfy.sh). A key's requests from rounds in which it was not hot are not
-// shared later: the peers then undercount, which is the safe side.
-func (s *Service) HotRequests() map[string]int64 {
-	now := s.now()
-	hot := make(map[string]int64)
+// BucketDeltas returns the tokens this node used per key and kind since the last call (refunds
+// netted out), each with its bucket's burst and refill, so a peer can charge them without the
+// visitor's rule, and starts over. Every key is in it, not only the ones being drained: spread over
+// N nodes, a client at N times its rate drains no node's bucket on its own.
+func (s *Service) BucketDeltas() SharedBuckets {
+	deltas := make(SharedBuckets)
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
-		for key, n := range bs.requests {
+		for key, d := range bs.deltas {
 			e, ok := bs.entries[key]
-			if !ok || len(hot) >= hotRequestsMax {
-				continue
+			if !ok || len(deltas) >= bucketDeltasMax {
+				continue // Pruned since, or a round that would be too large: the peers undercount
 			}
-			b := &e.buckets[KindRequests]
-			rule := &Rule{
-				Kind:   KindRequests,
-				Burst:  b.burst,
-				Refill: b.rate,
-			}
-			e.refillNoLock(rule, now)
-			if b.tokens < float64(b.burst)/2 {
-				hot[key] = n
+			for k := range d {
+				if d[k] == 0 {
+					continue
+				}
+				if deltas[key] == nil {
+					deltas[key] = make(map[Kind]*BucketUsage)
+				}
+				deltas[key][Kind(k)] = e.buckets[k].usage(d[k])
 			}
 		}
-		if bs.requests != nil {
-			bs.requests = make(map[string]int64)
+		if bs.deltas != nil {
+			bs.deltas = make(map[string]*[numKinds]float64)
 		}
 		bs.mu.Unlock()
 	}
-	return hot
+	return deltas
 }
 
-// ChargeRequests takes the requests that peers admitted (their HotRequests) from the keys' request
-// buckets here, down to a debt of one burst: an abuser spread over the nodes then gets the
-// configured rate from the cluster, while a burst cannot lock a key, or the neighbors behind its
-// NAT, out for longer than one burst takes to refill. Keys without a bucket here are skipped:
-// they are not limited here yet, and when they come, they get this node's burst, as without peers.
-func (s *Service) ChargeRequests(requests map[string]int64) {
+// ChargeBuckets takes what peers used (their BucketDeltas) from the keys' buckets here, down to a
+// debt of one burst: an abuser spread over the nodes then gets the configured rate from the
+// cluster, while a burst cannot lock a key, or the neighbors behind its NAT, out for longer than one
+// burst takes to refill. A key this node has not seen gets a bucket with the peer's rule, so it is
+// known here when the client comes, and when a restarting peer asks (BucketSnapshot).
+func (s *Service) ChargeBuckets(buckets SharedBuckets) {
 	now := s.now()
-	for key, n := range requests {
+	for key, kinds := range buckets {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
-		if e, ok := bs.entries[key]; ok && e.buckets[KindRequests].last != 0 {
-			b := &e.buckets[KindRequests]
-			rule := &Rule{
-				Kind:   KindRequests,
-				Burst:  b.burst,
-				Refill: b.rate,
+		e := bs.entryNoLock(key, now)
+		for kind, u := range kinds {
+			if b, rule := e.sharedNoLock(kind, u, now); b != nil {
+				b.tokens = math.Min(math.Max(b.tokens-u.Used, -float64(rule.Burst)), float64(rule.Burst))
+				e.noteFull(b, rule)
 			}
-			e.refillNoLock(rule, now)
-			b.tokens = math.Max(b.tokens-float64(n), -float64(b.burst))
-			e.noteFull(b, rule)
+		}
+		bs.mu.Unlock()
+	}
+}
+
+// BucketSnapshot returns every bucket that is not full, as the tokens used below its burst, for a
+// peer that restarts (RestoreBuckets). A full bucket is what a fresh node has anyway.
+func (s *Service) BucketSnapshot() SharedBuckets {
+	now := s.now()
+	snapshot := make(SharedBuckets)
+	for _, bs := range s.buckets {
+		bs.mu.Lock()
+		for key, e := range bs.entries {
+			for k := range e.buckets {
+				b := &e.buckets[k]
+				if b.last == 0 || b.burst <= 0 {
+					continue
+				}
+				e.refillNoLock(b.rule(Kind(k)), now)
+				if b.tokens >= float64(b.burst) {
+					continue
+				}
+				if snapshot[key] == nil {
+					snapshot[key] = make(map[Kind]*BucketUsage)
+				}
+				snapshot[key][Kind(k)] = b.usage(float64(b.burst) - b.tokens)
+			}
+		}
+		bs.mu.Unlock()
+	}
+	return snapshot
+}
+
+// RestoreBuckets takes over a peer's BucketSnapshot. Every peer holds the whole cluster's buckets
+// (ChargeBuckets), so a bucket keeps the most used of here and the snapshot, never the sum: a
+// node that restores from two peers, or got a delta before the snapshot, does not count twice.
+func (s *Service) RestoreBuckets(buckets SharedBuckets) {
+	now := s.now()
+	for key, kinds := range buckets {
+		bs := s.buckets[shardIndex(key)]
+		bs.mu.Lock()
+		e := bs.entryNoLock(key, now)
+		for kind, u := range kinds {
+			if b, rule := e.sharedNoLock(kind, u, now); b != nil && float64(rule.Burst)-b.tokens < u.Used {
+				b.tokens = math.Max(float64(rule.Burst)-u.Used, -float64(rule.Burst))
+				e.noteFull(b, rule)
+			}
 		}
 		bs.mu.Unlock()
 	}
@@ -597,9 +636,7 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
-	if rule.Kind == KindRequests && bs.requests != nil {
-		bs.requests[key] += n
-	}
+	bs.noteDeltaNoLock(key, rule.Kind, float64(n))
 	return b.decision(Decision{OK: true}, rule)
 }
 
@@ -611,7 +648,9 @@ func (s *Service) refundTokens(key string, kind Kind, n int64) {
 	if e, ok := bs.entries[key]; ok {
 		b := &e.buckets[kind]
 		if b.last != 0 {
+			before := b.tokens
 			b.tokens = math.Min(b.tokens+float64(n), float64(b.burst))
+			bs.noteDeltaNoLock(key, kind, before-b.tokens)
 		}
 	}
 }
@@ -658,6 +697,41 @@ func (bs *bucketShard) entryNoLock(key string, now time.Time) *bucketEntry {
 		bs.entries[key] = e
 	}
 	return e
+}
+
+// noteDeltaNoLock adds n used tokens (negative: refunded) of the kind to what is shared with the
+// peers, if the service shares its buckets. The caller must hold bs.mu.
+func (bs *bucketShard) noteDeltaNoLock(key string, kind Kind, n float64) {
+	if bs.deltas == nil || n == 0 {
+		return
+	}
+	d, ok := bs.deltas[key]
+	if !ok {
+		d = &[numKinds]float64{}
+		bs.deltas[key] = d
+	}
+	d[kind] += n
+}
+
+// sharedNoLock refills the entry's bucket of the kind for a peer's usage and returns it with the rule
+// to charge it by: the rule this node last used it with, or the peer's if this node never did. It
+// returns nil for a kind this node does not know (a newer peer) or a usage without a bucket. The
+// caller must hold the shard's lock.
+func (e *bucketEntry) sharedNoLock(kind Kind, u *BucketUsage, now time.Time) (*bucket, *Rule) {
+	if kind >= numKinds || u == nil || u.Burst <= 0 {
+		return nil, nil
+	}
+	b := &e.buckets[kind]
+	rule := &Rule{
+		Kind:   kind,
+		Burst:  u.Burst,
+		Refill: u.Refill,
+	}
+	if b.last != 0 {
+		rule = b.rule(kind)
+	}
+	e.refillNoLock(rule, now)
+	return b, rule
 }
 
 // settledNoLock returns true if forgetting the entry changes nothing: every bucket is full again,
@@ -715,6 +789,24 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 	}
 	b.burst = rule.Burst
 	b.rate = rule.Refill
+}
+
+// rule returns the rule the bucket was last used with
+func (b *bucket) rule(kind Kind) *Rule {
+	return &Rule{
+		Kind:   kind,
+		Burst:  b.burst,
+		Refill: b.rate,
+	}
+}
+
+// usage returns used tokens of the bucket, with its burst and refill, for the peers
+func (b *bucket) usage(used float64) *BucketUsage {
+	return &BucketUsage{
+		Used:   used,
+		Burst:  b.burst,
+		Refill: b.rate,
+	}
 }
 
 // decision adds the bucket's quota to d: the whole tokens left, and the time until the next one,

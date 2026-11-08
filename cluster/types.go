@@ -3,6 +3,7 @@ package cluster
 import (
 	"time"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/util"
 )
@@ -10,20 +11,21 @@ import (
 // Config configures the cluster. It is assembled by the server from its own config, which keeps
 // this package free of server types.
 type Config struct {
-	Enabled           bool              // Master switch; when false, New returns the nop cluster
-	NodeID            NodeID            // Stable per-node identifier; required
-	AdvertiseURL      string            // Base URL peers use to reach this node's fan-out endpoint
-	Role              Role              // Active (default) or passive: a passive node never leads and never fences
-	Secret            string            // Shared secret authenticating node-to-node fan-out requests
-	HeartbeatInterval time.Duration     // How often the node registry heartbeat is refreshed
-	NodeTTL           time.Duration     // Registry rows older than this do not count as live peers
-	BatchLinger       time.Duration     // How long messages wait in a peer queue to form a batch; 0 = send immediately
-	MaxMessageBytes   int64             // Upper bound for a single message on the wire (batch limits derive from this)
-	UsersDeletedFunc  UsersDeletedFunc  // Told that a peer deleted users; may be nil
-	AccessChangedFunc AccessChangedFunc // Told that a peer changed access entries; may be nil
-	TopicsAddedFunc   TopicsAddedFunc   // Told about topics that just gained their first subscriber on a peer; may be nil
-	IsolatedFunc      IsolatedFunc      // Called while this node is cut off from the cluster; may be nil
-	RequestsFunc      RequestsFunc      // Told how many requests peers admitted per hot visitor key; may be nil
+	Enabled            bool               // Master switch; when false, New returns the nop cluster
+	NodeID             NodeID             // Stable per-node identifier; required
+	AdvertiseURL       string             // Base URL peers use to reach this node's fan-out endpoint
+	Role               Role               // Active (default) or passive: a passive node never leads and never fences
+	Secret             string             // Shared secret authenticating node-to-node fan-out requests
+	HeartbeatInterval  time.Duration      // How often the node registry heartbeat is refreshed
+	NodeTTL            time.Duration      // Registry rows older than this do not count as live peers
+	BatchLinger        time.Duration      // How long messages wait in a peer queue to form a batch; 0 = send immediately
+	MaxMessageBytes    int64              // Upper bound for a single message on the wire (batch limits derive from this)
+	UsersDeletedFunc   UsersDeletedFunc   // Told that a peer deleted users; may be nil
+	AccessChangedFunc  AccessChangedFunc  // Told that a peer changed access entries; may be nil
+	TopicsAddedFunc    TopicsAddedFunc    // Told about topics that just gained their first subscriber on a peer; may be nil
+	IsolatedFunc       IsolatedFunc       // Called while this node is cut off from the cluster; may be nil
+	BucketsFunc        BucketsFunc        // Told what peers used of their visitors' buckets; may be nil
+	BucketSnapshotFunc BucketSnapshotFunc // Asked for this node's buckets by a starting peer; may be nil
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The
@@ -32,10 +34,9 @@ type DeliverFunc func(m *model.Message)
 
 // State is a state delta for Cluster.BroadcastState.
 type State struct {
-	AddedTopics    []string         // Topics that just gained their first local subscriber on this node
-	DeletedUserIDs []string         // Users this node just deleted: peers end their streams
-	AccessChanged  bool             // Access entries changed (written by this node): peers reload their access cache
-	Requests       map[string]int64 // Requests this node admitted per hot visitor key since its last broadcast
+	AddedTopics    []string // Topics that just gained their first local subscriber on this node
+	DeletedUserIDs []string // Users this node just deleted: peers end their streams
+	AccessChanged  bool     // Access entries changed (written by this node): peers reload their access cache
 }
 
 // UsersDeletedFunc is called with the IDs of users a peer just deleted (State.DeletedUserIDs). The
@@ -51,11 +52,15 @@ type UsersDeletedFunc func(userIDs []string)
 // announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
 
-// RequestsFunc is called with the requests a peer admitted per hot visitor key (State.Requests).
-// The server supplies it to charge them into this node's request buckets, so a client spread
-// over the nodes gets its request limit once, not once per node; it must not re-broadcast.
-// A lost update only makes this node's limit a little more generous for a moment.
-type RequestsFunc func(requests map[string]int64)
+// BucketsFunc is called with what a peer used of its visitors' token buckets since its last
+// broadcast (see Cluster.BroadcastBuckets). The server supplies it to charge them into this node's
+// buckets, so a client spread over the nodes gets its limits once, not once per node; it must not
+// re-broadcast. A lost update only makes this node's limits a little more generous for a moment.
+type BucketsFunc func(buckets limit.SharedBuckets)
+
+// BucketSnapshotFunc returns this node's buckets that are not full, for a peer that starts (see
+// Cluster.PeerBuckets). The server supplies it.
+type BucketSnapshotFunc func() limit.SharedBuckets
 
 // AccessChangedFunc is called when a peer changed access entries (State.AccessChanged). The server
 // supplies it to reload its access cache, which ends the local streams that lost access; it must
@@ -130,10 +135,9 @@ type apiHealth struct {
 // concerns (stats) become siblings of Topics. A node that does not know a section ignores it,
 // which keeps mixed-version clusters working during rolling deploys.
 type apiState struct {
-	Topics         *apiStateTopics  `json:"topics,omitempty"`
-	DeletedUserIDs []string         `json:"deleted_user_ids,omitempty"`
-	AccessChanged  bool             `json:"access_changed,omitempty"`
-	Requests       map[string]int64 `json:"requests,omitempty"` // Visitor key -> requests admitted since the last broadcast
+	Topics         *apiStateTopics `json:"topics,omitempty"`
+	DeletedUserIDs []string        `json:"deleted_user_ids,omitempty"`
+	AccessChanged  bool            `json:"access_changed,omitempty"`
 }
 
 // apiStateTopics carries topics that just gained their first subscriber on the sending node.

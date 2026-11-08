@@ -54,6 +54,18 @@ type Decision struct {
 	Reset      time.Duration // RateLimit t=: until the period ends, or until the bucket's next token (0 if it never refills)
 }
 
+// SharedBuckets is what the nodes of a cluster exchange about their token buckets, per key and kind
+// (see Service.BucketDeltas and Service.BucketSnapshot)
+type SharedBuckets map[string]map[Kind]*BucketUsage
+
+// BucketUsage is one bucket's used tokens: since the last exchange (a delta), or below its burst (a
+// snapshot); with the bucket's rule, so a node that never saw the key can create it
+type BucketUsage struct {
+	Used   float64       `json:"u"`
+	Burst  int64         `json:"b"`
+	Refill time.Duration `json:"r"` // Nanoseconds on the wire
+}
+
 // Usage is a key's daily counts in its current period
 type Usage struct {
 	counts [numDaily]int64 // Indexed like a counter's arrays (see dailyIndex)
@@ -82,9 +94,9 @@ type bucketEntry struct {
 
 // bucketShard is one independently locked part of the token buckets
 type bucketShard struct {
-	entries  map[string]*bucketEntry
-	requests map[string]int64 // Requests admitted here since the last HotRequests, to share with peers; nil unless ShareRequests
-	mu       sync.Mutex       // Protects entries, requests and everything inside them
+	entries map[string]*bucketEntry
+	deltas  map[string]*[numKinds]float64 // Tokens used here per kind since the last BucketDeltas, to share with peers; nil unless ShareBuckets
+	mu      sync.Mutex                    // Protects entries, deltas and everything inside them
 }
 
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
@@ -109,6 +121,22 @@ func (k Kind) String() string {
 		return kindNames[k]
 	}
 	return "unknown"
+}
+
+// MarshalText returns the kind's stable name, so kinds are names on the wire (also as map keys)
+func (k Kind) MarshalText() ([]byte, error) {
+	return []byte(k.String()), nil
+}
+
+// UnmarshalText parses a kind's name. A name this node does not know (a newer peer's kind) is not
+// an error, so the rest of the message still counts; it becomes an invalid kind that callers skip.
+func (k *Kind) UnmarshalText(text []byte) error {
+	kind, ok := ParseKind(string(text))
+	if !ok {
+		kind = numKinds
+	}
+	*k = kind
+	return nil
 }
 
 // ParseKind returns the kind with the given name

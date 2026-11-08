@@ -366,17 +366,18 @@ func New(conf *Config) (*Server, error) {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
-		Enabled:           conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
-		NodeID:            cluster.NodeID(conf.ClusterNodeID),
-		AdvertiseURL:      advertiseURL,
-		Role:              conf.ClusterRole,
-		Secret:            conf.ClusterSecret,
-		BatchLinger:       conf.ClusterBatchLinger,
-		UsersDeletedFunc:  s.handleUsersDeleted,
-		AccessChangedFunc: s.handlePeerAccessChanged,
-		IsolatedFunc:      s.maybeCloseLocalSubscribers,
-		RequestsFunc:      s.limiter.ChargeRequests,
-		MaxMessageBytes:   int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
+		Enabled:            conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
+		NodeID:             cluster.NodeID(conf.ClusterNodeID),
+		AdvertiseURL:       advertiseURL,
+		Role:               conf.ClusterRole,
+		Secret:             conf.ClusterSecret,
+		BatchLinger:        conf.ClusterBatchLinger,
+		UsersDeletedFunc:   s.handleUsersDeleted,
+		AccessChangedFunc:  s.handlePeerAccessChanged,
+		IsolatedFunc:       s.maybeCloseLocalSubscribers,
+		BucketsFunc:        s.limiter.ChargeBuckets,
+		BucketSnapshotFunc: s.limiter.BucketSnapshot,
+		MaxMessageBytes:    int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
 		return nil, err
@@ -390,7 +391,8 @@ func New(conf *Config) (*Server, error) {
 		go s.runTail()
 	}
 	if conf.ClusterListen != "" {
-		s.limiter.ShareRequests() // Counted for gossipRequests
+		s.limiter.ShareBuckets() // Kept for gossipBuckets
+		s.restoreBuckets()
 	}
 	if err := s.limiter.Start(context.Background()); err != nil {
 		return nil, err
@@ -603,7 +605,7 @@ func (s *Server) Run() error {
 	s.mu.Unlock()
 	go s.runManager()
 	if s.config.ClusterListen != "" {
-		go s.runRequestGossip()
+		go s.runBucketGossip()
 	}
 	go s.runDelayedSender()
 	go s.runFirebaseKeepaliver()
@@ -661,6 +663,7 @@ func (s *Server) stop() {
 		s.tail.Close() // Before the databases close under it
 	}
 	if s.cluster != nil {
+		s.gossipBuckets() // The last round, after the listeners closed; Close waits for it
 		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
 	}
 	s.limiter.Close()      // Writes the unflushed daily counts, before the databases close under it

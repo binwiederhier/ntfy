@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
@@ -453,21 +455,21 @@ func TestMesh_TopicAnnouncementInvokesTopicsAddedFunc(t *testing.T) {
 	require.Equal(t, []string{"up123456789012"}, addedB)
 }
 
-func TestMesh_RequestsBroadcastInvokesRequestsFunc(t *testing.T) {
-	// The requests node A admitted per hot visitor key must reach node B's RequestsFunc, which
-	// the server uses to charge them into its own request buckets
+func TestMesh_BucketsBroadcastInvokesBucketsFunc(t *testing.T) {
+	// The buckets node A used per visitor key must reach node B's BucketsFunc, which the server
+	// uses to charge them into its own buckets
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	var mu sync.Mutex
-	var requestsB map[string]int64
+	var bucketsB limit.SharedBuckets
 
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
-	confB.RequestsFunc = func(requests map[string]int64) {
+	confB.BucketsFunc = func(buckets limit.SharedBuckets) {
 		mu.Lock()
 		defer mu.Unlock()
-		requestsB = requests
+		bucketsB = buckets
 	}
 	meshB, err := newMeshCluster(confB, poolB, nil)
 	require.Nil(t, err)
@@ -480,15 +482,74 @@ func TestMesh_RequestsBroadcastInvokesRequestsFunc(t *testing.T) {
 	require.Nil(t, err)
 	defer meshA.Close()
 
-	meshA.BroadcastState(&State{Requests: map[string]int64{"ip:1.2.3.4": 42, "user:u_abc": 7}})
+	sent := limit.SharedBuckets{
+		"ip:1.2.3.4": {
+			limit.KindRequests: {
+				Used:   42,
+				Burst:  60,
+				Refill: 5 * time.Second,
+			},
+			limit.KindAuth: {
+				Used:   2,
+				Burst:  30,
+				Refill: 2 * time.Second,
+			},
+		},
+		"user:u_abc": {
+			limit.KindBandwidth: {
+				Used:   -100,
+				Burst:  1000,
+				Refill: time.Minute,
+			},
+		},
+	}
+	meshA.BroadcastBuckets(sent)
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
-		return requestsB != nil
+		return bucketsB != nil
 	})
 	mu.Lock()
 	defer mu.Unlock()
-	require.Equal(t, map[string]int64{"ip:1.2.3.4": 42, "user:u_abc": 7}, requestsB)
+	require.Equal(t, sent, bucketsB)
+}
+
+func TestMesh_PeerBuckets(t *testing.T) {
+	// A starting node reads every live peer's bucket snapshot (BucketSnapshotFunc); a peer that does
+	// not answer is left out
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	poolA, poolB, poolC := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
+	snapshot := limit.SharedBuckets{
+		"ip:1.2.3.4": {
+			limit.KindRequests: {
+				Used:   44.5,
+				Burst:  60,
+				Refill: 5 * time.Second,
+			},
+		},
+	}
+
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
+	confB.BucketSnapshotFunc = func() limit.SharedBuckets {
+		return snapshot
+	}
+	meshB, err := newMeshCluster(confB, poolB, nil)
+	require.Nil(t, err)
+	defer meshB.Close()
+	srvB := &http.Server{Handler: meshB}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+
+	meshC, err := newMeshCluster(newTestMeshConfig("node-c", "http://127.0.0.1:1"), poolC, nil) // Nothing listens
+	require.Nil(t, err)
+	defer meshC.Close()
+
+	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil)
+	require.Nil(t, err)
+	defer meshA.Close()
+	require.Equal(t, []limit.SharedBuckets{snapshot}, meshA.PeerBuckets(context.Background()))
 }
 
 func TestMesh_IsolatedFuncWhenPeersHealthy(t *testing.T) {

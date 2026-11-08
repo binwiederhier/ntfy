@@ -1,8 +1,10 @@
 package cluster
 
 import (
+	"context"
 	"net/http"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -21,6 +23,13 @@ func (c *nopCluster) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 
 func (c *nopCluster) BroadcastState(_ *State) {
 	// No peers to tell
+}
+
+func (c *nopCluster) BroadcastBuckets(_ limit.SharedBuckets) {
+}
+
+func (c *nopCluster) PeerBuckets(_ context.Context) []limit.SharedBuckets {
+	return nil
 }
 
 func (c *nopCluster) IsLeader() bool {

@@ -13,6 +13,7 @@ import (
 
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
@@ -26,6 +27,7 @@ const (
 	batchMaxMessages   = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, deleted users)
+	bucketsSendTimeout = time.Second     // A round of buckets that takes longer is overtaken by the next one
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -55,8 +57,9 @@ type meshCluster struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
-	draining       atomic.Bool // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
-	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
+	bucketSends    sync.WaitGroup // In-flight BroadcastBuckets sends, which Close lets finish (bounded by bucketsSendTimeout)
+	draining       atomic.Bool    // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
+	mu             sync.Mutex     // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -106,6 +109,8 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	c.mux.HandleFunc("GET "+MembersPath, c.secretAuthenticated(c.handleMembers))
 	c.mux.HandleFunc("GET "+HealthPath, c.secretAuthenticated(c.handleHealth))
 	c.mux.HandleFunc("GET "+StatusPath, c.secretAuthenticated(c.handleStatus))
+	c.mux.HandleFunc("POST "+BucketsPath, c.authenticated(c.handleBuckets))
+	c.mux.HandleFunc("GET "+BucketsPath, c.secretAuthenticated(c.handleBucketSnapshot))
 	c.wg.Add(2)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
@@ -146,10 +151,9 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 
 // BroadcastState tells all live peers about state changes that must not wait: topics that
 // gained their first local subscriber (a hint for peers' cached rate-visitor lookups, never
-// used for routing), changed access entries, deleted users, and the requests admitted per hot
-// visitor key.
+// used for routing), changed access entries, and deleted users.
 func (c *meshCluster) BroadcastState(state *State) {
-	if len(state.AddedTopics) == 0 && len(state.DeletedUserIDs) == 0 && !state.AccessChanged && len(state.Requests) == 0 {
+	if len(state.AddedTopics) == 0 && len(state.DeletedUserIDs) == 0 && !state.AccessChanged {
 		return
 	}
 	peers := c.registry.Peers()
@@ -159,7 +163,6 @@ func (c *meshCluster) BroadcastState(state *State) {
 	envelope := &apiState{
 		DeletedUserIDs: state.DeletedUserIDs,
 		AccessChanged:  state.AccessChanged,
-		Requests:       state.Requests,
 	}
 	if len(state.AddedTopics) > 0 {
 		envelope.Topics = &apiStateTopics{Added: state.AddedTopics}
@@ -168,11 +171,7 @@ func (c *meshCluster) BroadcastState(state *State) {
 	if err != nil {
 		return
 	}
-	if ev := log.Tag(tag); len(state.AddedTopics) > 0 || len(state.DeletedUserIDs) > 0 || state.AccessChanged {
-		ev.Debug("Broadcasting state (%d new topics, %d deleted users, access changed: %t, %d request keys) to %d peer(s)", len(state.AddedTopics), len(state.DeletedUserIDs), state.AccessChanged, len(state.Requests), len(peers))
-	} else if ev.IsTrace() {
-		ev.Trace("Broadcasting %d request keys to %d peer(s)", len(state.Requests), len(peers)) // Every second, so not at debug
-	}
+	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d deleted users, access changed: %t) to %d peer(s)", len(state.AddedTopics), len(state.DeletedUserIDs), state.AccessChanged, len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
 			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {
@@ -180,6 +179,61 @@ func (c *meshCluster) BroadcastState(state *State) {
 			})
 		}(p)
 	}
+}
+
+// BroadcastBuckets sends every live peer what this node used of its visitors' buckets (see
+// Cluster.BroadcastBuckets). A failed send is not retried: the peer undercounts that round, which
+// is the safe side, and a peer that was down catches up from a snapshot when it starts.
+func (c *meshCluster) BroadcastBuckets(buckets limit.SharedBuckets) {
+	peers := c.registry.Peers()
+	if len(buckets) == 0 || len(peers) == 0 {
+		return
+	}
+	body, err := json.Marshal(buckets)
+	if err != nil {
+		return
+	}
+	if ev := log.Tag(tag); ev.IsTrace() {
+		ev.Trace("Broadcasting buckets of %d visitor key(s) to %d peer(s)", len(buckets), len(peers)) // Every second, so not at debug
+	}
+	for _, p := range peers {
+		c.bucketSends.Add(1)
+		go func(p *registry.Peer) {
+			defer c.bucketSends.Done()
+			ctx, cancel := context.WithTimeout(c.ctx, bucketsSendTimeout)
+			defer cancel()
+			if err := c.client.SendBuckets(ctx, p.AdvertiseURL, body); err != nil && c.ctx.Err() == nil {
+				metrics.ClusterSendErrors.Inc()
+				log.Tag(tag).Err(err).Debug("Cannot send buckets to peer %s", p.NodeID) // Every second while it is down, and expected while it restarts
+			}
+		}(p)
+	}
+}
+
+// PeerBuckets reads the buckets that are not full from every live peer, in parallel (see
+// Cluster.PeerBuckets)
+func (c *meshCluster) PeerBuckets(ctx context.Context) []limit.SharedBuckets {
+	peers := c.registry.Peers()
+	results := make(chan limit.SharedBuckets, len(peers))
+	for _, p := range peers {
+		go func(p *registry.Peer) {
+			buckets, err := c.client.Buckets(ctx, p.AdvertiseURL)
+			if err != nil {
+				log.Tag(tag).Err(err).Warn("Cannot read buckets from peer %s", p.NodeID)
+				results <- nil
+				return
+			}
+			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(buckets), p.NodeID)
+			results <- buckets
+		}(p)
+	}
+	all := make([]limit.SharedBuckets, 0, len(peers))
+	for range peers {
+		if buckets := <-results; buckets != nil {
+			all = append(all, buckets)
+		}
+	}
+	return all
 }
 
 // Members returns this node plus the peers the registry currently considers live, for the LB
@@ -311,7 +365,8 @@ func (c *meshCluster) Ready() bool {
 // Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,
 // and waits for them to exit.
 func (c *meshCluster) Close() error {
-	c.cancel() // Stops the heartbeat loop and aborts in-flight peer deliveries
+	c.bucketSends.Wait() // The server's last round of buckets, so an orderly restart loses none of them
+	c.cancel()           // Stops the heartbeat loop and aborts in-flight peer deliveries
 	// Close the peer queues so their workers flush and exit; final sends are best-effort since
 	// the context is already canceled (parity with fire-and-forget delivery)
 	c.mu.Lock()

@@ -9,12 +9,19 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"heckel.io/ntfy/v2/limit"
 )
 
 const (
 	clientTimeout  = 5 * time.Second
 	healthMaxBytes = 4 * 1024    // Upper bound for a peer's health response
 	statusMaxBytes = 1024 * 1024 // Upper bound for a node's status response
+
+	// bucketsMaxBytes bounds a bucket exchange either way: a round's deltas (at most
+	// limit's bucketDeltasMax keys) and a starting node's snapshot (every key that is not full,
+	// ~80 bytes each; ~70k keys on ntfy.sh, under 10 MB)
+	bucketsMaxBytes = 64 * 1024 * 1024
 )
 
 // Client speaks the peer API to another node's cluster listener: it builds the requests, sets the
@@ -53,6 +60,21 @@ func (c *Client) SendMessages(ctx context.Context, baseURL string, body []byte) 
 // SendState posts a JSON state envelope to a peer's state endpoint
 func (c *Client) SendState(ctx context.Context, baseURL string, body []byte) error {
 	return c.post(ctx, stateURL(baseURL), contentTypeJSON, body)
+}
+
+// SendBuckets posts what this node used of its visitors' buckets (JSON limit.SharedBuckets) to a
+// peer's buckets endpoint
+func (c *Client) SendBuckets(ctx context.Context, baseURL string, body []byte) error {
+	return c.post(ctx, bucketsURL(baseURL), contentTypeJSON, body)
+}
+
+// Buckets reads a peer's buckets that are not full
+func (c *Client) Buckets(ctx context.Context, baseURL string) (limit.SharedBuckets, error) {
+	var buckets limit.SharedBuckets
+	if err := c.get(ctx, bucketsURL(baseURL), bucketsMaxBytes, &buckets); err != nil {
+		return nil, err
+	}
+	return buckets, nil
 }
 
 // Health asks a peer whether it is healthy; any answer other than a 200 with a health body is an
@@ -128,6 +150,11 @@ func stateURL(advertiseURL string) string {
 // statusURL derives a node's status endpoint URL from its cluster base URL.
 func statusURL(baseURL string) string {
 	return strings.TrimRight(baseURL, "/") + StatusPath
+}
+
+// bucketsURL derives the peer's buckets endpoint URL from its advertise URL.
+func bucketsURL(advertiseURL string) string {
+	return strings.TrimRight(advertiseURL, "/") + BucketsPath
 }
 
 // healthURL derives the peer's health endpoint URL from its advertise URL.

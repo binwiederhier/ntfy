@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -56,6 +57,12 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	if state.AccessChanged {
 		b.accessChanged++
 	}
+}
+
+func (b *fakeCluster) BroadcastBuckets(_ limit.SharedBuckets) {}
+
+func (b *fakeCluster) PeerBuckets(_ context.Context) []limit.SharedBuckets {
+	return nil
 }
 
 func (b *fakeCluster) Ready() bool {
@@ -368,27 +375,8 @@ func TestServer_Cluster_RequestLimitAcrossNodes(t *testing.T) {
 	// A client spread over two nodes gets its request limit once, not once per node: the requests
 	// node A admits for its visitor key are charged into node B's bucket for the same key
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
-	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
-	require.Nil(t, err)
-	confB := newTestConfig(t, schemaDSN)
-	confB.ClusterNodeID = "node-b"
-	confB.ClusterListen = listenerB.Addr().String()
-	confB.ClusterSecret = "s3cret"
-	confB.ClusterAdvertiseURL = "http://" + listenerB.Addr().String()
-	confB.VisitorRequestLimitBurst = 10
-	confB.VisitorRequestLimitReplenish = time.Hour
-	sB := newTestServer(t, confB)
-	srvB := &http.Server{Handler: sB.cluster}
-	go srvB.Serve(listenerB)
-	defer srvB.Close()
-	confA := newTestConfig(t, schemaDSN)
-	confA.ClusterNodeID = "node-a"
-	confA.ClusterListen = "127.0.0.1:1"
-	confA.ClusterSecret = "s3cret"
-	confA.ClusterAdvertiseURL = "http://127.0.0.1:1"
-	confA.VisitorRequestLimitBurst = 10
-	confA.VisitorRequestLimitReplenish = time.Hour
-	sA := newTestServer(t, confA)
+	sB := newTestClusterNode(t, schemaDSN, "node-b", "").s
+	sA := newTestClusterNode(t, schemaDSN, "node-a", "").s
 
 	// One request on node B, nine left there; then the whole burst on node A
 	require.Equal(t, 200, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
@@ -398,16 +386,117 @@ func TestServer_Cluster_RequestLimitAcrossNodes(t *testing.T) {
 	require.Equal(t, 429, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
 
 	// Node A tells node B, which then has no tokens left either (watched without spending any)
-	sA.gossipRequests()
-	rule := limit.Rule{
-		Kind:   limit.KindRequests,
-		Burst:  10,
-		Refill: time.Hour,
-	}
+	sA.gossipBuckets()
 	waitFor(t, func() bool {
-		return sB.limiter.Tokens("ip:9.9.9.9", rule) == 0
+		return sB.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == 0
 	})
 	require.Equal(t, 429, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+}
+
+func TestServer_Cluster_ModerateClientAcrossNodes(t *testing.T) {
+	// A client that alternates between two nodes never drains either node's bucket below half on
+	// its own; it still gets its burst once, not once per node
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	sB := newTestClusterNode(t, schemaDSN, "node-b", "").s
+	sA := newTestClusterNode(t, schemaDSN, "node-a", "").s
+	waitFor(t, func() bool {
+		return len(sB.cluster.Peers()) == 1 // B registered first and sees A from its next heartbeat
+	})
+	for i := 0; i < 5; i++ {
+		require.Equal(t, 200, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
+		require.Equal(t, 200, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+		tokensA, tokensB := sA.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule), sB.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule)
+		sA.gossipBuckets()
+		sB.gossipBuckets()
+		waitFor(t, func() bool {
+			return sA.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == tokensA-1 && sB.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == tokensB-1
+		})
+	}
+	require.Equal(t, 429, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	require.Equal(t, 429, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+}
+
+func TestServer_Cluster_RollingRestartKeepsBuckets(t *testing.T) {
+	// A node that restarts takes the buckets over from its peers before it serves, so a rolling
+	// restart forgives nothing as long as one node is up: node A's spent burst survives A's
+	// restart (from B), and then B's (from the new A)
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	nodeB := newTestClusterNode(t, schemaDSN, "node-b", "")
+	nodeA := newTestClusterNode(t, schemaDSN, "node-a", "")
+	for i := 0; i < 10; i++ {
+		require.Equal(t, 200, request(t, nodeA.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	nodeA.s.gossipBuckets()
+	waitFor(t, func() bool {
+		return nodeB.s.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == 0
+	})
+
+	nodeA.stop()
+	nodeA = newTestClusterNode(t, schemaDSN, "node-a", nodeA.listen)
+	require.Equal(t, 429, request(t, nodeA.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+
+	nodeB.stop()
+	nodeB = newTestClusterNode(t, schemaDSN, "node-b", nodeB.listen)
+	require.Equal(t, 429, request(t, nodeB.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+}
+
+func TestServer_Cluster_StopSendsLastBuckets(t *testing.T) {
+	// A node that stops sends what it used since its last gossip round before it goes, so an
+	// orderly restart loses nothing: the burst node A just spent is on node B once A has stopped
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	nodeB := newTestClusterNode(t, schemaDSN, "node-b", "")
+	nodeA := newTestClusterNode(t, schemaDSN, "node-a", "")
+	for i := 0; i < 10; i++ {
+		require.Equal(t, 200, request(t, nodeA.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	nodeA.stop()
+	require.Equal(t, int64(0), nodeB.s.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule))
+}
+
+// testClusterRequestRule is the request bucket of the nodes newTestClusterNode starts
+var testClusterRequestRule = limit.Rule{
+	Kind:   limit.KindRequests,
+	Burst:  10,
+	Refill: time.Hour,
+}
+
+// testClusterNode is a cluster node of a test: the server, and its peer API on listen
+type testClusterNode struct {
+	s      *Server
+	listen string
+	srv    *http.Server
+}
+
+// newTestClusterNode starts a cluster node with a request burst of 10 (testClusterRequestRule) whose
+// peer API listens on listen, or on a free port if empty
+func newTestClusterNode(t *testing.T, schemaDSN, nodeID, listen string) *testClusterNode {
+	t.Helper()
+	if listen == "" {
+		listen = "127.0.0.1:0"
+	}
+	listener, err := net.Listen("tcp", listen)
+	require.Nil(t, err)
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = nodeID
+	conf.ClusterListen = listener.Addr().String()
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://" + listener.Addr().String()
+	conf.VisitorRequestLimitBurst = int(testClusterRequestRule.Burst)
+	conf.VisitorRequestLimitReplenish = testClusterRequestRule.Refill
+	node := &testClusterNode{
+		s:      newTestServer(t, conf),
+		listen: listener.Addr().String(),
+	}
+	node.srv = &http.Server{Handler: node.s.cluster}
+	go node.srv.Serve(listener)
+	t.Cleanup(node.stop)
+	return node
+}
+
+// stop stops the node and its peer API, freeing its address for a restart
+func (n *testClusterNode) stop() {
+	n.srv.Close()
+	n.s.Stop()
 }
 
 func TestServer_Cluster_DeliverFromBus(t *testing.T) {

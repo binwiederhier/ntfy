@@ -2341,9 +2341,12 @@ A few important notes:
 * **Draining on shutdown:** when an active node gets `SIGTERM` (e.g. `systemctl restart ntfy` during a deploy) and
   another active node is up, it moves its clients to the other nodes gradually before it exits, so a restart does not
   cause a reconnect storm. See [draining on shutdown](#draining-on-shutdown).
-* **Limits are per node.** Rate limits and daily quotas are counted on each node separately, so a visitor spreading
-  requests across N nodes gets N times the limits. Access changes (e.g. a revoked token) reach the other nodes when
-  their access cache reloads.
+* **Limits are shared.** Daily quotas (messages, emails, calls) are counted in the database. The rate limits (requests,
+  failed logins, signups, topic creation, emails, attachment bandwidth) are exchanged between the nodes every second,
+  so a visitor spreading requests across N nodes gets its limits once, give or take one burst per node in the first
+  second. A node that restarts takes the rate limits over from the other nodes before it serves; only if all nodes
+  restart at once do they start over. The number of open subscriptions is limited per node. Access changes (e.g. a
+  revoked token) reach the other nodes when their access cache reloads.
 * Messages published with `cache: no` are not in the database, so for those, delivery across nodes is best effort.
 
 ### Draining on shutdown

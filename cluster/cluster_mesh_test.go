@@ -461,15 +461,16 @@ func TestMesh_BucketsBroadcastInvokesBucketsFunc(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	var mu sync.Mutex
-	var bucketsB limit.SharedBuckets
+	var bucketsB *limit.BucketRound
+	var originB NodeID
 
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
-	confB.BucketsFunc = func(buckets limit.SharedBuckets) {
+	confB.BucketsFunc = func(origin NodeID, round *limit.BucketRound) {
 		mu.Lock()
 		defer mu.Unlock()
-		bucketsB = buckets
+		bucketsB, originB = round, origin
 	}
 	meshB, err := newMeshCluster(confB, poolB, nil)
 	require.Nil(t, err)
@@ -482,24 +483,28 @@ func TestMesh_BucketsBroadcastInvokesBucketsFunc(t *testing.T) {
 	require.Nil(t, err)
 	defer meshA.Close()
 
-	sent := limit.SharedBuckets{
-		"ip:1.2.3.4": {
-			limit.KindRequests: {
-				Used:   42,
-				Burst:  60,
-				Refill: 5 * time.Second,
+	sent := &limit.BucketRound{
+		Epoch: 1794000000000000000,
+		Round: 7,
+		Buckets: limit.SharedBuckets{
+			"ip:1.2.3.4": {
+				limit.KindRequests: {
+					Used:   42,
+					Burst:  60,
+					Refill: 5 * time.Second,
+				},
+				limit.KindAuth: {
+					Used:   2,
+					Burst:  30,
+					Refill: 2 * time.Second,
+				},
 			},
-			limit.KindAuth: {
-				Used:   2,
-				Burst:  30,
-				Refill: 2 * time.Second,
-			},
-		},
-		"user:u_abc": {
-			limit.KindBandwidth: {
-				Used:   -100,
-				Burst:  1000,
-				Refill: time.Minute,
+			"user:u_abc": {
+				limit.KindBandwidth: {
+					Used:   -100,
+					Burst:  1000,
+					Refill: time.Minute,
+				},
 			},
 		},
 	}
@@ -512,6 +517,7 @@ func TestMesh_BucketsBroadcastInvokesBucketsFunc(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	require.Equal(t, sent, bucketsB)
+	require.Equal(t, NodeID("node-a"), originB)
 }
 
 func TestMesh_PeerBuckets(t *testing.T) {
@@ -519,12 +525,16 @@ func TestMesh_PeerBuckets(t *testing.T) {
 	// not answer is left out
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB, poolC := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
-	snapshot := limit.SharedBuckets{
-		"ip:1.2.3.4": {
-			limit.KindRequests: {
-				Used:   44.5,
-				Burst:  60,
-				Refill: 5 * time.Second,
+	snapshot := &limit.BucketRound{
+		Epoch: 1794000000000000000,
+		Round: 12,
+		Buckets: limit.SharedBuckets{
+			"ip:1.2.3.4": {
+				limit.KindRequests: {
+					Used:   44.5,
+					Burst:  60,
+					Refill: 5 * time.Second,
+				},
 			},
 		},
 	}
@@ -532,7 +542,7 @@ func TestMesh_PeerBuckets(t *testing.T) {
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
-	confB.BucketSnapshotFunc = func() limit.SharedBuckets {
+	confB.BucketSnapshotFunc = func() *limit.BucketRound {
 		return snapshot
 	}
 	meshB, err := newMeshCluster(confB, poolB, nil)
@@ -549,7 +559,7 @@ func TestMesh_PeerBuckets(t *testing.T) {
 	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
-	require.Equal(t, []limit.SharedBuckets{snapshot}, meshA.PeerBuckets(context.Background()))
+	require.Equal(t, map[NodeID]*limit.BucketRound{"node-b": snapshot}, meshA.PeerBuckets(context.Background()))
 }
 
 func TestMesh_IsolatedFuncWhenPeersHealthy(t *testing.T) {

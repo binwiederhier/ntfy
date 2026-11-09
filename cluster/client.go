@@ -61,19 +61,19 @@ func (c *Client) SendState(ctx context.Context, baseURL string, body []byte) err
 	return c.post(ctx, stateURL(baseURL), contentTypeJSON, body)
 }
 
-// SendBuckets posts what this node used of its visitors' buckets (JSON limit.SharedBuckets) to a
+// SendBuckets posts what this node used of its visitors' buckets (JSON limit.BucketRound) to a
 // peer's buckets endpoint
 func (c *Client) SendBuckets(ctx context.Context, baseURL string, body []byte) error {
 	return c.post(ctx, bucketsURL(baseURL), contentTypeJSON, body)
 }
 
 // Buckets reads a peer's buckets that are not full
-func (c *Client) Buckets(ctx context.Context, baseURL string) (limit.SharedBuckets, error) {
-	var buckets limit.SharedBuckets
-	if err := c.get(ctx, bucketsURL(baseURL), bucketSnapshotMaxBytes, &buckets); err != nil {
+func (c *Client) Buckets(ctx context.Context, baseURL string) (*limit.BucketRound, error) {
+	var snapshot limit.BucketRound
+	if err := c.get(ctx, bucketsURL(baseURL), bucketSnapshotMaxBytes, &snapshot); err != nil {
 		return nil, err
 	}
-	return buckets, nil
+	return &snapshot, nil
 }
 
 // Health asks a peer whether it is healthy; any answer other than a 200 with a health body is an

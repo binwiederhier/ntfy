@@ -25,10 +25,10 @@ func (c *nopCluster) BroadcastState(_ *State) {
 	// No peers to tell
 }
 
-func (c *nopCluster) BroadcastBuckets(_ limit.SharedBuckets) {
+func (c *nopCluster) BroadcastBuckets(_ *limit.BucketRound) {
 }
 
-func (c *nopCluster) PeerBuckets(_ context.Context) []limit.SharedBuckets {
+func (c *nopCluster) PeerBuckets(_ context.Context) map[NodeID]*limit.BucketRound {
 	return nil
 }
 

@@ -59,9 +59,9 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	}
 }
 
-func (b *fakeCluster) BroadcastBuckets(_ limit.SharedBuckets) {}
+func (b *fakeCluster) BroadcastBuckets(_ *limit.BucketRound) {}
 
-func (b *fakeCluster) PeerBuckets(_ context.Context) []limit.SharedBuckets {
+func (b *fakeCluster) PeerBuckets(_ context.Context) map[cluster.NodeID]*limit.BucketRound {
 	return nil
 }
 
@@ -405,13 +405,12 @@ func TestServer_Cluster_ModerateClientAcrossNodes(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		require.Equal(t, 200, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
 		require.Equal(t, 200, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
-		tokensA, tokensB := sA.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule), sB.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule)
-		sA.gossipBuckets()
-		sB.gossipBuckets()
-		waitFor(t, func() bool {
-			return sA.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == tokensA-1 && sB.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == tokensB-1
-		})
 	}
+	sA.gossipBuckets() // The gossip loops may have sent some rounds already; these send the rest
+	sB.gossipBuckets()
+	waitFor(t, func() bool {
+		return sA.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == 0 && sB.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == 0
+	})
 	require.Equal(t, 429, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
 	require.Equal(t, 429, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
 }
@@ -445,8 +444,8 @@ func TestServer_Cluster_StopWithGossipRunning(t *testing.T) {
 	// round to its peers: the loop is stopped (and finishes its round) before the last round and
 	// before the cluster closes
 	entered, release := make(chan struct{}, 1), make(chan struct{})
-	testHookBucketGossip = func(s *Server, buckets limit.SharedBuckets) {
-		if s.config.ClusterNodeID == "node-a" && len(buckets) > 0 {
+	testHookBucketGossip = func(s *Server, round *limit.BucketRound) {
+		if s.config.ClusterNodeID == "node-a" && len(round.Buckets) > 0 {
 			entered <- struct{}{}
 			<-release
 		}
@@ -457,18 +456,35 @@ func TestServer_Cluster_StopWithGossipRunning(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	nodeB := newTestClusterNode(t, schemaDSN, "node-b", "")
 	nodeA := newTestClusterNode(t, schemaDSN, "node-a", "")
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release) // Runs before the nodes stop, so a failed test does not leave a loop blocked
+		}
+	})
 	for i := 0; i < 10; i++ {
 		require.Equal(t, 200, request(t, nodeA.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
 	}
-	<-entered // The loop took the round, and has not sent it
+	select {
+	case <-entered: // The loop took the round, and has not sent it
+	case <-time.After(10 * time.Second):
+		t.Fatal("the gossip loop did not take a round")
+	}
 	stopped := make(chan struct{})
 	go func() {
 		nodeA.stop()
 		close(stopped)
 	}()
-	time.Sleep(200 * time.Millisecond)
+	waitFor(t, func() bool {
+		return nodeA.s.stopped.Load() // Stop is waiting for the loop
+	})
 	close(release)
-	<-stopped
+	select {
+	case <-stopped:
+	case <-time.After(10 * time.Second):
+		t.Fatal("stop did not finish")
+	}
 	require.Equal(t, int64(0), nodeB.s.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule))
 }
 

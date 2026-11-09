@@ -58,6 +58,22 @@ type Decision struct {
 // (see Service.BucketDeltas and Service.BucketSnapshot)
 type SharedBuckets map[string]map[Kind]*BucketUsage
 
+// BucketRound is what a node sends its peers about its buckets: a round of deltas (see
+// Service.BucketDeltas), or a snapshot (Service.BucketSnapshot), which contains the node's rounds up
+// to Round. Epoch and Round order a node's rounds, so a receiver can skip a round that came late or
+// that a snapshot it took over already contains.
+type BucketRound struct {
+	Epoch   int64         `json:"e"` // When the sending node's limit service was created, unix nanoseconds: a restarted node's rounds start over
+	Round   uint64        `json:"n"` // The round's number in its epoch; for a snapshot, the last round it contains
+	Buckets SharedBuckets `json:"b"`
+}
+
+// peerRound is the last bucket round taken from a peer (see Service.takeRound)
+type peerRound struct {
+	epoch int64
+	round uint64
+}
+
 // BucketUsage is one bucket's used tokens: since the last exchange (a delta), or below its burst (a
 // snapshot); with the bucket's rule, so a node that never saw the key can create it
 type BucketUsage struct {

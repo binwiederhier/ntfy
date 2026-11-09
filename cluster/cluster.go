@@ -37,7 +37,7 @@ const (
 	// StatusPath reports this node's view of the cluster for operators: its role and leadership,
 	// and per peer what it sent there and received from there (see Status)
 	StatusPath = "/v1/cluster/status"
-	// BucketsPath exchanges the visitors' token buckets (JSON limit.SharedBuckets): a POST carries
+	// BucketsPath exchanges the visitors' token buckets (JSON limit.BucketRound): a POST carries
 	// what the sending node used since its last one, a GET returns this node's buckets that are
 	// not full, for a node that starts (see Cluster.BroadcastBuckets and Cluster.PeerBuckets)
 	BucketsPath = "/v1/cluster/buckets"
@@ -117,10 +117,10 @@ type Cluster interface {
 	BroadcastState(state *State)
 	// BroadcastBuckets sends every live peer what this node used of its visitors' token buckets
 	// since the last call (limit.Service.BucketDeltas); fire-and-forget. Nop single-node.
-	BroadcastBuckets(buckets limit.SharedBuckets)
+	BroadcastBuckets(round *limit.BucketRound)
 	// PeerBuckets reads the buckets that are not full from every live peer (limit.Service.BucketSnapshot),
-	// for a node that starts: one entry per peer that answered before ctx is done. None single-node.
-	PeerBuckets(ctx context.Context) []limit.SharedBuckets
+	// for a node that starts: one per peer that answered before ctx is done. None single-node.
+	PeerBuckets(ctx context.Context) map[NodeID]*limit.BucketRound
 	// IsLeader reports whether this node is the one that should run the cluster's singleton jobs
 	// (e.g. the Firebase keepaliver). It is derived from membership, not held as a lock, and it is
 	// a belief with a lease rather than a fence: see registry.IsLeader for what it does and does

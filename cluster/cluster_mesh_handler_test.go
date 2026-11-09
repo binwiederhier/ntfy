@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -94,8 +95,8 @@ func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
 	charged := 0
-	conf.BucketsFunc = func(buckets limit.SharedBuckets) {
-		charged += len(buckets)
+	conf.BucketsFunc = func(_ NodeID, round *limit.BucketRound) {
+		charged += len(round.Buckets)
 	}
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
@@ -103,14 +104,14 @@ func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
 
 	post := func(keys int) int {
 		var body strings.Builder
-		body.WriteString("{")
+		body.WriteString(`{"e":1,"n":1,"b":{`)
 		for i := 0; i < keys; i++ {
 			if i > 0 {
 				body.WriteString(",")
 			}
 			fmt.Fprintf(&body, `"ip:10.%d.%d.%d":{"requests":{"u":1,"b":60,"r":5000000000}}`, i>>16&255, i>>8&255, i&255)
 		}
-		body.WriteString("}")
+		body.WriteString("}}")
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest("POST", BucketsPath, strings.NewReader(body.String()))
 		req.Header.Set(secretHeader, testSecret)
@@ -124,6 +125,31 @@ func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
 	require.Equal(t, 1000, charged)
 }
 
+func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
+	// The largest round a node sends (limit.BucketDeltasMax buckets) fits the body limit of its
+	// peers, also with long keys (IPv6 prefixes, user IDs) and the largest values
+	round := &limit.BucketRound{
+		Epoch:   math.MaxInt64,
+		Round:   math.MaxUint64,
+		Buckets: make(limit.SharedBuckets),
+	}
+	kinds := []limit.Kind{limit.KindRequests, limit.KindBandwidth, limit.KindTopics, limit.KindEmails, limit.KindAuth}
+	for i := 0; len(round.Buckets)*len(kinds) < limit.BucketDeltasMax; i++ {
+		buckets := make(map[limit.Kind]*limit.BucketUsage)
+		for _, kind := range kinds {
+			buckets[kind] = &limit.BucketUsage{
+				Used:   -1234567.891234,
+				Burst:  10_000_000_000_000,
+				Refill: 24 * time.Hour,
+			}
+		}
+		round.Buckets[fmt.Sprintf("ip:2001:db8:%04x:%04x::", i>>16, i&0xffff)] = buckets
+	}
+	body, err := json.Marshal(round)
+	require.Nil(t, err)
+	require.Less(t, len(body), bucketsMaxBytes)
+}
+
 func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
 	// A peer that does not take a round of buckets (it restarts, every deploy) is counted apart from
 	// failed message batches, which alert
@@ -134,12 +160,16 @@ func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
 	defer mesh.Close()
 
 	sendErrors, bucketErrors := testutil.ToFloat64(metrics.ClusterSendErrors), testutil.ToFloat64(metrics.ClusterBucketSendErrors)
-	mesh.BroadcastBuckets(limit.SharedBuckets{
-		"ip:1.2.3.4": {
-			limit.KindRequests: {
-				Used:   1,
-				Burst:  60,
-				Refill: 5 * time.Second,
+	mesh.BroadcastBuckets(&limit.BucketRound{
+		Epoch: 1,
+		Round: 1,
+		Buckets: limit.SharedBuckets{
+			"ip:1.2.3.4": {
+				limit.KindRequests: {
+					Used:   1,
+					Burst:  60,
+					Refill: 5 * time.Second,
+				},
 			},
 		},
 	})

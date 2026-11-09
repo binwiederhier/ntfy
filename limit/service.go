@@ -61,9 +61,9 @@ const (
 	// forgets its buckets, so a key in steady use is not dropped and recreated over and over
 	settledIdle = time.Minute
 
-	// bucketDeltasMax bounds the keys BucketDeltas returns per round, so a flood of fresh keys
-	// cannot make one round's message to the peers unbounded (~80 bytes per key on the wire)
-	bucketDeltasMax = 50000
+	// BucketDeltasMax bounds the buckets BucketDeltas returns per round, so a flood of fresh keys
+	// cannot make one round's message to the peers unbounded (~80 bytes per bucket on the wire)
+	BucketDeltasMax = 50000
 
 	// sharedBurstMax is the largest burst a peer's usage may carry (10 TB, for bandwidth buckets);
 	// usage with a larger one, or a negative refill, is a bug or a bad peer, and is ignored
@@ -79,7 +79,12 @@ type Service struct {
 	watermark int64                     // Time of the last read, unix seconds; the sync worker's only
 	prunedAt  int64                     // Time of the last prune, unix seconds; the sync worker's only
 	interval  time.Duration             // How often the worker syncs (syncInterval); tests change it
-	ctx       context.Context           // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
+	epoch     int64                     // When the service was created, unix nanoseconds; orders this node's bucket rounds across restarts
+	round     uint64                    // The last BucketDeltas round; protected by shareMu
+	shareMu   sync.Mutex                // Serializes BucketDeltas and BucketSnapshot, so a snapshot contains whole rounds
+	peers     map[string]*peerRound     // The last round taken from each peer (ChargeBuckets, RestoreBuckets); protected by peersMu
+	peersMu   sync.Mutex
+	ctx       context.Context // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
 	cancel    context.CancelFunc
 	closeOnce sync.Once
 	wg        sync.WaitGroup
@@ -96,6 +101,8 @@ func newService(store *Store, now func() time.Time) *Service {
 		now:      now,
 		store:    store,
 		interval: syncInterval,
+		epoch:    now().UnixNano(),
+		peers:    make(map[string]*peerRound),
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	for i := 0; i < shardCount; i++ {
@@ -380,28 +387,27 @@ func (s *Service) ShareBuckets() {
 // N nodes, a client at N times its rate drains no node's bucket on its own. A lost round undercounts,
 // except for a refund of a charge sent in an earlier round, which then stays charged on the peers
 // until the bucket refills; refunds almost always come in the same round as their charge.
-func (s *Service) BucketDeltas() SharedBuckets {
+func (s *Service) BucketDeltas() *BucketRound {
+	s.shareMu.Lock()
+	defer s.shareMu.Unlock()
+	s.round++
 	deltas := make(SharedBuckets)
-	dropped := 0
-	defer func() {
-		if dropped > 0 {
-			log.Tag(tag).Warn("Not sharing the buckets of %d key(s) this round, more than %d keys used them", dropped, bucketDeltasMax)
-		}
-	}()
+	entries, dropped := 0, 0
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
 		for key, d := range bs.deltas {
 			e, ok := bs.entries[key]
 			if !ok {
 				continue // Pruned since
-			} else if len(deltas) >= bucketDeltasMax {
-				dropped++ // A round that would be too large: the peers undercount
-				continue
 			}
 			for k := range d {
 				if d[k] == 0 {
 					continue
+				} else if entries >= BucketDeltasMax {
+					dropped++ // A round that would be too large: the peers undercount
+					continue
 				}
+				entries++
 				if deltas[key] == nil {
 					deltas[key] = make(map[Kind]*BucketUsage)
 				}
@@ -413,7 +419,14 @@ func (s *Service) BucketDeltas() SharedBuckets {
 		}
 		bs.mu.Unlock()
 	}
-	return deltas
+	if dropped > 0 {
+		log.Tag(tag).Warn("Not sharing %d bucket(s) this round, more than %d were used", dropped, BucketDeltasMax)
+	}
+	return &BucketRound{
+		Epoch:   s.epoch,
+		Round:   s.round,
+		Buckets: deltas,
+	}
 }
 
 // ChargeBuckets takes what peers used (their BucketDeltas) from the keys' buckets here, down to a
@@ -421,9 +434,15 @@ func (s *Service) BucketDeltas() SharedBuckets {
 // cluster, while a burst cannot lock a key, or the neighbors behind its NAT, out for longer than one
 // burst takes to refill. A key this node has not seen gets a bucket with the peer's rule, so it is
 // known here when the client comes, and when a restarting peer asks (BucketSnapshot).
-func (s *Service) ChargeBuckets(buckets SharedBuckets) {
+// Rounds from the same peer are taken in order: a round that is not newer than the last one taken
+// (it was overtaken, or the peer's snapshot that RestoreBuckets took over contains it) is skipped,
+// which undercounts rather than counting twice or clipping a refund that overtook its charge.
+func (s *Service) ChargeBuckets(origin string, round *BucketRound) {
+	if !s.takeRound(origin, round, false) {
+		return
+	}
 	now := s.now()
-	for key, kinds := range buckets {
+	for key, kinds := range round.Buckets {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
@@ -441,7 +460,9 @@ func (s *Service) ChargeBuckets(buckets SharedBuckets) {
 // peer that restarts (RestoreBuckets). A full bucket is what a fresh node has anyway. What this node
 // used since its last BucketDeltas is left out: the next round sends it to the peer, which would
 // otherwise count it twice.
-func (s *Service) BucketSnapshot() SharedBuckets {
+func (s *Service) BucketSnapshot() *BucketRound {
+	s.shareMu.Lock()
+	defer s.shareMu.Unlock()
 	now := s.now()
 	snapshot := make(SharedBuckets)
 	for _, bs := range s.buckets {
@@ -468,15 +489,21 @@ func (s *Service) BucketSnapshot() SharedBuckets {
 		}
 		bs.mu.Unlock()
 	}
-	return snapshot
+	return &BucketRound{
+		Epoch:   s.epoch,
+		Round:   s.round,
+		Buckets: snapshot,
+	}
 }
 
 // RestoreBuckets takes over a peer's BucketSnapshot. Every peer holds the whole cluster's buckets
 // (ChargeBuckets), so a bucket keeps the most used of here and the snapshot, never the sum: a
 // node that restores from two peers, or got a delta before the snapshot, does not count twice.
-func (s *Service) RestoreBuckets(buckets SharedBuckets) {
+// The peer's rounds up to the snapshot's are skipped from now on (see ChargeBuckets).
+func (s *Service) RestoreBuckets(origin string, snapshot *BucketRound) {
+	s.takeRound(origin, snapshot, true)
 	now := s.now()
-	for key, kinds := range buckets {
+	for key, kinds := range snapshot.Buckets {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
@@ -488,6 +515,23 @@ func (s *Service) RestoreBuckets(buckets SharedBuckets) {
 		}
 		bs.mu.Unlock()
 	}
+}
+
+// takeRound records the round as the last one taken from the peer and returns true, or returns
+// false if it is not newer than the last one; a snapshot is also taken if it is the last round
+// itself (its rounds up to the snapshot's are then skipped)
+func (s *Service) takeRound(origin string, round *BucketRound, snapshot bool) bool {
+	s.peersMu.Lock()
+	defer s.peersMu.Unlock()
+	last, ok := s.peers[origin]
+	if ok && (round.Epoch < last.epoch || round.Epoch == last.epoch && (round.Round < last.round || round.Round == last.round && !snapshot)) {
+		return false
+	}
+	s.peers[origin] = &peerRound{
+		epoch: round.Epoch,
+		round: round.Round,
+	}
+	return true
 }
 
 // runSync loads the current counts, retrying until it succeeds, then syncs every interval until

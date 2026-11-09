@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
@@ -66,7 +67,7 @@ func (s *Server) maybeCloseLocalSubscribers() {
 
 // testHookBucketGossip, if non-nil, is called by gossipBuckets between taking a round and sending
 // it, so tests can stop a node at that point; it is always nil in production
-var testHookBucketGossip func(s *Server, buckets limit.SharedBuckets)
+var testHookBucketGossip func(s *Server, round *limit.BucketRound)
 
 // restoreBuckets takes the visitors' buckets over from the live peers before this node serves.
 // Every peer holds the whole cluster's buckets (see limit.Service.ChargeBuckets), so a rolling
@@ -75,9 +76,15 @@ var testHookBucketGossip func(s *Server, buckets limit.SharedBuckets)
 func (s *Server) restoreBuckets() {
 	ctx, cancel := context.WithTimeout(context.Background(), bucketRestoreTimeout)
 	defer cancel()
-	for _, buckets := range s.cluster.PeerBuckets(ctx) {
-		s.limiter.RestoreBuckets(buckets)
+	for origin, snapshot := range s.cluster.PeerBuckets(ctx) {
+		s.limiter.RestoreBuckets(string(origin), snapshot)
 	}
+}
+
+// chargePeerBuckets charges what a peer used of its visitors' buckets into this node's (see
+// limit.Service.ChargeBuckets)
+func (s *Server) chargePeerBuckets(origin cluster.NodeID, round *limit.BucketRound) {
+	s.limiter.ChargeBuckets(string(origin), round)
 }
 
 // runBucketGossip sends the peers what this node used of its visitors' buckets every
@@ -98,9 +105,9 @@ func (s *Server) runBucketGossip() {
 // (see limit.Service.BucketDeltas), which they charge into their own buckets, so a client spread
 // over the nodes gets its limits once, not once per node
 func (s *Server) gossipBuckets() {
-	buckets := s.limiter.BucketDeltas()
+	round := s.limiter.BucketDeltas()
 	if testHookBucketGossip != nil {
-		testHookBucketGossip(s, buckets)
+		testHookBucketGossip(s, round)
 	}
-	s.cluster.BroadcastBuckets(buckets)
+	s.cluster.BroadcastBuckets(round)
 }

@@ -377,7 +377,7 @@ func New(conf *Config) (*Server, error) {
 		UsersDeletedFunc:   s.handleUsersDeleted,
 		AccessChangedFunc:  s.handlePeerAccessChanged,
 		IsolatedFunc:       s.maybeCloseLocalSubscribers,
-		BucketsFunc:        s.limiter.ChargeBuckets,
+		BucketsFunc:        s.chargePeerBuckets,
 		BucketSnapshotFunc: s.limiter.BucketSnapshot,
 		MaxMessageBytes:    int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
@@ -673,7 +673,10 @@ func (s *Server) stop() {
 			close(s.bucketGossipStop)
 			s.bucketGossip.Wait() // Its round, if it took one, is sent before the last one
 		}
-		s.gossipBuckets() // The last round, after the listeners closed; Close waits for it
+		// The last round, after the listeners closed; Close waits for it. A request still running
+		// (closing a listener does not wait for its handlers) may use a bucket after it, which
+		// the peers then never learn of; draining (see SetDraining) leaves few such requests.
+		s.gossipBuckets()
 		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
 	}
 	s.limiter.Close()      // Writes the unflushed daily counts, before the databases close under it

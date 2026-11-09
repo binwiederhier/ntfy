@@ -102,28 +102,28 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 
 // handleBuckets receives what a peer used of its visitors' buckets and hands it to the server
 func (c *meshCluster) handleBuckets(origin NodeID, w http.ResponseWriter, r *http.Request) {
-	var buckets limit.SharedBuckets
-	if err := json.NewDecoder(io.LimitReader(r.Body, bucketsMaxBytes)).Decode(&buckets); err != nil {
+	var round limit.BucketRound
+	if err := json.NewDecoder(io.LimitReader(r.Body, bucketsMaxBytes)).Decode(&round); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if ev := log.Tag(tag); ev.IsTrace() {
-		ev.Trace("Received buckets of %d visitor key(s) from peer %s", len(buckets), origin)
+		ev.Trace("Received round %d of buckets of %d visitor key(s) from peer %s", round.Round, len(round.Buckets), origin)
 	}
 	if c.conf.BucketsFunc != nil {
-		c.conf.BucketsFunc(buckets)
+		c.conf.BucketsFunc(origin, &round)
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
 // handleBucketSnapshot serves this node's buckets that are not full to a starting peer
 func (c *meshCluster) handleBucketSnapshot(w http.ResponseWriter, _ *http.Request) {
-	buckets := limit.SharedBuckets{}
+	snapshot := &limit.BucketRound{}
 	if c.conf.BucketSnapshotFunc != nil {
-		buckets = c.conf.BucketSnapshotFunc()
+		snapshot = c.conf.BucketSnapshotFunc()
 	}
 	w.Header().Set("Content-Type", contentTypeJSON)
-	if err := json.NewEncoder(w).Encode(buckets); err != nil {
+	if err := json.NewEncoder(w).Encode(snapshot); err != nil {
 		log.Tag(tag).Err(err).Warn("Cannot write buckets")
 	}
 }

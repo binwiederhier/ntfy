@@ -183,14 +183,14 @@ func (c *meshCluster) BroadcastState(state *State) {
 }
 
 // BroadcastBuckets sends every live peer what this node used of its visitors' buckets (see
-// Cluster.BroadcastBuckets). A failed send is not retried: the peer undercounts that round, which
-// is the safe side, and a peer that was down catches up from a snapshot when it starts.
-func (c *meshCluster) BroadcastBuckets(buckets limit.SharedBuckets) {
+// Cluster.BroadcastBuckets). A failed send is not retried: the peer undercounts that round, and a
+// peer that was down catches up from a snapshot when it starts.
+func (c *meshCluster) BroadcastBuckets(round *limit.BucketRound) {
 	peers := c.registry.Peers()
-	if len(buckets) == 0 || len(peers) == 0 {
+	if len(round.Buckets) == 0 || len(peers) == 0 {
 		return
 	}
-	body, err := json.Marshal(buckets)
+	body, err := json.Marshal(round)
 	if err != nil {
 		return
 	}
@@ -202,7 +202,7 @@ func (c *meshCluster) BroadcastBuckets(buckets limit.SharedBuckets) {
 	c.bucketSends.Add(len(peers))
 	c.mu.Unlock()
 	if ev := log.Tag(tag); ev.IsTrace() {
-		ev.Trace("Broadcasting buckets of %d visitor key(s) to %d peer(s)", len(buckets), len(peers)) // Every second, so not at debug
+		ev.Trace("Broadcasting round %d of buckets of %d visitor key(s) to %d peer(s)", round.Round, len(round.Buckets), len(peers)) // Every second, so not at debug
 	}
 	for _, p := range peers {
 		go func(p *registry.Peer) {
@@ -219,28 +219,35 @@ func (c *meshCluster) BroadcastBuckets(buckets limit.SharedBuckets) {
 
 // PeerBuckets reads the buckets that are not full from every live peer, in parallel (see
 // Cluster.PeerBuckets)
-func (c *meshCluster) PeerBuckets(ctx context.Context) []limit.SharedBuckets {
+func (c *meshCluster) PeerBuckets(ctx context.Context) map[NodeID]*limit.BucketRound {
+	type result struct {
+		nodeID   NodeID
+		snapshot *limit.BucketRound
+	}
 	peers := c.registry.Peers()
-	results := make(chan limit.SharedBuckets, len(peers))
+	results := make(chan *result, len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
-			buckets, err := c.client.Buckets(ctx, p.AdvertiseURL)
+			snapshot, err := c.client.Buckets(ctx, p.AdvertiseURL)
 			if err != nil {
 				log.Tag(tag).Err(err).Warn("Cannot read buckets from peer %s", p.NodeID)
 				results <- nil
 				return
 			}
-			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(buckets), p.NodeID)
-			results <- buckets
+			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(snapshot.Buckets), p.NodeID)
+			results <- &result{
+				nodeID:   NodeID(p.NodeID),
+				snapshot: snapshot,
+			}
 		}(p)
 	}
-	all := make([]limit.SharedBuckets, 0, len(peers))
+	snapshots := make(map[NodeID]*limit.BucketRound)
 	for range peers {
-		if buckets := <-results; buckets != nil {
-			all = append(all, buckets)
+		if r := <-results; r != nil {
+			snapshots[r.nodeID] = r.snapshot
 		}
 	}
-	return all
+	return snapshots
 }
 
 // Members returns this node plus the peers the registry currently considers live, for the LB

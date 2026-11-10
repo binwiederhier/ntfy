@@ -159,6 +159,10 @@ func (s *Service) takeRound(origin string, round *BucketRound, snapshot bool) bo
 	defer s.peersMu.Unlock()
 	last, ok := s.peers[origin]
 	if ok && (round.Round < last || round.Round == last && !snapshot) {
+		log.Tag(tag).Fields(log.Context{
+			"bucket_round": round.Round,
+			"peer_node_id": origin,
+		}).Trace("Skipping round of buckets from peer %s, not newer than %d", origin, last)
 		return false
 	}
 	s.peers[origin] = round.Round

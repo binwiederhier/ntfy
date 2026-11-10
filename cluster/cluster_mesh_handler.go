@@ -107,8 +107,8 @@ func (c *meshCluster) handleBuckets(origin NodeID, w http.ResponseWriter, r *htt
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if ev := log.Tag(tag); ev.IsTrace() {
-		ev.Trace("Received round %d of buckets of %d visitor key(s) from peer %s", round.Round, len(round.Buckets), origin)
+	if ev := bucketLog(&round, int(r.ContentLength), string(origin)); ev.IsTrace() {
+		ev.Trace("Received round of buckets of %d visitor key(s) from peer %s", len(round.Buckets), origin) // Every second, so not at debug
 	}
 	if c.conf.BucketsFunc != nil {
 		c.conf.BucketsFunc(origin, &round)
@@ -125,7 +125,9 @@ func (c *meshCluster) handleBucketSnapshot(w http.ResponseWriter, _ *http.Reques
 	w.Header().Set("Content-Type", contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(snapshot); err != nil {
 		log.Tag(tag).Err(err).Warn("Cannot write buckets")
+		return
 	}
+	bucketLog(snapshot, 0, "").Info("Sent buckets of %d visitor key(s) to a starting peer", len(snapshot.Buckets))
 }
 
 // handleMembers lists the live cluster members for the load balancers' agents

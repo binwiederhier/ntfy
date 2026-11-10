@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/netip"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
@@ -60,4 +61,20 @@ func decodeMessageBody(r io.Reader, maxLineBytes int, deliver DeliverFunc) error
 		deliver(apiMsg.Message)
 	}
 	return scanner.Err()
+}
+
+// bucketLog returns a log event for a round of buckets with the bucket_round field, so the override
+// "bucket_round -> trace" shows the bucket traffic without the rest of the cluster's trace logs
+func bucketLog(round *limit.BucketRound, bytes int, peerNodeID string) *log.Event {
+	ev := log.Tag(tag).Fields(log.Context{
+		"bucket_round": round.Round,
+		"bucket_keys":  len(round.Buckets),
+	})
+	if bytes > 0 {
+		ev.Field("bucket_bytes", bytes)
+	}
+	if peerNodeID != "" {
+		ev.Field("peer_node_id", peerNodeID)
+	}
+	return ev
 }

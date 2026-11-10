@@ -201,17 +201,18 @@ func (c *meshCluster) BroadcastBuckets(round *limit.BucketRound) {
 	}
 	c.bucketSends.Add(len(peers))
 	c.mu.Unlock()
-	if ev := log.Tag(tag); ev.IsTrace() {
-		ev.Trace("Broadcasting round %d of buckets of %d visitor key(s) to %d peer(s)", round.Round, len(round.Buckets), len(peers)) // Every second, so not at debug
-	}
 	for _, p := range peers {
 		go func(p *registry.Peer) {
 			defer c.bucketSends.Done()
 			ctx, cancel := context.WithTimeout(c.ctx, bucketsSendTimeout)
 			defer cancel()
-			if err := c.client.SendBuckets(ctx, p.AdvertiseURL, body); err != nil && c.ctx.Err() == nil {
+			started := time.Now()
+			err := c.client.SendBuckets(ctx, p.AdvertiseURL, body)
+			if err != nil && c.ctx.Err() == nil {
 				metrics.ClusterBucketSendErrors.Inc()                                   // Not ClusterSendErrors, which alerts: every restart of a peer fails a few rounds
 				log.Tag(tag).Err(err).Debug("Cannot send buckets to peer %s", p.NodeID) // Every second while it is down, and expected while it restarts
+			} else if ev := bucketLog(round, len(body), p.NodeID); ev.IsTrace() {
+				ev.Field("time_taken_ms", time.Since(started).Milliseconds()).Trace("Sent round of buckets of %d visitor key(s) to peer %s", len(round.Buckets), p.NodeID) // Every second, so not at debug
 			}
 		}(p)
 	}

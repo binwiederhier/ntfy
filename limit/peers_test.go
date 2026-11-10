@@ -409,3 +409,41 @@ func TestService_BucketDeltas_EntryCap(t *testing.T) {
 	}
 	require.Equal(t, BucketDeltasMax, entries)
 }
+
+func TestService_ChargeBuckets_GenerousRefill(t *testing.T) {
+	// A peer's usage is charged with the faster of its refill and the one the bucket was last used
+	// with here, also for the time that passed since then
+	s, clock := newTestServiceWithClock(t)
+	local := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Second,
+	}
+	require.True(t, s.Allow("ip:1.2.3.4", local, 10).OK)
+	clock.advance(5 * time.Second)
+	s.ChargeBuckets("peer", testRound(BucketUsages{
+		"ip:1.2.3.4": {
+			KindRequests: {
+				Used:   1,
+				Burst:  10,
+				Refill: time.Hour,
+			},
+		},
+	}))
+	require.Equal(t, int64(4), s.Tokens("ip:1.2.3.4", local))
+}
+
+func TestService_BucketDeltas_SkipsPrunedKey(t *testing.T) {
+	// A key pruned before its round is left out: its buckets are full again, so what it used no
+	// longer matters to the peers
+	s, clock := newTrackingTestService(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  10,
+		Refill: time.Second,
+	}
+	require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
+	clock.advance(2 * settledIdle)
+	require.Equal(t, 1, s.Prune())
+	require.Empty(t, s.BucketDeltas().Buckets)
+}

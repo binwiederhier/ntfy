@@ -76,6 +76,18 @@ func TestClient_LogsRequests(t *testing.T) {
 	require.Contains(t, out.String(), "mesh_direction=out")
 }
 
+func TestClient_LogsFailedRequests(t *testing.T) {
+	// A request that gets no answer is logged too, with its error and no status
+	out := captureMeshLog(t)
+	srv, _ := newTestClientServer(t, http.StatusOK, "")
+	srv.Close()
+	client := NewClient(testSecret, "node-a")
+	require.Error(t, client.SendState(context.Background(), srv.URL, []byte("{}")))
+	require.Contains(t, out.String(), "mesh_path="+StatePath)
+	require.Contains(t, out.String(), "status=0")
+	require.Contains(t, out.String(), "error=")
+}
+
 func TestClient_SendMessages(t *testing.T) {
 	srv, seen := newTestClientServer(t, http.StatusOK, "")
 	client := NewClient(testSecret, "node-a")

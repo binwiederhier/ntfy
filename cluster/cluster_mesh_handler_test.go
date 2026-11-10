@@ -38,6 +38,45 @@ func TestMesh_LogsRequests(t *testing.T) {
 	require.Contains(t, out.String(), "peer=node-b")
 }
 
+func TestMesh_LogsRequests_GetAndRejected(t *testing.T) {
+	// A GET carries no origin, so it is logged with the remote address and the bytes of its answer;
+	// a rejected request is logged with its status
+	out := captureMeshLog(t)
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.BucketSnapshotFunc = func() *limit.BucketRound {
+		return &limit.BucketRound{
+			Round: 1,
+			Buckets: limit.BucketUsages{
+				"ip:1.2.3.4": {
+					limit.KindRequests: {
+						Used:   5,
+						Burst:  60,
+						Refill: 5 * time.Second,
+					},
+				},
+			},
+		}
+	}
+	mesh, err := newMeshCluster(conf, openTestPool(t, dbtest.CreateTestPostgresSchema(t)), nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	req := httptest.NewRequest("GET", BucketsPath, nil)
+	req.Header.Set(secretHeader, testSecret)
+	req.RemoteAddr = "192.0.2.1:41234"
+	rr := httptest.NewRecorder()
+	mesh.ServeHTTP(rr, req)
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.Contains(t, out.String(), "peer=192.0.2.1:41234")
+	require.Contains(t, out.String(), fmt.Sprintf("bytes_out=%d", rr.Body.Len()))
+
+	req = httptest.NewRequest("POST", StatePath, strings.NewReader("{}"))
+	req.Header.Set(secretHeader, "wrong")
+	req.Header.Set(originHeader, "node-b")
+	mesh.ServeHTTP(httptest.NewRecorder(), req)
+	require.Contains(t, out.String(), "status=401")
+}
+
 func TestMesh_PeerAPI_Auth(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)

@@ -6385,3 +6385,12 @@ func TestServer_AnonymousEmailDailyCapShared(t *testing.T) {
 		require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
 	})
 }
+
+func TestServer_SingleNodeDoesNotTrackBucketDeltas(t *testing.T) {
+	// Without a cluster nothing drains the deltas, so the limiter does not keep them
+	s := newTestServer(t, newTestConfig(t, ""))
+	for i := 0; i < 5; i++ {
+		require.Equal(t, 200, request(t, s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	require.Empty(t, s.limiter.BucketDeltas().Buckets)
+}

@@ -59,11 +59,10 @@ type BucketUsages map[string]map[Kind]*BucketUsage
 
 // BucketRound is what a node sends its peers about its buckets: a round of deltas (see
 // Service.BucketDeltas), or a snapshot (Service.BucketSnapshot), which contains the node's rounds up
-// to Round. Epoch and Round order a node's rounds, so a receiver can skip a round that came late or
-// that a snapshot it took over already contains.
+// to Round. Round orders a node's rounds, also across its restarts (with clocks in sync, see the package
+// comment), so a receiver can skip a round that came late or that a snapshot it took over already contains.
 type BucketRound struct {
-	Epoch   int64        `json:"e"` // When the sending node's limit service was created, unix nanoseconds: a restarted node's rounds start over
-	Round   uint64       `json:"n"` // The round's number in its epoch; for a snapshot, the last round it contains
+	Round   int64        `json:"n"` // When the round was taken, unix nanoseconds, increasing per node; for a snapshot, the last round it contains
 	Buckets BucketUsages `json:"b"`
 }
 

@@ -484,8 +484,7 @@ func TestMesh_BucketsBroadcastInvokesBucketsFunc(t *testing.T) {
 	defer meshA.Close()
 
 	sent := &limit.BucketRound{
-		Epoch: 1794000000000000000,
-		Round: 7,
+		Round: 1794000000000000007,
 		Buckets: limit.BucketUsages{
 			"ip:1.2.3.4": {
 				limit.KindRequests: {
@@ -526,8 +525,7 @@ func TestMesh_PeerBuckets(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB, poolC := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	snapshot := &limit.BucketRound{
-		Epoch: 1794000000000000000,
-		Round: 12,
+		Round: 1794000000000000012,
 		Buckets: limit.BucketUsages{
 			"ip:1.2.3.4": {
 				limit.KindRequests: {

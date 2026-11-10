@@ -17,12 +17,6 @@ const (
 	peerBurstMax = 10_000_000_000_000
 )
 
-// peerRound is the last bucket round taken from a peer (see Service.takeRound)
-type peerRound struct {
-	epoch int64
-	round uint64
-}
-
 // TrackBucketDeltas makes Allow and Refund record the tokens used per key and kind, for BucketDeltas
 // to hand to the peers. Off by default: on a single node nothing would drain them. Call it before the
 // service is used.
@@ -39,7 +33,7 @@ func (s *Service) TrackBucketDeltas() {
 func (s *Service) BucketDeltas() *BucketRound {
 	s.roundMu.Lock()
 	defer s.roundMu.Unlock()
-	s.round++
+	s.round = max(s.now().UnixNano(), s.round+1) // Newer than the last round, also if the clock went back
 	deltas := make(BucketUsages)
 	entries, dropped := 0, 0
 	for _, bs := range s.buckets {
@@ -72,7 +66,6 @@ func (s *Service) BucketDeltas() *BucketRound {
 		log.Tag(tag).Warn("Not sharing %d bucket(s) this round, more than %d were used", dropped, BucketDeltasMax)
 	}
 	return &BucketRound{
-		Epoch:   s.epoch,
 		Round:   s.round,
 		Buckets: deltas,
 	}
@@ -139,7 +132,6 @@ func (s *Service) BucketSnapshot() *BucketRound {
 		bs.mu.Unlock()
 	}
 	return &BucketRound{
-		Epoch:   s.epoch,
 		Round:   s.round,
 		Buckets: snapshot,
 	}
@@ -173,13 +165,10 @@ func (s *Service) takeRound(origin string, round *BucketRound, snapshot bool) bo
 	s.peersMu.Lock()
 	defer s.peersMu.Unlock()
 	last, ok := s.peers[origin]
-	if ok && (round.Epoch < last.epoch || round.Epoch == last.epoch && (round.Round < last.round || round.Round == last.round && !snapshot)) {
+	if ok && (round.Round < last || round.Round == last && !snapshot) {
 		return false
 	}
-	s.peers[origin] = &peerRound{
-		epoch: round.Epoch,
-		round: round.Round,
-	}
+	s.peers[origin] = round.Round
 	return true
 }
 

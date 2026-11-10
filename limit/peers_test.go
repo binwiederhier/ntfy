@@ -189,12 +189,11 @@ func requestUsage(key string, used float64) *BucketRound {
 }
 
 // testRounds numbers the rounds of testRound
-var testRounds atomic.Uint64
+var testRounds atomic.Int64
 
 // testRound is the next round of the test peer, with the given buckets
 func testRound(buckets BucketUsages) *BucketRound {
 	return &BucketRound{
-		Epoch:   1,
 		Round:   testRounds.Add(1),
 		Buckets: buckets,
 	}
@@ -355,7 +354,7 @@ func TestService_RestoreBuckets_SkipsRoundsInSnapshot(t *testing.T) {
 }
 
 func TestService_ChargeBuckets_RestartedPeer(t *testing.T) {
-	// A peer that restarted numbers its rounds from one again, in a later epoch; they count
+	// A peer that restarted takes its rounds anew, at a later time; they count
 	a, clock := newTestServiceWithClock(t)
 	a.TrackBucketDeltas()
 	b := newTestService(t)
@@ -374,6 +373,17 @@ func TestService_ChargeBuckets_RestartedPeer(t *testing.T) {
 	require.True(t, restarted.Allow("ip:1.2.3.4", rule, 5).OK)
 	b.ChargeBuckets("a", restarted.BucketDeltas())
 	require.Equal(t, int64(52), b.Tokens("ip:1.2.3.4", rule))
+}
+
+func TestService_BucketDeltas_RoundIsTheTime(t *testing.T) {
+	// A round is numbered by when it was taken, so a restarted node's rounds are newer than its old
+	// ones, and the next round is newer even if the clock went back
+	s, clock := newTestServiceWithClock(t)
+	s.TrackBucketDeltas()
+	first := s.BucketDeltas()
+	require.Equal(t, clock.now().UnixNano(), first.Round)
+	clock.advance(-time.Second)
+	require.Equal(t, first.Round+1, s.BucketDeltas().Round)
 }
 
 func TestService_BucketDeltas_EntryCap(t *testing.T) {

@@ -72,10 +72,9 @@ type Service struct {
 	prunedAt    int64                     // Time of the last prune, unix seconds; the sync worker's only
 	interval    time.Duration             // How often the worker syncs (syncInterval); tests change it
 	trackDeltas bool                      // Whether takeTokens and refundTokens record deltas (see TrackBucketDeltas)
-	epoch       int64                     // When the service was created, unix nanoseconds; orders this node's bucket rounds across restarts
-	round       uint64                    // The last BucketDeltas round; protected by roundMu
+	round       int64                     // The last BucketDeltas round (see BucketRound.Round); protected by roundMu
 	roundMu     sync.Mutex                // Serializes BucketDeltas and BucketSnapshot, so a snapshot contains whole rounds
-	peers       map[string]*peerRound     // The last round taken from each peer (ChargeBuckets, RestoreBuckets); protected by peersMu
+	peers       map[string]int64          // The last round taken from each peer (ChargeBuckets, RestoreBuckets); protected by peersMu
 	peersMu     sync.Mutex
 	ctx         context.Context // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
 	cancel      context.CancelFunc
@@ -94,8 +93,7 @@ func newService(store *Store, now func() time.Time) *Service {
 		now:      now,
 		store:    store,
 		interval: syncInterval,
-		epoch:    now().UnixNano(),
-		peers:    make(map[string]*peerRound),
+		peers:    make(map[string]int64),
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	for i := 0; i < shardCount; i++ {

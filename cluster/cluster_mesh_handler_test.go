@@ -129,8 +129,7 @@ func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
 	// The largest round a node sends (limit.BucketDeltasMax buckets) fits the body limit of its
 	// peers, also with long keys (IPv6 prefixes, user IDs) and the largest values
 	round := &limit.BucketRound{
-		Epoch:   math.MaxInt64,
-		Round:   math.MaxUint64,
+		Round:   math.MaxInt64,
 		Buckets: make(limit.BucketUsages),
 	}
 	kinds := []limit.Kind{limit.KindRequests, limit.KindBandwidth, limit.KindTopics, limit.KindEmails, limit.KindAuth}
@@ -161,7 +160,6 @@ func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
 
 	sendErrors, bucketErrors := testutil.ToFloat64(metrics.ClusterSendErrors), testutil.ToFloat64(metrics.ClusterBucketSendErrors)
 	mesh.BroadcastBuckets(&limit.BucketRound{
-		Epoch: 1,
 		Round: 1,
 		Buckets: limit.BucketUsages{
 			"ip:1.2.3.4": {

@@ -44,22 +44,21 @@ const (
 // Each peer has its own bounded send queue and delivery worker, so a slow or wedged peer only
 // backs up (and eventually drops) its own queue and never delays delivery to healthy peers.
 type meshCluster struct {
-	conf             *Config
-	deliver          DeliverFunc
-	registry         *registry.Registry
-	client           *Client
-	mux              *http.ServeMux            // The internal peer API; Cluster is an http.Handler
-	queues           map[NodeID]*peerQueue     // per-peer send queues; reconciled against the registry
-	closed           bool                      // Guards against ForwardMessage spawning new workers after Close
-	knownPeers       map[NodeID]*registry.Peer // Peers seen in the last reconcile, for join/leave logging and fencing
-	stats            map[NodeID]*peerStats     // Per-peer batch counters for Status; kept after a peer leaves
-	lastRegistered   time.Time                 // Last successful registry heartbeat, for Healthy
-	ctx              context.Context
-	cancel           context.CancelFunc
-	wg               sync.WaitGroup
-	bucketGossipStop chan struct{} // Closed by Close to end runBucketGossip
-	draining         atomic.Bool   // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
-	mu               sync.Mutex    // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
+	conf           *Config
+	deliver        DeliverFunc
+	registry       *registry.Registry
+	client         *Client
+	mux            *http.ServeMux            // The internal peer API; Cluster is an http.Handler
+	queues         map[NodeID]*peerQueue     // per-peer send queues; reconciled against the registry
+	closed         bool                      // Guards against ForwardMessage spawning new workers after Close
+	knownPeers     map[NodeID]*registry.Peer // Peers seen in the last reconcile, for join/leave logging and fencing
+	stats          map[NodeID]*peerStats     // Per-peer batch counters for Status; kept after a peer leaves
+	lastRegistered time.Time                 // Last successful registry heartbeat, for Healthy
+	ctx            context.Context
+	cancel         context.CancelFunc
+	wg             sync.WaitGroup
+	draining       atomic.Bool // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
+	mu             sync.Mutex  // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -92,17 +91,16 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &meshCluster{
-		conf:             conf,
-		deliver:          deliver,
-		registry:         reg,
-		client:           NewClient(conf.Secret, conf.NodeID),
-		queues:           make(map[NodeID]*peerQueue),
-		lastRegistered:   time.Now(), // The synchronous Register above just succeeded
-		knownPeers:       make(map[NodeID]*registry.Peer),
-		stats:            make(map[NodeID]*peerStats),
-		ctx:              ctx,
-		cancel:           cancel,
-		bucketGossipStop: make(chan struct{}),
+		conf:           conf,
+		deliver:        deliver,
+		registry:       reg,
+		client:         NewClient(conf.Secret, conf.NodeID),
+		queues:         make(map[NodeID]*peerQueue),
+		lastRegistered: time.Now(), // The synchronous Register above just succeeded
+		knownPeers:     make(map[NodeID]*registry.Peer),
+		stats:          make(map[NodeID]*peerStats),
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 	c.mux = http.NewServeMux()
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
@@ -317,12 +315,9 @@ func (c *meshCluster) Ready() bool {
 // and waits for them to exit.
 func (c *meshCluster) Close() error {
 	c.mu.Lock()
-	if !c.closed {
-		close(c.bucketGossipStop) // The gossip loop sends the last round of buckets, so an orderly restart loses none of them
-	}
 	c.closed = true // No new peer queues from here on
 	c.mu.Unlock()
-	c.cancel() // Stops the heartbeat loop and aborts in-flight peer deliveries
+	c.cancel() // Stops the loops and aborts in-flight peer deliveries; the gossip loop first sends the last round of buckets
 	// Close the peer queues so their workers flush and exit; final sends are best-effort since
 	// the context is already canceled (parity with fire-and-forget delivery)
 	c.mu.Lock()

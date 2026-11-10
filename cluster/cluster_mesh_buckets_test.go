@@ -150,7 +150,7 @@ func TestMesh_CloseWithGossipRunning(t *testing.T) {
 	}()
 	waitFor(t, func() bool {
 		select {
-		case <-meshA.bucketGossipStop: // Close is waiting for the loop
+		case <-meshA.ctx.Done(): // Close is waiting for the loop
 			return true
 		default:
 			return false

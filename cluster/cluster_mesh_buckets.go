@@ -55,7 +55,7 @@ func (c *meshCluster) runBucketGossip() {
 		select {
 		case <-ticker.C:
 			c.gossipBuckets()
-		case <-c.bucketGossipStop:
+		case <-c.ctx.Done():
 			c.gossipBuckets()
 			return
 		}
@@ -90,7 +90,7 @@ func (c *meshCluster) broadcastBuckets(buckets limit.Buckets) {
 		wg.Add(1)
 		go func(p *registry.Peer) {
 			defer wg.Done()
-			// Not c.ctx: Close cancels it before it waits for the last round
+			// Not c.ctx: Close cancels it, which is when the loop sends the last round
 			ctx, cancel := context.WithTimeout(context.Background(), bucketsSendTimeout)
 			defer cancel()
 			if err := c.client.SendBuckets(ctx, p.AdvertiseURL, body); err != nil {

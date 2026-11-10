@@ -79,6 +79,7 @@ type Service struct {
 	watermark int64                     // Time of the last read, unix seconds; the sync worker's only
 	prunedAt  int64                     // Time of the last prune, unix seconds; the sync worker's only
 	interval  time.Duration             // How often the worker syncs (syncInterval); tests change it
+	track     bool                      // Whether takeTokens and refundTokens record deltas (see TrackBucketDeltas)
 	epoch     int64                     // When the service was created, unix nanoseconds; orders this node's bucket rounds across restarts
 	round     uint64                    // The last BucketDeltas round; protected by shareMu
 	shareMu   sync.Mutex                // Serializes BucketDeltas and BucketSnapshot, so a snapshot contains whole rounds
@@ -111,6 +112,7 @@ func newService(store *Store, now func() time.Time) *Service {
 		}
 		s.buckets[i] = &bucketShard{
 			entries: make(map[string]*bucketEntry),
+			deltas:  make(map[string]*[numKinds]float64),
 		}
 	}
 	return s
@@ -369,16 +371,11 @@ func (s *Service) Size() int {
 	return size
 }
 
-// ShareBuckets makes the service keep what it uses of each key's buckets, for BucketDeltas. Only a
-// cluster shares them; without, nothing would ever take the deltas.
-func (s *Service) ShareBuckets() {
-	for _, bs := range s.buckets {
-		bs.mu.Lock()
-		if bs.deltas == nil {
-			bs.deltas = make(map[string]*[numKinds]float64)
-		}
-		bs.mu.Unlock()
-	}
+// TrackBucketDeltas makes Allow and Refund record the tokens used per key and kind, for BucketDeltas
+// to hand to the peers. Off by default: on a single node nothing would drain them. Call it before the
+// service is used.
+func (s *Service) TrackBucketDeltas() {
+	s.track = true
 }
 
 // BucketDeltas returns the tokens this node used per key and kind since the last call (refunds
@@ -414,7 +411,7 @@ func (s *Service) BucketDeltas() *BucketRound {
 				deltas[key][Kind(k)] = e.buckets[k].usage(d[k])
 			}
 		}
-		if bs.deltas != nil {
+		if len(bs.deltas) > 0 {
 			bs.deltas = make(map[string]*[numKinds]float64)
 		}
 		bs.mu.Unlock()
@@ -701,7 +698,9 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
-	bs.noteDeltaNoLock(key, rule.Kind, float64(n))
+	if s.track {
+		bs.noteDeltaNoLock(key, rule.Kind, float64(n))
+	}
 	return b.decision(Decision{OK: true}, rule)
 }
 
@@ -715,7 +714,9 @@ func (s *Service) refundTokens(key string, kind Kind, n int64) {
 		if b.last != 0 {
 			before := b.tokens
 			b.tokens = math.Min(b.tokens+float64(n), float64(b.burst))
-			bs.noteDeltaNoLock(key, kind, before-b.tokens)
+			if s.track {
+				bs.noteDeltaNoLock(key, kind, before-b.tokens)
+			}
 		}
 	}
 }
@@ -765,9 +766,9 @@ func (bs *bucketShard) entryNoLock(key string, now time.Time) *bucketEntry {
 }
 
 // noteDeltaNoLock adds n used tokens (negative: refunded) of the kind to what is shared with the
-// peers, if the service shares its buckets. The caller must hold bs.mu.
+// peers. The caller must hold bs.mu.
 func (bs *bucketShard) noteDeltaNoLock(key string, kind Kind, n float64) {
-	if bs.deltas == nil || n == 0 {
+	if n == 0 {
 		return
 	}
 	d, ok := bs.deltas[key]

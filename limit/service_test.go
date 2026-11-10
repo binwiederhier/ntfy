@@ -1354,7 +1354,7 @@ func TestService_BucketDeltas(t *testing.T) {
 	// client far below its burst: spread over N nodes, a client at N times its rate drains none
 	// of their buckets on its own. Refunds net out, and every call starts over.
 	s := newTestService(t)
-	s.ShareBuckets()
+	s.TrackBucketDeltas()
 	requests := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -1414,6 +1414,7 @@ func TestService_BucketDeltas_NotCountedWithoutSharing(t *testing.T) {
 	for i := 0; i < 40; i++ {
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 	}
+	s.Refund("ip:1.2.3.4", KindRequests, 10)
 	require.Empty(t, s.BucketDeltas().Buckets)
 }
 
@@ -1459,7 +1460,7 @@ func TestService_ChargeBuckets_UnknownKey(t *testing.T) {
 func TestService_ChargeBuckets_NotShared(t *testing.T) {
 	// Peers' usage is theirs to share: charging it here does not make it this node's
 	s := newTestService(t)
-	s.ShareBuckets()
+	s.TrackBucketDeltas()
 	s.ChargeBuckets("peer", requestUsage("ip:1.2.3.4", 50))
 	require.Empty(t, s.BucketDeltas().Buckets)
 }
@@ -1551,7 +1552,7 @@ func TestService_BucketSnapshot_LeavesOutUnsent(t *testing.T) {
 	// What this node used since its last BucketDeltas is not in its snapshot: the next round sends
 	// it to the restarted peer, which would otherwise count it twice
 	a := newTestService(t)
-	a.ShareBuckets()
+	a.TrackBucketDeltas()
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -1652,7 +1653,7 @@ func TestService_ChargeBuckets_LateRoundSkipped(t *testing.T) {
 	// taken from its node is skipped: a refund that overtook its charge must not be clipped at the
 	// full bucket and then followed by the charge.
 	a := newTestService(t)
-	a.ShareBuckets()
+	a.TrackBucketDeltas()
 	b := newTestService(t)
 	rule := Rule{
 		Kind:   KindBandwidth,
@@ -1672,7 +1673,7 @@ func TestService_RestoreBuckets_SkipsRoundsInSnapshot(t *testing.T) {
 	// A round taken before the snapshot is in the snapshot, also if it is still on its way and
 	// arrives after the restarted node took the snapshot over; only later rounds are charged
 	a := newTestService(t)
-	a.ShareBuckets()
+	a.TrackBucketDeltas()
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -1694,7 +1695,7 @@ func TestService_RestoreBuckets_SkipsRoundsInSnapshot(t *testing.T) {
 func TestService_ChargeBuckets_RestartedPeer(t *testing.T) {
 	// A peer that restarted numbers its rounds from one again, in a later epoch; they count
 	a, clock := newTestServiceWithClock(t)
-	a.ShareBuckets()
+	a.TrackBucketDeltas()
 	b := newTestService(t)
 	rule := Rule{
 		Kind:   KindRequests,
@@ -1707,7 +1708,7 @@ func TestService_ChargeBuckets_RestartedPeer(t *testing.T) {
 	}
 	clock.advance(time.Second)
 	restarted := newService(nil, clock.now)
-	restarted.ShareBuckets()
+	restarted.TrackBucketDeltas()
 	require.True(t, restarted.Allow("ip:1.2.3.4", rule, 5).OK)
 	b.ChargeBuckets("a", restarted.BucketDeltas())
 	require.Equal(t, int64(52), b.Tokens("ip:1.2.3.4", rule))
@@ -1716,7 +1717,7 @@ func TestService_ChargeBuckets_RestartedPeer(t *testing.T) {
 func TestService_BucketDeltas_EntryCap(t *testing.T) {
 	// A round is capped by its buckets, not its keys: a key with several kinds weighs more on the wire
 	s := newTestService(t)
-	s.ShareBuckets()
+	s.TrackBucketDeltas()
 	requests := Rule{
 		Kind:   KindRequests,
 		Burst:  60,

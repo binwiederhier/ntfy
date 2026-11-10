@@ -393,7 +393,7 @@ func New(conf *Config) (*Server, error) {
 		go s.runTail()
 	}
 	if conf.ClusterListen != "" {
-		s.limiter.ShareBuckets() // Kept for gossipBuckets
+		s.limiter.TrackBucketDeltas() // Drained by gossipBuckets
 		s.bucketGossipStop = make(chan struct{})
 	}
 	if err := s.limiter.Start(context.Background()); err != nil {

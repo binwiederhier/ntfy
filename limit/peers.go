@@ -12,9 +12,9 @@ const (
 	// cannot make one round's message to the peers unbounded (~80 bytes per bucket on the wire)
 	BucketDeltasMax = 50000
 
-	// sharedBurstMax is the largest burst a peer's usage may carry (10 TB, for bandwidth buckets);
+	// peerBurstMax is the largest burst a peer's usage may carry (10 TB, for bandwidth buckets);
 	// usage with a larger one, or a negative refill, is a bug or a bad peer, and is ignored
-	sharedBurstMax = 10_000_000_000_000
+	peerBurstMax = 10_000_000_000_000
 )
 
 // peerRound is the last bucket round taken from a peer (see Service.takeRound)
@@ -37,10 +37,10 @@ func (s *Service) TrackBucketDeltas() {
 // except for a refund of a charge sent in an earlier round, which then stays charged on the peers
 // until the bucket refills; refunds almost always come in the same round as their charge.
 func (s *Service) BucketDeltas() *BucketRound {
-	s.shareMu.Lock()
-	defer s.shareMu.Unlock()
+	s.roundMu.Lock()
+	defer s.roundMu.Unlock()
 	s.round++
-	deltas := make(SharedBuckets)
+	deltas := make(BucketUsages)
 	entries, dropped := 0, 0
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
@@ -110,10 +110,10 @@ func (s *Service) ChargeBuckets(origin string, round *BucketRound) {
 // used since its last BucketDeltas is left out: the next round sends it to the peer, which would
 // otherwise count it twice.
 func (s *Service) BucketSnapshot() *BucketRound {
-	s.shareMu.Lock()
-	defer s.shareMu.Unlock()
+	s.roundMu.Lock()
+	defer s.roundMu.Unlock()
 	now := s.now()
-	snapshot := make(SharedBuckets)
+	snapshot := make(BucketUsages)
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
 		for key, e := range bs.entries {
@@ -183,7 +183,7 @@ func (s *Service) takeRound(origin string, round *BucketRound, snapshot bool) bo
 	return true
 }
 
-// noteDeltaNoLock adds n used tokens (negative: refunded) of the kind to what is shared with the
+// noteDeltaNoLock adds n used tokens (negative: refunded) of the kind to what the next round sends the
 // peers. The caller must hold bs.mu.
 func (bs *bucketShard) noteDeltaNoLock(key string, kind Kind, n float64) {
 	if n == 0 {
@@ -204,7 +204,7 @@ func (bs *bucketShard) noteDeltaNoLock(key string, kind Kind, n float64) {
 // nil for a kind this node does not know (a newer peer) or a usage without a valid bucket. The caller
 // must hold the shard's lock.
 func (e *bucketEntry) peerBucketNoLock(kind Kind, u *BucketUsage, now time.Time) (*bucket, *Rule) {
-	if kind >= numKinds || u == nil || u.Burst <= 0 || u.Burst > sharedBurstMax || u.Refill < 0 {
+	if kind >= numKinds || u == nil || u.Burst <= 0 || u.Burst > peerBurstMax || u.Refill < 0 {
 		return nil, nil
 	}
 	b := &e.buckets[kind]

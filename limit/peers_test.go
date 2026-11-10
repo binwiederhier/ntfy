@@ -12,7 +12,7 @@ import (
 )
 
 func TestService_BucketDeltas(t *testing.T) {
-	// Every bucket's usage since the last call is shared, for every kind and every key, also a
+	// Every bucket's usage since the last call goes to the peers, for every kind and every key, also a
 	// client far below its burst: spread over N nodes, a client at N times its rate drains none
 	// of their buckets on its own. Refunds net out, and every call starts over.
 	s := newTestService(t)
@@ -37,7 +37,7 @@ func TestService_BucketDeltas(t *testing.T) {
 	require.True(t, s.Allow("ip:1.2.3.4", bandwidth, 300).OK)
 	s.Refund("ip:1.2.3.4", KindBandwidth, 100)
 	require.True(t, s.Allow("user:u_abc", auth, 1).OK)
-	require.Equal(t, SharedBuckets{
+	require.Equal(t, BucketUsages{
 		"ip:1.2.3.4": {
 			KindRequests: {
 				Used:   2,
@@ -119,8 +119,8 @@ func TestService_ChargeBuckets_UnknownKey(t *testing.T) {
 	require.Equal(t, int64(12), s.Tokens("ip:5.6.7.8", rule))
 }
 
-func TestService_ChargeBuckets_NotShared(t *testing.T) {
-	// Peers' usage is theirs to share: charging it here does not make it this node's
+func TestService_ChargeBuckets_NotSentOn(t *testing.T) {
+	// Peers' usage is theirs to send: charging it here does not make it this node's
 	s := newTestService(t)
 	s.TrackBucketDeltas()
 	s.ChargeBuckets("peer", requestUsage("ip:1.2.3.4", 50))
@@ -146,7 +146,7 @@ func TestService_BucketSnapshot_Restore(t *testing.T) {
 	require.True(t, a.Allow("ip:5.6.7.8", requests, 1).OK)
 	clockA.advance(5 * time.Second) // ip:5.6.7.8 is full again
 	snapshot := a.BucketSnapshot()
-	require.Equal(t, SharedBuckets{
+	require.Equal(t, BucketUsages{
 		"ip:1.2.3.4": {
 			KindRequests: {
 				Used:   44,
@@ -177,7 +177,7 @@ func TestService_BucketSnapshot_Restore(t *testing.T) {
 
 // requestUsage is a round of a peer's usage of the key's request bucket (burst 60, one token per 5 s)
 func requestUsage(key string, used float64) *BucketRound {
-	return testRound(SharedBuckets{
+	return testRound(BucketUsages{
 		key: {
 			KindRequests: {
 				Used:   used,
@@ -192,7 +192,7 @@ func requestUsage(key string, used float64) *BucketRound {
 var testRounds atomic.Uint64
 
 // testRound is the next round of the test peer, with the given buckets
-func testRound(buckets SharedBuckets) *BucketRound {
+func testRound(buckets BucketUsages) *BucketRound {
 	return &BucketRound{
 		Epoch:   1,
 		Round:   testRounds.Add(1),
@@ -201,7 +201,7 @@ func testRound(buckets SharedBuckets) *BucketRound {
 }
 
 // roundUsed rounds the used tokens, which a snapshot taken between refills has fractions of
-func roundUsed(buckets SharedBuckets) SharedBuckets {
+func roundUsed(buckets BucketUsages) BucketUsages {
 	for _, kinds := range buckets {
 		for _, u := range kinds {
 			u.Used = math.Round(u.Used)
@@ -246,7 +246,7 @@ func TestService_ChargeBuckets_GenerousRule(t *testing.T) {
 		Burst:  1000,
 		Refill: time.Second,
 	}
-	s.ChargeBuckets("peer", testRound(SharedBuckets{
+	s.ChargeBuckets("peer", testRound(BucketUsages{
 		"user:u_abc": {
 			KindRequests: {
 				Used:   50,
@@ -255,7 +255,7 @@ func TestService_ChargeBuckets_GenerousRule(t *testing.T) {
 			},
 		},
 	}))
-	s.ChargeBuckets("peer", testRound(SharedBuckets{
+	s.ChargeBuckets("peer", testRound(BucketUsages{
 		"user:u_abc": {
 			KindRequests: {
 				Used:   100,
@@ -276,7 +276,7 @@ func TestService_ChargeBuckets_InvalidRule(t *testing.T) {
 		Burst:  60,
 		Refill: 5 * time.Second,
 	}
-	s.ChargeBuckets("peer", testRound(SharedBuckets{
+	s.ChargeBuckets("peer", testRound(BucketUsages{
 		"ip:1.2.3.4": {
 			KindRequests: {
 				Used:   1e15,
@@ -299,7 +299,7 @@ func TestService_ChargeBuckets_InvalidRule(t *testing.T) {
 func TestService_ChargeBuckets_UnknownKind(t *testing.T) {
 	// A newer peer's kind is skipped, and the rest of its round still counts
 	s := newTestService(t)
-	var buckets SharedBuckets
+	var buckets BucketUsages
 	require.Nil(t, json.Unmarshal([]byte(`{"ip:1.2.3.4":{"requests":{"u":50,"b":60,"r":5000000000},"teleports":{"u":3,"b":5,"r":1000000000}}}`), &buckets))
 	s.ChargeBuckets("peer", testRound(buckets))
 	rule := Rule{

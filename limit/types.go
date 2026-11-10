@@ -53,18 +53,18 @@ type Decision struct {
 	Reset      time.Duration // RateLimit t=: until the period ends, or until the bucket's next token (0 if it never refills)
 }
 
-// SharedBuckets is what the nodes of a cluster exchange about their token buckets, per key and kind
+// BucketUsages is what the nodes of a cluster exchange about their token buckets, per key and kind
 // (see Service.BucketDeltas and Service.BucketSnapshot)
-type SharedBuckets map[string]map[Kind]*BucketUsage
+type BucketUsages map[string]map[Kind]*BucketUsage
 
 // BucketRound is what a node sends its peers about its buckets: a round of deltas (see
 // Service.BucketDeltas), or a snapshot (Service.BucketSnapshot), which contains the node's rounds up
 // to Round. Epoch and Round order a node's rounds, so a receiver can skip a round that came late or
 // that a snapshot it took over already contains.
 type BucketRound struct {
-	Epoch   int64         `json:"e"` // When the sending node's limit service was created, unix nanoseconds: a restarted node's rounds start over
-	Round   uint64        `json:"n"` // The round's number in its epoch; for a snapshot, the last round it contains
-	Buckets SharedBuckets `json:"b"`
+	Epoch   int64        `json:"e"` // When the sending node's limit service was created, unix nanoseconds: a restarted node's rounds start over
+	Round   uint64       `json:"n"` // The round's number in its epoch; for a snapshot, the last round it contains
+	Buckets BucketUsages `json:"b"`
 }
 
 // BucketUsage is one bucket's used tokens: since the last exchange (a delta), or below its burst (a

@@ -486,7 +486,7 @@ func TestMesh_BucketsBroadcastInvokesBucketsFunc(t *testing.T) {
 	sent := &limit.BucketRound{
 		Epoch: 1794000000000000000,
 		Round: 7,
-		Buckets: limit.SharedBuckets{
+		Buckets: limit.BucketUsages{
 			"ip:1.2.3.4": {
 				limit.KindRequests: {
 					Used:   42,
@@ -528,7 +528,7 @@ func TestMesh_PeerBuckets(t *testing.T) {
 	snapshot := &limit.BucketRound{
 		Epoch: 1794000000000000000,
 		Round: 12,
-		Buckets: limit.SharedBuckets{
+		Buckets: limit.BucketUsages{
 			"ip:1.2.3.4": {
 				limit.KindRequests: {
 					Used:   44.5,

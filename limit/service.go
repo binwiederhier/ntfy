@@ -73,8 +73,8 @@ type Service struct {
 	interval    time.Duration             // How often the worker syncs (syncInterval); tests change it
 	trackDeltas bool                      // Whether takeTokens and refundTokens record deltas (see TrackBucketDeltas)
 	epoch       int64                     // When the service was created, unix nanoseconds; orders this node's bucket rounds across restarts
-	round       uint64                    // The last BucketDeltas round; protected by shareMu
-	shareMu     sync.Mutex                // Serializes BucketDeltas and BucketSnapshot, so a snapshot contains whole rounds
+	round       uint64                    // The last BucketDeltas round; protected by roundMu
+	roundMu     sync.Mutex                // Serializes BucketDeltas and BucketSnapshot, so a snapshot contains whole rounds
 	peers       map[string]*peerRound     // The last round taken from each peer (ChargeBuckets, RestoreBuckets); protected by peersMu
 	peersMu     sync.Mutex
 	ctx         context.Context // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one

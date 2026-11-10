@@ -131,7 +131,7 @@ func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
 	round := &limit.BucketRound{
 		Epoch:   math.MaxInt64,
 		Round:   math.MaxUint64,
-		Buckets: make(limit.SharedBuckets),
+		Buckets: make(limit.BucketUsages),
 	}
 	kinds := []limit.Kind{limit.KindRequests, limit.KindBandwidth, limit.KindTopics, limit.KindEmails, limit.KindAuth}
 	for i := 0; len(round.Buckets)*len(kinds) < limit.BucketDeltasMax; i++ {
@@ -163,7 +163,7 @@ func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
 	mesh.BroadcastBuckets(&limit.BucketRound{
 		Epoch: 1,
 		Round: 1,
-		Buckets: limit.SharedBuckets{
+		Buckets: limit.BucketUsages{
 			"ip:1.2.3.4": {
 				limit.KindRequests: {
 					Used:   1,

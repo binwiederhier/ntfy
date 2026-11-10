@@ -95,7 +95,7 @@ func (s *Server) runBucketGossip() {
 		select {
 		case <-time.After(bucketGossipInterval):
 			s.gossipBuckets()
-		case <-s.bucketGossipStop:
+		case <-s.closeChan:
 			return
 		}
 	}

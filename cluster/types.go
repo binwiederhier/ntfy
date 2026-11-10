@@ -153,6 +153,12 @@ type peerQueue struct {
 	queue        *util.LingerQueue[[]byte]
 }
 
+// peerSnapshot is one peer's buckets, as read by PeerBuckets
+type peerSnapshot struct {
+	nodeID   NodeID
+	snapshot *limit.BucketRound
+}
+
 // apiMessage is one line of a message request body (NDJSON: one message per line; a single
 // message is just a one-line body). It carries the two fields that model.Message does not
 // serialize to JSON (Sender and User), which are needed to reconstruct the visitor on the

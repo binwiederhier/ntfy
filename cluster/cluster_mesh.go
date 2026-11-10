@@ -220,12 +220,8 @@ func (c *meshCluster) BroadcastBuckets(round *limit.BucketRound) {
 // PeerBuckets reads the buckets that are not full from every live peer, in parallel (see
 // Cluster.PeerBuckets)
 func (c *meshCluster) PeerBuckets(ctx context.Context) map[NodeID]*limit.BucketRound {
-	type result struct {
-		nodeID   NodeID
-		snapshot *limit.BucketRound
-	}
 	peers := c.registry.Peers()
-	results := make(chan *result, len(peers))
+	results := make(chan *peerSnapshot, len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
 			snapshot, err := c.client.Buckets(ctx, p.AdvertiseURL)
@@ -235,7 +231,7 @@ func (c *meshCluster) PeerBuckets(ctx context.Context) map[NodeID]*limit.BucketR
 				return
 			}
 			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(snapshot.Buckets), p.NodeID)
-			results <- &result{
+			results <- &peerSnapshot{
 				nodeID:   NodeID(p.NodeID),
 				snapshot: snapshot,
 			}

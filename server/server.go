@@ -83,7 +83,6 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
-	bucketGossipStop  chan struct{}  // Closed by stop to end runBucketGossip; nil single-node
 	bucketGossip      sync.WaitGroup // runBucketGossip, which stop waits for before the last round
 	tail              *message.Tail  // Reads what was written, see runTail; nil without a message cache
 	stopOnce          sync.Once
@@ -394,7 +393,6 @@ func New(conf *Config) (*Server, error) {
 	}
 	if conf.ClusterListen != "" {
 		s.limiter.TrackBucketDeltas() // Drained by gossipBuckets
-		s.bucketGossipStop = make(chan struct{})
 	}
 	if err := s.limiter.Start(context.Background()); err != nil {
 		return nil, err
@@ -607,7 +605,7 @@ func (s *Server) Run() error {
 			errChan <- s.runSMTPServer()
 		}()
 	}
-	if s.bucketGossipStop != nil {
+	if s.config.ClusterListen != "" {
 		s.bucketGossip.Add(1) // Under the lock, so stop cannot wait before it
 		go s.runBucketGossip()
 	}
@@ -644,6 +642,9 @@ func (s *Server) stopBounded() {
 func (s *Server) stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closeChan != nil {
+		close(s.closeChan) // Ends the background loops first, before what they use closes
+	}
 	for _, httpServer := range s.httpServers {
 		httpServer.Close()
 	}
@@ -669,10 +670,7 @@ func (s *Server) stop() {
 		s.tail.Close() // Before the databases close under it
 	}
 	if s.cluster != nil {
-		if s.bucketGossipStop != nil {
-			close(s.bucketGossipStop)
-			s.bucketGossip.Wait() // Its round, if it took one, is sent before the last one
-		}
+		s.bucketGossip.Wait() // The gossip loop's round, if it took one, is sent before the last one
 		// The last round, after the listeners closed; Close waits for it. A request still running
 		// (closing a listener does not wait for its handlers) may use a bucket after it, which
 		// the peers then never learn of; draining (see SetDraining) leaves few such requests.
@@ -684,9 +682,6 @@ func (s *Server) stop() {
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
-	}
-	if s.closeChan != nil {
-		close(s.closeChan)
 	}
 }
 

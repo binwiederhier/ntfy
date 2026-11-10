@@ -102,6 +102,7 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		ctx:            ctx,
 		cancel:         cancel,
 	}
+	c.restoreBuckets() // Before the server serves, so it does not forgive what the peers know
 	c.mux = http.NewServeMux()
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
 	c.mux.HandleFunc("POST "+StatePath, c.authenticated(c.handleState))
@@ -116,7 +117,6 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	c.wg.Add(3)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
-	c.restoreBuckets() // Before the server serves, so it does not forgive what the peers know
 	go c.runBucketGossip()
 	return c, nil
 }

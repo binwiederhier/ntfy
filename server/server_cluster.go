@@ -1,25 +1,11 @@
 package server
 
 import (
-	"context"
 	"time"
 
-	"heckel.io/ntfy/v2/cluster"
-	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
-)
-
-const (
-	// bucketGossipInterval is how often a node sends its peers what it used of its visitors' buckets.
-	// A client spread over the nodes gets at most about one burst per node more than its limit
-	// before the peers know, once; after that, the cluster admits its configured rate.
-	bucketGossipInterval = time.Second
-
-	// bucketRestoreTimeout bounds how long a starting node waits for its peers' buckets; a peer that
-	// has not answered by then is left out, and its buckets are forgiven (fail open)
-	bucketRestoreTimeout = 10 * time.Second
 )
 
 // deliverFromBus delivers a message received from a peer node (via the cluster) to this
@@ -63,51 +49,4 @@ func (s *Server) maybeCloseLocalSubscribers() {
 	for _, t := range s.topics {
 		t.CancelAllSubscribers()
 	}
-}
-
-// testHookBucketGossip, if non-nil, is called by gossipBuckets between taking a round and sending
-// it, so tests can stop a node at that point; it is always nil in production
-var testHookBucketGossip func(s *Server, round *limit.Buckets)
-
-// restoreBuckets takes the visitors' buckets over from the live peers before this node serves.
-// Every peer holds the whole cluster's buckets (see limit.Service.ChargeBuckets), so a rolling
-// restart, or a crash, forgives nothing as long as one node is up; only what this node used in its
-// last gossip round before it went down is lost.
-func (s *Server) restoreBuckets() {
-	ctx, cancel := context.WithTimeout(context.Background(), bucketRestoreTimeout)
-	defer cancel()
-	for origin, snapshot := range s.cluster.PeerBuckets(ctx) {
-		s.limiter.RestoreBuckets(string(origin), snapshot)
-	}
-}
-
-// chargePeerBuckets charges what a peer used of its visitors' buckets into this node's (see
-// limit.Service.ChargeBuckets)
-func (s *Server) chargePeerBuckets(origin cluster.NodeID, round *limit.Buckets) {
-	s.limiter.ChargeBuckets(string(origin), round)
-}
-
-// runBucketGossip sends the peers what this node used of its visitors' buckets every
-// bucketGossipInterval, until stop ends it (before the last round, see stop)
-func (s *Server) runBucketGossip() {
-	defer s.bucketGossip.Done()
-	for {
-		select {
-		case <-time.After(bucketGossipInterval):
-			s.gossipBuckets()
-		case <-s.closeChan:
-			return
-		}
-	}
-}
-
-// gossipBuckets sends the peers what this node used of its visitors' buckets since the last round
-// (see limit.Service.BucketDeltas), which they charge into their own buckets, so a client spread
-// over the nodes gets its limits once, not once per node
-func (s *Server) gossipBuckets() {
-	round := s.limiter.BucketDeltas()
-	if testHookBucketGossip != nil {
-		testHookBucketGossip(s, round)
-	}
-	s.cluster.BroadcastBuckets(round)
 }

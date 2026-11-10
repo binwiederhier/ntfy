@@ -83,8 +83,7 @@ type Server struct {
 	priceCache        *util.LookupCache[map[string]int64] // Stripe price ID -> price as cents (USD implied!)
 	metricsHandler    http.Handler                        // Handles /metrics if enable-metrics set, and listen-metrics-http not set
 	closeChan         chan bool
-	bucketGossip      sync.WaitGroup // runBucketGossip, which stop waits for before the last round
-	tail              *message.Tail  // Reads what was written, see runTail; nil without a message cache
+	tail              *message.Tail // Reads what was written, see runTail; nil without a message cache
 	stopOnce          sync.Once
 	stopped           atomic.Bool     // Set by Stop; read by Run, which must not start listeners afterwards
 	streams           *streamRegistry // Open subscriber connections, for Drain
@@ -361,7 +360,7 @@ func New(conf *Config) (*Server, error) {
 	s.userManager = userManager
 	s.limiter = limit.New(&limit.Config{
 		Store:       createUsageStore(pool, userDB),
-		TrackDeltas: conf.ClusterListen != "", // Drained by gossipBuckets
+		TrackDeltas: conf.ClusterListen != "", // Drained by the cluster's bucket gossip
 	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.topicService = tp.New(createTopicStore(pool, userDB))
@@ -370,18 +369,17 @@ func New(conf *Config) (*Server, error) {
 		metrics.SetDBPoolsFunc(s.dbPoolStats)
 	}
 	s.cluster, err = cluster.New(&cluster.Config{
-		Enabled:            conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
-		NodeID:             cluster.NodeID(conf.ClusterNodeID),
-		AdvertiseURL:       advertiseURL,
-		Role:               conf.ClusterRole,
-		Secret:             conf.ClusterSecret,
-		BatchLinger:        conf.ClusterBatchLinger,
-		UsersDeletedFunc:   s.handleUsersDeleted,
-		AccessChangedFunc:  s.handlePeerAccessChanged,
-		IsolatedFunc:       s.maybeCloseLocalSubscribers,
-		BucketsFunc:        s.chargePeerBuckets,
-		BucketSnapshotFunc: s.limiter.BucketSnapshot,
-		MaxMessageBytes:    int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
+		Enabled:           conf.ClusterListen != "", // Setting experimental-cluster-listen implicitly enables clustering
+		NodeID:            cluster.NodeID(conf.ClusterNodeID),
+		AdvertiseURL:      advertiseURL,
+		Role:              conf.ClusterRole,
+		Secret:            conf.ClusterSecret,
+		BatchLinger:       conf.ClusterBatchLinger,
+		UsersDeletedFunc:  s.handleUsersDeleted,
+		AccessChangedFunc: s.handlePeerAccessChanged,
+		IsolatedFunc:      s.maybeCloseLocalSubscribers,
+		Limiter:           s.limiter,
+		MaxMessageBytes:   int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
 		return nil, err
@@ -399,9 +397,6 @@ func New(conf *Config) (*Server, error) {
 	}
 	if err := s.topicService.Start(context.Background()); err != nil {
 		return nil, err
-	}
-	if conf.ClusterListen != "" {
-		s.restoreBuckets() // Last, so what the peers send before Run listens is as little as possible
 	}
 	return s, nil
 }
@@ -605,10 +600,6 @@ func (s *Server) Run() error {
 			errChan <- s.runSMTPServer()
 		}()
 	}
-	if s.config.ClusterListen != "" {
-		s.bucketGossip.Add(1) // Under the lock, so stop cannot wait before it
-		go s.runBucketGossip()
-	}
 	s.mu.Unlock()
 	go s.runManager()
 	go s.runDelayedSender()
@@ -670,12 +661,7 @@ func (s *Server) stop() {
 		s.tail.Close() // Before the databases close under it
 	}
 	if s.cluster != nil {
-		s.bucketGossip.Wait() // The gossip loop's round, if it took one, is sent before the last one
-		// The last round, after the listeners closed; Close waits for it. A request still running
-		// (closing a listener does not wait for its handlers) may use a bucket after it, which
-		// the peers then never learn of; draining (see SetDraining) leaves few such requests.
-		s.gossipBuckets()
-		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
+		s.cluster.Close() // After the listeners, so its last round of buckets has all they used; before the databases, so it can deregister the node
 	}
 	s.limiter.Close()      // Writes the unflushed daily counts, before the databases close under it
 	s.topicService.Close() // Likewise, the changed topics

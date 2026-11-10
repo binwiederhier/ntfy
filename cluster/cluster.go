@@ -5,7 +5,6 @@
 package cluster
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,7 +12,6 @@ import (
 
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
-	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -39,7 +37,7 @@ const (
 	StatusPath = "/v1/cluster/status"
 	// BucketsPath exchanges the visitors' token buckets (JSON limit.Buckets): a POST carries
 	// what the sending node used since its last one, a GET returns this node's buckets that are
-	// not full, for a node that starts (see Cluster.BroadcastBuckets and Cluster.PeerBuckets)
+	// not full, for a node that starts (see meshCluster.gossipBuckets and restoreBuckets)
 	BucketsPath = "/v1/cluster/buckets"
 )
 
@@ -115,12 +113,6 @@ type Cluster interface {
 	// BroadcastState pushes a state delta (first-subscriber hints, access changes, deleted users) to all
 	// peers. Nop single-node.
 	BroadcastState(state *State)
-	// BroadcastBuckets sends every live peer what this node used of its visitors' token buckets
-	// since the last call (limit.Service.BucketDeltas); fire-and-forget. Nop single-node.
-	BroadcastBuckets(round *limit.Buckets)
-	// PeerBuckets reads the buckets that are not full from every live peer (limit.Service.BucketSnapshot),
-	// for a node that starts: one per peer that answered before ctx is done. None single-node.
-	PeerBuckets(ctx context.Context) map[NodeID]*limit.Buckets
 	// IsLeader reports whether this node is the one that should run the cluster's singleton jobs
 	// (e.g. the Firebase keepaliver). It is derived from membership, not held as a lock, and it is
 	// a belief with a lease rather than a fence: see registry.IsLeader for what it does and does

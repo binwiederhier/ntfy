@@ -43,20 +43,8 @@ func TestMesh_LogsRequests_GetAndRejected(t *testing.T) {
 	// a rejected request is logged with its status
 	out := captureMeshLog(t)
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	conf.BucketSnapshotFunc = func() *limit.Buckets {
-		return &limit.Buckets{
-			Time: 1,
-			Usages: limit.BucketUsages{
-				"ip:1.2.3.4": {
-					limit.KindRequests: {
-						Used:   5,
-						Burst:  60,
-						Refill: 5 * time.Second,
-					},
-				},
-			},
-		}
-	}
+	conf.Limiter = limit.New(&limit.Config{})
+	require.True(t, conf.Limiter.Allow("ip:1.2.3.4", testRequestRule, 5).OK)
 	mesh, err := newMeshCluster(conf, openTestPool(t, dbtest.CreateTestPostgresSchema(t)), nil)
 	require.Nil(t, err)
 	defer mesh.Close()
@@ -150,17 +138,14 @@ func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
 	// is decoded into memory, whoever sends it
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	charged := 0
-	conf.BucketsFunc = func(_ NodeID, round *limit.Buckets) {
-		charged += len(round.Usages)
-	}
+	conf.Limiter = limit.New(&limit.Config{})
 	mesh, err := newMeshCluster(conf, pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 
 	post := func(keys int) int {
 		var body strings.Builder
-		body.WriteString(`{"e":1,"n":1,"b":{`)
+		body.WriteString(`{"t":1,"b":{`)
 		for i := 0; i < keys; i++ {
 			if i > 0 {
 				body.WriteString(",")
@@ -176,9 +161,9 @@ func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
 		return rr.Code
 	}
 	require.Equal(t, http.StatusOK, post(1000))
-	require.Equal(t, 1000, charged)
+	require.Equal(t, 1000, mesh.conf.Limiter.Size())
 	require.Equal(t, http.StatusBadRequest, post(200000)) // ~12 MB
-	require.Equal(t, 1000, charged)
+	require.Equal(t, 1000, mesh.conf.Limiter.Size())
 }
 
 func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
@@ -203,35 +188,6 @@ func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
 	body, err := json.Marshal(round)
 	require.Nil(t, err)
 	require.Less(t, len(body), bucketsMaxBytes)
-}
-
-func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
-	// A peer that does not take a round of buckets (it restarts, every deploy) is counted under its
-	// own path, apart from failed message batches, which alert
-	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
-	registerFakePeer(t, pool, "node-b", "http://127.0.0.1:1") // Nothing listens
-	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:2"), pool, nil)
-	require.Nil(t, err)
-	defer mesh.Close()
-
-	messageErrors := testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(MessagePath))
-	bucketErrors := testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(BucketsPath))
-	mesh.BroadcastBuckets(&limit.Buckets{
-		Time: 1,
-		Usages: limit.BucketUsages{
-			"ip:1.2.3.4": {
-				limit.KindRequests: {
-					Used:   1,
-					Burst:  60,
-					Refill: 5 * time.Second,
-				},
-			},
-		},
-	})
-	waitFor(t, func() bool {
-		return testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(BucketsPath)) == bucketErrors+1
-	})
-	require.Equal(t, messageErrors, testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(MessagePath)))
 }
 
 func TestMesh_HealthEndpoint(t *testing.T) {

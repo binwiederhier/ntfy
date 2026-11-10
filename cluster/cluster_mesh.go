@@ -13,7 +13,6 @@ import (
 
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
-	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
@@ -45,22 +44,24 @@ const (
 // Each peer has its own bounded send queue and delivery worker, so a slow or wedged peer only
 // backs up (and eventually drops) its own queue and never delays delivery to healthy peers.
 type meshCluster struct {
-	conf           *Config
-	deliver        DeliverFunc
-	registry       *registry.Registry
-	client         *Client
-	mux            *http.ServeMux            // The internal peer API; Cluster is an http.Handler
-	queues         map[NodeID]*peerQueue     // per-peer send queues; reconciled against the registry
-	closed         bool                      // Guards against ForwardMessage spawning new workers after Close
-	knownPeers     map[NodeID]*registry.Peer // Peers seen in the last reconcile, for join/leave logging and fencing
-	stats          map[NodeID]*peerStats     // Per-peer batch counters for Status; kept after a peer leaves
-	lastRegistered time.Time                 // Last successful registry heartbeat, for Healthy
-	ctx            context.Context
-	cancel         context.CancelFunc
-	wg             sync.WaitGroup
-	bucketSends    sync.WaitGroup // In-flight BroadcastBuckets sends, which Close lets finish (bounded by bucketsSendTimeout)
-	draining       atomic.Bool    // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
-	mu             sync.Mutex     // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
+	conf             *Config
+	deliver          DeliverFunc
+	registry         *registry.Registry
+	client           *Client
+	mux              *http.ServeMux            // The internal peer API; Cluster is an http.Handler
+	queues           map[NodeID]*peerQueue     // per-peer send queues; reconciled against the registry
+	closed           bool                      // Guards against ForwardMessage spawning new workers after Close
+	knownPeers       map[NodeID]*registry.Peer // Peers seen in the last reconcile, for join/leave logging and fencing
+	stats            map[NodeID]*peerStats     // Per-peer batch counters for Status; kept after a peer leaves
+	lastRegistered   time.Time                 // Last successful registry heartbeat, for Healthy
+	ctx              context.Context
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
+	bucketGossipStop chan struct{}  // Closed by Close to end runBucketGossip; nil without a Limiter
+	bucketGossip     sync.WaitGroup // runBucketGossip, which Close waits for before the last round
+	bucketSends      sync.WaitGroup // In-flight broadcastBuckets sends, which Close lets finish (bounded by bucketsSendTimeout)
+	draining         atomic.Bool    // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
+	mu               sync.Mutex     // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -118,6 +119,12 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	c.wg.Add(2)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
+	if conf.Limiter != nil {
+		c.restoreBuckets() // Before the server serves, so it does not forgive what the peers know
+		c.bucketGossipStop = make(chan struct{})
+		c.bucketGossip.Add(1)
+		go c.runBucketGossip()
+	}
 	return c, nil
 }
 
@@ -183,67 +190,6 @@ func (c *meshCluster) BroadcastState(state *State) {
 			})
 		}(p)
 	}
-}
-
-// BroadcastBuckets sends every live peer what this node used of its visitors' buckets (see
-// Cluster.BroadcastBuckets). A failed send is not retried: the peer undercounts that round, and a
-// peer that was down catches up from a snapshot when it starts.
-func (c *meshCluster) BroadcastBuckets(round *limit.Buckets) {
-	peers := c.registry.Peers()
-	if len(round.Usages) == 0 || len(peers) == 0 {
-		return
-	}
-	body, err := json.Marshal(round)
-	if err != nil {
-		return
-	}
-	c.mu.Lock()
-	if c.closed {
-		c.mu.Unlock()
-		return // Close is waiting for the sends, or done; a send added now would race it
-	}
-	c.bucketSends.Add(len(peers))
-	c.mu.Unlock()
-	for _, p := range peers {
-		go func(p *registry.Peer) {
-			defer c.bucketSends.Done()
-			ctx, cancel := context.WithTimeout(c.ctx, bucketsSendTimeout)
-			defer cancel()
-			if err := c.client.SendBuckets(ctx, p.AdvertiseURL, body); err != nil && c.ctx.Err() == nil {
-				metrics.ClusterSendErrors.WithLabelValues(BucketsPath).Inc()            // Apart from the message and state paths, which alert: every restart of a peer fails a few rounds
-				log.Tag(tag).Err(err).Debug("Cannot send buckets to peer %s", p.NodeID) // Every second while it is down, and expected while it restarts
-			}
-		}(p)
-	}
-}
-
-// PeerBuckets reads the buckets that are not full from every live peer, in parallel (see
-// Cluster.PeerBuckets)
-func (c *meshCluster) PeerBuckets(ctx context.Context) map[NodeID]*limit.Buckets {
-	peers := c.registry.Peers()
-	results := make(chan *peerSnapshot, len(peers))
-	for _, p := range peers {
-		go func(p *registry.Peer) {
-			snapshot, err := c.client.Buckets(ctx, p.AdvertiseURL)
-			if err != nil {
-				log.Tag(tag).Err(err).Warn("Cannot read buckets from peer %s", p.NodeID)
-				results <- nil
-				return
-			}
-			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(snapshot.Usages), p.NodeID)
-			results <- &peerSnapshot{
-				nodeID:   NodeID(p.NodeID),
-				snapshot: snapshot,
-			}
-		}(p)
-	}
-	snapshots := make(map[NodeID]*limit.Buckets)
-	for range peers {
-		if r := <-results; r != nil {
-			snapshots[r.nodeID] = r.snapshot
-		}
-	}
-	return snapshots
 }
 
 // Members returns this node plus the peers the registry currently considers live, for the LB
@@ -376,9 +322,15 @@ func (c *meshCluster) Ready() bool {
 // and waits for them to exit.
 func (c *meshCluster) Close() error {
 	c.mu.Lock()
+	closed := c.closed
+	c.mu.Unlock()
+	if !closed && c.bucketGossipStop != nil {
+		c.stopBucketGossip()
+	}
+	c.mu.Lock()
 	c.closed = true // No new peer queues or bucket sends from here on
 	c.mu.Unlock()
-	c.bucketSends.Wait() // The server's last round of buckets, so an orderly restart loses none of them
+	c.bucketSends.Wait() // The last round of buckets, so an orderly restart loses none of them
 	c.cancel()           // Stops the heartbeat loop and aborts in-flight peer deliveries
 	// Close the peer queues so their workers flush and exit; final sends are best-effort since
 	// the context is already canceled (parity with fire-and-forget delivery)

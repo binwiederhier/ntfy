@@ -12,21 +12,20 @@ import (
 // Config configures the cluster. It is assembled by the server from its own config, which keeps
 // this package free of server types.
 type Config struct {
-	Enabled            bool               // Master switch; when false, New returns the nop cluster
-	NodeID             NodeID             // Stable per-node identifier; required
-	AdvertiseURL       string             // Base URL peers use to reach this node's fan-out endpoint
-	Role               Role               // Active (default) or passive: a passive node never leads and never fences
-	Secret             string             // Shared secret authenticating node-to-node fan-out requests
-	HeartbeatInterval  time.Duration      // How often the node registry heartbeat is refreshed
-	NodeTTL            time.Duration      // Registry rows older than this do not count as live peers
-	BatchLinger        time.Duration      // How long messages wait in a peer queue to form a batch; 0 = send immediately
-	MaxMessageBytes    int64              // Upper bound for a single message on the wire (batch limits derive from this)
-	UsersDeletedFunc   UsersDeletedFunc   // Told that a peer deleted users; may be nil
-	AccessChangedFunc  AccessChangedFunc  // Told that a peer changed access entries; may be nil
-	TopicsAddedFunc    TopicsAddedFunc    // Told about topics that just gained their first subscriber on a peer; may be nil
-	IsolatedFunc       IsolatedFunc       // Called while this node is cut off from the cluster; may be nil
-	BucketsFunc        BucketsFunc        // Told what peers used of their visitors' buckets; may be nil
-	BucketSnapshotFunc BucketSnapshotFunc // Asked for this node's buckets by a starting peer; may be nil
+	Enabled           bool              // Master switch; when false, New returns the nop cluster
+	NodeID            NodeID            // Stable per-node identifier; required
+	AdvertiseURL      string            // Base URL peers use to reach this node's fan-out endpoint
+	Role              Role              // Active (default) or passive: a passive node never leads and never fences
+	Secret            string            // Shared secret authenticating node-to-node fan-out requests
+	HeartbeatInterval time.Duration     // How often the node registry heartbeat is refreshed
+	NodeTTL           time.Duration     // Registry rows older than this do not count as live peers
+	BatchLinger       time.Duration     // How long messages wait in a peer queue to form a batch; 0 = send immediately
+	MaxMessageBytes   int64             // Upper bound for a single message on the wire (batch limits derive from this)
+	UsersDeletedFunc  UsersDeletedFunc  // Told that a peer deleted users; may be nil
+	AccessChangedFunc AccessChangedFunc // Told that a peer changed access entries; may be nil
+	TopicsAddedFunc   TopicsAddedFunc   // Told about topics that just gained their first subscriber on a peer; may be nil
+	IsolatedFunc      IsolatedFunc      // Called while this node is cut off from the cluster; may be nil
+	Limiter           *limit.Service    // Its visitors' buckets are exchanged with the peers (see gossipBuckets); may be nil
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The
@@ -52,16 +51,6 @@ type UsersDeletedFunc func(userIDs []string)
 // those topics; it must not re-broadcast (loop prevention). It is a cache hint only: a lost
 // announcement costs a stale lookup until its TTL, never a lost message.
 type TopicsAddedFunc func(topics []string)
-
-// BucketsFunc is called with what a peer used of its visitors' token buckets since its last
-// broadcast (see Cluster.BroadcastBuckets). The server supplies it to charge them into this node's
-// buckets, so a client spread over the nodes gets its limits once, not once per node; it must not
-// re-broadcast. A lost update only makes this node's limits a little more generous for a moment.
-type BucketsFunc func(origin NodeID, round *limit.Buckets)
-
-// BucketSnapshotFunc returns this node's buckets that are not full, for a peer that starts (see
-// Cluster.PeerBuckets). The server supplies it.
-type BucketSnapshotFunc func() *limit.Buckets
 
 // AccessChangedFunc is called when a peer changed access entries (State.AccessChanged). The server
 // supplies it to reload its access cache, which ends the local streams that lost access; it must
@@ -175,7 +164,7 @@ func (w *meshResponseWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// peerSnapshot is one peer's buckets, as read by PeerBuckets
+// peerSnapshot is one peer's buckets, as read by peerBuckets
 type peerSnapshot struct {
 	nodeID   NodeID
 	snapshot *limit.Buckets

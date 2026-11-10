@@ -57,11 +57,11 @@ type TopicsAddedFunc func(topics []string)
 // broadcast (see Cluster.BroadcastBuckets). The server supplies it to charge them into this node's
 // buckets, so a client spread over the nodes gets its limits once, not once per node; it must not
 // re-broadcast. A lost update only makes this node's limits a little more generous for a moment.
-type BucketsFunc func(origin NodeID, round *limit.BucketRound)
+type BucketsFunc func(origin NodeID, round *limit.Buckets)
 
 // BucketSnapshotFunc returns this node's buckets that are not full, for a peer that starts (see
 // Cluster.PeerBuckets). The server supplies it.
-type BucketSnapshotFunc func() *limit.BucketRound
+type BucketSnapshotFunc func() *limit.Buckets
 
 // AccessChangedFunc is called when a peer changed access entries (State.AccessChanged). The server
 // supplies it to reload its access cache, which ends the local streams that lost access; it must
@@ -178,7 +178,7 @@ func (w *meshResponseWriter) Write(p []byte) (int, error) {
 // peerSnapshot is one peer's buckets, as read by PeerBuckets
 type peerSnapshot struct {
 	nodeID   NodeID
-	snapshot *limit.BucketRound
+	snapshot *limit.Buckets
 }
 
 // apiMessage is one line of a message request body (NDJSON: one message per line; a single

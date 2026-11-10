@@ -62,15 +62,15 @@ func (c *Client) SendState(ctx context.Context, baseURL string, body []byte) err
 	return c.post(ctx, stateURL(baseURL), contentTypeJSON, body)
 }
 
-// SendBuckets posts what this node used of its visitors' buckets (JSON limit.BucketRound) to a
+// SendBuckets posts what this node used of its visitors' buckets (JSON limit.Buckets) to a
 // peer's buckets endpoint
 func (c *Client) SendBuckets(ctx context.Context, baseURL string, body []byte) error {
 	return c.post(ctx, bucketsURL(baseURL), contentTypeJSON, body)
 }
 
 // Buckets reads a peer's buckets that are not full
-func (c *Client) Buckets(ctx context.Context, baseURL string) (*limit.BucketRound, error) {
-	var snapshot limit.BucketRound
+func (c *Client) Buckets(ctx context.Context, baseURL string) (*limit.Buckets, error) {
+	var snapshot limit.Buckets
 	if err := c.get(ctx, bucketsURL(baseURL), bucketSnapshotMaxBytes, &snapshot); err != nil {
 		return nil, err
 	}

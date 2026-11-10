@@ -23,7 +23,7 @@ const (
 // N nodes, a client at N times its rate drains no node's bucket on its own. A lost round undercounts,
 // except for a refund of a charge sent in an earlier round, which then stays charged on the peers
 // until the bucket refills; refunds almost always come in the same round as their charge.
-func (s *Service) BucketDeltas() *BucketRound {
+func (s *Service) BucketDeltas() *Buckets {
 	s.roundMu.Lock()
 	defer s.roundMu.Unlock()
 	s.round = max(s.now().UnixNano(), s.round+1) // Newer than the last round, also if the clock went back
@@ -58,9 +58,9 @@ func (s *Service) BucketDeltas() *BucketRound {
 	if dropped > 0 {
 		log.Tag(tag).Warn("Not sharing %d bucket(s) this round, more than %d were used", dropped, BucketDeltasMax)
 	}
-	return &BucketRound{
-		Round:   s.round,
-		Buckets: deltas,
+	return &Buckets{
+		Time:   s.round,
+		Usages: deltas,
 	}
 }
 
@@ -72,12 +72,12 @@ func (s *Service) BucketDeltas() *BucketRound {
 // Rounds from the same peer are taken in order: a round that is not newer than the last one taken
 // (it was overtaken, or the peer's snapshot that RestoreBuckets took over contains it) is skipped,
 // which undercounts rather than counting twice or clipping a refund that overtook its charge.
-func (s *Service) ChargeBuckets(origin string, round *BucketRound) {
+func (s *Service) ChargeBuckets(origin string, round *Buckets) {
 	if !s.takeRound(origin, round, false) {
 		return
 	}
 	now := s.now()
-	for key, kinds := range round.Buckets {
+	for key, kinds := range round.Usages {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
@@ -95,7 +95,7 @@ func (s *Service) ChargeBuckets(origin string, round *BucketRound) {
 // peer that restarts (RestoreBuckets). A full bucket is what a fresh node has anyway. What this node
 // used since its last BucketDeltas is left out: the next round sends it to the peer, which would
 // otherwise count it twice.
-func (s *Service) BucketSnapshot() *BucketRound {
+func (s *Service) BucketSnapshot() *Buckets {
 	s.roundMu.Lock()
 	defer s.roundMu.Unlock()
 	now := s.now()
@@ -124,9 +124,9 @@ func (s *Service) BucketSnapshot() *BucketRound {
 		}
 		bs.mu.Unlock()
 	}
-	return &BucketRound{
-		Round:   s.round,
-		Buckets: snapshot,
+	return &Buckets{
+		Time:   s.round,
+		Usages: snapshot,
 	}
 }
 
@@ -134,10 +134,10 @@ func (s *Service) BucketSnapshot() *BucketRound {
 // (ChargeBuckets), so a bucket keeps the most used of here and the snapshot, never the sum: a
 // node that restores from two peers, or got a delta before the snapshot, does not count twice.
 // The peer's rounds up to the snapshot's are skipped from now on (see ChargeBuckets).
-func (s *Service) RestoreBuckets(origin string, snapshot *BucketRound) {
+func (s *Service) RestoreBuckets(origin string, snapshot *Buckets) {
 	s.takeRound(origin, snapshot, true)
 	now := s.now()
-	for key, kinds := range snapshot.Buckets {
+	for key, kinds := range snapshot.Usages {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
@@ -154,15 +154,15 @@ func (s *Service) RestoreBuckets(origin string, snapshot *BucketRound) {
 // takeRound records the round as the last one taken from the peer and returns true, or returns
 // false if it is not newer than the last one; a snapshot is also taken if it is the last round
 // itself (its rounds up to the snapshot's are then skipped)
-func (s *Service) takeRound(origin string, round *BucketRound, snapshot bool) bool {
+func (s *Service) takeRound(origin string, round *Buckets, snapshot bool) bool {
 	s.peersMu.Lock()
 	defer s.peersMu.Unlock()
 	last, ok := s.peers[origin]
-	if ok && (round.Round < last || round.Round == last && !snapshot) {
-		log.Tag(tag).Debug("Skipping round %d of buckets from peer %s, not newer than %d", round.Round, origin, last)
+	if ok && (round.Time < last || round.Time == last && !snapshot) {
+		log.Tag(tag).Debug("Skipping round %d of buckets from peer %s, not newer than %d", round.Time, origin, last)
 		return false
 	}
-	s.peers[origin] = round.Round
+	s.peers[origin] = round.Time
 	return true
 }
 

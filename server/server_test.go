@@ -6392,5 +6392,5 @@ func TestServer_SingleNodeDoesNotTrackBucketDeltas(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		require.Equal(t, 200, request(t, s, "GET", "/mytopic/json?poll=1", "", nil).Code)
 	}
-	require.Empty(t, s.limiter.BucketDeltas().Buckets)
+	require.Empty(t, s.limiter.BucketDeltas().Usages)
 }

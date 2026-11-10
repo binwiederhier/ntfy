@@ -63,13 +63,14 @@ type Decision struct {
 // (see Service.BucketDeltas and Service.BucketSnapshot)
 type BucketUsages map[string]map[Kind]*BucketUsage
 
-// BucketRound is what a node sends its peers about its buckets: a round of deltas (see
-// Service.BucketDeltas), or a snapshot (Service.BucketSnapshot), which contains the node's rounds up
-// to Round. Round orders a node's rounds, also across its restarts (with clocks in sync, see the package
-// comment), so a receiver can skip a round that came late or that a snapshot it took over already contains.
-type BucketRound struct {
-	Round   int64        `json:"n"` // When the round was taken, unix nanoseconds, increasing per node; for a snapshot, the last round it contains
-	Buckets BucketUsages `json:"b"`
+// Buckets is what a node sends its peers about its token buckets as of Time: what it used since its
+// last round (Service.BucketDeltas), or what is used below each bucket's burst, for a peer that starts
+// (Service.BucketSnapshot), which then contains the node's rounds up to Time. Time orders a node's
+// rounds, also across its restarts (with clocks in sync, see the package comment), so a receiver can
+// skip a round that came late or that a snapshot it took over already contains.
+type Buckets struct {
+	Time   int64        `json:"t"` // When the round was taken, unix nanoseconds; above the node's last round even if its clock went back
+	Usages BucketUsages `json:"b"`
 }
 
 // BucketUsage is one bucket's used tokens: since the last exchange (a delta), or below its burst (a

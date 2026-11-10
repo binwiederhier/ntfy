@@ -59,9 +59,9 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	}
 }
 
-func (b *fakeCluster) BroadcastBuckets(_ *limit.BucketRound) {}
+func (b *fakeCluster) BroadcastBuckets(_ *limit.Buckets) {}
 
-func (b *fakeCluster) PeerBuckets(_ context.Context) map[cluster.NodeID]*limit.BucketRound {
+func (b *fakeCluster) PeerBuckets(_ context.Context) map[cluster.NodeID]*limit.Buckets {
 	return nil
 }
 
@@ -444,8 +444,8 @@ func TestServer_Cluster_StopWithGossipRunning(t *testing.T) {
 	// round to its peers: the loop is stopped (and finishes its round) before the last round and
 	// before the cluster closes
 	entered, release := make(chan struct{}, 1), make(chan struct{})
-	testHookBucketGossip = func(s *Server, round *limit.BucketRound) {
-		if s.config.ClusterNodeID == "node-a" && len(round.Buckets) > 0 {
+	testHookBucketGossip = func(s *Server, round *limit.Buckets) {
+		if s.config.ClusterNodeID == "node-a" && len(round.Usages) > 0 {
 			entered <- struct{}{}
 			<-release
 		}

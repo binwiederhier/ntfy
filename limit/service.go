@@ -72,7 +72,7 @@ type Service struct {
 	prunedAt    int64                     // Time of the last prune, unix seconds; the sync worker's only
 	interval    time.Duration             // How often the worker syncs (syncInterval); tests change it
 	trackDeltas bool                      // Whether takeTokens and refundTokens record deltas (see Config.TrackDeltas)
-	round       int64                     // The last BucketDeltas round (see BucketRound.Round); protected by roundMu
+	round       int64                     // The last BucketDeltas round (see Buckets.Time); protected by roundMu
 	roundMu     sync.Mutex                // Serializes BucketDeltas and BucketSnapshot, so a snapshot contains whole rounds
 	peers       map[string]int64          // The last round taken from each peer (ChargeBuckets, RestoreBuckets); protected by peersMu
 	peersMu     sync.Mutex

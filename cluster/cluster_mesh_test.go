@@ -463,13 +463,13 @@ func TestMesh_BucketsBroadcastInvokesBucketsFunc(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	var mu sync.Mutex
-	var bucketsB *limit.BucketRound
+	var bucketsB *limit.Buckets
 	var originB NodeID
 
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
-	confB.BucketsFunc = func(origin NodeID, round *limit.BucketRound) {
+	confB.BucketsFunc = func(origin NodeID, round *limit.Buckets) {
 		mu.Lock()
 		defer mu.Unlock()
 		bucketsB, originB = round, origin
@@ -485,9 +485,9 @@ func TestMesh_BucketsBroadcastInvokesBucketsFunc(t *testing.T) {
 	require.Nil(t, err)
 	defer meshA.Close()
 
-	sent := &limit.BucketRound{
-		Round: 1794000000000000007,
-		Buckets: limit.BucketUsages{
+	sent := &limit.Buckets{
+		Time: 1794000000000000007,
+		Usages: limit.BucketUsages{
 			"ip:1.2.3.4": {
 				limit.KindRequests: {
 					Used:   42,
@@ -526,9 +526,9 @@ func TestMesh_PeerBuckets(t *testing.T) {
 	// not answer is left out
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB, poolC := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
-	snapshot := &limit.BucketRound{
-		Round: 1794000000000000012,
-		Buckets: limit.BucketUsages{
+	snapshot := &limit.Buckets{
+		Time: 1794000000000000012,
+		Usages: limit.BucketUsages{
 			"ip:1.2.3.4": {
 				limit.KindRequests: {
 					Used:   44.5,
@@ -542,7 +542,7 @@ func TestMesh_PeerBuckets(t *testing.T) {
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
-	confB.BucketSnapshotFunc = func() *limit.BucketRound {
+	confB.BucketSnapshotFunc = func() *limit.Buckets {
 		return snapshot
 	}
 	meshB, err := newMeshCluster(confB, poolB, nil)
@@ -559,7 +559,7 @@ func TestMesh_PeerBuckets(t *testing.T) {
 	meshA, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
-	require.Equal(t, map[NodeID]*limit.BucketRound{"node-b": snapshot}, meshA.PeerBuckets(context.Background()))
+	require.Equal(t, map[NodeID]*limit.Buckets{"node-b": snapshot}, meshA.PeerBuckets(context.Background()))
 }
 
 func TestMesh_IsolatedFuncWhenPeersHealthy(t *testing.T) {

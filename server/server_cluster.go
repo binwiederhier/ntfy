@@ -67,7 +67,7 @@ func (s *Server) maybeCloseLocalSubscribers() {
 
 // testHookBucketGossip, if non-nil, is called by gossipBuckets between taking a round and sending
 // it, so tests can stop a node at that point; it is always nil in production
-var testHookBucketGossip func(s *Server, round *limit.BucketRound)
+var testHookBucketGossip func(s *Server, round *limit.Buckets)
 
 // restoreBuckets takes the visitors' buckets over from the live peers before this node serves.
 // Every peer holds the whole cluster's buckets (see limit.Service.ChargeBuckets), so a rolling
@@ -83,7 +83,7 @@ func (s *Server) restoreBuckets() {
 
 // chargePeerBuckets charges what a peer used of its visitors' buckets into this node's (see
 // limit.Service.ChargeBuckets)
-func (s *Server) chargePeerBuckets(origin cluster.NodeID, round *limit.BucketRound) {
+func (s *Server) chargePeerBuckets(origin cluster.NodeID, round *limit.Buckets) {
 	s.limiter.ChargeBuckets(string(origin), round)
 }
 

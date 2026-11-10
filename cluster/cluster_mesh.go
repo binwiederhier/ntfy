@@ -188,9 +188,9 @@ func (c *meshCluster) BroadcastState(state *State) {
 // BroadcastBuckets sends every live peer what this node used of its visitors' buckets (see
 // Cluster.BroadcastBuckets). A failed send is not retried: the peer undercounts that round, and a
 // peer that was down catches up from a snapshot when it starts.
-func (c *meshCluster) BroadcastBuckets(round *limit.BucketRound) {
+func (c *meshCluster) BroadcastBuckets(round *limit.Buckets) {
 	peers := c.registry.Peers()
-	if len(round.Buckets) == 0 || len(peers) == 0 {
+	if len(round.Usages) == 0 || len(peers) == 0 {
 		return
 	}
 	body, err := json.Marshal(round)
@@ -219,7 +219,7 @@ func (c *meshCluster) BroadcastBuckets(round *limit.BucketRound) {
 
 // PeerBuckets reads the buckets that are not full from every live peer, in parallel (see
 // Cluster.PeerBuckets)
-func (c *meshCluster) PeerBuckets(ctx context.Context) map[NodeID]*limit.BucketRound {
+func (c *meshCluster) PeerBuckets(ctx context.Context) map[NodeID]*limit.Buckets {
 	peers := c.registry.Peers()
 	results := make(chan *peerSnapshot, len(peers))
 	for _, p := range peers {
@@ -230,14 +230,14 @@ func (c *meshCluster) PeerBuckets(ctx context.Context) map[NodeID]*limit.BucketR
 				results <- nil
 				return
 			}
-			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(snapshot.Buckets), p.NodeID)
+			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(snapshot.Usages), p.NodeID)
 			results <- &peerSnapshot{
 				nodeID:   NodeID(p.NodeID),
 				snapshot: snapshot,
 			}
 		}(p)
 	}
-	snapshots := make(map[NodeID]*limit.BucketRound)
+	snapshots := make(map[NodeID]*limit.Buckets)
 	for range peers {
 		if r := <-results; r != nil {
 			snapshots[r.nodeID] = r.snapshot

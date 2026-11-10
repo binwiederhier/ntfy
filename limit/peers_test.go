@@ -63,12 +63,12 @@ func TestService_BucketDeltas(t *testing.T) {
 				Refill: 2 * time.Second,
 			},
 		},
-	}, s.BucketDeltas().Buckets)
-	require.Empty(t, s.BucketDeltas().Buckets)
+	}, s.BucketDeltas().Usages)
+	require.Empty(t, s.BucketDeltas().Usages)
 
 	// Only what was used since the last call
 	require.True(t, s.Allow("ip:1.2.3.4", requests, 1).OK)
-	require.Equal(t, 1.0, s.BucketDeltas().Buckets["ip:1.2.3.4"][KindRequests].Used)
+	require.Equal(t, 1.0, s.BucketDeltas().Usages["ip:1.2.3.4"][KindRequests].Used)
 }
 
 func TestService_BucketDeltas_NotCountedWithoutTracking(t *testing.T) {
@@ -83,7 +83,7 @@ func TestService_BucketDeltas_NotCountedWithoutTracking(t *testing.T) {
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 	}
 	s.Refund("ip:1.2.3.4", KindRequests, 10)
-	require.Empty(t, s.BucketDeltas().Buckets)
+	require.Empty(t, s.BucketDeltas().Usages)
 }
 
 func TestService_ChargeBuckets(t *testing.T) {
@@ -129,7 +129,7 @@ func TestService_ChargeBuckets_NotSentOn(t *testing.T) {
 	// Peers' usage is theirs to send: charging it here does not make it this node's
 	s, _ := newTrackingTestService(t)
 	s.ChargeBuckets("peer", requestUsage("ip:1.2.3.4", 50))
-	require.Empty(t, s.BucketDeltas().Buckets)
+	require.Empty(t, s.BucketDeltas().Usages)
 }
 
 func TestService_BucketSnapshot_Restore(t *testing.T) {
@@ -164,7 +164,7 @@ func TestService_BucketSnapshot_Restore(t *testing.T) {
 				Refill: oneDay / 5,
 			},
 		},
-	}, roundUsed(snapshot.Buckets))
+	}, roundUsed(snapshot.Usages))
 
 	b := newTestService(t)
 	b.RestoreBuckets("a", snapshot)
@@ -181,7 +181,7 @@ func TestService_BucketSnapshot_Restore(t *testing.T) {
 }
 
 // requestUsage is a round of a peer's usage of the key's request bucket (burst 60, one token per 5 s)
-func requestUsage(key string, used float64) *BucketRound {
+func requestUsage(key string, used float64) *Buckets {
 	return testRound(BucketUsages{
 		key: {
 			KindRequests: {
@@ -197,10 +197,10 @@ func requestUsage(key string, used float64) *BucketRound {
 var testRounds atomic.Int64
 
 // testRound is the next round of the test peer, with the given buckets
-func testRound(buckets BucketUsages) *BucketRound {
-	return &BucketRound{
-		Round:   testRounds.Add(1),
-		Buckets: buckets,
+func testRound(buckets BucketUsages) *Buckets {
+	return &Buckets{
+		Time:   testRounds.Add(1),
+		Usages: buckets,
 	}
 }
 
@@ -227,7 +227,7 @@ func TestService_BucketSnapshot_LeavesOutUnsent(t *testing.T) {
 	a.BucketDeltas() // Sent
 	require.True(t, a.Allow("ip:1.2.3.4", rule, 4).OK)
 	snapshot := a.BucketSnapshot()
-	require.Equal(t, 10.0, math.Round(snapshot.Buckets["ip:1.2.3.4"][KindRequests].Used))
+	require.Equal(t, 10.0, math.Round(snapshot.Usages["ip:1.2.3.4"][KindRequests].Used))
 
 	b := newTestService(t)
 	b.RestoreBuckets("a", snapshot)
@@ -380,9 +380,9 @@ func TestService_BucketDeltas_RoundIsTheTime(t *testing.T) {
 	// ones, and the next round is newer even if the clock went back
 	s, clock := newTrackingTestService(t)
 	first := s.BucketDeltas()
-	require.Equal(t, clock.now().UnixNano(), first.Round)
+	require.Equal(t, clock.now().UnixNano(), first.Time)
 	clock.advance(-time.Second)
-	require.Equal(t, first.Round+1, s.BucketDeltas().Round)
+	require.Equal(t, first.Time+1, s.BucketDeltas().Time)
 }
 
 func TestService_BucketDeltas_EntryCap(t *testing.T) {
@@ -404,7 +404,7 @@ func TestService_BucketDeltas_EntryCap(t *testing.T) {
 		require.True(t, s.Allow(key, topics, 1).OK)
 	}
 	entries := 0
-	for _, kinds := range s.BucketDeltas().Buckets {
+	for _, kinds := range s.BucketDeltas().Usages {
 		entries += len(kinds)
 	}
 	require.Equal(t, BucketDeltasMax, entries)
@@ -445,5 +445,5 @@ func TestService_BucketDeltas_SkipsPrunedKey(t *testing.T) {
 	require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 	clock.advance(2 * settledIdle)
 	require.Equal(t, 1, s.Prune())
-	require.Empty(t, s.BucketDeltas().Buckets)
+	require.Empty(t, s.BucketDeltas().Usages)
 }

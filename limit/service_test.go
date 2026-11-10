@@ -1008,6 +1008,3 @@ func BenchmarkService_MemoryFlood(b *testing.B) {
 		runtime.KeepAlive(s)
 	}
 }
-
-// testRounds numbers the rounds of testRound
-var testRounds atomic.Uint64

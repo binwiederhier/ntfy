@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -186,6 +187,9 @@ func requestUsage(key string, used float64) *BucketRound {
 		},
 	})
 }
+
+// testRounds numbers the rounds of testRound
+var testRounds atomic.Uint64
 
 // testRound is the next round of the test peer, with the given buckets
 func testRound(buckets SharedBuckets) *BucketRound {

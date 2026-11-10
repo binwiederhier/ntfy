@@ -167,15 +167,16 @@ func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
 }
 
 func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
-	// A peer that does not take a round of buckets (it restarts, every deploy) is counted apart from
-	// failed message batches, which alert
+	// A peer that does not take a round of buckets (it restarts, every deploy) is counted under its
+	// own path, apart from failed message batches, which alert
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	registerFakePeer(t, pool, "node-b", "http://127.0.0.1:1") // Nothing listens
 	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:2"), pool, nil)
 	require.Nil(t, err)
 	defer mesh.Close()
 
-	sendErrors, bucketErrors := testutil.ToFloat64(metrics.ClusterSendErrors), testutil.ToFloat64(metrics.ClusterBucketSendErrors)
+	messageErrors := testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(MessagePath))
+	bucketErrors := testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(BucketsPath))
 	mesh.BroadcastBuckets(&limit.BucketRound{
 		Round: 1,
 		Buckets: limit.BucketUsages{
@@ -189,9 +190,9 @@ func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
 		},
 	})
 	waitFor(t, func() bool {
-		return testutil.ToFloat64(metrics.ClusterBucketSendErrors) == bucketErrors+1
+		return testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(BucketsPath)) == bucketErrors+1
 	})
-	require.Equal(t, sendErrors, testutil.ToFloat64(metrics.ClusterSendErrors))
+	require.Equal(t, messageErrors, testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(MessagePath)))
 }
 
 func TestMesh_HealthEndpoint(t *testing.T) {

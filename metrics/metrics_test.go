@@ -21,7 +21,6 @@ var expectedMetricNames = []string{
 	"ntfy_calls_made_failure",
 	"ntfy_calls_made_success",
 	"ntfy_cluster_batches_sent_total",
-	"ntfy_cluster_bucket_send_errors_total",
 	"ntfy_cluster_leader",
 	"ntfy_cluster_messages_forwarded_total",
 	"ntfy_cluster_messages_wasted_total",
@@ -66,6 +65,7 @@ var expectedMetricNames = []string{
 func TestRegisteredMetricNames(t *testing.T) {
 	HTTPRequests.WithLabelValues("200", "20000", "GET").Inc() // Vectors are only gathered once they have a series
 	ClusterPeerBatchesSent.WithLabelValues("node-b", "ok").Inc()
+	ClusterSendErrors.WithLabelValues("/v1/cluster/message")
 	ClusterPeerBatchesReceived.WithLabelValues("node-b").Inc()
 	ClusterPeerLastSendSuccess.WithLabelValues("node-b").Set(1)
 	SetDBPoolsFunc(func() []*DBPool {

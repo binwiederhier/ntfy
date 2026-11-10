@@ -112,6 +112,9 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	c.mux.HandleFunc("GET "+StatusPath, c.secretAuthenticated(c.handleStatus))
 	c.mux.HandleFunc("POST "+BucketsPath, c.authenticated(c.handleBuckets))
 	c.mux.HandleFunc("GET "+BucketsPath, c.secretAuthenticated(c.handleBucketSnapshot))
+	for _, path := range []string{MessagePath, StatePath, BucketsPath} {
+		metrics.ClusterSendErrors.WithLabelValues(path) // At zero, so the series exist before the first error
+	}
 	c.wg.Add(2)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
@@ -175,7 +178,7 @@ func (c *meshCluster) BroadcastState(state *State) {
 	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d deleted users, access changed: %t) to %d peer(s)", len(state.AddedTopics), len(state.DeletedUserIDs), state.AccessChanged, len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
-			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {
+			_ = c.sendToPeer(NodeID(p.NodeID), StatePath, stateURL(p.AdvertiseURL), func() error {
 				return c.client.SendState(c.ctx, p.AdvertiseURL, body)
 			})
 		}(p)
@@ -207,7 +210,7 @@ func (c *meshCluster) BroadcastBuckets(round *limit.BucketRound) {
 			ctx, cancel := context.WithTimeout(c.ctx, bucketsSendTimeout)
 			defer cancel()
 			if err := c.client.SendBuckets(ctx, p.AdvertiseURL, body); err != nil && c.ctx.Err() == nil {
-				metrics.ClusterBucketSendErrors.Inc()                                   // Not ClusterSendErrors, which alerts: every restart of a peer fails a few rounds
+				metrics.ClusterSendErrors.WithLabelValues(BucketsPath).Inc()            // Apart from the message and state paths, which alert: every restart of a peer fails a few rounds
 				log.Tag(tag).Err(err).Debug("Cannot send buckets to peer %s", p.NodeID) // Every second while it is down, and expected while it restarts
 			}
 		}(p)
@@ -572,7 +575,7 @@ func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	for lines := range q.queue.Dequeue() {
 		body := assembleMessageBody(lines)
 		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(lines), len(body), nodeID)
-		err := c.sendToPeer(nodeID, messageURL(q.advertiseURL), func() error {
+		err := c.sendToPeer(nodeID, MessagePath, messageURL(q.advertiseURL), func() error {
 			return c.client.SendMessages(c.ctx, q.advertiseURL, body)
 		})
 		if err != nil {
@@ -665,16 +668,16 @@ func deletePeerMetrics(nodeID NodeID) {
 // sendToPeer runs one peer API POST (via the client, authenticated with the shared cluster
 // secret). Failures are logged, counted and returned; the caller decides what a failure means (a
 // message batch is dropped, state is retried on the next heartbeat).
-func (c *meshCluster) sendToPeer(nodeID NodeID, url string, send func() error) error {
+func (c *meshCluster) sendToPeer(nodeID NodeID, path, url string, send func() error) error {
 	err := send()
 	var httpErr *HTTPError
 	if errors.As(err, &httpErr) {
-		metrics.ClusterSendErrors.Inc()
+		metrics.ClusterSendErrors.WithLabelValues(path).Inc()
 		log.Tag(tag).Warn("Peer %s (%s) rejected request with HTTP %d", nodeID, url, httpErr.StatusCode)
 		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, httpErr.StatusCode)
 	} else if err != nil {
 		if c.ctx.Err() == nil {
-			metrics.ClusterSendErrors.Inc()
+			metrics.ClusterSendErrors.WithLabelValues(path).Inc()
 			log.Tag(tag).Err(err).Warn("Failed to send to peer %s (%s)", nodeID, url)
 		}
 		return err

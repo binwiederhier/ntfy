@@ -21,6 +21,23 @@ import (
 	"heckel.io/ntfy/v2/model"
 )
 
+func TestMesh_LogsRequests(t *testing.T) {
+	// Every request a node receives on the mesh is a log line with the mesh_path field (see
+	// TestClient_LogsRequests for the sending side)
+	out := captureMeshLog(t)
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), openTestPool(t, schemaDSN), nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	req := httptest.NewRequest("POST", StatePath, strings.NewReader("{}"))
+	req.Header.Set(secretHeader, testSecret)
+	req.Header.Set(originHeader, "node-b")
+	mesh.ServeHTTP(httptest.NewRecorder(), req)
+	require.Contains(t, out.String(), "mesh_path="+StatePath)
+	require.Contains(t, out.String(), "mesh_direction=in")
+	require.Contains(t, out.String(), "peer=node-b")
+}
+
 func TestMesh_PeerAPI_Auth(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	pool := openTestPool(t, schemaDSN)

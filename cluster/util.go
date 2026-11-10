@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/netip"
 
-	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
@@ -63,18 +62,13 @@ func decodeMessageBody(r io.Reader, maxLineBytes int, deliver DeliverFunc) error
 	return scanner.Err()
 }
 
-// bucketLog returns a log event for a round of buckets with the bucket_round field, so the override
-// "bucket_round -> trace" shows the bucket traffic without the rest of the cluster's trace logs
-func bucketLog(round *limit.BucketRound, bytes int, peerNodeID string) *log.Event {
-	ev := log.Tag(tag).Fields(log.Context{
-		"bucket_round": round.Round,
-		"bucket_keys":  len(round.Buckets),
+// meshLog returns the log event for one request on the mesh, sent ("out") or received ("in"), with
+// the mesh_path field: the override "mesh_path -> trace" shows all mesh traffic without the rest of
+// the cluster's trace logs, and e.g. "mesh_path=/v1/cluster/buckets -> trace" one endpoint's
+func meshLog(direction, method, path string) *log.Event {
+	return log.Tag(tag).Fields(log.Context{
+		"mesh_direction": direction,
+		"mesh_method":    method,
+		"mesh_path":      path,
 	})
-	if bytes > 0 {
-		ev.Field("bucket_bytes", bytes)
-	}
-	if peerNodeID != "" {
-		ev.Field("peer_node_id", peerNodeID)
-	}
-	return ev
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"heckel.io/ntfy/v2/limit"
+	"heckel.io/ntfy/v2/log"
 )
 
 const (
@@ -107,7 +108,7 @@ func (c *Client) post(ctx context.Context, url, contentType string, body []byte)
 	if c.origin != "" {
 		req.Header.Set(originHeader, string(c.origin))
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req, len(body))
 	if err != nil {
 		return err
 	}
@@ -125,7 +126,7 @@ func (c *Client) get(ctx context.Context, url string, limit int64, v any) error 
 		return err
 	}
 	req.Header.Set(secretHeader, c.secret)
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req, 0)
 	if err != nil {
 		return err
 	}
@@ -134,6 +135,29 @@ func (c *Client) get(ctx context.Context, url string, limit int64, v any) error 
 		return &HTTPError{URL: url, StatusCode: resp.StatusCode}
 	}
 	return json.NewDecoder(io.LimitReader(resp.Body, limit)).Decode(v)
+}
+
+// do sends the request, and logs it with its answer's status at trace (see meshLog)
+func (c *Client) do(req *http.Request, bytesOut int) (*http.Response, error) {
+	started := time.Now()
+	resp, err := c.httpClient.Do(req)
+	if ev := meshLog("out", req.Method, req.URL.Path); ev.IsTrace() {
+		status, bytesIn := 0, int64(-1)
+		if resp != nil {
+			status, bytesIn = resp.StatusCode, resp.ContentLength
+		}
+		if err != nil {
+			ev.Err(err)
+		}
+		ev.Fields(log.Context{
+			"peer":          req.URL.Host,
+			"bytes_in":      bytesIn,
+			"bytes_out":     bytesOut,
+			"status":        status,
+			"time_taken_ms": time.Since(started).Milliseconds(),
+		}).Trace("Sent %s %s to %s: HTTP %d, %d bytes out", req.Method, req.URL.Path, req.URL.Host, status, bytesOut)
+	}
+	return resp, err
 }
 
 // messageURL derives the peer's message endpoint URL from its advertise URL.

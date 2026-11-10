@@ -2348,6 +2348,9 @@ A few important notes:
   restart at once do they start over. The number of open subscriptions is limited per node. Access changes (e.g. a
   revoked token) reach the other nodes when their access cache reloads.
 * Messages published with `cache: no` are not in the database, so for those, delivery across nodes is best effort.
+* To see the traffic between the nodes, set `log-level-overrides: ["mesh_path -> trace"]`: every request a node sends
+  or receives on the cluster port is then logged, with its path, peer, size, status and time. To see only one kind, match
+  the path, e.g. `mesh_path=/v1/cluster/buckets -> trace`.
 
 ### Draining on shutdown
 Restarting a node drops all of its subscriber connections at once, and all of its clients reconnect to the other nodes

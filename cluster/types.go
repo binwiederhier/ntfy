@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"net/http"
 	"time"
 
 	"heckel.io/ntfy/v2/limit"
@@ -151,6 +152,27 @@ type apiStateTopics struct {
 type peerQueue struct {
 	advertiseURL string
 	queue        *util.LingerQueue[[]byte]
+}
+
+// meshResponseWriter notes the status and the bytes of an answer on the mesh, for its log line (see
+// meshCluster.ServeHTTP)
+type meshResponseWriter struct {
+	http.ResponseWriter
+	status int
+	bytes  int
+}
+
+// WriteHeader notes the status and writes it
+func (w *meshResponseWriter) WriteHeader(status int) {
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+// Write counts the bytes and writes them
+func (w *meshResponseWriter) Write(p []byte) (int, error) {
+	n, err := w.ResponseWriter.Write(p)
+	w.bytes += n
+	return n, err
 }
 
 // peerSnapshot is one peer's buckets, as read by PeerBuckets

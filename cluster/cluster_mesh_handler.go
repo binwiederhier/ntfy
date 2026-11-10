@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
@@ -14,7 +15,28 @@ import (
 // ServeHTTP serves the internal peer API. Auth lives in the authenticated middleware, so every
 // endpoint gets the same shared-secret and origin handling.
 func (c *meshCluster) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	c.mux.ServeHTTP(w, r)
+	ev := meshLog("in", r.Method, r.URL.Path)
+	if !ev.IsTrace() {
+		c.mux.ServeHTTP(w, r)
+		return
+	}
+	started := time.Now()
+	rw := &meshResponseWriter{
+		ResponseWriter: w,
+		status:         http.StatusOK,
+	}
+	c.mux.ServeHTTP(rw, r)
+	peer := r.Header.Get(originHeader)
+	if peer == "" {
+		peer = r.RemoteAddr // A GET (snapshot, health, members, status) carries no origin
+	}
+	ev.Fields(log.Context{
+		"peer":          peer,
+		"bytes_in":      r.ContentLength,
+		"bytes_out":     rw.bytes,
+		"status":        rw.status,
+		"time_taken_ms": time.Since(started).Milliseconds(),
+	}).Trace("Received %s %s from %s: HTTP %d, %d bytes in, %d bytes out", r.Method, r.URL.Path, peer, rw.status, r.ContentLength, rw.bytes)
 }
 
 // authenticated wraps a peer API handler with the checks every endpoint needs: the shared
@@ -107,9 +129,6 @@ func (c *meshCluster) handleBuckets(origin NodeID, w http.ResponseWriter, r *htt
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if ev := bucketLog(&round, int(r.ContentLength), string(origin)); ev.IsTrace() {
-		ev.Trace("Received round of buckets of %d visitor key(s) from peer %s", len(round.Buckets), origin) // Every second, so not at debug
-	}
 	if c.conf.BucketsFunc != nil {
 		c.conf.BucketsFunc(origin, &round)
 	}
@@ -127,7 +146,7 @@ func (c *meshCluster) handleBucketSnapshot(w http.ResponseWriter, _ *http.Reques
 		log.Tag(tag).Err(err).Warn("Cannot write buckets")
 		return
 	}
-	bucketLog(snapshot, 0, "").Info("Sent buckets of %d visitor key(s) to a starting peer", len(snapshot.Buckets))
+	log.Tag(tag).Info("Sent buckets of %d visitor key(s) to a starting peer", len(snapshot.Buckets))
 }
 
 // handleMembers lists the live cluster members for the load balancers' agents

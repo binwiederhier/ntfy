@@ -16,7 +16,7 @@ import (
 // on its own: the tests sync by hand. It is closed when the test ends.
 func startTestService(t *testing.T, store *Store, now func() time.Time) *Service {
 	t.Helper()
-	s := newService(store, now)
+	s := newService(&Config{Store: store}, now)
 	s.interval = time.Hour
 	require.Nil(t, s.Start(context.Background()))
 	t.Cleanup(s.Close)
@@ -262,7 +262,7 @@ func TestService_Persist_StartupWithoutStore(t *testing.T) {
 		require.Nil(t, err)
 		_, err = store.db.Exec(`ALTER TABLE usage RENAME TO usage_down`)
 		require.Nil(t, err)
-		s := newService(store, time.Now)
+		s := newService(&Config{Store: store}, time.Now)
 		s.interval = 50 * time.Millisecond
 		t.Cleanup(s.Close)
 		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)

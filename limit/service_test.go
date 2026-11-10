@@ -33,7 +33,7 @@ func (c *testClock) advance(d time.Duration) {
 func newTestServiceWithClock(t *testing.T) (*Service, *testClock) {
 	t.Helper()
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	return newService(nil, clock.now), clock
+	return newService(&Config{}, clock.now), clock
 }
 
 func newTestService(t *testing.T) *Service {
@@ -438,7 +438,7 @@ func TestService_Prune_ForgettingIsARefillAtPruneTime(t *testing.T) {
 	// Forgetting a settled key is the same as refilling its buckets when it is forgotten: a
 	// wall clock stepped back afterwards finds the same tokens either way
 	clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-	pruned, kept := newService(nil, clock.now), newService(nil, clock.now)
+	pruned, kept := newService(&Config{}, clock.now), newService(&Config{}, clock.now)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  10,
@@ -583,7 +583,7 @@ func TestService_Prune_LimiterViewAcrossPrune(t *testing.T) {
 }
 
 func TestService_Allow_Concurrent(t *testing.T) {
-	s := New(nil)
+	s := New(&Config{})
 	rule := Rule{
 		Kind:   KindMessages,
 		Burst:  500,
@@ -618,7 +618,7 @@ func TestService_Allow_Concurrent(t *testing.T) {
 }
 
 func BenchmarkAllow_HotKey(b *testing.B) {
-	s := New(nil)
+	s := New(&Config{})
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -633,7 +633,7 @@ func BenchmarkAllow_HotKey(b *testing.B) {
 }
 
 func BenchmarkAllow_ManyKeys(b *testing.B) {
-	s := New(nil)
+	s := New(&Config{})
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -652,7 +652,7 @@ func BenchmarkAllow_ManyKeys(b *testing.B) {
 }
 
 func BenchmarkAllow_Parallel(b *testing.B) {
-	s := New(nil)
+	s := New(&Config{})
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
@@ -858,7 +858,7 @@ func TestService_Allow_DenyRacesRollover(t *testing.T) {
 	// roll the counter over; run with -race
 	var ticks atomic.Int64
 	start := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
-	s := newService(nil, func() time.Time {
+	s := newService(&Config{}, func() time.Time {
 		return start.Add(time.Duration(ticks.Add(1)) * time.Hour)
 	})
 	rule := Rule{
@@ -888,7 +888,7 @@ func TestService_Close_CancelsStalledLoad(t *testing.T) {
 	conn, err := pool.Conn(context.Background()) // Holds the only connection: the load waits for it
 	require.Nil(t, err)
 	defer conn.Close()
-	s := newService(store, time.Now)
+	s := newService(&Config{Store: store}, time.Now)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.Nil(t, s.Start(ctx))
@@ -932,7 +932,7 @@ var (
 
 func newBenchService(b *testing.B) *Service {
 	b.Helper()
-	s := newService(nil, time.Now)
+	s := newService(&Config{}, time.Now)
 	for i := 0; i < benchIdleKeys; i++ {
 		s.Allow(fmt.Sprintf("ip:10.%d.%d.%d", i>>16, (i>>8)&255, i&255), benchRequestRule, 1)
 	}
@@ -987,7 +987,7 @@ func BenchmarkService_MemoryFlood(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&base)
 		clock := &testClock{t: time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)}
-		s := newService(nil, clock.now)
+		s := newService(&Config{}, clock.now)
 		for j := 0; j < benchFloodKeys; j++ {
 			key := fmt.Sprintf("ip:10.%d.%d.%d", j>>16, (j>>8)&255, j&255)
 			s.Touch(key)

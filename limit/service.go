@@ -71,7 +71,7 @@ type Service struct {
 	watermark   int64                     // Time of the last read, unix seconds; the sync worker's only
 	prunedAt    int64                     // Time of the last prune, unix seconds; the sync worker's only
 	interval    time.Duration             // How often the worker syncs (syncInterval); tests change it
-	trackDeltas bool                      // Whether takeTokens and refundTokens record deltas (see TrackBucketDeltas)
+	trackDeltas bool                      // Whether takeTokens and refundTokens record deltas (see Config.TrackDeltas)
 	round       int64                     // The last BucketDeltas round (see BucketRound.Round); protected by roundMu
 	roundMu     sync.Mutex                // Serializes BucketDeltas and BucketSnapshot, so a snapshot contains whole rounds
 	peers       map[string]int64          // The last round taken from each peer (ChargeBuckets, RestoreBuckets); protected by peersMu
@@ -82,18 +82,18 @@ type Service struct {
 	wg          sync.WaitGroup
 }
 
-// New creates the service; the store shares the daily counts and keeps them across restarts, nil
-// for memory only
-func New(store *Store) *Service {
-	return newService(store, time.Now)
+// New creates the service (see Config)
+func New(conf *Config) *Service {
+	return newService(conf, time.Now)
 }
 
-func newService(store *Store, now func() time.Time) *Service {
+func newService(conf *Config, now func() time.Time) *Service {
 	s := &Service{
-		now:      now,
-		store:    store,
-		interval: syncInterval,
-		peers:    make(map[string]int64),
+		now:         now,
+		store:       conf.Store,
+		interval:    syncInterval,
+		trackDeltas: conf.TrackDeltas,
+		peers:       make(map[string]int64),
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	for i := 0; i < shardCount; i++ {

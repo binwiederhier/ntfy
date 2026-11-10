@@ -4,6 +4,12 @@ import (
 	"time"
 )
 
+// Config configures the limit service
+type Config struct {
+	Store       *Store // Shares the daily counts and keeps them across restarts; nil for memory only
+	TrackDeltas bool   // Record the tokens used per key and kind, for BucketDeltas to hand to the peers; off on a single node, where nothing would drain them
+}
+
 // Kind is what a key is being limited on: a request, a message, an email, ... Each kind has its
 // own token bucket per key; messages, emails and calls also have a daily count.
 type Kind uint8

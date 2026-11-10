@@ -9,7 +9,7 @@ import (
 // bucketShard is one independently locked part of the token buckets
 type bucketShard struct {
 	entries map[string]*bucketEntry
-	deltas  map[string]*[numKinds]float64 // Tokens used here per kind since the last BucketDeltas, for the peers; empty unless TrackBucketDeltas
+	deltas  map[string]*[numKinds]float64 // Tokens used here per kind since the last BucketDeltas, for the peers; empty unless Config.TrackDeltas
 	mu      sync.Mutex                    // Protects entries, deltas and everything inside them
 }
 

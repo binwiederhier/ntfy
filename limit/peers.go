@@ -17,13 +17,6 @@ const (
 	peerBurstMax = 10_000_000_000_000
 )
 
-// TrackBucketDeltas makes Allow and Refund record the tokens used per key and kind, for BucketDeltas
-// to hand to the peers. Off by default: on a single node nothing would drain them. Call it before the
-// service is used.
-func (s *Service) TrackBucketDeltas() {
-	s.trackDeltas = true
-}
-
 // BucketDeltas returns the tokens this node used per key and kind since the last call (refunds
 // netted out), each with its bucket's burst and refill, so a peer can charge them without the
 // visitor's rule, and starts over. Every key is in it, not only the ones being drained: spread over

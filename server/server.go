@@ -359,7 +359,10 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
-	s.limiter = limit.New(createUsageStore(pool, userDB))
+	s.limiter = limit.New(&limit.Config{
+		Store:       createUsageStore(pool, userDB),
+		TrackDeltas: conf.ClusterListen != "", // Drained by gossipBuckets
+	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.topicService = tp.New(createTopicStore(pool, userDB))
 	s.firebaseClient = firebaseClient
@@ -392,7 +395,6 @@ func New(conf *Config) (*Server, error) {
 		go s.runTail()
 	}
 	if conf.ClusterListen != "" {
-		s.limiter.TrackBucketDeltas() // Drained by gossipBuckets
 	}
 	if err := s.limiter.Start(context.Background()); err != nil {
 		return nil, err

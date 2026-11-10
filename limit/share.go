@@ -27,7 +27,7 @@ type peerRound struct {
 // to hand to the peers. Off by default: on a single node nothing would drain them. Call it before the
 // service is used.
 func (s *Service) TrackBucketDeltas() {
-	s.track = true
+	s.trackDeltas = true
 }
 
 // BucketDeltas returns the tokens this node used per key and kind since the last call (refunds

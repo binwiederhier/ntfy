@@ -48,7 +48,7 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
-	if s.track {
+	if s.trackDeltas {
 		bs.noteDeltaNoLock(key, rule.Kind, float64(n))
 	}
 	return b.decision(Decision{OK: true}, rule)
@@ -64,7 +64,7 @@ func (s *Service) refundTokens(key string, kind Kind, n int64) {
 		if b.last != 0 {
 			before := b.tokens
 			b.tokens = math.Min(b.tokens+float64(n), float64(b.burst))
-			if s.track {
+			if s.trackDeltas {
 				bs.noteDeltaNoLock(key, kind, before-b.tokens)
 			}
 		}

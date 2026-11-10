@@ -65,7 +65,7 @@ func TestService_BucketDeltas(t *testing.T) {
 	require.Equal(t, 1.0, s.BucketDeltas().Buckets["ip:1.2.3.4"][KindRequests].Used)
 }
 
-func TestService_BucketDeltas_NotCountedWithoutSharing(t *testing.T) {
+func TestService_BucketDeltas_NotCountedWithoutTracking(t *testing.T) {
 	// Without a cluster nothing takes the deltas, so they are not kept
 	s := newTestService(t)
 	rule := Rule{

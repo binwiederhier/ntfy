@@ -394,8 +394,6 @@ func New(conf *Config) (*Server, error) {
 		s.tail = tail
 		go s.runTail()
 	}
-	if conf.ClusterListen != "" {
-	}
 	if err := s.limiter.Start(context.Background()); err != nil {
 		return nil, err
 	}

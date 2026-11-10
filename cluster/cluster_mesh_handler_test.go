@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -101,14 +100,14 @@ func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
 
 	post := func(keys int) int {
 		var body strings.Builder
-		body.WriteString(`{"t":1,"b":{`)
+		body.WriteString(`{`)
 		for i := 0; i < keys; i++ {
 			if i > 0 {
 				body.WriteString(",")
 			}
 			fmt.Fprintf(&body, `"ip:10.%d.%d.%d":{"requests":{"u":1,"b":60,"r":5000000000}}`, i>>16&255, i>>8&255, i&255)
 		}
-		body.WriteString("}}")
+		body.WriteString("}")
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest("POST", BucketsPath, strings.NewReader(body.String()))
 		req.Header.Set(secretHeader, testSecret)
@@ -125,12 +124,9 @@ func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
 func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
 	// The largest round a node sends (limit.BucketDeltasMax buckets) fits the body limit of its
 	// peers, also with long keys (IPv6 prefixes, user IDs) and the largest values
-	round := &limit.Buckets{
-		Time:   math.MaxInt64,
-		Usages: make(limit.BucketUsages),
-	}
+	round := make(limit.Buckets)
 	kinds := []limit.Kind{limit.KindRequests, limit.KindBandwidth, limit.KindTopics, limit.KindEmails, limit.KindAuth}
-	for i := 0; len(round.Usages)*len(kinds) < limit.BucketDeltasMax; i++ {
+	for i := 0; len(round)*len(kinds) < limit.BucketDeltasMax; i++ {
 		buckets := make(map[limit.Kind]*limit.BucketUsage)
 		for _, kind := range kinds {
 			buckets[kind] = &limit.BucketUsage{
@@ -139,7 +135,7 @@ func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
 				Refill: 24 * time.Hour,
 			}
 		}
-		round.Usages[fmt.Sprintf("ip:2001:db8:%04x:%04x::", i>>16, i&0xffff)] = buckets
+		round[fmt.Sprintf("ip:2001:db8:%04x:%04x::", i>>16, i&0xffff)] = buckets
 	}
 	body, err := json.Marshal(round)
 	require.Nil(t, err)

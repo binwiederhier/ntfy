@@ -69,20 +69,17 @@ func TestMesh_BroadcastBucketsSendsEveryKind(t *testing.T) {
 		Burst:  30,
 		Refill: time.Hour,
 	}
-	meshA.broadcastBuckets(&limit.Buckets{
-		Time: 1794000000000000007,
-		Usages: limit.BucketUsages{
-			"ip:1.2.3.4": {
-				limit.KindRequests: {
-					Used:   42,
-					Burst:  testRequestRule.Burst,
-					Refill: testRequestRule.Refill,
-				},
-				limit.KindAuth: {
-					Used:   2,
-					Burst:  auth.Burst,
-					Refill: auth.Refill,
-				},
+	meshA.broadcastBuckets(limit.Buckets{
+		"ip:1.2.3.4": {
+			limit.KindRequests: {
+				Used:   42,
+				Burst:  testRequestRule.Burst,
+				Refill: testRequestRule.Refill,
+			},
+			limit.KindAuth: {
+				Used:   2,
+				Burst:  auth.Burst,
+				Refill: auth.Refill,
 			},
 		},
 	})
@@ -121,8 +118,8 @@ func TestMesh_CloseWithGossipRunning(t *testing.T) {
 	// A node that closes while its gossip loop holds a round it has not sent yet still gets that
 	// round to its peers: Close ends the loop, which finishes its round, before the last round
 	entered, release := make(chan struct{}, 1), make(chan struct{})
-	testHookBucketGossip = func(c *meshCluster, buckets *limit.Buckets) {
-		if c.conf.NodeID == "node-a" && len(buckets.Usages) > 0 {
+	testHookBucketGossip = func(c *meshCluster, buckets limit.Buckets) {
+		if c.conf.NodeID == "node-a" && len(buckets) > 0 {
 			entered <- struct{}{}
 			<-release
 		}
@@ -179,15 +176,12 @@ func TestMesh_BucketSendErrorsCountedApart(t *testing.T) {
 
 	messageErrors := testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(MessagePath))
 	bucketErrors := testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(BucketsPath))
-	mesh.broadcastBuckets(&limit.Buckets{
-		Time: 1,
-		Usages: limit.BucketUsages{
-			"ip:1.2.3.4": {
-				limit.KindRequests: {
-					Used:   1,
-					Burst:  60,
-					Refill: 5 * time.Second,
-				},
+	mesh.broadcastBuckets(limit.Buckets{
+		"ip:1.2.3.4": {
+			limit.KindRequests: {
+				Used:   1,
+				Burst:  60,
+				Refill: 5 * time.Second,
 			},
 		},
 	})

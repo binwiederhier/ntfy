@@ -101,13 +101,13 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 }
 
 // handleBuckets receives what a peer used of its visitors' buckets and charges it into this node's own
-func (c *meshCluster) handleBuckets(origin NodeID, w http.ResponseWriter, r *http.Request) {
+func (c *meshCluster) handleBuckets(_ NodeID, w http.ResponseWriter, r *http.Request) {
 	var buckets limit.Buckets
 	if err := json.NewDecoder(io.LimitReader(r.Body, bucketsMaxBytes)).Decode(&buckets); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	c.conf.Limiter.ChargeBuckets(string(origin), &buckets)
+	c.conf.Limiter.ChargeBuckets(buckets)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -119,7 +119,7 @@ func (c *meshCluster) handleBucketSnapshot(w http.ResponseWriter, _ *http.Reques
 		log.Tag(tag).Err(err).Warn("Cannot write buckets")
 		return
 	}
-	log.Tag(tag).Info("Sent buckets of %d visitor key(s) to a starting peer", len(snapshot.Usages))
+	log.Tag(tag).Info("Sent buckets of %d visitor key(s) to a starting peer", len(snapshot))
 }
 
 // handleMembers lists the live cluster members for the load balancers' agents

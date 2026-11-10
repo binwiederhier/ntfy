@@ -27,7 +27,7 @@ var (
 
 	// testHookBucketGossip, if non-nil, is called by gossipBuckets between taking a round and sending
 	// it, so tests can close a node at that point; it is always nil in production
-	testHookBucketGossip func(c *meshCluster, buckets *limit.Buckets)
+	testHookBucketGossip func(c *meshCluster, buckets limit.Buckets)
 )
 
 // restoreBuckets takes the visitors' buckets over from the live peers before this node serves.
@@ -37,8 +37,8 @@ var (
 func (c *meshCluster) restoreBuckets() {
 	ctx, cancel := context.WithTimeout(c.ctx, bucketRestoreTimeout)
 	defer cancel()
-	for origin, snapshot := range c.peerBuckets(ctx) {
-		c.conf.Limiter.RestoreBuckets(string(origin), snapshot)
+	for _, snapshot := range c.peerBuckets(ctx) {
+		c.conf.Limiter.RestoreBuckets(snapshot)
 	}
 }
 
@@ -76,9 +76,9 @@ func (c *meshCluster) gossipBuckets() {
 // broadcastBuckets sends every live peer the buckets, in parallel, and returns when all sends are
 // done. A failed send is not retried: the peer undercounts that round, and a peer that was down
 // catches up from a snapshot when it starts.
-func (c *meshCluster) broadcastBuckets(buckets *limit.Buckets) {
+func (c *meshCluster) broadcastBuckets(buckets limit.Buckets) {
 	peers := c.registry.Peers()
-	if len(buckets.Usages) == 0 || len(peers) == 0 {
+	if len(buckets) == 0 || len(peers) == 0 {
 		return
 	}
 	body, err := json.Marshal(buckets)
@@ -104,9 +104,9 @@ func (c *meshCluster) broadcastBuckets(buckets *limit.Buckets) {
 
 // peerBuckets reads the buckets that are not full from every live peer, in parallel: one per peer
 // that answered before ctx is done
-func (c *meshCluster) peerBuckets(ctx context.Context) map[NodeID]*limit.Buckets {
+func (c *meshCluster) peerBuckets(ctx context.Context) []limit.Buckets {
 	peers := c.registry.Peers()
-	results := make(chan *peerSnapshot, len(peers))
+	results := make(chan limit.Buckets, len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
 			snapshot, err := c.client.Buckets(ctx, p.AdvertiseURL)
@@ -115,17 +115,14 @@ func (c *meshCluster) peerBuckets(ctx context.Context) map[NodeID]*limit.Buckets
 				results <- nil
 				return
 			}
-			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(snapshot.Usages), p.NodeID)
-			results <- &peerSnapshot{
-				nodeID:   NodeID(p.NodeID),
-				snapshot: snapshot,
-			}
+			log.Tag(tag).Info("Read buckets of %d visitor key(s) from peer %s", len(snapshot), p.NodeID)
+			results <- snapshot
 		}(p)
 	}
-	snapshots := make(map[NodeID]*limit.Buckets)
+	snapshots := make([]limit.Buckets, 0, len(peers))
 	for range peers {
-		if r := <-results; r != nil {
-			snapshots[r.nodeID] = r.snapshot
+		if snapshot := <-results; snapshot != nil {
+			snapshots = append(snapshots, snapshot)
 		}
 	}
 	return snapshots

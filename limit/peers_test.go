@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,7 +42,7 @@ func TestService_BucketDeltas(t *testing.T) {
 	require.True(t, s.Allow("ip:1.2.3.4", bandwidth, 300).OK)
 	s.Refund("ip:1.2.3.4", KindBandwidth, 100)
 	require.True(t, s.Allow("user:u_abc", auth, 1).OK)
-	require.Equal(t, BucketUsages{
+	require.Equal(t, Buckets{
 		"ip:1.2.3.4": {
 			KindRequests: {
 				Used:   2,
@@ -63,12 +62,12 @@ func TestService_BucketDeltas(t *testing.T) {
 				Refill: 2 * time.Second,
 			},
 		},
-	}, s.BucketDeltas().Usages)
-	require.Empty(t, s.BucketDeltas().Usages)
+	}, s.BucketDeltas())
+	require.Empty(t, s.BucketDeltas())
 
 	// Only what was used since the last call
 	require.True(t, s.Allow("ip:1.2.3.4", requests, 1).OK)
-	require.Equal(t, 1.0, s.BucketDeltas().Usages["ip:1.2.3.4"][KindRequests].Used)
+	require.Equal(t, 1.0, s.BucketDeltas()["ip:1.2.3.4"][KindRequests].Used)
 }
 
 func TestService_BucketDeltas_NotCountedWithoutTracking(t *testing.T) {
@@ -83,7 +82,7 @@ func TestService_BucketDeltas_NotCountedWithoutTracking(t *testing.T) {
 		require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 	}
 	s.Refund("ip:1.2.3.4", KindRequests, 10)
-	require.Empty(t, s.BucketDeltas().Usages)
+	require.Empty(t, s.BucketDeltas())
 }
 
 func TestService_ChargeBuckets(t *testing.T) {
@@ -96,17 +95,17 @@ func TestService_ChargeBuckets(t *testing.T) {
 		Refill: 5 * time.Second,
 	}
 	require.True(t, s.Allow("ip:1.2.3.4", rule, 10).OK)
-	s.ChargeBuckets("peer", requestUsage("ip:1.2.3.4", 30))
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 30))
 	require.Equal(t, int64(20), s.Tokens("ip:1.2.3.4", rule))
 
-	s.ChargeBuckets("peer", requestUsage("ip:1.2.3.4", 1000))
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 1000))
 	require.Equal(t, int64(0), s.Tokens("ip:1.2.3.4", rule))
 	require.False(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 	clock.advance(5*time.Minute + 5*time.Second) // 61 tokens: the debt of 60, then one
 	require.Equal(t, int64(1), s.Tokens("ip:1.2.3.4", rule))
 
 	// A peer's refund hands tokens back, up to the burst
-	s.ChargeBuckets("peer", requestUsage("ip:1.2.3.4", -10))
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", -10))
 	require.Equal(t, int64(11), s.Tokens("ip:1.2.3.4", rule))
 }
 
@@ -119,7 +118,7 @@ func TestService_ChargeBuckets_UnknownKey(t *testing.T) {
 		Burst:  60,
 		Refill: 5 * time.Second,
 	}
-	s.ChargeBuckets("peer", requestUsage("ip:5.6.7.8", 50))
+	s.ChargeBuckets(requestUsage("ip:5.6.7.8", 50))
 	require.Equal(t, int64(10), s.Tokens("ip:5.6.7.8", rule))
 	clock.advance(10 * time.Second)
 	require.Equal(t, int64(12), s.Tokens("ip:5.6.7.8", rule))
@@ -128,8 +127,8 @@ func TestService_ChargeBuckets_UnknownKey(t *testing.T) {
 func TestService_ChargeBuckets_NotSentOn(t *testing.T) {
 	// Peers' usage is theirs to send: charging it here does not make it this node's
 	s, _ := newTrackingTestService(t)
-	s.ChargeBuckets("peer", requestUsage("ip:1.2.3.4", 50))
-	require.Empty(t, s.BucketDeltas().Usages)
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 50))
+	require.Empty(t, s.BucketDeltas())
 }
 
 func TestService_BucketSnapshot_Restore(t *testing.T) {
@@ -151,7 +150,7 @@ func TestService_BucketSnapshot_Restore(t *testing.T) {
 	require.True(t, a.Allow("ip:5.6.7.8", requests, 1).OK)
 	clockA.advance(5 * time.Second) // ip:5.6.7.8 is full again
 	snapshot := a.BucketSnapshot()
-	require.Equal(t, BucketUsages{
+	require.Equal(t, Buckets{
 		"ip:1.2.3.4": {
 			KindRequests: {
 				Used:   44,
@@ -164,25 +163,25 @@ func TestService_BucketSnapshot_Restore(t *testing.T) {
 				Refill: oneDay / 5,
 			},
 		},
-	}, roundUsed(snapshot.Usages))
+	}, roundUsed(snapshot))
 
 	b := newTestService(t)
-	b.RestoreBuckets("a", snapshot)
+	b.RestoreBuckets(snapshot)
 	require.Equal(t, int64(16), b.Tokens("ip:1.2.3.4", requests))
 	require.Equal(t, int64(2), b.Tokens("ip:1.2.3.4", emails))
 	require.Equal(t, int64(60), b.Tokens("ip:5.6.7.8", requests))
 
 	// Every peer holds the whole cluster's buckets, so a restore takes the most used, never the sum
-	b.RestoreBuckets("a", snapshot)
+	b.RestoreBuckets(snapshot)
 	require.Equal(t, int64(16), b.Tokens("ip:1.2.3.4", requests))
 	require.True(t, b.Allow("ip:1.2.3.4", requests, 10).OK)
-	b.RestoreBuckets("a", snapshot)
+	b.RestoreBuckets(snapshot)
 	require.Equal(t, int64(6), b.Tokens("ip:1.2.3.4", requests))
 }
 
 // requestUsage is a round of a peer's usage of the key's request bucket (burst 60, one token per 5 s)
-func requestUsage(key string, used float64) *Buckets {
-	return testRound(BucketUsages{
+func requestUsage(key string, used float64) Buckets {
+	return Buckets{
 		key: {
 			KindRequests: {
 				Used:   used,
@@ -190,22 +189,11 @@ func requestUsage(key string, used float64) *Buckets {
 				Refill: 5 * time.Second,
 			},
 		},
-	})
-}
-
-// testRounds numbers the rounds of testRound
-var testRounds atomic.Int64
-
-// testRound is the next round of the test peer, with the given buckets
-func testRound(buckets BucketUsages) *Buckets {
-	return &Buckets{
-		Time:   testRounds.Add(1),
-		Usages: buckets,
 	}
 }
 
 // roundUsed rounds the used tokens, which a snapshot taken between refills has fractions of
-func roundUsed(buckets BucketUsages) BucketUsages {
+func roundUsed(buckets Buckets) Buckets {
 	for _, kinds := range buckets {
 		for _, u := range kinds {
 			u.Used = math.Round(u.Used)
@@ -227,11 +215,11 @@ func TestService_BucketSnapshot_LeavesOutUnsent(t *testing.T) {
 	a.BucketDeltas() // Sent
 	require.True(t, a.Allow("ip:1.2.3.4", rule, 4).OK)
 	snapshot := a.BucketSnapshot()
-	require.Equal(t, 10.0, math.Round(snapshot.Usages["ip:1.2.3.4"][KindRequests].Used))
+	require.Equal(t, 10.0, math.Round(snapshot["ip:1.2.3.4"][KindRequests].Used))
 
 	b := newTestService(t)
-	b.RestoreBuckets("a", snapshot)
-	b.ChargeBuckets("a", a.BucketDeltas())
+	b.RestoreBuckets(snapshot)
+	b.ChargeBuckets(a.BucketDeltas())
 	require.Equal(t, int64(46), b.Tokens("ip:1.2.3.4", rule))
 }
 
@@ -249,7 +237,7 @@ func TestService_ChargeBuckets_GenerousRule(t *testing.T) {
 		Burst:  1000,
 		Refill: time.Second,
 	}
-	s.ChargeBuckets("peer", testRound(BucketUsages{
+	s.ChargeBuckets(Buckets{
 		"user:u_abc": {
 			KindRequests: {
 				Used:   50,
@@ -257,8 +245,8 @@ func TestService_ChargeBuckets_GenerousRule(t *testing.T) {
 				Refill: slow.Refill,
 			},
 		},
-	}))
-	s.ChargeBuckets("peer", testRound(BucketUsages{
+	})
+	s.ChargeBuckets(Buckets{
 		"user:u_abc": {
 			KindRequests: {
 				Used:   100,
@@ -266,7 +254,7 @@ func TestService_ChargeBuckets_GenerousRule(t *testing.T) {
 				Refill: fast.Refill,
 			},
 		},
-	}))
+	})
 	require.Equal(t, int64(850), s.Tokens("user:u_abc", fast))
 }
 
@@ -279,7 +267,7 @@ func TestService_ChargeBuckets_InvalidRule(t *testing.T) {
 		Burst:  60,
 		Refill: 5 * time.Second,
 	}
-	s.ChargeBuckets("peer", testRound(BucketUsages{
+	s.ChargeBuckets(Buckets{
 		"ip:1.2.3.4": {
 			KindRequests: {
 				Used:   1e15,
@@ -294,7 +282,7 @@ func TestService_ChargeBuckets_InvalidRule(t *testing.T) {
 				Refill: -time.Second,
 			},
 		},
-	}))
+	})
 	require.Equal(t, int64(60), s.Tokens("ip:1.2.3.4", rule))
 	require.Equal(t, int64(60), s.Tokens("ip:5.6.7.8", rule))
 }
@@ -302,87 +290,15 @@ func TestService_ChargeBuckets_InvalidRule(t *testing.T) {
 func TestService_ChargeBuckets_UnknownKind(t *testing.T) {
 	// A newer peer's kind is skipped, and the rest of its round still counts
 	s := newTestService(t)
-	var buckets BucketUsages
+	var buckets Buckets
 	require.Nil(t, json.Unmarshal([]byte(`{"ip:1.2.3.4":{"requests":{"u":50,"b":60,"r":5000000000},"teleports":{"u":3,"b":5,"r":1000000000}}}`), &buckets))
-	s.ChargeBuckets("peer", testRound(buckets))
+	s.ChargeBuckets(buckets)
 	rule := Rule{
 		Kind:   KindRequests,
 		Burst:  60,
 		Refill: 5 * time.Second,
 	}
 	require.Equal(t, int64(10), s.Tokens("ip:1.2.3.4", rule))
-}
-
-func TestService_ChargeBuckets_LateRoundSkipped(t *testing.T) {
-	// Rounds are sent concurrently, so one can overtake another. A round older than the last one
-	// taken from its node is skipped: a refund that overtook its charge must not be clipped at the
-	// full bucket and then followed by the charge.
-	a, _ := newTrackingTestService(t)
-	b := newTestService(t)
-	rule := Rule{
-		Kind:   KindBandwidth,
-		Burst:  1000,
-		Refill: time.Hour,
-	}
-	require.True(t, a.Allow("ip:1.2.3.4", rule, 600).OK)
-	charge := a.BucketDeltas()
-	a.Refund("ip:1.2.3.4", KindBandwidth, 600)
-	refund := a.BucketDeltas()
-	b.ChargeBuckets("a", refund)
-	b.ChargeBuckets("a", charge) // Late
-	require.Equal(t, int64(1000), b.Tokens("ip:1.2.3.4", rule))
-}
-
-func TestService_RestoreBuckets_SkipsRoundsInSnapshot(t *testing.T) {
-	// A round taken before the snapshot is in the snapshot, also if it is still on its way and
-	// arrives after the restarted node took the snapshot over; only later rounds are charged
-	a, _ := newTrackingTestService(t)
-	rule := Rule{
-		Kind:   KindRequests,
-		Burst:  60,
-		Refill: time.Hour,
-	}
-	require.True(t, a.Allow("ip:1.2.3.4", rule, 10).OK)
-	inFlight := a.BucketDeltas()
-	snapshot := a.BucketSnapshot()
-	b := newTestService(t)
-	b.RestoreBuckets("a", snapshot)
-	b.ChargeBuckets("a", inFlight)
-	require.Equal(t, int64(50), b.Tokens("ip:1.2.3.4", rule))
-
-	require.True(t, a.Allow("ip:1.2.3.4", rule, 4).OK)
-	b.ChargeBuckets("a", a.BucketDeltas())
-	require.Equal(t, int64(46), b.Tokens("ip:1.2.3.4", rule))
-}
-
-func TestService_ChargeBuckets_RestartedPeer(t *testing.T) {
-	// A peer that restarted takes its rounds anew, at a later time; they count
-	a, clock := newTrackingTestService(t)
-	b := newTestService(t)
-	rule := Rule{
-		Kind:   KindRequests,
-		Burst:  60,
-		Refill: time.Hour,
-	}
-	for i := 0; i < 3; i++ {
-		require.True(t, a.Allow("ip:1.2.3.4", rule, 1).OK)
-		b.ChargeBuckets("a", a.BucketDeltas())
-	}
-	clock.advance(time.Second)
-	restarted := newService(&Config{TrackDeltas: true}, clock.now)
-	require.True(t, restarted.Allow("ip:1.2.3.4", rule, 5).OK)
-	b.ChargeBuckets("a", restarted.BucketDeltas())
-	require.Equal(t, int64(52), b.Tokens("ip:1.2.3.4", rule))
-}
-
-func TestService_BucketDeltas_RoundIsTheTime(t *testing.T) {
-	// A round is numbered by when it was taken, so a restarted node's rounds are newer than its old
-	// ones, and the next round is newer even if the clock went back
-	s, clock := newTrackingTestService(t)
-	first := s.BucketDeltas()
-	require.Equal(t, clock.now().UnixNano(), first.Time)
-	clock.advance(-time.Second)
-	require.Equal(t, first.Time+1, s.BucketDeltas().Time)
 }
 
 func TestService_BucketDeltas_EntryCap(t *testing.T) {
@@ -404,7 +320,7 @@ func TestService_BucketDeltas_EntryCap(t *testing.T) {
 		require.True(t, s.Allow(key, topics, 1).OK)
 	}
 	entries := 0
-	for _, kinds := range s.BucketDeltas().Usages {
+	for _, kinds := range s.BucketDeltas() {
 		entries += len(kinds)
 	}
 	require.Equal(t, BucketDeltasMax, entries)
@@ -421,7 +337,7 @@ func TestService_ChargeBuckets_GenerousRefill(t *testing.T) {
 	}
 	require.True(t, s.Allow("ip:1.2.3.4", local, 10).OK)
 	clock.advance(5 * time.Second)
-	s.ChargeBuckets("peer", testRound(BucketUsages{
+	s.ChargeBuckets(Buckets{
 		"ip:1.2.3.4": {
 			KindRequests: {
 				Used:   1,
@@ -429,7 +345,7 @@ func TestService_ChargeBuckets_GenerousRefill(t *testing.T) {
 				Refill: time.Hour,
 			},
 		},
-	}))
+	})
 	require.Equal(t, int64(4), s.Tokens("ip:1.2.3.4", local))
 }
 
@@ -445,5 +361,5 @@ func TestService_BucketDeltas_SkipsPrunedKey(t *testing.T) {
 	require.True(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
 	clock.advance(2 * settledIdle)
 	require.Equal(t, 1, s.Prune())
-	require.Empty(t, s.BucketDeltas().Usages)
+	require.Empty(t, s.BucketDeltas())
 }

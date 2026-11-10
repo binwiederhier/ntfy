@@ -23,11 +23,8 @@ const (
 // N nodes, a client at N times its rate drains no node's bucket on its own. A lost round undercounts,
 // except for a refund of a charge sent in an earlier round, which then stays charged on the peers
 // until the bucket refills; refunds almost always come in the same round as their charge.
-func (s *Service) BucketDeltas() *Buckets {
-	s.roundMu.Lock()
-	defer s.roundMu.Unlock()
-	s.round = max(s.now().UnixNano(), s.round+1) // Newer than the last round, also if the clock went back
-	deltas := make(BucketUsages)
+func (s *Service) BucketDeltas() Buckets {
+	deltas := make(Buckets)
 	entries, dropped := 0, 0
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
@@ -58,10 +55,7 @@ func (s *Service) BucketDeltas() *Buckets {
 	if dropped > 0 {
 		log.Tag(tag).Warn("Not sharing %d bucket(s) this round, more than %d were used", dropped, BucketDeltasMax)
 	}
-	return &Buckets{
-		Time:   s.round,
-		Usages: deltas,
-	}
+	return deltas
 }
 
 // ChargeBuckets takes what peers used (their BucketDeltas) from the keys' buckets here, down to a
@@ -69,15 +63,9 @@ func (s *Service) BucketDeltas() *Buckets {
 // cluster, while a burst cannot lock a key, or the neighbors behind its NAT, out for longer than one
 // burst takes to refill. A key this node has not seen gets a bucket with the peer's rule, so it is
 // known here when the client comes, and when a restarting peer asks (BucketSnapshot).
-// Rounds from the same peer are taken in order: a round that is not newer than the last one taken
-// (it was overtaken, or the peer's snapshot that RestoreBuckets took over contains it) is skipped,
-// which undercounts rather than counting twice or clipping a refund that overtook its charge.
-func (s *Service) ChargeBuckets(origin string, buckets *Buckets) {
-	if !s.takeBuckets(origin, buckets, false) {
-		return
-	}
+func (s *Service) ChargeBuckets(buckets Buckets) {
 	now := s.now()
-	for key, kinds := range buckets.Usages {
+	for key, kinds := range buckets {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
@@ -95,11 +83,9 @@ func (s *Service) ChargeBuckets(origin string, buckets *Buckets) {
 // peer that restarts (RestoreBuckets). A full bucket is what a fresh node has anyway. What this node
 // used since its last BucketDeltas is left out: the next round sends it to the peer, which would
 // otherwise count it twice.
-func (s *Service) BucketSnapshot() *Buckets {
-	s.roundMu.Lock()
-	defer s.roundMu.Unlock()
+func (s *Service) BucketSnapshot() Buckets {
 	now := s.now()
-	snapshot := make(BucketUsages)
+	snapshot := make(Buckets)
 	for _, bs := range s.buckets {
 		bs.mu.Lock()
 		for key, e := range bs.entries {
@@ -124,20 +110,17 @@ func (s *Service) BucketSnapshot() *Buckets {
 		}
 		bs.mu.Unlock()
 	}
-	return &Buckets{
-		Time:   s.round,
-		Usages: snapshot,
-	}
+	return snapshot
 }
 
 // RestoreBuckets takes over a peer's BucketSnapshot. Every peer holds the whole cluster's buckets
 // (ChargeBuckets), so a bucket keeps the most used of here and the snapshot, never the sum: a
 // node that restores from two peers, or got a delta before the snapshot, does not count twice.
-// The peer's rounds up to the snapshot's are skipped from now on (see ChargeBuckets).
-func (s *Service) RestoreBuckets(origin string, snapshot *Buckets) {
-	s.takeBuckets(origin, snapshot, true)
+// It must run before the node accepts its peers' rounds: a round the snapshot contains would then
+// arrive again and count twice.
+func (s *Service) RestoreBuckets(snapshot Buckets) {
 	now := s.now()
-	for key, kinds := range snapshot.Usages {
+	for key, kinds := range snapshot {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
@@ -149,21 +132,6 @@ func (s *Service) RestoreBuckets(origin string, snapshot *Buckets) {
 		}
 		bs.mu.Unlock()
 	}
-}
-
-// takeBuckets records the buckets as the last ones taken from the peer and returns true, or returns
-// false if they are not newer than the last ones; a snapshot is also taken if it is the last round
-// itself (its rounds up to the snapshot's are then skipped)
-func (s *Service) takeBuckets(origin string, buckets *Buckets, snapshot bool) bool {
-	s.peersMu.Lock()
-	defer s.peersMu.Unlock()
-	last, ok := s.peers[origin]
-	if ok && (buckets.Time < last || buckets.Time == last && !snapshot) {
-		log.Tag(tag).Debug("Skipping buckets of peer %s from %d, not newer than %d", origin, buckets.Time, last)
-		return false
-	}
-	s.peers[origin] = buckets.Time
-	return true
 }
 
 // noteDeltaNoLock adds n used tokens (negative: refunded) of the kind to what the next round sends the

@@ -68,12 +68,12 @@ func (c *Client) SendBuckets(ctx context.Context, baseURL string, body []byte) e
 }
 
 // Buckets reads a peer's buckets that are not full
-func (c *Client) Buckets(ctx context.Context, baseURL string) (*limit.Buckets, error) {
+func (c *Client) Buckets(ctx context.Context, baseURL string) (limit.Buckets, error) {
 	var snapshot limit.Buckets
 	if err := c.get(ctx, bucketsURL(baseURL), bucketSnapshotMaxBytes, &snapshot); err != nil {
 		return nil, err
 	}
-	return &snapshot, nil
+	return snapshot, nil
 }
 
 // Health asks a peer whether it is healthy; any answer other than a 200 with a health body is an

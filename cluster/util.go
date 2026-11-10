@@ -61,14 +61,3 @@ func decodeMessageBody(r io.Reader, maxLineBytes int, deliver DeliverFunc) error
 	}
 	return scanner.Err()
 }
-
-// meshLog returns the log event for one request on the mesh, sent ("out") or received ("in"), with
-// the mesh_path field: the override "mesh_path -> trace" shows all mesh traffic without the rest of
-// the cluster's trace logs, and e.g. "mesh_path=/v1/cluster/buckets -> trace" one endpoint's
-func meshLog(direction, method, path string) *log.Event {
-	return log.Tag(tag).Fields(log.Context{
-		"mesh_direction": direction,
-		"mesh_method":    method,
-		"mesh_path":      path,
-	})
-}

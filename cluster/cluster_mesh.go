@@ -27,7 +27,7 @@ const (
 	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, deleted users)
 	bucketsMaxBytes    = 8 * 1024 * 1024 // Upper bound for a round of buckets: at most limit's 50k keys, ~80 bytes each
-	bucketsSendTimeout = time.Second     // A round of buckets that takes longer is overtaken by the next one
+	bucketsSendTimeout = time.Second     // A round of buckets that takes longer is given up, so the next one is not held up
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -57,11 +57,9 @@ type meshCluster struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
-	bucketGossipStop chan struct{}  // Closed by Close to end runBucketGossip; nil without a Limiter
-	bucketGossip     sync.WaitGroup // runBucketGossip, which Close waits for before the last round
-	bucketSends      sync.WaitGroup // In-flight broadcastBuckets sends, which Close lets finish (bounded by bucketsSendTimeout)
-	draining         atomic.Bool    // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
-	mu               sync.Mutex     // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
+	bucketGossipStop chan struct{} // Closed by Close to end runBucketGossip
+	draining         atomic.Bool   // This node is draining and acts as passive (see SetDraining); lock-free reads, since Role is called with c.mu held
+	mu               sync.Mutex    // Protects queues, closed, knownPeers, stats and lastRegistered; serializes SetDraining
 }
 
 // newMeshCluster creates the mesh cluster: it sets up the registry schema, registers this node
@@ -94,16 +92,17 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &meshCluster{
-		conf:           conf,
-		deliver:        deliver,
-		registry:       reg,
-		client:         NewClient(conf.Secret, conf.NodeID),
-		queues:         make(map[NodeID]*peerQueue),
-		lastRegistered: time.Now(), // The synchronous Register above just succeeded
-		knownPeers:     make(map[NodeID]*registry.Peer),
-		stats:          make(map[NodeID]*peerStats),
-		ctx:            ctx,
-		cancel:         cancel,
+		conf:             conf,
+		deliver:          deliver,
+		registry:         reg,
+		client:           NewClient(conf.Secret, conf.NodeID),
+		queues:           make(map[NodeID]*peerQueue),
+		lastRegistered:   time.Now(), // The synchronous Register above just succeeded
+		knownPeers:       make(map[NodeID]*registry.Peer),
+		stats:            make(map[NodeID]*peerStats),
+		ctx:              ctx,
+		cancel:           cancel,
+		bucketGossipStop: make(chan struct{}),
 	}
 	c.mux = http.NewServeMux()
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
@@ -116,15 +115,11 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 	for _, path := range []string{MessagePath, StatePath, BucketsPath} {
 		metrics.ClusterSendErrors.WithLabelValues(path) // At zero, so the series exist before the first error
 	}
-	c.wg.Add(2)
+	c.wg.Add(3)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
-	if conf.Limiter != nil {
-		c.restoreBuckets() // Before the server serves, so it does not forgive what the peers know
-		c.bucketGossipStop = make(chan struct{})
-		c.bucketGossip.Add(1)
-		go c.runBucketGossip()
-	}
+	c.restoreBuckets() // Before the server serves, so it does not forgive what the peers know
+	go c.runBucketGossip()
 	return c, nil
 }
 
@@ -322,16 +317,12 @@ func (c *meshCluster) Ready() bool {
 // and waits for them to exit.
 func (c *meshCluster) Close() error {
 	c.mu.Lock()
-	closed := c.closed
-	c.mu.Unlock()
-	if !closed && c.bucketGossipStop != nil {
-		c.stopBucketGossip()
+	if !c.closed {
+		close(c.bucketGossipStop) // The gossip loop sends the last round of buckets, so an orderly restart loses none of them
 	}
-	c.mu.Lock()
-	c.closed = true // No new peer queues or bucket sends from here on
+	c.closed = true // No new peer queues from here on
 	c.mu.Unlock()
-	c.bucketSends.Wait() // The last round of buckets, so an orderly restart loses none of them
-	c.cancel()           // Stops the heartbeat loop and aborts in-flight peer deliveries
+	c.cancel() // Stops the heartbeat loop and aborts in-flight peer deliveries
 	// Close the peer queues so their workers flush and exit; final sends are best-effort since
 	// the context is already canceled (parity with fire-and-forget delivery)
 	c.mu.Lock()

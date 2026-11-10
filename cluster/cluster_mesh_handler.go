@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"time"
 
 	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
@@ -15,28 +14,7 @@ import (
 // ServeHTTP serves the internal peer API. Auth lives in the authenticated middleware, so every
 // endpoint gets the same shared-secret and origin handling.
 func (c *meshCluster) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ev := meshLog("in", r.Method, r.URL.Path)
-	if !ev.IsTrace() {
-		c.mux.ServeHTTP(w, r)
-		return
-	}
-	started := time.Now()
-	rw := &meshResponseWriter{
-		ResponseWriter: w,
-		status:         http.StatusOK,
-	}
-	c.mux.ServeHTTP(rw, r)
-	peer := r.Header.Get(originHeader)
-	if peer == "" {
-		peer = r.RemoteAddr // A GET (snapshot, health, members, status) carries no origin
-	}
-	ev.Fields(log.Context{
-		"peer":          peer,
-		"bytes_in":      r.ContentLength,
-		"bytes_out":     rw.bytes,
-		"status":        rw.status,
-		"time_taken_ms": time.Since(started).Milliseconds(),
-	}).Trace("Received %s %s from %s: HTTP %d, %d bytes in, %d bytes out", r.Method, r.URL.Path, peer, rw.status, r.ContentLength, rw.bytes)
+	c.mux.ServeHTTP(w, r)
 }
 
 // authenticated wraps a peer API handler with the checks every endpoint needs: the shared
@@ -122,25 +100,20 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleBuckets receives what a peer used of its visitors' buckets and charges it into this node's
+// handleBuckets receives what a peer used of its visitors' buckets and charges it into this node's own
 func (c *meshCluster) handleBuckets(origin NodeID, w http.ResponseWriter, r *http.Request) {
-	var round limit.Buckets
-	if err := json.NewDecoder(io.LimitReader(r.Body, bucketsMaxBytes)).Decode(&round); err != nil {
+	var buckets limit.Buckets
+	if err := json.NewDecoder(io.LimitReader(r.Body, bucketsMaxBytes)).Decode(&buckets); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if c.conf.Limiter != nil {
-		c.conf.Limiter.ChargeBuckets(string(origin), &round)
-	}
+	c.conf.Limiter.ChargeBuckets(string(origin), &buckets)
 	w.WriteHeader(http.StatusOK)
 }
 
 // handleBucketSnapshot serves this node's buckets that are not full to a starting peer
 func (c *meshCluster) handleBucketSnapshot(w http.ResponseWriter, _ *http.Request) {
-	snapshot := &limit.Buckets{}
-	if c.conf.Limiter != nil {
-		snapshot = c.conf.Limiter.BucketSnapshot()
-	}
+	snapshot := c.conf.Limiter.BucketSnapshot()
 	w.Header().Set("Content-Type", contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(snapshot); err != nil {
 		log.Tag(tag).Err(err).Warn("Cannot write buckets")

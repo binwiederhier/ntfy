@@ -163,6 +163,9 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 	if conf.NodeID == "" {
 		return nil, errors.New("cluster mode requires a stable node ID (set experimental-cluster-node-id)")
 	}
+	if conf.Limiter == nil {
+		return nil, errors.New("cluster mode requires a limiter, whose buckets it shares with the peers")
+	}
 	if conf.Role == "" {
 		conf.Role = RoleActive
 	} else if !conf.Role.Valid() {

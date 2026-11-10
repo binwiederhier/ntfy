@@ -1,20 +1,16 @@
 package cluster
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"heckel.io/ntfy/v2/log"
 )
 
 // testClientRequest is what a fake peer saw of one request
@@ -33,59 +29,6 @@ func newTestClientServer(t *testing.T, status int, body string) (*httptest.Serve
 	}))
 	t.Cleanup(srv.Close)
 	return srv, seen
-}
-
-// testLogBuffer is a log output that tests read while other goroutines write to it
-type testLogBuffer struct {
-	buf bytes.Buffer
-	mu  sync.Mutex
-}
-
-func (b *testLogBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.Write(p)
-}
-
-func (b *testLogBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buf.String()
-}
-
-// captureMeshLog sends the log to a buffer, with the mesh traffic at trace (see meshLog)
-func captureMeshLog(t *testing.T) *testLogBuffer {
-	out := &testLogBuffer{}
-	log.SetOutput(out)
-	log.SetLevelOverride("mesh_path", "", log.TraceLevel)
-	t.Cleanup(func() {
-		log.ResetLevelOverrides()
-		log.SetOutput(os.Stderr)
-	})
-	return out
-}
-
-func TestClient_LogsRequests(t *testing.T) {
-	// Every request to a peer is a log line with the mesh_path field, so the override
-	// "mesh_path -> trace" shows the mesh traffic alone
-	out := captureMeshLog(t)
-	srv, _ := newTestClientServer(t, http.StatusOK, "")
-	client := NewClient(testSecret, "node-a")
-	require.Nil(t, client.SendState(context.Background(), srv.URL, []byte("{}")))
-	require.Contains(t, out.String(), "mesh_path="+StatePath)
-	require.Contains(t, out.String(), "mesh_direction=out")
-}
-
-func TestClient_LogsFailedRequests(t *testing.T) {
-	// A request that gets no answer is logged too, with its error and no status
-	out := captureMeshLog(t)
-	srv, _ := newTestClientServer(t, http.StatusOK, "")
-	srv.Close()
-	client := NewClient(testSecret, "node-a")
-	require.Error(t, client.SendState(context.Background(), srv.URL, []byte("{}")))
-	require.Contains(t, out.String(), "mesh_path="+StatePath)
-	require.Contains(t, out.String(), "status=0")
-	require.Contains(t, out.String(), "error=")
 }
 
 func TestClient_SendMessages(t *testing.T) {

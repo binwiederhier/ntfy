@@ -665,6 +665,7 @@ func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) 
 		// TTL truncates the liveness cutoff to 0 and the peer inserted below counts as live
 		// only within the same wall-clock second, leaving nothing to probe for isolation
 		HeartbeatInterval: 10 * time.Millisecond, NodeTTL: time.Second,
+		Limiter: s.limiter,
 		IsolatedFunc: func() {
 			once.Do(func() { close(entered) })
 			<-release

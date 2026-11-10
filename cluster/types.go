@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"net/http"
 	"time"
 
 	"heckel.io/ntfy/v2/limit"
@@ -25,7 +24,7 @@ type Config struct {
 	AccessChangedFunc AccessChangedFunc // Told that a peer changed access entries; may be nil
 	TopicsAddedFunc   TopicsAddedFunc   // Told about topics that just gained their first subscriber on a peer; may be nil
 	IsolatedFunc      IsolatedFunc      // Called while this node is cut off from the cluster; may be nil
-	Limiter           *limit.Service    // Its visitors' buckets are exchanged with the peers (see gossipBuckets); may be nil
+	Limiter           *limit.Service    // Its visitors' buckets are exchanged with the peers (see gossipBuckets)
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The
@@ -141,27 +140,6 @@ type apiStateTopics struct {
 type peerQueue struct {
 	advertiseURL string
 	queue        *util.LingerQueue[[]byte]
-}
-
-// meshResponseWriter notes the status and the bytes of an answer on the mesh, for its log line (see
-// meshCluster.ServeHTTP)
-type meshResponseWriter struct {
-	http.ResponseWriter
-	status int
-	bytes  int
-}
-
-// WriteHeader notes the status and writes it
-func (w *meshResponseWriter) WriteHeader(status int) {
-	w.status = status
-	w.ResponseWriter.WriteHeader(status)
-}
-
-// Write counts the bytes and writes them
-func (w *meshResponseWriter) Write(p []byte) (int, error) {
-	n, err := w.ResponseWriter.Write(p)
-	w.bytes += n
-	return n, err
 }
 
 // peerSnapshot is one peer's buckets, as read by peerBuckets

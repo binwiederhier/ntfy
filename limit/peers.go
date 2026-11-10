@@ -72,12 +72,12 @@ func (s *Service) BucketDeltas() *Buckets {
 // Rounds from the same peer are taken in order: a round that is not newer than the last one taken
 // (it was overtaken, or the peer's snapshot that RestoreBuckets took over contains it) is skipped,
 // which undercounts rather than counting twice or clipping a refund that overtook its charge.
-func (s *Service) ChargeBuckets(origin string, round *Buckets) {
-	if !s.takeRound(origin, round, false) {
+func (s *Service) ChargeBuckets(origin string, buckets *Buckets) {
+	if !s.takeBuckets(origin, buckets, false) {
 		return
 	}
 	now := s.now()
-	for key, kinds := range round.Usages {
+	for key, kinds := range buckets.Usages {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
 		e := bs.entryNoLock(key, now)
@@ -135,7 +135,7 @@ func (s *Service) BucketSnapshot() *Buckets {
 // node that restores from two peers, or got a delta before the snapshot, does not count twice.
 // The peer's rounds up to the snapshot's are skipped from now on (see ChargeBuckets).
 func (s *Service) RestoreBuckets(origin string, snapshot *Buckets) {
-	s.takeRound(origin, snapshot, true)
+	s.takeBuckets(origin, snapshot, true)
 	now := s.now()
 	for key, kinds := range snapshot.Usages {
 		bs := s.buckets[shardIndex(key)]
@@ -151,18 +151,18 @@ func (s *Service) RestoreBuckets(origin string, snapshot *Buckets) {
 	}
 }
 
-// takeRound records the round as the last one taken from the peer and returns true, or returns
-// false if it is not newer than the last one; a snapshot is also taken if it is the last round
+// takeBuckets records the buckets as the last ones taken from the peer and returns true, or returns
+// false if they are not newer than the last ones; a snapshot is also taken if it is the last round
 // itself (its rounds up to the snapshot's are then skipped)
-func (s *Service) takeRound(origin string, round *Buckets, snapshot bool) bool {
+func (s *Service) takeBuckets(origin string, buckets *Buckets, snapshot bool) bool {
 	s.peersMu.Lock()
 	defer s.peersMu.Unlock()
 	last, ok := s.peers[origin]
-	if ok && (round.Time < last || round.Time == last && !snapshot) {
-		log.Tag(tag).Debug("Skipping round %d of buckets from peer %s, not newer than %d", round.Time, origin, last)
+	if ok && (buckets.Time < last || buckets.Time == last && !snapshot) {
+		log.Tag(tag).Debug("Skipping buckets of peer %s from %d, not newer than %d", origin, buckets.Time, last)
 		return false
 	}
-	s.peers[origin] = round.Time
+	s.peers[origin] = buckets.Time
 	return true
 }
 

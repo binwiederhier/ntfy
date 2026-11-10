@@ -13,6 +13,10 @@ import (
 	"heckel.io/ntfy/v2/metrics"
 )
 
+func init() {
+	bucketRestoreTimeout = 200 * time.Millisecond // Most mesh tests register fake peers at addresses that never answer
+}
+
 // testRequestRule is the request bucket of the tests' limiters
 var testRequestRule = limit.Rule{
 	Kind:   limit.KindRequests,
@@ -93,7 +97,8 @@ func TestMesh_RestoresBucketsFromPeers(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	meshB, limiterB := newTestBucketMesh(t, schemaDSN, "node-b")
 	require.True(t, limiterB.Allow("ip:1.2.3.4", testRequestRule, 15).OK)
-	meshB.gossipBuckets() // A snapshot leaves out what the next round sends
+	// A snapshot leaves out what the next round sends
+	meshB.gossipBuckets()
 	meshC, err := newMeshCluster(newTestMeshConfig("node-c", "http://127.0.0.1:1"), openTestPool(t, schemaDSN), nil) // Nothing listens
 	require.Nil(t, err)
 	defer meshC.Close()
@@ -116,8 +121,8 @@ func TestMesh_CloseWithGossipRunning(t *testing.T) {
 	// A node that closes while its gossip loop holds a round it has not sent yet still gets that
 	// round to its peers: Close ends the loop, which finishes its round, before the last round
 	entered, release := make(chan struct{}, 1), make(chan struct{})
-	testHookBucketGossip = func(c *meshCluster, round *limit.Buckets) {
-		if c.conf.NodeID == "node-a" && len(round.Usages) > 0 {
+	testHookBucketGossip = func(c *meshCluster, buckets *limit.Buckets) {
+		if c.conf.NodeID == "node-a" && len(buckets.Usages) > 0 {
 			entered <- struct{}{}
 			<-release
 		}

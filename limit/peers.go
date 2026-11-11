@@ -68,12 +68,16 @@ func (s *Service) ChargeBuckets(buckets Buckets) {
 	for key, kinds := range buckets {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
-		e := bs.entryNoLock(key, now)
+		var e *bucketEntry
 		for kind, u := range kinds {
-			if b, rule := e.peerBucketNoLock(kind, u, now); b != nil {
-				b.tokens = math.Min(math.Max(b.tokens-u.Used, -float64(rule.Burst)), float64(rule.Burst))
-				e.noteFull(b, rule)
+			if !validPeerUsage(kind, u) {
+				continue
+			} else if e == nil {
+				e = bs.entryNoLock(key, now)
 			}
+			b, rule := e.peerBucketNoLock(kind, u, now)
+			b.tokens = math.Min(math.Max(b.tokens-u.Used, -float64(rule.Burst)), float64(rule.Burst))
+			e.noteFull(b, rule)
 		}
 		bs.mu.Unlock()
 	}
@@ -123,9 +127,14 @@ func (s *Service) RestoreBuckets(snapshot Buckets) {
 	for key, kinds := range snapshot {
 		bs := s.buckets[shardIndex(key)]
 		bs.mu.Lock()
-		e := bs.entryNoLock(key, now)
+		var e *bucketEntry
 		for kind, u := range kinds {
-			if b, rule := e.peerBucketNoLock(kind, u, now); b != nil && float64(rule.Burst)-b.tokens < u.Used {
+			if !validPeerUsage(kind, u) {
+				continue
+			} else if e == nil {
+				e = bs.entryNoLock(key, now)
+			}
+			if b, rule := e.peerBucketNoLock(kind, u, now); float64(rule.Burst)-b.tokens < u.Used {
 				b.tokens = math.Max(float64(rule.Burst)-u.Used, -float64(rule.Burst))
 				e.noteFull(b, rule)
 			}
@@ -151,13 +160,9 @@ func (bs *bucketShard) noteDeltaNoLock(key string, kind Kind, n float64) {
 // peerBucketNoLock refills the entry's bucket of the kind for a peer's usage and returns it with the
 // rule to charge it by: the more generous of the peer's rule and the one the bucket was last used
 // with, so a tier upgrade on the peer applies here too, and two rules that disagree undercount rather
-// than lock the key out. When the client comes here, this node's own rule applies again. It returns
-// nil for a kind this node does not know (a newer peer) or a usage without a valid bucket. The caller
-// must hold the shard's lock.
+// than lock the key out. When the client comes here, this node's own rule applies again. The usage
+// must be valid (validPeerUsage), and the caller must hold the shard's lock.
 func (e *bucketEntry) peerBucketNoLock(kind Kind, u *BucketUsage, now time.Time) (*bucket, *Rule) {
-	if kind >= numKinds || u == nil || u.Burst <= 0 || u.Burst > peerBurstMax || u.Refill < 0 {
-		return nil, nil
-	}
 	b := &e.buckets[kind]
 	rule := &Rule{
 		Kind:   kind,
@@ -172,6 +177,12 @@ func (e *bucketEntry) peerBucketNoLock(kind Kind, u *BucketUsage, now time.Time)
 	}
 	e.refillNoLock(rule, now)
 	return b, rule
+}
+
+// validPeerUsage returns false for a kind this node does not know (a newer peer) or a usage without a
+// valid bucket, which is then skipped before it creates an entry
+func validPeerUsage(kind Kind, u *BucketUsage) bool {
+	return kind < numKinds && u != nil && u.Burst > 0 && u.Burst <= peerBurstMax && u.Refill >= 0
 }
 
 // rule returns the rule the bucket was last used with

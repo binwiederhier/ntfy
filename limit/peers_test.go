@@ -287,6 +287,17 @@ func TestService_ChargeBuckets_InvalidRule(t *testing.T) {
 	require.Equal(t, int64(60), s.Tokens("ip:5.6.7.8", rule))
 }
 
+func TestService_ChargeBuckets_InvalidUsageKeepsNoKey(t *testing.T) {
+	// A key with nothing valid to charge or restore is not kept, so a bad peer's round cannot fill
+	// the memory with empty buckets
+	s := newTestService(t)
+	var buckets Buckets
+	require.Nil(t, json.Unmarshal([]byte(`{"ip:1.2.3.4":null,"ip:1.2.3.5":{},"ip:1.2.3.6":{"requests":null},"ip:1.2.3.7":{"requests":{"u":50,"b":60,"r":-1}},"ip:1.2.3.8":{"teleports":{"u":3,"b":5,"r":1000000000}}}`), &buckets))
+	s.ChargeBuckets(buckets)
+	s.RestoreBuckets(buckets)
+	require.Equal(t, 0, s.Size())
+}
+
 func TestService_ChargeBuckets_UnknownKind(t *testing.T) {
 	// A newer peer's kind is skipped, and the rest of its round still counts
 	s := newTestService(t)

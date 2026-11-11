@@ -184,6 +184,9 @@ var (
 	errHTTPBadRequestUserNoPrimaryEmail              = &errHTTP{40067, http.StatusBadRequest, "invalid request: user has no primary email, cannot send reset link", "", nil, nil}
 	errHTTPBadRequestBaseURLNotConfigured            = &errHTTP{40068, http.StatusBadRequest, "invalid request: base-url must be configured on the server to generate links", "https://ntfy.sh/docs/config/", nil, nil}
 	errHTTPBadRequestPasswordHashInvalid             = &errHTTP{40069, http.StatusBadRequest, "invalid request: password hash must be a bcrypt hash with cost 10 or higher, use 'ntfy user hash' to generate", "", nil, nil}
+	errHTTPBadRequestAppleCriticalInvalid            = &errHTTP{40070, http.StatusBadRequest, "invalid X-Apple-Critical parameter: must be a boolean value", "https://ntfy.sh/docs/publish/#ios-critical-alerts", nil, nil}
+	errHTTPBadRequestAppleSoundInvalid               = &errHTTP{40071, http.StatusBadRequest, "invalid X-Apple-Sound parameter: must be a sound name without path separators or control characters", "https://ntfy.sh/docs/publish/#ios-critical-alerts", nil, nil}
+	errHTTPBadRequestAppleVolumeInvalid              = &errHTTP{40072, http.StatusBadRequest, "invalid X-Apple-Volume parameter: must be a number greater than 0.0, at most 1.0", "https://ntfy.sh/docs/publish/#ios-critical-alerts", nil, nil}
 	errHTTPNotFound                                  = &errHTTP{40401, http.StatusNotFound, "page not found", "", nil, nil}
 	errHTTPUnauthorized                              = &errHTTP{40101, http.StatusUnauthorized, "unauthorized", "https://ntfy.sh/docs/publish/#authentication", nil, nil}
 	errHTTPForbidden                                 = &errHTTP{40301, http.StatusForbidden, "forbidden", "https://ntfy.sh/docs/publish/#authentication", nil, nil}

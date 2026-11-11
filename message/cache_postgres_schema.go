@@ -32,6 +32,7 @@ const (
 			user_id TEXT NOT NULL,
 			content_type TEXT NOT NULL,
 			encoding TEXT NOT NULL,
+			apple TEXT NOT NULL,
 			published BOOLEAN NOT NULL DEFAULT FALSE,
 			claimed_at BIGINT NOT NULL DEFAULT 0
 		);
@@ -67,6 +68,11 @@ const (
 	postgresMigrate16To17CreateIndexQuery = `
 		CREATE INDEX IF NOT EXISTS idx_message_topic_published_id ON message (topic, published, id);
 	`
+
+	// 17 -> 18: adds the apple column for the X-Apple-* headers
+	postgresMigrate17To18AddAppleQuery = `
+		ALTER TABLE message ADD COLUMN IF NOT EXISTS apple TEXT NOT NULL DEFAULT('');
+	`
 )
 
 var (
@@ -78,5 +84,6 @@ var (
 		{From: 14, To: 15}: schema.Query(postgresMigrate14To15CreateIndexQuery),
 		{From: 15, To: 16}: schema.Query(postgresMigrate15To16AddClaimedAtQuery),
 		{From: 16, To: 17}: schema.Query(postgresMigrate16To17CreateIndexQuery),
+		{From: 17, To: 18}: schema.Query(postgresMigrate17To18AddAppleQuery),
 	}
 )

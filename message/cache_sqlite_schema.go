@@ -35,6 +35,7 @@ const (
 			user TEXT NOT NULL,
 			content_type TEXT NOT NULL,
 			encoding TEXT NOT NULL,
+			apple TEXT NOT NULL,
 			published INT NOT NULL
 		);
 		CREATE INDEX IF NOT EXISTS idx_mid ON messages (mid);
@@ -174,6 +175,11 @@ const (
 	sqliteMigrate16To17CreateIndexQuery = `
 		CREATE INDEX IF NOT EXISTS idx_topic_published_time ON messages (topic, published, time);
 	`
+
+	// 17 -> 18: adds the apple column for the X-Apple-* headers
+	sqliteMigrate17To18AlterMessagesTableQuery = `
+		ALTER TABLE messages ADD COLUMN apple TEXT NOT NULL DEFAULT('');
+	`
 )
 
 var (
@@ -207,6 +213,7 @@ func sqliteMigrations(cacheDuration time.Duration) schema.Migrations {
 		{From: 14, To: 15}: schema.Nop, // Corresponds to Postgres migration
 		{From: 15, To: 16}: schema.Nop, // 15 -> 16 adds the Postgres claim column; SQLite is single-node
 		{From: 16, To: 17}: schema.Query(sqliteMigrate16To17CreateIndexQuery),
+		{From: 17, To: 18}: schema.Query(sqliteMigrate17To18AlterMessagesTableQuery),
 	}
 }
 

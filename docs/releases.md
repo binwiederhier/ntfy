@@ -2369,6 +2369,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.38.0 (UNRELEASED)
 
+**Features:**
+
+* Support [iOS critical alerts](publish.md#ios-critical-alerts) via the `X-Apple-(Critical|Sound|Volume)` headers: the publisher decides whether a message breaks through Focus, Do Not Disturb and the mute switch; without the header, max priority (5) messages are delivered as critical alerts ([#1235](https://github.com/binwiederhier/ntfy/issues/1235))
+
 **Bug fixes + maintenance:**
 
 * WebSocket subscribers that a node closes while draining are no longer counted and logged as internal server errors (HTTP 500, ntfy error 50001); on ntfy.sh, each node's drain counted ~18k of them and tripped the 5xx alert, although clients never saw an error ([#2171](https://github.com/binwiederhier/ntfy/pull/2171))

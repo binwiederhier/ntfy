@@ -15,6 +15,11 @@ const (
 	// peerBurstMax is the largest burst a peer's usage may carry (10 TB, for bandwidth buckets);
 	// usage with a larger one, or a negative refill, is a bug or a bad peer, and is ignored
 	peerBurstMax = 10_000_000_000_000
+
+	// peerDebtMax is the debt, in bursts, the peers' usage can put a bucket in. Honest nodes owe each
+	// other at most a burst per other node (all drained at once), so it forgives nothing up to 11
+	// nodes, while a bad peer's usage cannot lock a key out for good
+	peerDebtMax = 10
 )
 
 // BucketDeltas returns the tokens this node used per key and kind since the last call (refunds
@@ -59,9 +64,8 @@ func (s *Service) BucketDeltas() Buckets {
 }
 
 // ChargeBuckets takes what peers used (their BucketDeltas) from the keys' buckets here, down to a
-// debt of one burst: an abuser spread over the nodes then gets the configured rate from the
-// cluster, while a burst cannot lock a key, or the neighbors behind its NAT, out for longer than one
-// burst takes to refill. A key this node has not seen gets a bucket with the peer's rule, so it is
+// debt of peerDebtMax bursts: an abuser spread over the nodes then gets the configured rate from
+// the cluster. A key this node has not seen gets a bucket with the peer's rule, so it is
 // known here when the client comes, and when a restarting peer asks (BucketSnapshot).
 func (s *Service) ChargeBuckets(buckets Buckets) {
 	now := s.now()
@@ -76,7 +80,7 @@ func (s *Service) ChargeBuckets(buckets Buckets) {
 				e = bs.entryNoLock(key, now)
 			}
 			b, rule := e.peerBucketNoLock(kind, u, now)
-			b.tokens = math.Min(math.Max(b.tokens-u.Used, -float64(rule.Burst)), float64(rule.Burst))
+			b.tokens = math.Min(math.Max(b.tokens-u.Used, -peerDebtMax*float64(rule.Burst)), float64(rule.Burst))
 			e.noteFull(b, rule)
 		}
 		bs.mu.Unlock()
@@ -135,7 +139,7 @@ func (s *Service) RestoreBuckets(snapshot Buckets) {
 				e = bs.entryNoLock(key, now)
 			}
 			if b, rule := e.peerBucketNoLock(kind, u, now); float64(rule.Burst)-b.tokens < u.Used {
-				b.tokens = math.Max(float64(rule.Burst)-u.Used, -float64(rule.Burst))
+				b.tokens = math.Max(float64(rule.Burst)-u.Used, -peerDebtMax*float64(rule.Burst))
 				e.noteFull(b, rule)
 			}
 		}

@@ -86,8 +86,8 @@ func TestService_BucketDeltas_NotCountedWithoutTracking(t *testing.T) {
 }
 
 func TestService_ChargeBuckets(t *testing.T) {
-	// What the peers used comes off this node's bucket, down to a debt of one burst, so a burst
-	// spread over several nodes cannot lock a key (or the NAT behind it) out for long
+	// What the peers used comes off this node's bucket, down to a debt of peerDebtMax bursts, so a
+	// bad peer's usage cannot lock a key out for good
 	s, clock := newTestServiceWithClock(t)
 	rule := Rule{
 		Kind:   KindRequests,
@@ -98,15 +98,51 @@ func TestService_ChargeBuckets(t *testing.T) {
 	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 30))
 	require.Equal(t, int64(20), s.Tokens("ip:1.2.3.4", rule))
 
-	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 1000))
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 1e15))
 	require.Equal(t, int64(0), s.Tokens("ip:1.2.3.4", rule))
 	require.False(t, s.Allow("ip:1.2.3.4", rule, 1).OK)
-	clock.advance(5*time.Minute + 5*time.Second) // 61 tokens: the debt of 60, then one
+	clock.advance(50 * time.Minute) // 600 tokens: the debt of 10 bursts
+	require.Equal(t, int64(0), s.Tokens("ip:1.2.3.4", rule))
+	clock.advance(5 * time.Second)
 	require.Equal(t, int64(1), s.Tokens("ip:1.2.3.4", rule))
 
 	// A peer's refund hands tokens back, up to the burst
 	s.ChargeBuckets(requestUsage("ip:1.2.3.4", -10))
 	require.Equal(t, int64(11), s.Tokens("ip:1.2.3.4", rule))
+}
+
+func TestService_ChargeBuckets_KeepsDebtOfSeveralPeers(t *testing.T) {
+	// A client that drains its burst on each of 3 nodes at once owes this node the other 2 bursts,
+	// and waits for all of them, so it gets the configured rate from the cluster
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	require.True(t, s.Allow("ip:1.2.3.4", rule, 60).OK)
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 60))
+	s.ChargeBuckets(requestUsage("ip:1.2.3.4", 60))
+	clock.advance(10 * time.Minute) // 120 tokens: the debt of the 2 peers' bursts
+	require.Equal(t, int64(0), s.Tokens("ip:1.2.3.4", rule))
+	clock.advance(5 * time.Second)
+	require.Equal(t, int64(1), s.Tokens("ip:1.2.3.4", rule))
+}
+
+func TestService_RestoreBuckets_DebtCap(t *testing.T) {
+	// A snapshot is capped like a round: a bad peer's usage costs a key at most peerDebtMax bursts
+	s, clock := newTestServiceWithClock(t)
+	rule := Rule{
+		Kind:   KindRequests,
+		Burst:  60,
+		Refill: 5 * time.Second,
+	}
+	s.RestoreBuckets(requestUsage("ip:1.2.3.4", 1e15))
+	clock.advance(55 * time.Minute) // 660 tokens: from 10 bursts of debt to full
+	require.Equal(t, int64(60), s.Tokens("ip:1.2.3.4", rule))
+	s.RestoreBuckets(requestUsage("ip:5.6.7.8", 1e15))
+	clock.advance(54 * time.Minute)
+	require.Less(t, s.Tokens("ip:5.6.7.8", rule), int64(60))
 }
 
 func TestService_ChargeBuckets_UnknownKey(t *testing.T) {

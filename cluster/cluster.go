@@ -32,6 +32,9 @@ const (
 	// that lost its registration probes it to find out whether anywhere better exists for its
 	// subscribers. The server's public /v1/health is a separate endpoint for load balancers.
 	HealthPath = "/v1/cluster/health"
+	// StatusPath reports this node's view of the cluster for operators: its role and leadership,
+	// and per peer what it sent there and received from there (see Status)
+	StatusPath = "/v1/cluster/status"
 )
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer
@@ -44,6 +47,14 @@ type NodeID string
 
 // Role is a node's part in the cluster; the registry owns it because leadership is derived there
 type Role = registry.Role
+
+type (
+	// Peer is a live peer node (see registry.Peer)
+	Peer = registry.Peer
+
+	// Peers is a list of live peer nodes (see registry.Peers)
+	Peers = registry.Peers
+)
 
 // Node roles (see registry.Role)
 const (
@@ -95,7 +106,7 @@ type Cluster interface {
 	// without a subscriber for the topic drop it. It is fire-and-forget and must not block the
 	// caller's request path.
 	ForwardMessage(m *model.Message) error
-	// BroadcastState pushes a state delta (first-subscriber hints, subscriber cancels) to all
+	// BroadcastState pushes a state delta (first-subscriber hints, access changes, deleted users) to all
 	// peers. Nop single-node.
 	BroadcastState(state *State)
 	// IsLeader reports whether this node is the one that should run the cluster's singleton jobs
@@ -114,9 +125,21 @@ type Cluster interface {
 	// Ready reports whether a load balancer should send clients here: an active node that is
 	// Healthy, or that is not but has no other active node to take its clients. The only active
 	// node stays ready with a stale heartbeat, since pulling it would leave clients nowhere to go.
+	// A draining node is never ready: it acts as passive (see Role).
 	Ready() bool
-	// Role reports this node's configured role (active, or passive)
+	// Role reports the role this node acts in: its configured role (active, or passive), or passive
+	// while draining
 	Role() Role
+	// SetDraining marks this node as draining (moving its clients to other nodes, e.g. before a
+	// shutdown), or not. While draining, it acts as passive: it is not ready, does not lead, and its
+	// peers see it as passive. Nop single-node.
+	SetDraining(on bool)
+	// Draining reports whether this node is draining. Never single-node.
+	Draining() bool
+	// Peers returns the live peer nodes (as of the last registry refresh), excluding this node; e.g.
+	// Peers().HasActive() tells whether there is somewhere for this node's clients to go. None
+	// single-node.
+	Peers() Peers
 	// Close stops the cluster and releases its resources.
 	Close() error
 }

@@ -17,6 +17,7 @@ import (
 	"heckel.io/ntfy/v2/payments"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	vis "heckel.io/ntfy/v2/visitor" // Aliased: the server has its own visitor type
 	"io"
 	"net/http"
 	"net/netip"
@@ -62,12 +63,12 @@ func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _
 	if err != nil {
 		return err
 	}
-	freeTier := configBasedVisitorLimits(s.config)
+	freeTier := s.visitors.ipLimits
 	response := []*apiAccountBillingTier{
 		{
 			// This is a bit of a hack: This is the "Free" tier. It has no tier code, name or price.
 			Limits: &apiAccountLimits{
-				Basis:                    string(visitorLimitBasisIP),
+				Basis:                    string(vis.BasisIP),
 				Messages:                 freeTier.MessageLimit,
 				MessagesExpiryDuration:   int64(freeTier.MessageExpiryDuration.Seconds()),
 				Emails:                   freeTier.EmailLimit,
@@ -96,7 +97,7 @@ func (s *Server) handleBillingTiersGet(w http.ResponseWriter, _ *http.Request, _
 				Year:  priceYear,
 			},
 			Limits: &apiAccountLimits{
-				Basis:                    string(visitorLimitBasisTier),
+				Basis:                    string(vis.BasisTier),
 				Messages:                 tier.MessageLimit,
 				MessagesExpiryDuration:   int64(tier.MessageExpiryDuration.Seconds()),
 				Emails:                   tier.EmailLimit,
@@ -210,7 +211,7 @@ func (s *Server) handleAccountBillingSubscriptionCreateSuccess(w http.ResponseWr
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	logvr(v, r).
 		With(tier).
 		Tag(tagStripe).
@@ -434,7 +435,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(r *http.Request,
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	tier, err := s.userManager.TierByStripePrice(priceID)
 	if err != nil {
 		return err
@@ -457,7 +458,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(r *http.Request,
 	if err != nil {
 		return err
 	}
-	v.SetUser(u)
+	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	logvr(v, r).
 		Tag(tagStripe).
 		Field("stripe_webhook_type", event.Type).
@@ -470,7 +471,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(r *http.Request,
 }
 
 func (s *Server) updateSubscriptionAndTier(r *http.Request, v *visitor, u *user.User, tier *user.Tier, customerID, subscriptionID, status, interval string, paidUntil, cancelAt int64) error {
-	reservationsLimit := visitorDefaultReservationsLimit
+	reservationsLimit := vis.DefaultReservationsLimit
 	if tier != nil {
 		reservationsLimit = tier.ReservationLimit
 	}

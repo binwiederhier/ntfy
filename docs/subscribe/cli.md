@@ -111,7 +111,7 @@ Or, if you already started the long-running process and want to wait for it usin
 
 === "Using a `pidof`"
     ```
-    $ ntfy pub --wait-pid $(pidof rsync) mytopic | jq .
+    $ ntfy pub --wait-pid $(pidof -s rsync) mytopic | jq .
     {
       "id": "orM6hJKNYkWb",
       "time": 1655825827,

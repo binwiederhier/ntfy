@@ -60,6 +60,24 @@ func TestMatrix_NewRequestFromMatrixJSON_MismatchingPushKey(t *testing.T) {
 	require.Equal(t, "https://ntfy.example.com/upABCDEFGHI?up=1", matrixErr.rejectedPushKey)
 }
 
+func TestMatrix_NewRequestFromMatrixJSON_InvalidTopic(t *testing.T) {
+	baseURL := "https://ntfy.sh"
+	maxLength := 4096
+	for _, pushKey := range []string{
+		"https://ntfy.sh/sec%00ret?up=1", // NUL is stripped from the topic after authorization
+		"https://ntfy.sh/sec%FFret?up=1", // Invalid UTF-8, also rewritten after authorization
+		"https://ntfy.sh/one,two?up=1",
+		"https://ntfy.sh/mytopic/json?up=1",
+		"https://ntfy.sh/?up=1",
+		"https://ntfy.sh/" + strings.Repeat("a", 65) + "?up=1",
+	} {
+		body := `{"notification":{"devices":[{"pushkey":"` + pushKey + `"}]}}`
+		r, _ := http.NewRequest("POST", "http://ntfy.example.com/_matrix/push/v1/notify", strings.NewReader(body))
+		_, err := newRequestFromMatrixJSON(r, baseURL, maxLength)
+		require.Equal(t, errHTTPBadRequestTopicInvalid, err, pushKey)
+	}
+}
+
 func TestMatrix_WriteMatrixDiscoveryResponse(t *testing.T) {
 	w := httptest.NewRecorder()
 	require.Nil(t, writeMatrixDiscoveryResponse(w))

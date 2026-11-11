@@ -19,6 +19,9 @@
 # To listen on all interfaces, you may omit the IP address, e.g. ":443".
 # To disable HTTP, set "listen-http" to "-".
 #
+# "listen-http" may list several comma-separated addresses, e.g. "10.0.0.5:2586,10.0.0.5:2588".
+# Behind a load balancer, each address allows ~63k more connections from it (one per source port).
+#
 # listen-http: ":80"
 # listen-https:
 
@@ -27,6 +30,12 @@
 #
 # listen-unix: <socket-path>
 # listen-unix-mode: <linux permissions, e.g. 0700>
+
+# Experimental: local admin socket that serves the admin API without credentials. Whoever can open the
+# socket (mode 0660: the ntfy user and group, and root) can manage users without a password. Off by default.
+# The socket is only opened if auth-file or database-url is set. Not available on Windows.
+#
+# experimental-listen-admin-unix: "/run/ntfy/admin.sock"
 
 # Path to the private key & cert file for the HTTPS web server. Not used if "listen-https" is not set.
 #
@@ -61,10 +70,18 @@
 #
 # database-url: <connection-string>
 
+# Optional PostgreSQL read replicas, used for read queries to take load off the primary. Requires
+# "database-url". The same URL parameters as for "database-url" apply.
+#
+# database-replica-urls:
+#   - "postgres://user:pass@replica1:5432/ntfy"
+#   - "postgres://user:pass@replica2:5432/ntfy"
+
 # EXPERIMENTAL: Clustering options. Setting "experimental-cluster-listen" runs this server as one
-# node of a cluster that shares a PostgreSQL database. This is not ready for production: dropped
-# node-to-node batches are not recovered yet, and rate limits and quotas are enforced per node,
-# not across the cluster. The "experimental-" prefix means these option names may still change.
+# node of a cluster that shares a PostgreSQL database. Messages a node misses (e.g. a dropped
+# node-to-node batch) are recovered from the database. Request rate limits are enforced per node,
+# not across the cluster; daily message, e-mail and phone call limits are shared through the
+# database. The "experimental-" prefix means these option names may still change.
 #
 # - experimental-cluster-listen is the ip:port of the dedicated fan-out listener that peer nodes
 #   talk to. Bind it to a private network interface (e.g. "10.0.0.5:2587"); the public listeners
@@ -84,6 +101,13 @@
 #   jobs, and it never closes its subscribers to send them elsewhere. Active nodes do not count
 #   it as a place to send theirs either. The member list reports each node's role, so load
 #   balancer agents can route to active nodes only.
+# - experimental-cluster-drain-delay and experimental-cluster-drain-duration control how an active
+#   node drains on shutdown (SIGTERM) if another active node is up, so its clients move to the
+#   other nodes gradually instead of all at once. For the drain delay, the node withdraws: it is not
+#   ready (/v1/ready fails) but still serves everything, so the load balancer can stop sending it
+#   requests. Then it is read-only (new subscriptions and publishes get 503) and closes its
+#   subscriber connections evenly over the drain duration (all at once with 0). Make sure the
+#   service manager waits long enough (systemd: TimeoutStopSec, default 90s).
 #
 # Clustering also requires "database-url": the shared PostgreSQL database carries the durable
 # state and the cluster's own coordination tables.
@@ -98,6 +122,8 @@
 # experimental-cluster-secret: <secret>
 # experimental-cluster-batch-linger: 500ms
 # experimental-cluster-role: active
+# experimental-cluster-drain-delay: 15s
+# experimental-cluster-drain-duration: 1m
 
 # If "cache-file" is set, messages are cached in a local SQLite database instead of only in-memory.
 # This allows for service restarts without losing messages in support of the since= parameter.
@@ -386,9 +412,12 @@
 # visitor-request-limit-replenish: "5s"
 # visitor-request-limit-exempt-hosts: ""
 
-# Rate limiting: Hard daily limit of messages per visitor and day. The limit is reset
-# every day at midnight UTC. If the limit is not set (or set to zero), the request
-# limit (see above) governs the upper limit.
+# Rate limiting: Hard daily limit of messages per visitor and day. The day is a rolling 24-hour
+# period per visitor (account or IP), starting at a time of day of the visitor's own, so not
+# every count resets at once. If the limit is not set (or set to zero), the request
+# limit (see above) governs the upper limit. The daily counts (messages, emails, calls) are
+# kept in the user database ("auth-file", or "database-url"), so they survive a restart and,
+# on PostgreSQL, are shared by all servers; without one, they are counted in memory only.
 #
 # visitor-message-daily-limit: 0
 
@@ -421,7 +450,9 @@
 # - ban-weights assigns a strike weight to a matcher KEY (KEY:WEIGHT). A KEY is an exact ntfy code
 #   ("42909"), a prefix family ("429*"), a bare HTTP status ("403", shorthand for "403*"), or "*".
 #   Longest match wins. A weight of 0 exempts a code (never contributes to a ban), so the legit quota
-#   429s can be carved out from a "*" catch-all. Heavier weights ban faster (auth-failure floods).
+#   429s can be carved out from a "*" catch-all. Heavier weights ban faster (auth-failure floods);
+#   weights may be fractional down to 0.001 (e.g. 0.05: 20 rejections make one strike). Codes that
+#   match no key weigh 1.
 #
 # Each appended line has the exact format
 #   "<RFC3339-UTC-timestamp> <ip> <prefix> <http-code> <ntfy-code>", for example:
@@ -431,15 +462,12 @@
 # unit a fail2ban jail should ban, so a whole IPv6 subnet is banned as one.
 #
 # ban-file: "/var/log/ntfy-ban.log"
-# ban-window: "1m"
+# ban-window: "10m"
 # ban-threshold: 100
 # ban-weights:
-#   - "42909:10"   # auth-failure flood: bans in ~10
-#   - "42908:0"    # daily message quota reached -> legit, never counts
-#   - "42903:0"    # subscription limit -> legit
-#   - "42905:0"    # daily bandwidth reached -> legit
-#   - "42910:0"    # daily phone call quota reached -> legit
-#   - "*:1"        # everything else 4xx/5xx
+#   - "42909:2"      # auth-failure flood: bans at half the threshold
+#   - "50701:0.05"   # UnifiedPush push without a subscriber: app servers with many offline phones
+#   - "41002:0.05"   # abandoned UnifiedPush topic (410 Gone): the same app servers
 
 # Rate limiting: IPv4/IPv6 address prefix bits used for rate limiting
 # - visitor-prefix-bits-ipv4: number of bits of the IPv4 address to use for rate limiting (default: 32, full address)

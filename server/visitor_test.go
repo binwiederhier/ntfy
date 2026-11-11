@@ -1,7 +1,11 @@
 package server
 
 import (
+	"io"
 	"net/netip"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,40 +14,10 @@ import (
 	"heckel.io/ntfy/v2/util"
 )
 
-func TestVisitor_UserStatsDeltaFlush(t *testing.T) {
-	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfigWithAuthFile(t, databaseURL)
-		c.AuthStatsQueueWriterInterval = 300 * time.Millisecond
-		s := newTestServer(t, c)
-		require.Nil(t, s.userManager.AddTier(&user.Tier{
-			Code:         "test",
-			MessageLimit: 100,
-		}))
-		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
-		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
-
-		// Publish 3 messages; the visitor enqueues a stats delta after each publish
-		for i := 0; i < 3; i++ {
-			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
-				"Authorization": util.BasicAuth("phil", "phil"),
-			})
-			require.Equal(t, 200, response.Code)
-		}
-
-		// After two flush intervals, the persisted count must be exactly 3: per-publish
-		// enqueues must be deltas, not absolute snapshots (snapshots would add up to 1+2+3=6)
-		time.Sleep(time.Second)
-		u, err := s.userManager.User("phil")
-		require.Nil(t, err)
-		require.Equal(t, int64(3), u.Stats.Messages)
-	})
-}
-
-func TestVisitor_SetUser_DoesNotChargeAnonymousUsage(t *testing.T) {
-	// A user who gets a tier takes over their IP-keyed visitor (e.g. the billing callback). What
-	// that visitor counted anonymously must not land on the account.
+func TestVisitor_TierUserDoesNotGetAnonymousUsage(t *testing.T) {
+	// What a user's IP counted anonymously must not land on the account once the user (with a
+	// tier) shows up from that IP.
 	c := newTestConfigWithAuthFile(t, "")
-	c.AuthStatsQueueWriterInterval = 100 * time.Millisecond
 	s := newTestServer(t, c)
 	require.Nil(t, s.userManager.AddTier(&user.Tier{Code: "test", MessageLimit: 100}))
 	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
@@ -52,12 +26,639 @@ func TestVisitor_SetUser_DoesNotChargeAnonymousUsage(t *testing.T) {
 	require.Nil(t, err)
 	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 	for i := 0; i < 3; i++ {
-		require.True(t, v.MessageAllowed())
+		require.True(t, v.MessageAllowed().OK)
+	}
+	vu := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+	require.True(t, vu.RequestAllowed().OK)
+	require.Equal(t, int64(0), vu.Stats().Messages)
+	require.Equal(t, int64(3), v.Stats().Messages)
+}
+
+func TestVisitor_BandwidthRefund(t *testing.T) {
+	// A revert on the bandwidth limiter (what util.LimitReader and util.LimitWriter do when a
+	// later limiter rejects a chunk) hands the bytes back; it used to be a no-op
+	c := newTestConfig(t, "")
+	c.VisitorAttachmentDailyBandwidthLimit = 1000
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	l := v.BandwidthLimiter()
+	require.True(t, l.AllowN(900))
+	require.False(t, l.AllowN(200))
+	require.True(t, l.AllowN(-500))
+	require.True(t, l.AllowN(200))
+	require.False(t, v.BandwidthAllowed(500).OK)
+	require.True(t, v.BandwidthAllowed(400).OK)
+}
+
+func TestVisitor_TierChangeKeepsBuckets(t *testing.T) {
+	// Moving between tiers re-resolves the limits on the next request, but the request bucket is
+	// not handed back full: what the user spent on the old tier stays spent
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.VisitorRequestLimitBurst = 3
+		c.VisitorRequestLimitReplenish = time.Hour
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "small",
+			MessageLimit: 10,
+		}))
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "large",
+			MessageLimit: 10000,
+		})) // Burst 500
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "small"))
+		for i := 0; i < 3; i++ {
+			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+				"Authorization": util.BasicAuth("phil", "phil"),
+			})
+			require.Equal(t, 200, response.Code)
+		}
+		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 429, response.Code)
+		require.Nil(t, s.userManager.ChangeTier("phil", "large"))
+		response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, response.Code) // 4 of 500 spent, not a full bucket
+		require.Nil(t, s.userManager.ChangeTier("phil", "small"))
+		response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 429, response.Code) // 4 of 3 spent: in debt
+	})
+}
+
+func TestVisitor_AccountEmailsRemainingCountsTheDay(t *testing.T) {
+	// The account shows the day's remaining emails, like it does for messages. The email bucket
+	// may still refuse a send while the day has room left.
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 2
+	c.VisitorEmailLimitReplenish = time.Hour // Daily limit 24
+	s := newTestServer(t, c)
+	s.mailer = &testMailer{}
+	for i := 0; i < 2; i++ {
+		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Email": "test@email.com",
+		})
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "GET", "/v1/account", "", nil)
+	require.Equal(t, 200, response.Code)
+	account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+	require.Nil(t, err)
+	require.Equal(t, int64(2), account.Stats.Emails)
+	require.Equal(t, int64(22), account.Stats.EmailsRemaining)
+	response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Email": "test@email.com",
+	})
+	require.Equal(t, 429, response.Code)
+}
+
+func TestVisitor_TierFieldChangeAppliesAtOnce(t *testing.T) {
+	// A changed limit on the user's existing tier applies on the next request, without the tier
+	// ID changing; it used to need a visitor rebuild
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "test",
+			MessageLimit: 2,
+		}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+		for i := 0; i < 2; i++ {
+			response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+				"Authorization": util.BasicAuth("phil", "phil"),
+			})
+			require.Equal(t, 200, response.Code)
+		}
+		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 429, response.Code)
+		tier, err := s.userManager.Tier("test")
+		require.Nil(t, err)
+		tier.MessageLimit = 3
+		require.Nil(t, s.userManager.UpdateTier(tier))
+		response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, response.Code)
+		response = request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 429, response.Code)
+	})
+}
+
+func TestVisitor_EmailDailyLimitCapsBelowBurst(t *testing.T) {
+	// A tier's daily email limit (what the account page shows) is enforced, not only the bucket:
+	// with a daily limit of 2 and a burst of 16, the third email is denied even though the bucket
+	// has tokens
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorEmailLimitBurst = 16
+	s := newTestServer(t, c)
+	s.mailer = &testMailer{}
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 10,
+		EmailLimit:   2,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	for i := 0; i < 2; i++ {
+		response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+			"Email":         "test@email.com",
+		})
+		require.Equal(t, 200, response.Code)
+	}
+	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+		"Email":         "test@email.com",
+	})
+	require.Equal(t, 429, response.Code)
+	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
+}
+
+func TestVisitor_ZeroLimitsAdmitNothing(t *testing.T) {
+	// A limit of zero admits nothing, as main's FixedLimiter(0) and bytes limiter did; the limit
+	// service reads a zero cap as "no cap", so the visitor must not hand it a zero (Codex review #3:
+	// a user downgraded to a tier without calls kept calling)
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:                     "zero",
+			MessageLimit:             0,
+			CallLimit:                0,
+			AttachmentBandwidthLimit: 0,
+		}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "zero"))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+		require.False(t, v.MessageAllowed().OK)
+		require.False(t, v.CallAllowed().OK)
+		require.False(t, v.BandwidthAllowed(1).OK)
+		require.False(t, v.BandwidthLimiter().AllowN(1))
+	})
+}
+
+func TestVisitor_UserIsPerRequest(t *testing.T) {
+	// Untiered users and anonymous requests from one IP share a limiter key, but each request
+	// must keep its own user (#1051)
+	s := newTestServer(t, newTestConfigWithAuthFile(t, ""))
+	require.Nil(t, s.userManager.AddUser("phil", "phil12345", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+
+	// The concurrent requests, made deterministic
+	authed := s.visitor(ip, u)
+	anon := s.visitor(ip, nil)
+	require.NotNil(t, authed.User())
+	require.Equal(t, u.ID, authed.User().ID)
+	require.Nil(t, anon.User())
+	authedAgain := s.visitor(ip, u)
+	require.Nil(t, anon.User())
+	require.NotNil(t, authedAgain.User())
+	require.Equal(t, u.ID, authedAgain.User().ID)
+
+	// Limits are still shared per IP: requests and the node-local subscription gauge
+	for authed.RequestAllowed().OK {
+	}
+	require.False(t, anon.RequestAllowed().OK)
+	for authed.SubscriptionAllowed() {
+	}
+	require.False(t, anon.SubscriptionAllowed())
+	authed.RemoveSubscription()
+	require.True(t, anon.SubscriptionAllowed())
+}
+
+func TestVisitor_SubscriptionLimitSharedPerKey(t *testing.T) {
+	c := newTestConfig(t, "")
+	c.VisitorSubscriptionLimit = 2
+	s := newTestServer(t, c)
+	ip := netip.MustParseAddr("9.9.9.9")
+	v1 := s.visitor(ip, nil)
+	v2 := s.visitor(ip, nil) // A second request from the same IP shares the slots
+	require.True(t, v1.SubscriptionAllowed())
+	require.True(t, v2.SubscriptionAllowed())
+	require.False(t, v1.SubscriptionAllowed())
+	require.True(t, s.visitor(netip.MustParseAddr("1.2.3.4"), nil).SubscriptionAllowed())
+	v1.RemoveSubscription()
+	require.True(t, v2.SubscriptionAllowed())
+}
+
+func TestVisitor_FirebasePenaltyIsSharedPerKey(t *testing.T) {
+	s := newTestServer(t, newTestConfig(t, ""))
+	ip := netip.MustParseAddr("9.9.9.9")
+	v1 := s.visitor(ip, nil)
+	v2 := s.visitor(ip, nil)
+	require.True(t, v2.FirebaseAllowed())
+	v1.FirebaseTemporarilyDeny()
+	require.False(t, v2.FirebaseAllowed())
+	require.True(t, s.visitor(netip.MustParseAddr("1.2.3.4"), nil).FirebaseAllowed())
+}
+
+func TestVisitor_FirebasePenaltyExpires(t *testing.T) {
+	c := newTestConfig(t, "")
+	c.FirebaseQuotaExceededPenaltyDuration = 300 * time.Millisecond
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	v.FirebaseTemporarilyDeny()
+	require.False(t, v.FirebaseAllowed())
+	require.Eventually(t, v.FirebaseAllowed, 3*time.Second, 50*time.Millisecond) // Sends resume once the penalty has passed
+}
+
+func TestVisitor_AuthLimiter_NotBypassedByConcurrentLogin(t *testing.T) {
+	// A user without a tier shares the IP limiter key with anonymous requests from the same IP.
+	// Their login must not switch off the auth failure limiter for a concurrent guesser (#1051).
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorAuthFailureLimitBurst = 3
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+	vip := s.visitor(ip, nil) // The guesser's anonymous visitor (see maybeAuthenticate)
+
+	// The user logs in between the guesser's lookup and each failed guess
+	for i := 0; i < 3; i++ {
+		s.visitor(ip, u)
+		require.True(t, vip.AuthAllowed().OK)
+		vip.AuthFailed()
+	}
+	s.visitor(ip, u)
+	require.False(t, vip.AuthAllowed().OK)
+}
+
+func TestVisitor_AccountLimiter_NotDeniedByConcurrentLogin(t *testing.T) {
+	// The other direction: a concurrent login on the same IP must not deny an anonymous signup
+	c := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+	vip := s.visitor(ip, nil)
+
+	s.visitor(ip, u)
+	require.True(t, vip.AccountActionAllowed().OK)
+}
+
+func TestVisitor_AuthAndAccountLimitsIgnoreUser(t *testing.T) {
+	// The auth and account limits are per key and do not look at the user (as on main since #2119):
+	// a logged-in user may request a password reset, and is charged like everyone on the key
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorAuthFailureLimitBurst = 1
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
+	require.True(t, v.AccountActionAllowed().OK)
+	require.True(t, v.AuthAllowed().OK)
+	v.AuthFailed()
+	require.False(t, v.AuthAllowed().OK)
+}
+
+func TestVisitor_SharedKeyCountsOnce(t *testing.T) {
+	// Two visitors with the same user key (the user from two addresses) share one count in the
+	// limiter, so the user's usage is not double counted
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "test",
+			MessageLimit: 10,
+		}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		v1 := s.visitor(netip.MustParseAddr("1.1.1.1"), u)
+		v2 := s.visitor(netip.MustParseAddr("2.2.2.2"), u)
+		require.Equal(t, v1.key, v2.key)
+		for i := 0; i < 3; i++ {
+			require.True(t, v1.MessageAllowed().OK)
+		}
+		for i := 0; i < 2; i++ {
+			require.True(t, v2.MessageAllowed().OK)
+		}
+		require.Equal(t, int64(5), v1.Stats().Messages)
+		require.Equal(t, int64(5), v2.Stats().Messages)
+
+		// The account sees the shared count, and the day's remaining messages are shared too
+		response := request(t, s, "GET", "/v1/account", "", map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		})
+		require.Equal(t, 200, response.Code)
+		account, err := util.UnmarshalJSON[apiAccountResponse](io.NopCloser(response.Body))
+		require.Nil(t, err)
+		require.Equal(t, int64(5), account.Stats.Messages)
+		require.Equal(t, int64(5), account.Stats.MessagesRemaining)
+		for i := 0; i < 5; i++ {
+			require.True(t, v2.MessageAllowed().OK)
+		}
+		require.False(t, v1.MessageAllowed().OK)
+	})
+}
+
+func TestVisitor_RequestLimiterZeroBurstAdmitsNothing(t *testing.T) {
+	// A request burst of zero admits nothing, as the old rate.Limiter did; the limit service
+	// reads a zero burst as "no bucket", so the visitor must not hand it one. A tier's burst is
+	// floored at the config's, so a small tier gets zero too.
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorRequestLimitBurst = 0
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "small",
+		MessageLimit: 10, // Burst 10 * 5% = 0
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "small"))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+	require.False(t, s.visitor(ip, nil).RequestAllowed().OK)
+	require.False(t, s.visitor(ip, u).RequestAllowed().OK)
+}
+
+func TestVisitor_TopicCreationLimiterDisabledByZero(t *testing.T) {
+	// The topic creation limiter is off when either its burst or its replenish interval is zero;
+	// a bucket that never refills would otherwise lock a visitor out of new topics for good
+	topicsAllowed := func(burst int, replenish time.Duration) bool {
+		c := newTestConfig(t, "")
+		c.VisitorTopicCreationLimitBurst = burst
+		c.VisitorTopicCreationLimitReplenish = replenish
+		s := newTestServer(t, c)
+		v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+		for i := 0; i < 3; i++ {
+			require.True(t, v.TopicCreationAllowed().OK)
+		}
+		return v.TopicCreationAllowed().OK // The 4th: denied only if a 3-burst limiter is on
+	}
+	require.True(t, topicsAllowed(0, time.Hour))
+	require.True(t, topicsAllowed(3, 0))
+	require.False(t, topicsAllowed(3, time.Hour))
+}
+
+func TestVisitor_TierChangeDoesNotReseedCounts(t *testing.T) {
+	// On a tier change (and for a new visitor object of a known key), the key keeps its live
+	// counts; nothing is seeded from the user's row.
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		s := newTestServer(t, c)
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "small",
+			MessageLimit: 5,
+		}))
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:         "large",
+			MessageLimit: 10,
+		}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "small"))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		ip := netip.MustParseAddr("9.9.9.9")
+		v := s.visitor(ip, u)
+		for i := 0; i < 4; i++ {
+			require.True(t, v.MessageAllowed().OK)
+		}
+		require.Nil(t, s.userManager.ChangeTier("phil", "large"))
+		u, err = s.userManager.User("phil")
+		require.Nil(t, err)
+		v = s.visitor(ip, u) // The next request carries the new tier
+		require.Equal(t, int64(4), v.Stats().Messages)
+		for i := 0; i < 6; i++ {
+			require.True(t, v.MessageAllowed().OK)
+		}
+		require.False(t, v.MessageAllowed().OK)
+		fresh := s.visitor(ip, u)
+		require.Equal(t, int64(10), fresh.Stats().Messages)
+		require.False(t, fresh.MessageAllowed().OK)
+	})
+}
+
+func TestVisitor_IPPrefixKeying(t *testing.T) {
+	// Addresses in one prefix share the IP key and its counts, other prefixes do not, and a user
+	// without a tier counts against the IP key like an anonymous request from the same address
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorPrefixBitsIPv4 = 24
+	c.VisitorMessageDailyLimit = 3
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	v := s.visitor(netip.MustParseAddr("1.2.3.4"), nil)
+	require.True(t, v.MessageAllowed().OK)
+	require.True(t, v.MessageAllowed().OK)
+	peer := s.visitor(netip.MustParseAddr("1.2.3.200"), nil)
+	require.Equal(t, v.key, peer.key)
+	require.Equal(t, int64(2), peer.Stats().Messages)
+	require.True(t, s.visitor(netip.MustParseAddr("1.2.4.1"), nil).MessageAllowed().OK)
+	vu := s.visitor(netip.MustParseAddr("1.2.3.77"), u)
+	require.Equal(t, v.key, vu.key)
+	require.True(t, vu.MessageAllowed().OK)
+	require.False(t, vu.MessageAllowed().OK)
+	require.False(t, s.visitor(netip.MustParseAddr("1.2.3.4"), nil).MessageAllowed().OK)
+
+	// IPv6: the default /64
+	v6 := s.visitor(netip.MustParseAddr("2001:db8:1:2::1"), nil)
+	require.Equal(t, v6.key, s.visitor(netip.MustParseAddr("2001:db8:1:2:ffff::1"), nil).key)
+	require.NotEqual(t, v6.key, s.visitor(netip.MustParseAddr("2001:db8:1:3::1"), nil).key)
+}
+
+func TestVisitor_TierDowngradeReturnsToIPBucket(t *testing.T) {
+	// Gaining a tier moves the user to their own key with fresh counts, losing it moves them back
+	// to the IP key with whatever anonymous usage it has, and regaining it finds the user key's
+	// counts as they were left
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorMessageDailyLimit = 3
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 10,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	ip := netip.MustParseAddr("9.9.9.9")
+	anon := s.visitor(ip, nil)
+	require.True(t, anon.MessageAllowed().OK)
+	require.True(t, anon.MessageAllowed().OK)
+
+	// Up: fresh counts on the user key
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	vu := s.visitor(ip, u)
+	require.NotEqual(t, anon.key, vu.key)
+	require.Equal(t, int64(0), vu.Stats().Messages)
+	for i := 0; i < 5; i++ {
+		require.True(t, vu.MessageAllowed().OK)
 	}
 
-	v.SetUser(u)
-	time.Sleep(500 * time.Millisecond)
+	// Down: back on the IP key, with the anonymous usage
+	require.Nil(t, s.userManager.ResetTier("phil"))
 	u, err = s.userManager.User("phil")
 	require.Nil(t, err)
-	require.Equal(t, int64(0), u.Stats.Messages)
+	require.Nil(t, u.Tier)
+	vd := s.visitor(ip, u)
+	require.Equal(t, anon.key, vd.key)
+	require.Equal(t, int64(2), vd.Stats().Messages)
+	require.True(t, vd.MessageAllowed().OK)
+	require.False(t, vd.MessageAllowed().OK)
+
+	// Up again: what was spent on the tier stays spent
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	u, err = s.userManager.User("phil")
+	require.Nil(t, err)
+	vr := s.visitor(ip, u)
+	require.Equal(t, vu.key, vr.key)
+	require.Equal(t, int64(5), vr.Stats().Messages)
+}
+
+func TestVisitor_ConcurrentSharedKey(t *testing.T) {
+	// Every request builds its own visitor on a shared key. Under contention, the daily count
+	// must stay exact (no over-admission) and the reads must not race the writes; run with -race.
+	c := newTestConfigWithAuthFile(t, "")
+	c.VisitorRequestLimitBurst = 10000
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "test",
+		MessageLimit: 50,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "test"))
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false)) // No tier: shares the IP key
+	u, err := s.userManager.User("phil")
+	require.Nil(t, err)
+	noTier, err := s.userManager.User("ben")
+	require.Nil(t, err)
+	ip := netip.MustParseAddr("9.9.9.9")
+	const goroutines, iterations = 32, 25
+	var wg sync.WaitGroup
+	var admitted atomic.Int64
+	errs := make(chan error, goroutines*iterations)
+	for g := 0; g < goroutines; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				v := s.visitor(ip, u)
+				if v.MessageAllowed().OK {
+					admitted.Add(1)
+				}
+				v.RequestAllowed()
+				v.Stats()
+				v.Context()
+				vip := s.visitor(ip, nil)
+				vip.RequestAllowed()
+				vip.AuthAllowed()
+				vip.Context()
+				vn := s.visitor(ip, noTier)
+				vn.MessageAllowed()
+				vn.Context()
+				if i%5 == 0 {
+					if _, err := v.Info(); err != nil {
+						errs <- err
+					}
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.Nil(t, err)
+	}
+	require.Equal(t, int64(50), admitted.Load())
+	require.Equal(t, int64(50), s.visitor(ip, u).Stats().Messages)
+}
+
+// Fails if negative bandwidth AllowN becomes a no-op; a later reader limiter's rejection must refund the shared quota.
+func TestVisitor_BandwidthReaderRollback(t *testing.T) {
+	c := newTestConfig(t, "")
+	c.VisitorAttachmentDailyBandwidthLimit = 10
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	l := v.BandwidthLimiter()
+	r := util.NewLimitReader(strings.NewReader("12345678"), l, util.NewFixedLimiter(0))
+	n, err := r.Read(make([]byte, 8))
+	require.ErrorIs(t, err, util.ErrLimitReached)
+	require.Zero(t, n)
+	require.Equal(t, int64(10), s.limiter.Tokens(v.key, v.bandwidthRule())) // Refunded in full
+	require.True(t, v.BandwidthAllowed(10).OK)
+	require.False(t, l.Allow())
+}
+
+func TestVisitor_TierWithoutEmailsAdmitsNone(t *testing.T) {
+	// A tier whose daily email limit is zero sends no emails, even though its bucket inherits the
+	// server's burst; the limit service reads a daily limit of zero as "no cap"
+	c := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, c)
+	s.mailer = &testMailer{}
+	require.Nil(t, s.userManager.AddTier(&user.Tier{
+		Code:         "noemails",
+		MessageLimit: 10,
+		EmailLimit:   0,
+	}))
+	require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+	require.Nil(t, s.userManager.ChangeTier("phil", "noemails"))
+	response := request(t, s, "PUT", "/mytopic", "test", map[string]string{
+		"Authorization": util.BasicAuth("phil", "phil"),
+		"Email":         "test@email.com",
+	})
+	require.Equal(t, 429, response.Code)
+	require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
+}
+
+func TestVisitor_EmailsWithoutTierHaveDailyCap(t *testing.T) {
+	// Without a tier, the daily limit derived from the refill (24 with a refill of an hour) is a
+	// cap, as for tiers: a burst of 30 is cut at 24
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 30
+	c.VisitorEmailLimitReplenish = time.Hour
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	for i := 0; i < 24; i++ {
+		require.True(t, v.EmailAllowed().OK, "email %d", i)
+	}
+	require.False(t, v.EmailAllowed().OK)
+}
+
+func TestVisitor_EmailsWithoutTierAllowedWithSlowRefill(t *testing.T) {
+	// A refill slower than a day derives a daily limit of zero, which must not turn off email
+	// without a tier: the bucket alone limits it
+	c := newTestConfig(t, "")
+	c.VisitorEmailLimitBurst = 2
+	c.VisitorEmailLimitReplenish = 48 * time.Hour
+	s := newTestServer(t, c)
+	v := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
+	require.True(t, v.EmailAllowed().OK)
+	require.True(t, v.EmailAllowed().OK)
+	require.False(t, v.EmailAllowed().OK)
+}
+
+func TestVisitor_LoggedInUserWrittenFromFirstMessage(t *testing.T) {
+	// A logged-in user's messages are written from the first one, even without a tier (on the IP
+	// key), so the account page agrees across nodes and restarts; anonymous ones only from the
+	// threshold on
+	c := newTestConfigWithAuthFile(t, "")
+	s := newTestServer(t, c)
+	require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+	u, err := s.userManager.User("ben")
+	require.Nil(t, err)
+	require.True(t, s.visitor(netip.MustParseAddr("1.1.1.1"), u).MessageAllowed().OK)
+	require.True(t, s.visitor(netip.MustParseAddr("2.2.2.2"), nil).MessageAllowed().OK)
+	s.Stop()
+	s = newTestServer(t, c)
+	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.1.1.1"), u).Stats().Messages)
+	require.Equal(t, int64(0), s.visitor(netip.MustParseAddr("2.2.2.2"), nil).Stats().Messages)
 }

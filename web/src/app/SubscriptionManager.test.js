@@ -158,6 +158,37 @@ describe("SubscriptionManager.addNotification", () => {
     expect((await db.subscriptions.get(subscriptionId)).last).toBe("m2");
   });
 
+  it("replaces an older version of the same sequence", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotification(subscriptionId, message("m1", { sequence_id: "s1", message: "Downloading" }));
+
+    expect(
+      await manager.addNotification(subscriptionId, message("m2", { sequence_id: "s1", message: "Download complete", time: 1700000001 })),
+    ).toBe(true);
+
+    expect((await db.notifications.toArray()).map((n) => [n.id, n.new])).toEqual([["m2", 1]]);
+  });
+
+  it("does not replace a newer version of the same sequence when the WebSocket replays an older one", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotification(subscriptionId, message("m2", { sequence_id: "s1", message: "Download complete", time: 1700000001 }));
+
+    expect(await manager.addNotification(subscriptionId, message("m1", { sequence_id: "s1", message: "Downloading" }))).toBe(false);
+
+    expect((await db.notifications.toArray()).map((n) => n.message)).toEqual(["Download complete"]);
+    expect((await db.subscriptions.get(subscriptionId)).last).toBe("m2");
+  });
+
+  it("marks a message the poll stored as unread when the WebSocket delivers it", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m1")]);
+
+    // The poll stored it before the live delivery arrived; the user hasn't seen it yet
+    expect(await manager.addNotification(subscriptionId, message("m1"))).toBe(true);
+
+    expect((await db.notifications.get("m1")).new).toBe(1);
+  });
+
   it("does not store delete and clear events", async () => {
     const { db, manager } = await setup();
     expect(await manager.addNotification(subscriptionId, message("d1", { event: "message_delete", sequence_id: "s1" }))).toBe(false);
@@ -231,5 +262,89 @@ describe("SubscriptionManager.addNotifications", () => {
     await manager.addNotifications(subscriptionId, [message("m1", { sequence_id: "s1", message: "Downloading" })]);
 
     expect((await db.notifications.toArray()).map((n) => n.message)).toEqual(["Download complete"]);
+  });
+});
+
+const visibleIds = async (manager) => (await manager.getNotifications(subscriptionId)).map((n) => n.id).sort();
+
+// The server replays the whole second of a since=<id> marker, so a poll returns messages the
+// client already has, or had and deleted (#2098)
+describe("SubscriptionManager deleted notifications", () => {
+  it("does not add a deleted message again when a poll replays it", async () => {
+    const { manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2"), message("m3")]);
+    await manager.deleteNotification("m1");
+    await manager.deleteNotification("m2");
+
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2")]);
+
+    expect(await visibleIds(manager)).toEqual(["m3"]);
+  });
+
+  it("does not add a deleted message again when the WebSocket replays it", async () => {
+    const { manager } = await setup();
+    await manager.addNotification(subscriptionId, message("m1"));
+    await manager.deleteNotification("m1");
+
+    expect(await manager.addNotification(subscriptionId, message("m1"))).toBe(false);
+
+    expect(await visibleIds(manager)).toEqual([]);
+  });
+
+  it("does not add older versions of a deleted sequence again, but newer ones", async () => {
+    const { manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m2", { sequence_id: "s1", message: "Download complete", time: 1700000001 })]);
+    await manager.deleteNotification("m2");
+
+    await manager.addNotifications(subscriptionId, [message("m1", { sequence_id: "s1", message: "Downloading" })]);
+    expect(await visibleIds(manager)).toEqual([]);
+
+    await manager.addNotification(subscriptionId, message("m3", { sequence_id: "s1", message: "Download failed", time: 1700000002 }));
+    expect(await visibleIds(manager)).toEqual(["m3"]);
+  });
+
+  it("does not add messages again after deleting all of them", async () => {
+    const { manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2")]);
+    await manager.deleteNotifications(subscriptionId);
+
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2")]);
+
+    expect(await visibleIds(manager)).toEqual([]);
+  });
+
+  it("keeps the last message when a poll only replays known or deleted messages", async () => {
+    const { db, manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2"), message("m3")]);
+    await manager.deleteNotification("m1");
+
+    await manager.addNotifications(subscriptionId, [message("m1"), message("m2")]);
+
+    expect((await db.subscriptions.get(subscriptionId)).last).toBe("m3");
+  });
+
+  it("does not list deleted messages or count them as new", async () => {
+    const { manager } = await setup();
+    await manager.addNotification(subscriptionId, message("m1"));
+    await manager.addNotification(subscriptionId, message("m2"));
+    await manager.deleteNotification("m1");
+
+    expect((await manager.getAllNotifications()).map((n) => n.id)).toEqual(["m2"]);
+    expect((await manager.all()).find((s) => s.id === subscriptionId).new).toBe(1);
+  });
+
+  it("forgets deleted messages when the subscription is removed or they are pruned", async () => {
+    const { manager } = await setup();
+    await manager.addNotifications(subscriptionId, [message("old", { time: 1600000000 }), message("m1")]);
+    await manager.deleteNotifications(subscriptionId);
+
+    await manager.pruneNotifications(1650000000);
+    await manager.addNotifications(subscriptionId, [message("old", { time: 1600000000 })]);
+    expect(await visibleIds(manager)).toEqual(["old"]);
+
+    await manager.remove({ id: subscriptionId });
+    await manager.upsert(baseUrl, "mytopic");
+    await manager.addNotifications(subscriptionId, [message("m1")]);
+    expect(await visibleIds(manager)).toEqual(["m1"]);
   });
 });

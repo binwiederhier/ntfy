@@ -4,6 +4,10 @@
 package metrics
 
 import (
+	"database/sql"
+	"sync/atomic"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -72,6 +76,9 @@ var (
 	Topics = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_topics_total",
 	})
+	TopicsUnifiedPush = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_topics_unifiedpush_total",
+	})
 	HTTPRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ntfy_http_requests_total",
 	}, []string{"http_code", "ntfy_code", "http_method"})
@@ -96,6 +103,15 @@ var (
 	ClusterLeader = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_cluster_leader",
 	})
+	ClusterPeerBatchesSent = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ntfy_cluster_peer_batches_sent_total", // Per peer, result "ok" or "error": a link that only fails shows up here
+	}, []string{"peer", "result"})
+	ClusterPeerBatchesReceived = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ntfy_cluster_peer_batches_received_total",
+	}, []string{"peer"})
+	ClusterPeerLastSendSuccess = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "ntfy_cluster_peer_last_send_success_timestamp_seconds",
+	}, []string{"peer"})
 	TailMessagesLagSeconds = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_tail_messages_lag_seconds", // Age of the newest message of the last read; well above the write delay means it is behind
 	})
@@ -105,6 +121,7 @@ var (
 	TailMessagesMissed = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_tail_messages_missed_total", // Sent by the tail, per subscriber that had missed it
 	})
+	dbPools = newDBPoolCollector() // Read through SetDBPoolsFunc
 )
 
 // init registers all collectors with the default Prometheus registry. Registration is
@@ -135,6 +152,9 @@ func init() {
 		ClusterQueueDropped,
 		ClusterMessagesWasted,
 		ClusterLeader,
+		ClusterPeerBatchesSent,
+		ClusterPeerBatchesReceived,
+		ClusterPeerLastSendSuccess,
 		TailMessagesLagSeconds,
 		TailMessagesRead,
 		TailMessagesMissed,
@@ -142,6 +162,101 @@ func init() {
 		Users,
 		Subscribers,
 		Topics,
+		TopicsUnifiedPush,
 		HTTPRequests,
+		dbPools,
 	)
+}
+
+// DBPool is one database connection pool's statistics: the primary's or a replica's
+type DBPool struct {
+	Role  string // db.PoolRolePrimary or db.PoolRoleReplica
+	Addr  string // "host:port"
+	Up    bool   // The last health check of the pool's database succeeded
+	Stats sql.DBStats
+
+	PingDuration time.Duration // How long the last health check ping took
+}
+
+// SetDBPoolsFunc sets the function that the ntfy_db_* metrics read their values from on
+// every scrape; nil (the default) reports no pools
+func SetDBPoolsFunc(fn func() []*DBPool) {
+	dbPools.fn.Store(&fn)
+}
+
+// dbPoolCollector exports the database connection pools' statistics. It reads them at scrape
+// time rather than on a timer, so the in-use count is as fresh as the scrape, and a burst that
+// exhausts a pool between two scrapes still shows up in the wait counters.
+type dbPoolCollector struct {
+	fn      atomic.Pointer[func() []*DBPool]
+	metrics []*dbPoolMetric
+}
+
+// dbPoolMetric is one ntfy_db_* metric: its description, and how to read it from a pool
+type dbPoolMetric struct {
+	desc      *prometheus.Desc
+	valueType prometheus.ValueType
+	value     func(pool *DBPool) float64
+}
+
+func newDBPoolCollector() *dbPoolCollector {
+	return &dbPoolCollector{
+		metrics: []*dbPoolMetric{
+			newDBPoolMetric("ntfy_db_up", "1 if the last health check of the pool's database (a ping every 30s) succeeded, 0 if not, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				if pool.Up {
+					return 1
+				}
+				return 0
+			}),
+			newDBPoolMetric("ntfy_db_ping_seconds", "How long the last health check ping took (every 30s), including any wait for a free connection, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return pool.PingDuration.Seconds()
+			}),
+			newDBPoolMetric("ntfy_db_pool_connections_max", "Maximum open database connections (pool_max_conns), per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.MaxOpenConnections)
+			}),
+			newDBPoolMetric("ntfy_db_pool_connections_open", "Open database connections, in use or idle, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.OpenConnections)
+			}),
+			newDBPoolMetric("ntfy_db_pool_connections_in_use", "Database connections currently in use, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.InUse)
+			}),
+			newDBPoolMetric("ntfy_db_pool_connections_idle", "Idle database connections, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.Idle)
+			}),
+			newDBPoolMetric("ntfy_db_pool_waits_total", "Times a query had to wait for a free database connection, per pool", prometheus.CounterValue, func(pool *DBPool) float64 {
+				return float64(pool.Stats.WaitCount)
+			}),
+			newDBPoolMetric("ntfy_db_pool_wait_seconds_total", "Total time spent waiting for a free database connection, per pool", prometheus.CounterValue, func(pool *DBPool) float64 {
+				return pool.Stats.WaitDuration.Seconds()
+			}),
+		},
+	}
+}
+
+func newDBPoolMetric(name, help string, valueType prometheus.ValueType, value func(pool *DBPool) float64) *dbPoolMetric {
+	return &dbPoolMetric{
+		desc:      prometheus.NewDesc(name, help, []string{"role", "host"}, nil),
+		valueType: valueType,
+		value:     value,
+	}
+}
+
+// Describe implements prometheus.Collector
+func (c *dbPoolCollector) Describe(ch chan<- *prometheus.Desc) {
+	for _, m := range c.metrics {
+		ch <- m.desc
+	}
+}
+
+// Collect implements prometheus.Collector
+func (c *dbPoolCollector) Collect(ch chan<- prometheus.Metric) {
+	fn := c.fn.Load()
+	if fn == nil || *fn == nil {
+		return
+	}
+	for _, pool := range (*fn)() {
+		for _, m := range c.metrics {
+			ch <- prometheus.MustNewConstMetric(m.desc, m.valueType, m.value(pool), pool.Role, pool.Addr)
+		}
+	}
 }

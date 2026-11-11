@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"net/netip"
 	"reflect"
+	"runtime"
+	"strconv"
 	"text/template"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 
 // Defines default config settings (excluding limits, see below)
 const (
+	DefaultListenAdminUnixMode                  = fs.FileMode(0660) // Owner (the ntfy user) and the ntfy group; root bypasses anyway
 	DefaultListenHTTP                           = ":80"
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultCacheBatchTimeout                    = time.Duration(0)
@@ -32,6 +35,8 @@ const (
 	DefaultStripePriceCacheDuration             = 3 * time.Hour          // Time to keep Stripe prices cached in memory before a refresh is needed
 	DefaultClusterBatchLinger                   = 500 * time.Millisecond // How long fan-out messages wait to form a per-peer batch (experimental clustering)
 	DefaultClusterRole                          = cluster.RoleActive     // Active nodes take client traffic, lead and fence (experimental clustering)
+	DefaultClusterDrainDelay                    = 15 * time.Second       // On shutdown, how long a draining node withdraws (not ready, still serves everything); with the drain duration, fits systemd's default stop timeout (90s) (experimental clustering)
+	DefaultClusterDrainDuration                 = time.Minute            // On shutdown, how long a draining node takes to close its streams, read-only (experimental clustering)
 )
 
 // Platform-specific default paths (set in config_unix.go or config_windows.go)
@@ -52,16 +57,18 @@ const (
 	DefaultBanThreshold = 100 // Weighted strikes per BanWindow before a prefix is banned
 )
 
-// DefaultBanWeights is the ban-feed's default per-code strike weights: the auth-failure flood bans fast,
-// and everything else defaults to weight 1 (no "*" rule needed; see BanWeights.WeightFor).
+// DefaultBanWeights is the ban-feed's default per-code strike weights; everything else defaults to
+// weight 1 (no "*" rule needed; see BanWeights.WeightFor).
 var DefaultBanWeights = []string{
-	banWeight(errHTTPTooManyRequestsLimitAuthFailure, 10), // brute-force auth flood -> ban fast
+	banWeight(errHTTPTooManyRequestsLimitAuthFailure, 2),   // Brute-force auth flood: bans at half the threshold
+	banWeight(errHTTPInsufficientStorageUnifiedPush, 0.05), // An app server pushing to many offline phones is not an attack
+	banWeight(errHTTPGoneUnifiedPushTopicAbandoned, 0.05),  // The same app servers, told a subscription is gone
 }
 
 // banWeight formats a "CODE:WEIGHT" ban-feed default from an ntfy error, so the codes stay in sync with
 // the errHTTP definitions instead of being duplicated as string literals.
-func banWeight(err *errHTTP, weight int) string {
-	return fmt.Sprintf("%d:%d", err.Code, weight)
+func banWeight(err *errHTTP, weight float64) string {
+	return fmt.Sprintf("%d:%s", err.Code, strconv.FormatFloat(weight, 'f', -1, 64))
 }
 
 // Defines all global and per-visitor limits
@@ -114,9 +121,6 @@ const (
 )
 
 var (
-	// DefaultVisitorStatsResetTime defines the time at which visitor stats are reset (wall clock only)
-	DefaultVisitorStatsResetTime = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-
 	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
 	// extended using the server.yml config. If updated, also update in Android and web app.
 	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "metrics", "account", "settings", "signup", "login", "v1"}
@@ -126,10 +130,11 @@ var (
 type Config struct {
 	File                                 string // Config file, only used for testing
 	BaseURL                              string
-	ListenHTTP                           string
+	ListenHTTP                           []string // Several addresses let a load balancer open more than ~63k connections to this node
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
+	ListenAdminUnix                      string // Path of the local admin socket (CLI access without credentials); empty disables it
 	KeyFile                              string
 	CertFile                             string
 	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
@@ -140,6 +145,8 @@ type Config struct {
 	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	ClusterRole                          cluster.Role  // Active (default) or passive: a passive node never leads and never fences
+	ClusterDrainDelay                    time.Duration // On shutdown, how long a draining node withdraws (not ready, still serves everything) before it turns read-only
+	ClusterDrainDuration                 time.Duration // On shutdown, how long an active node takes to close its streams so they reconnect to other nodes; 0 disables
 	FirebaseKeyFile                      string
 	CacheFile                            string
 	CacheDuration                        time.Duration
@@ -211,7 +218,6 @@ type Config struct {
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
-	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
@@ -244,15 +250,32 @@ type Config struct {
 	BuildCommit                          string        // Injected by App
 }
 
+// DefaultListenAdminUnix returns the default admin socket path. On Windows there is none: unix socket
+// file permissions do not protect it there, so the CLI uses the database or --server instead.
+func DefaultListenAdminUnix() string {
+	return defaultListenAdminUnixFor(runtime.GOOS)
+}
+
+func defaultListenAdminUnixFor(goos string) string {
+	switch goos {
+	case "windows":
+		return ""
+	case "linux":
+		return "/run/ntfy/admin.sock"
+	}
+	return "/var/run/ntfy/admin.sock" // macOS and the BSDs have no /run
+}
+
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
 		File:                                 DefaultConfigFile, // Only used for testing
 		BaseURL:                              "",
-		ListenHTTP:                           DefaultListenHTTP,
+		ListenHTTP:                           []string{DefaultListenHTTP},
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,
+		ListenAdminUnix:                      "", // Experimental, off unless configured
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",
@@ -262,6 +285,8 @@ func NewConfig() *Config {
 		ClusterSecret:                        "",
 		ClusterBatchLinger:                   DefaultClusterBatchLinger,
 		ClusterRole:                          DefaultClusterRole,
+		ClusterDrainDelay:                    DefaultClusterDrainDelay,
+		ClusterDrainDuration:                 DefaultClusterDrainDuration,
 		FirebaseKeyFile:                      "",
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
@@ -329,7 +354,6 @@ func NewConfig() *Config {
 		VisitorAccountCreationLimitReplenish: DefaultVisitorAccountCreationLimitReplenish,
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
-		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address

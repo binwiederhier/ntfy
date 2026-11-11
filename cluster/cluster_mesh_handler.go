@@ -68,6 +68,7 @@ func (c *meshCluster) handleMessage(origin NodeID, w http.ResponseWriter, r *htt
 		return
 	}
 	log.Tag(tag).Debug("Received batch of %d message(s) from peer %s", received, origin)
+	c.recordReceived(origin, received)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -87,11 +88,13 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 		log.Tag(tag).Debug("Received %d announced topic(s) from peer %s", len(state.Topics.Added), origin)
 		c.conf.TopicsAddedFunc(state.Topics.Added)
 	}
-	if len(state.Cancels) > 0 && c.conf.CancelFunc != nil {
-		log.Tag(tag).Debug("Received %d subscriber cancel(s) from peer %s", len(state.Cancels), origin)
-		for _, cancel := range state.Cancels {
-			c.conf.CancelFunc(cancel)
-		}
+	if state.AccessChanged && c.conf.AccessChangedFunc != nil {
+		log.Tag(tag).Debug("Peer %s changed access entries, reloading the access cache", origin)
+		c.conf.AccessChangedFunc()
+	}
+	if len(state.DeletedUserIDs) > 0 && c.conf.UsersDeletedFunc != nil {
+		log.Tag(tag).Debug("Peer %s deleted %d user(s)", origin, len(state.DeletedUserIDs))
+		c.conf.UsersDeletedFunc(state.DeletedUserIDs)
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -101,6 +104,14 @@ func (c *meshCluster) handleMembers(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(c.Members()); err != nil {
 		log.Tag(tag).Err(err).Warn("Cannot write member list")
+	}
+}
+
+// handleStatus serves this node's view of the cluster to operators (see Status)
+func (c *meshCluster) handleStatus(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", contentTypeJSON)
+	if err := json.NewEncoder(w).Encode(c.Status()); err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot write cluster status")
 	}
 }
 

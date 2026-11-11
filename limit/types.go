@@ -1,0 +1,85 @@
+package limit
+
+import (
+	"time"
+)
+
+// Kind is what a key is being limited on: a request, a message, an email, ... Each kind has its
+// own token bucket per key; messages, emails and calls also have a daily count.
+type Kind uint8
+
+// The kinds of usage a key is limited on
+const (
+	KindRequests  Kind = iota // Requests of (almost) any type, including publishes
+	KindMessages              // Published messages
+	KindEmails                // Emails sent on behalf of the key
+	KindCalls                 // Phone calls made on behalf of the key
+	KindBandwidth             // Attachment and poll bytes, up and down
+	KindTopics                // Topics created in the server's in-memory topic map
+	KindAccount               // Account actions: signups and password reset requests
+	KindAuth                  // Failed authentication attempts
+	KindFirebase              // Firebase sends, paused for a while after Firebase reports the quota exceeded
+	numKinds                  // Sentinel, keep last
+)
+
+const (
+	numDaily = 3 // Kinds with a daily count: messages, emails, calls (see dailyIndex)
+)
+
+// kindNames are the stable names of the kinds, used in the usage table and on the wire; they
+// must never change once released
+var kindNames = [numKinds]string{"requests", "messages", "emails", "calls", "bandwidth", "topics", "account", "auth", "firebase"}
+
+// Rule says how much of a kind a key may use: a token bucket of Burst tokens refilling one token
+// per Refill, a Daily cap, or both. A zero Rule allows everything.
+type Rule struct {
+	Kind      Kind
+	Burst     int64         // Token bucket size; 0 for no bucket
+	Refill    time.Duration // Time to refill one token; 0 for a bucket that never refills
+	Daily     int64         // Cap per 24h period of the key (see periodStart), for kinds with a daily count; 0 for none
+	Threshold int64         // Daily count from which the key's counts are written to the store; 0 from the first unit
+}
+
+// Decision is the answer to Allow: whether the usage was admitted, and if not, how long until
+// it could be (0 if unknown, e.g. when n exceeds the burst). The other fields describe the limit
+// that decided, for the RateLimit headers: the daily cap if the rule has one, else the bucket.
+type Decision struct {
+	OK         bool          // Whether the usage was admitted; no header
+	RetryAfter time.Duration // Retry-After (on a 429): how long until the usage could be admitted
+	Kind       Kind          // RateLimit-Policy and RateLimit: the policy name ("messages"), the rule's kind
+	Quota      int64         // RateLimit-Policy q=: the daily cap or the burst; 0 if the rule has neither (no headers)
+	Window     time.Duration // RateLimit-Policy w=: a day, or the time the bucket takes to refill completely
+	Remaining  int64         // RateLimit r=: units left after this call
+	Reset      time.Duration // RateLimit t=: until the period ends, or until the bucket's next token (0 if it never refills)
+}
+
+// Usage is a key's daily counts in its current period
+type Usage struct {
+	counts [numDaily]int64 // Indexed like a counter's arrays (see dailyIndex)
+}
+
+// String returns the kind's stable name
+func (k Kind) String() string {
+	if k < numKinds {
+		return kindNames[k]
+	}
+	return "unknown"
+}
+
+// ParseKind returns the kind with the given name
+func ParseKind(name string) (Kind, bool) {
+	for k, n := range kindNames {
+		if n == name {
+			return Kind(k), true
+		}
+	}
+	return 0, false
+}
+
+// Count returns the usage of the given kind; 0 for a kind without a daily count
+func (u Usage) Count(kind Kind) int64 {
+	if i := dailyIndex(kind); i >= 0 {
+		return u.counts[i]
+	}
+	return 0
+}

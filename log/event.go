@@ -209,9 +209,9 @@ func (e *Event) String() string {
 }
 
 func (e *Event) globalLevelWithOverride() Level {
-	mu.RLock()
+	mu.RLock() // Held while iterating: SetLevelOverride changes the overrides map in place
+	defer mu.RUnlock()
 	l, ov := level, overrides
-	mu.RUnlock()
 	if e.fields == nil {
 		return l
 	}

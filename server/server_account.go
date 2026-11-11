@@ -30,8 +30,8 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 		} else if u != nil {
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
-		if !v.AccountActionAllowed() {
-			return errHTTPTooManyRequestsLimitAccountActions
+		if d := v.AccountActionAllowed(); !d.OK {
+			return errHTTPTooManyRequestsLimitAccountActions.WithLimitDecision(d)
 		}
 	}
 	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit, false)
@@ -96,6 +96,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			ReservationsRemaining:        stats.ReservationsRemaining,
 			AttachmentTotalSize:          stats.AttachmentTotalSize,
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
+			ResetAt:                      stats.ResetAt.Unix(),
 		},
 	}
 	u := v.User()
@@ -245,6 +246,7 @@ func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request, v *
 	if err := s.userManager.MarkUserRemoved(u); err != nil {
 		return err
 	}
+	s.userDeleted(u)
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -325,9 +327,8 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
 	if u == nil {
-		// ensureUser already checked, but the user can be nil'd between that check and this
-		// re-read: IP-keyed visitors are shared, and a concurrent anonymous request on the
-		// same IP calls SetUser(nil) on this very object (recurring production panic)
+		// ensureUser already checked; kept as a guard, since a nil user here was a recurring
+		// production panic while visitors were shared between requests (#1051)
 		return errHTTPUnauthorized
 	}
 	req, err := readJSONWithLimit[apiAccountTokenUpdateRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
@@ -553,7 +554,7 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		return err
 	}
-	t.CancelSubscribersExceptUser(u.ID)
+	t.CancelSubscribersExceptUser(u.ID) // The other nodes end theirs when they reload their access cache, see broadcastAccessChanged
 	return s.writeJSON(w, newSuccessResponse())
 }
 
@@ -656,6 +657,8 @@ func (s *Server) handleAccountPhoneNumberAdd(w http.ResponseWriter, r *http.Requ
 	if err := s.twilio.CheckVerify(req.Number, req.Code); err != nil {
 		if errors.Is(err, twilio.ErrVerificationExpired) {
 			return errHTTPGonePhoneVerificationExpired
+		} else if errors.Is(err, twilio.ErrVerificationCodeInvalid) {
+			return errHTTPBadRequestPhoneVerificationCodeInvalid
 		}
 		return err
 	}
@@ -707,8 +710,8 @@ func (s *Server) handleAccountEmailAdd(w http.ResponseWriter, r *http.Request, v
 		return errHTTPConflictEmailExists
 	}
 	// Rate limit (counts against the user's email quota)
-	if !v.EmailAllowed() {
-		return errHTTPTooManyRequestsLimitEmails
+	if d := v.EmailAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitEmails.WithLimitDecision(d)
 	}
 	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Starting email verification")
 	if err := s.enqueueEmailVerification(u.ID, req.Email); err != nil {
@@ -800,8 +803,8 @@ func (s *Server) handleAccountEmailResend(w http.ResponseWriter, r *http.Request
 	} else if !util.Contains(pending, req.Email) {
 		return errHTTPBadRequestEmailAddressInvalid
 	}
-	if !v.EmailAllowed() {
-		return errHTTPTooManyRequestsLimitEmails
+	if d := v.EmailAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitEmails.WithLimitDecision(d)
 	}
 	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Resending email verification")
 	if err := s.enqueueEmailVerification(u.ID, req.Email); err != nil {
@@ -835,8 +838,8 @@ func (s *Server) handleAccountPasswordResetRequest(w http.ResponseWriter, r *htt
 		return err
 	}
 	// Rate limit via the shared per-visitor account-creation bucket (no new limiter/config)
-	if !v.AccountActionAllowed() {
-		return errHTTPTooManyRequestsLimitAccountActions
+	if d := v.AccountActionAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitAccountActions.WithLimitDecision(d)
 	}
 	v.AccountActionPerformed() // Consume a token on every request (including no-match), to throttle probing
 	identifier := strings.TrimSpace(req.Identifier)

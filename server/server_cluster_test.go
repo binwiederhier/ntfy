@@ -11,11 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 )
@@ -23,13 +25,17 @@ import (
 // fakeCluster records relayed messages and topic announcements so tests can assert that every
 // publish path passes through the cluster exactly once, and that subscription hooks fire.
 type fakeCluster struct {
-	mu         sync.Mutex
-	messages   []*model.Message
-	announced  []string
-	notLeader  bool
-	notHealthy bool
-	notReady   bool
-	role       cluster.Role // Empty means active
+	mu            sync.Mutex
+	messages      []*model.Message
+	announced     []string
+	deletedUsers  []string
+	accessChanged int
+	notLeader     bool
+	notHealthy    bool
+	notReady      bool
+	role          cluster.Role // Empty means active
+	draining      bool
+	peers         cluster.Peers
 }
 
 func (b *fakeCluster) ForwardMessage(m *model.Message) error {
@@ -45,12 +51,16 @@ func (b *fakeCluster) BroadcastState(state *cluster.State) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.announced = append(b.announced, state.AddedTopics...)
+	b.deletedUsers = append(b.deletedUsers, state.DeletedUserIDs...)
+	if state.AccessChanged {
+		b.accessChanged++
+	}
 }
 
 func (b *fakeCluster) Ready() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	return !b.notReady
+	return !b.notReady && !b.draining // Like the mesh: a draining node acts as passive
 }
 
 func (b *fakeCluster) setReady(ready bool) {
@@ -62,7 +72,9 @@ func (b *fakeCluster) setReady(ready bool) {
 func (b *fakeCluster) Role() cluster.Role {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.role == "" {
+	if b.draining {
+		return cluster.RolePassive // Like the mesh: the role it acts in
+	} else if b.role == "" {
 		return cluster.RoleActive
 	}
 	return b.role
@@ -92,7 +104,27 @@ func (b *fakeCluster) setLeader(leader bool) {
 	b.notLeader = !leader
 }
 
-func (b *fakeCluster) Members() []cluster.Member { return nil }
+func (b *fakeCluster) SetDraining(on bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.draining = on
+}
+
+func (b *fakeCluster) Draining() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.draining
+}
+
+func (b *fakeCluster) Peers() cluster.Peers {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.peers
+}
+
+func (b *fakeCluster) Members() []cluster.Member {
+	return nil // No test needs members
+}
 
 func (b *fakeCluster) Close() error { return nil }
 
@@ -100,6 +132,18 @@ func (b *fakeCluster) Messages() []*model.Message {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return append([]*model.Message{}, b.messages...)
+}
+
+func (b *fakeCluster) AccessChanged() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.accessChanged
+}
+
+func (b *fakeCluster) DeletedUsers() []string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.deletedUsers
 }
 
 func (b *fakeCluster) Announced() []string {
@@ -154,7 +198,7 @@ func TestServer_Cluster_DeliverNotOnPublicHandler(t *testing.T) {
 		defer mu.Unlock()
 		received = append(received, m)
 		return nil
-	}, "", func() {})
+	}, nil, func() {})
 	// A valid fan-out request against the PUBLIC handler must not deliver
 	response := request(t, s, "POST", "/v1/cluster/message",
 		`{"message":{"id":"x1","time":1,"event":"message","topic":"mytopic","message":"sneaky"}}`,
@@ -193,6 +237,27 @@ func TestServer_Cluster_Role(t *testing.T) {
 	members := s.cluster.Members()
 	require.Len(t, members, 1)
 	require.Equal(t, cluster.RolePassive, members[0].Role)
+}
+
+func TestServer_Cluster_StopClosesCluster(t *testing.T) {
+	// Stopping the server must stop the cluster: it deregisters the node, so a node starting
+	// after it no longer sees it, and its heartbeat does not outlive the server's database
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = "127.0.0.1:1" // Enables clustering; not bound since Run() is not called
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		return newTestServer(t, conf)
+	}
+	sA := newNode("node-a")
+	require.Len(t, sA.cluster.Members(), 1)
+	sA.Stop()
+	sB := newNode("node-b")
+	members := sB.cluster.Members()
+	require.Len(t, members, 1)
+	require.Equal(t, cluster.NodeID("node-b"), members[0].NodeID)
 }
 
 func TestServer_Cluster_ActiveWithPassivePeer(t *testing.T) {
@@ -234,7 +299,7 @@ func TestServer_Cluster_ActiveWithPassivePeer(t *testing.T) {
 			defer mu.Unlock()
 			received = append(received, m.Message)
 			return nil
-		}, "", func() {})
+		}, nil, func() {})
 		return func() []string {
 			mu.Lock()
 			defer mu.Unlock()
@@ -284,7 +349,7 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 		defer mu.Unlock()
 		received = append(received, m)
 		return nil
-	}, "", func() {})
+	}, nil, func() {})
 	// Publish on node A
 	response := request(t, sA, "PUT", "/mytopic", "hello cluster", nil)
 	require.Equal(t, 200, response.Code)
@@ -314,7 +379,7 @@ func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 		defer mu.Unlock()
 		received = append(received, m)
 		return nil
-	}, "", func() {})
+	}, nil, func() {})
 	m := model.NewDefaultMessage("mytopic", "from peer")
 	m.Sender = netip.MustParseAddr("5.6.7.8")
 	s.deliverFromBus(m)
@@ -324,6 +389,37 @@ func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 		return len(received) == 1
 	})
 	require.Empty(t, b.Messages()) // Peer messages are never re-relayed
+}
+
+func TestServer_Cluster_DeliverFromBus_WastedWithoutSubscribers(t *testing.T) {
+	// A fan-out message that no subscriber here wants is counted as wasted: its topic is unknown
+	// here, or known but without subscribers. The latter is not published either, so the fan-out
+	// does not keep an idle topic alive (see topicExpungeAfter).
+	s := newTestServer(t, newTestConfig(t, ""))
+	s.cluster = &fakeCluster{}
+	topics, err := s.topicsFromIDs(nil, "idletopic")
+	require.Nil(t, err)
+	idle := topics[0]
+	idle.mu.Lock()
+	idle.lastAccess = time.Now().Add(-topicExpungeAfter - time.Minute)
+	idle.mu.Unlock()
+	wasted := testutil.ToFloat64(metrics.ClusterMessagesWasted)
+
+	// Unknown topic
+	s.deliverFromBus(model.NewDefaultMessage("unknowntopic", "from peer"))
+	require.Equal(t, wasted+1, testutil.ToFloat64(metrics.ClusterMessagesWasted))
+
+	// Known topic without subscribers: wasted, and still stale
+	s.deliverFromBus(model.NewDefaultMessage("idletopic", "from peer"))
+	require.Equal(t, wasted+2, testutil.ToFloat64(metrics.ClusterMessagesWasted))
+	require.True(t, idle.Stale())
+
+	// Known topic with a subscriber: delivered, not wasted
+	idle.Subscribe(func(_ *visitor, m *model.Message) error {
+		return nil
+	}, nil, func() {})
+	s.deliverFromBus(model.NewDefaultMessage("idletopic", "from peer"))
+	require.Equal(t, wasted+2, testutil.ToFloat64(metrics.ClusterMessagesWasted))
 }
 
 func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {

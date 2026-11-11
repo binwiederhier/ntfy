@@ -10,15 +10,15 @@ import (
 )
 
 const (
-	tag                            = "db"
-	replicaHealthCheckInitialDelay = 5 * time.Second
-	replicaHealthCheckInterval     = 30 * time.Second
-	replicaHealthCheckTimeout      = 10 * time.Second
+	tag                     = "db"
+	healthCheckInitialDelay = 5 * time.Second
+	healthCheckInterval     = 30 * time.Second
+	healthCheckTimeout      = 10 * time.Second
 )
 
 // DB wraps a primary *sql.DB and optional read replicas. All standard query/exec methods
-// delegate to the primary. The ReadOnly() method returns a *sql.DB from a healthy replica
-// (round-robin), falling back to the primary if no replicas are configured or all are unhealthy.
+// delegate to the primary. The ReadOnly() method returns a *sql.DB from the least busy healthy
+// replica, falling back to the primary if none is configured or healthy.
 type DB struct {
 	primary  *Host
 	replicas []*Host
@@ -28,7 +28,8 @@ type DB struct {
 
 // New creates a new DB that wraps the given primary and optional replica connections.
 // If replicas is nil or empty, ReadOnly() simply returns the primary.
-// Replicas start unhealthy and are checked immediately by a background goroutine.
+// Replicas start unhealthy, the primary healthy (it was just opened); a background goroutine
+// checks all of them, so the metrics show a node that is cut off from its database.
 func New(primary *Host, replicas []*Host) *DB {
 	ctx, cancel := context.WithCancel(context.Background())
 	d := &DB{
@@ -36,9 +37,8 @@ func New(primary *Host, replicas []*Host) *DB {
 		replicas: replicas,
 		cancel:   cancel,
 	}
-	if len(d.replicas) > 0 {
-		go d.healthCheckLoop(ctx)
-	}
+	primary.healthy.Store(true)
+	go d.healthCheckLoop(ctx)
 	return d
 }
 
@@ -67,6 +67,11 @@ func (d *DB) QueryContext(ctx context.Context, query string, args ...any) (*sql.
 	return d.primary.DB.QueryContext(ctx, query, args...)
 }
 
+// QueryRowContext delegates to the primary database.
+func (d *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return d.primary.DB.QueryRowContext(ctx, query, args...)
+}
+
 // Begin delegates to the primary database.
 func (d *DB) Begin() (*sql.Tx, error) {
 	return d.primary.DB.Begin()
@@ -83,21 +88,56 @@ func (d *DB) Primary() *sql.DB {
 	return d.primary.DB
 }
 
-// ReadOnly returns a *sql.DB suitable for read-only queries. It round-robins across healthy
-// replicas. If all replicas are unhealthy or none are configured, the primary is returned.
+// Stats returns the connection pool statistics of the primary, then of each replica
+func (d *DB) Stats() []*PoolStats {
+	stats := []*PoolStats{
+		{
+			Role:         PoolRolePrimary,
+			Addr:         d.primary.Addr,
+			Healthy:      d.primary.healthy.Load(),
+			Stats:        d.primary.DB.Stats(),
+			PingDuration: time.Duration(d.primary.ping.Load()),
+		},
+	}
+	for _, r := range d.replicas {
+		stats = append(stats, &PoolStats{
+			Role:         PoolRoleReplica,
+			Addr:         r.Addr,
+			Healthy:      r.healthy.Load(),
+			Stats:        r.DB.Stats(),
+			PingDuration: time.Duration(r.ping.Load()),
+		})
+	}
+	return stats
+}
+
+// ReadOnly returns a *sql.DB suitable for read-only queries: the healthy replica with the fewest
+// connections in use, round-robin among equally busy ones. A replica that stalls piles up
+// connections and stops getting new reads. If every replica's pool is full, the read waits for a
+// connection rather than moving to the primary, which takes every write. If no replica is healthy
+// or none is configured, the primary is returned.
 func (d *DB) ReadOnly() *sql.DB {
 	if len(d.replicas) == 0 {
 		return d.primary.DB
 	}
 	n := len(d.replicas)
 	start := int(d.counter.Add(1) - 1)
+	var best *Host
+	bestInUse := 0
 	for i := 0; i < n; i++ {
 		r := d.replicas[(start+i)%n]
-		if r.healthy.Load() {
-			return r.DB
+		if !r.healthy.Load() {
+			continue
+		}
+		inUse := r.DB.Stats().InUse
+		if best == nil || inUse < bestInUse {
+			best, bestInUse = r, inUse
 		}
 	}
-	return d.primary.DB
+	if best == nil {
+		return d.primary.DB
+	}
+	return best.DB
 }
 
 // MarkReplicasHealthyForTest immediately marks all configured replicas as healthy, bypassing the
@@ -118,39 +158,48 @@ func (d *DB) Close() error {
 	return d.primary.DB.Close()
 }
 
-// healthCheckLoop checks replicas immediately, then periodically on a ticker.
+// healthCheckLoop checks the primary and the replicas shortly after start, then periodically.
 func (d *DB) healthCheckLoop(ctx context.Context) {
 	select {
 	case <-ctx.Done():
 		return
-	case <-time.After(replicaHealthCheckInitialDelay):
-		d.checkReplicas(ctx)
+	case <-time.After(healthCheckInitialDelay):
+		d.checkHealth(ctx)
 	}
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(replicaHealthCheckInterval):
-			d.checkReplicas(ctx)
+		case <-time.After(healthCheckInterval):
+			d.checkHealth(ctx)
 		}
 	}
 }
 
-// checkReplicas pings each replica with a timeout and updates its health status.
-func (d *DB) checkReplicas(ctx context.Context) {
+// checkHealth pings the primary and each replica with a timeout and updates their health status.
+func (d *DB) checkHealth(ctx context.Context) {
+	checkHost(ctx, d.primary, "primary")
 	for _, r := range d.replicas {
-		wasHealthy := r.healthy.Load()
-		pingCtx, cancel := context.WithTimeout(ctx, replicaHealthCheckTimeout)
-		err := r.DB.PingContext(pingCtx)
-		cancel()
-		if err != nil {
-			r.healthy.Store(false)
-			log.Tag(tag).Error("Database replica %s is unhealthy: %s", r.Addr, err)
-		} else {
-			r.healthy.Store(true)
-			if !wasHealthy {
-				log.Tag(tag).Info("Database replica %s is healthy", r.Addr)
-			}
+		checkHost(ctx, r, "replica")
+	}
+}
+
+// checkHost pings the host and updates its health status, logging when it changes (and every
+// failure, so a lasting outage stays visible in the logs)
+func checkHost(ctx context.Context, h *Host, kind string) {
+	wasHealthy := h.healthy.Load()
+	pingCtx, cancel := context.WithTimeout(ctx, healthCheckTimeout)
+	started := time.Now()
+	err := h.DB.PingContext(pingCtx)
+	h.ping.Store(int64(time.Since(started)))
+	cancel()
+	if err != nil {
+		h.healthy.Store(false)
+		log.Tag(tag).Error("Database %s %s is unhealthy: %s", kind, h.Addr, err)
+	} else {
+		h.healthy.Store(true)
+		if !wasHealthy {
+			log.Tag(tag).Info("Database %s %s is healthy", kind, h.Addr)
 		}
 	}
 }

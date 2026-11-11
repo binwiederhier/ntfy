@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
@@ -328,22 +330,22 @@ func TestMesh_HealthyReflectsRegistration(t *testing.T) {
 	require.True(t, mesh.Healthy())
 }
 
-func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
-	// A subscriber-cancel broadcast from node A must invoke node B's CancelFunc; node A's own
-	// callback must not fire (no loop).
+func TestMesh_UsersDeletedBroadcast(t *testing.T) {
+	// Users deleted on node A must reach node B's UsersDeletedFunc; node A's own callback must not
+	// fire (no loop).
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
 	var mu sync.Mutex
-	var receivedB []*SubscriberCancel
-	canceledA := 0
+	var receivedB []string
+	deletedA := 0
 
 	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
 	require.Nil(t, err)
 	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
-	confB.CancelFunc = func(cancel *SubscriberCancel) {
+	confB.UsersDeletedFunc = func(userIDs []string) {
 		mu.Lock()
 		defer mu.Unlock()
-		receivedB = append(receivedB, cancel)
+		receivedB = append(receivedB, userIDs...)
 	}
 	meshB, err := newMeshCluster(confB, poolB, nil)
 	require.Nil(t, err)
@@ -353,19 +355,18 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	defer srvB.Close()
 
 	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
-	confA.CancelFunc = func(_ *SubscriberCancel) {
+	confA.UsersDeletedFunc = func(_ []string) {
 		mu.Lock()
 		defer mu.Unlock()
-		canceledA++
+		deletedA++
 	}
 	meshA, err := newMeshCluster(confA, poolA, nil)
 	require.Nil(t, err)
 	defer meshA.Close()
 
-	meshA.BroadcastState(&State{SubscriberCancels: []*SubscriberCancel{
-		{Topic: "mytopic", ExceptUserID: "u_owner"},
-		{Topic: "up*", UserID: "u_revoked"},
-	}})
+	meshA.BroadcastState(&State{
+		DeletedUserIDs: []string{"u_deleted", "u_other"},
+	})
 	waitFor(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
@@ -373,11 +374,8 @@ func TestMesh_SubscriberCancelBroadcast(t *testing.T) {
 	})
 	mu.Lock()
 	defer mu.Unlock()
-	require.Equal(t, "mytopic", receivedB[0].Topic)
-	require.Equal(t, "u_owner", receivedB[0].ExceptUserID)
-	require.Equal(t, "up*", receivedB[1].Topic)
-	require.Equal(t, "u_revoked", receivedB[1].UserID)
-	require.Equal(t, 0, canceledA)
+	require.Equal(t, []string{"u_deleted", "u_other"}, receivedB)
+	require.Equal(t, 0, deletedA)
 }
 
 func TestMesh_ForwardsEveryTopicToEveryPeer(t *testing.T) {
@@ -728,4 +726,199 @@ func TestMesh_PassiveNodeIsNeverReady(t *testing.T) {
 	defer mesh.Close()
 	require.True(t, mesh.Healthy())
 	require.False(t, mesh.Ready())
+}
+
+func TestMesh_Status_PeerThatLeftShowsLastSeen(t *testing.T) {
+	// A peer that left the registry keeps its counters, marked not live, with the time it was last
+	// seen; after peerStatsRetention it is forgotten, so a decommissioned node does not linger
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:1"), openTestPool(t, schemaDSN), discardMessage)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	before := time.Now().Unix()
+	mesh.reconcilePeers([]*registry.Peer{{NodeID: "node-b", AdvertiseURL: "http://127.0.0.1:1", Role: registry.RoleActive, HeartbeatAt: time.Now()}})
+	mesh.reconcilePeers(nil) // node-b left
+	b := findPeerStatus(mesh.Status(), "node-b")
+	require.NotNil(t, b)
+	require.False(t, b.Live)
+	require.GreaterOrEqual(t, b.LastSeen, before)
+
+	mesh.mu.Lock()
+	mesh.stats["node-b"].lastSeen = time.Now().Add(-peerStatsRetention - time.Minute).Unix()
+	mesh.mu.Unlock()
+	mesh.reconcilePeers(nil)
+	require.Nil(t, findPeerStatus(mesh.Status(), "node-b"))
+}
+
+func findPeerStatus(status *Status, nodeID NodeID) *PeerStatus {
+	for _, p := range status.Peers {
+		if p.NodeID == nodeID {
+			return p
+		}
+	}
+	return nil
+}
+
+func TestMesh_PeerMetrics_SeededForNewPeer(t *testing.T) {
+	// A peer whose sends all fail must still have a last-success series (0 = never), or an alert on
+	// its age has no sample: exactly the new node behind a one-way firewall (review of #2074)
+	mesh := &meshCluster{stats: make(map[NodeID]*peerStats)}
+	mesh.updatePeerStatsNoLock(map[NodeID]*registry.Peer{"node-never-ok": {NodeID: "node-never-ok"}})
+	mesh.recordSent("node-never-ok", 1, errors.New("connection refused"))
+	series := peerMetricSeries(t, "node-never-ok")
+	require.Contains(t, series, `ntfy_cluster_peer_last_send_success_timestamp_seconds{}`)
+	require.Contains(t, series, `ntfy_cluster_peer_batches_sent_total{result="ok"}`)
+	require.Contains(t, series, `ntfy_cluster_peer_batches_sent_total{result="error"}`)
+	require.Contains(t, series, `ntfy_cluster_peer_batches_received_total{}`)
+
+	// Seeding happens once: a later refresh does not reset a recorded success
+	mesh.recordSent("node-never-ok", 1, nil)
+	mesh.updatePeerStatsNoLock(map[NodeID]*registry.Peer{"node-never-ok": {NodeID: "node-never-ok"}})
+	require.NotZero(t, peerMetricValue(t, "ntfy_cluster_peer_last_send_success_timestamp_seconds", "node-never-ok"))
+}
+
+func TestMesh_PeerMetrics_RemovedWhenPeerForgotten(t *testing.T) {
+	// When a departed peer is forgotten, its labeled series go too, so retired IDs are not exported forever
+	mesh := &meshCluster{stats: make(map[NodeID]*peerStats)}
+	mesh.recordSent("node-retired", 1, nil)
+	mesh.recordReceived("node-retired", 1)
+	mesh.stats["node-retired"].lastSeen = time.Now().Add(-peerStatsRetention - time.Hour).Unix()
+	mesh.updatePeerStatsNoLock(map[NodeID]*registry.Peer{})
+	require.NotContains(t, mesh.stats, NodeID("node-retired"))
+	require.Empty(t, peerMetricSeries(t, "node-retired"))
+}
+
+// peerMetricSeries returns the metric series carrying the given peer label, as name{other labels}
+func peerMetricSeries(t *testing.T, peer string) []string {
+	families, err := prometheus.DefaultGatherer.Gather()
+	require.Nil(t, err)
+	series := make([]string, 0)
+	for _, family := range families {
+		for _, m := range family.Metric {
+			matches, other := false, ""
+			for _, label := range m.Label {
+				if label.GetName() == "peer" {
+					matches = label.GetValue() == peer
+				} else {
+					other += fmt.Sprintf("%s=%q", label.GetName(), label.GetValue())
+				}
+			}
+			if matches {
+				series = append(series, fmt.Sprintf("%s{%s}", family.GetName(), other))
+			}
+		}
+	}
+	return series
+}
+
+func peerMetricValue(t *testing.T, name, peer string) float64 {
+	families, err := prometheus.DefaultGatherer.Gather()
+	require.Nil(t, err)
+	for _, family := range families {
+		if family.GetName() != name {
+			continue
+		}
+		for _, m := range family.Metric {
+			for _, label := range m.Label {
+				if label.GetName() == "peer" && label.GetValue() == peer {
+					return m.GetGauge().GetValue()
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// discardMessage is the deliver callback for tests that do not look at deliveries
+func discardMessage(_ *model.Message) {
+	// Nothing to do: these tests only check status and counters
+}
+
+func TestMesh_DrainingActsAsPassive(t *testing.T) {
+	// A draining node takes no clients and gives up leadership, and its peers see it as passive, so
+	// they no longer count it as a place for clients. Its configured role stays.
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	pool := openTestPool(t, schemaDSN)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	waitFor(t, mesh.IsLeader)
+	require.True(t, mesh.Ready())
+
+	mesh.SetDraining(true)
+	require.True(t, mesh.Draining())
+	require.False(t, mesh.Ready())
+	require.False(t, mesh.IsLeader())
+	require.Equal(t, RolePassive, mesh.Role()) // The role it acts in; the configured one is in its config
+	require.Equal(t, RolePassive, mesh.Members()[0].Role)
+	observer, err := registry.New(pool, "observer", "http://192.168.1.99:2587", RolePassive, time.Minute)
+	require.Nil(t, err)
+	waitFor(t, func() bool {
+		peers, err := observer.Refresh()
+		require.Nil(t, err)
+		return len(peers) == 1 && peers[0].Role == RolePassive
+	})
+
+	mesh.SetDraining(false)
+	require.False(t, mesh.Draining())
+	require.True(t, mesh.Ready())
+	require.Equal(t, RoleActive, mesh.Role())
+	require.Equal(t, RoleActive, mesh.Members()[0].Role)
+}
+
+func TestMesh_PeersHasActive(t *testing.T) {
+	// A node only drains if another active node can take its clients
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeer(t, pool, "node-active", "http://192.168.1.52:2587")
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.True(t, mesh.Peers().HasActive())
+}
+
+func TestMesh_PassivePeerIsNoActivePeer(t *testing.T) {
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeerWithRole(t, pool, "node-passive", "http://192.168.1.51:2587", RolePassive)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://192.168.1.10:2587"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+	require.False(t, mesh.Peers().HasActive())
+}
+
+func TestMesh_AccessChangedBroadcast(t *testing.T) {
+	// Node A changed access entries: node B must be told, so it reloads its access cache; node A's
+	// own callback must not fire (no loop)
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	poolA, poolB := openTestPool(t, schemaDSN), openTestPool(t, schemaDSN)
+	changedA, changedB := atomic.Int32{}, atomic.Int32{}
+
+	listenerB, err := net.Listen("tcp", "127.0.0.1:0")
+	require.Nil(t, err)
+	confB := newTestMeshConfig("node-b", "http://"+listenerB.Addr().String())
+	confB.AccessChangedFunc = func() {
+		changedB.Add(1)
+	}
+	meshB, err := newMeshCluster(confB, poolB, nil)
+	require.Nil(t, err)
+	defer meshB.Close()
+	srvB := &http.Server{Handler: meshB}
+	go srvB.Serve(listenerB)
+	defer srvB.Close()
+
+	confA := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	confA.AccessChangedFunc = func() {
+		changedA.Add(1)
+	}
+	meshA, err := newMeshCluster(confA, poolA, nil)
+	require.Nil(t, err)
+	defer meshA.Close()
+
+	meshA.BroadcastState(&State{
+		AccessChanged: true,
+	})
+	waitFor(t, func() bool {
+		return changedB.Load() == 1
+	})
+	require.Equal(t, int32(0), changedA.Load())
 }

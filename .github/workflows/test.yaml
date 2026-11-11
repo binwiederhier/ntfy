@@ -5,7 +5,12 @@ on:
   pull_request:
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.part }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [checks, server, rest] # In parallel: the server package takes as long as all others together
     services:
       postgres:
         image: postgres:17
@@ -31,18 +36,24 @@ jobs:
         with:
           go-version-file: '.go-version'
       - name: Install node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: 'npm'
           cache-dependency-path: './web/package-lock.json'
       - name: Install dependencies
+        timeout-minutes: 10 # A stalled apt mirror must fail the run, not hang it
         run: make build-deps-ubuntu
       - name: Build docs (required for tests)
         run: make docs
       - name: Build web app (required for tests)
         run: make web
-      - name: Run tests, formatting, vetting and linting
-        run: make checkv
-      - name: Run coverage
-        run: make coverage
+      - name: Run web tests, formatting, vetting and linting
+        if: matrix.part == 'checks'
+        run: make web-test web-fmt-check fmt-check vet web-lint lint staticcheck template-check go-check
+      - name: Run Go tests of the server package (race detector)
+        if: matrix.part == 'server'
+        run: go test -race ./server
+      - name: Run Go tests of all other packages (race detector)
+        if: matrix.part == 'rest'
+        run: go test -race $(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | grep -vE 'ntfy/v2/(test|examples|tools|web|server)$')

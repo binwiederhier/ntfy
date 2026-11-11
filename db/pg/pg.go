@@ -1,16 +1,22 @@
 package pg
 
 import (
-	"database/sql"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib" // PostgreSQL driver
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 
 	"heckel.io/ntfy/v2/db"
+)
+
+const (
+	// tcpUserTimeout is how long a database connection may have data in flight without an
+	// acknowledgment before the kernel gives up on it (Linux only, see newDialer)
+	tcpUserTimeout = 30 * time.Second
 )
 
 // Advisory lock keys. PostgreSQL advisory locks share one database-wide key space, so every
@@ -72,10 +78,11 @@ func open(dsn string) (*db.Host, error) {
 		return nil, err
 	}
 	u.RawQuery = q.Encode()
-	d, err := sql.Open("pgx", u.String())
+	config, err := parseConnConfig(u.String())
 	if err != nil {
 		return nil, err
 	}
+	d := stdlib.OpenDB(*config)
 	d.SetMaxOpenConns(maxOpenConns)
 	if maxIdleConns == 0 {
 		// database/sql keeps only 2 idle connections by default, so every burst above that
@@ -93,6 +100,16 @@ func open(dsn string) (*db.Host, error) {
 		Addr: u.Host,
 		DB:   d,
 	}, nil
+}
+
+// parseConnConfig parses the driver part of the DSN, and dials with newDialer
+func parseConnConfig(dsn string) (*pgx.ConnConfig, error) {
+	config, err := pgx.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	config.DialFunc = newDialer().DialContext
+	return config, nil
 }
 
 func extractIntParam(q url.Values, key string, defaultValue int) (int, error) {

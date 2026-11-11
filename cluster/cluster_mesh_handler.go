@@ -106,6 +106,8 @@ func (c *meshCluster) handleBuckets(_ NodeID, w http.ResponseWriter, r *http.Req
 	if err := json.NewDecoder(io.LimitReader(r.Body, bucketsMaxBytes)).Decode(&buckets); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	} else if r.Context().Err() != nil {
+		return // The peer gave up on this round; charged after its next one, it could undo a refund there
 	}
 	c.conf.Limiter.ChargeBuckets(buckets)
 	w.WriteHeader(http.StatusOK)

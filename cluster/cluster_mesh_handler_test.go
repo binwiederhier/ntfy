@@ -121,6 +121,26 @@ func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
 	require.Equal(t, 1000, mesh.conf.Limiter.Size())
 }
 
+func TestMesh_BucketsEndpointSkipsAbandonedRound(t *testing.T) {
+	// A round whose sender gave up (timeout) is not charged: it could otherwise land after the
+	// sender's next round and undo a refund in it
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.Limiter = limit.New(&limit.Config{})
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(ctx, "POST", BucketsPath, strings.NewReader(`{"ip:1.2.3.4":{"requests":{"u":20,"b":60,"r":5000000000}}}`))
+	req.Header.Set(secretHeader, testSecret)
+	req.Header.Set(originHeader, "node-b")
+	mesh.ServeHTTP(rr, req)
+	require.Equal(t, 0, mesh.conf.Limiter.Size())
+}
+
 func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
 	// The largest round a node sends (limit.BucketDeltasMax buckets) fits the body limit of its
 	// peers, also with long keys (IPv6 prefixes, user IDs) and the largest values

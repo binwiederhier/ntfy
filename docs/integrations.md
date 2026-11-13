@@ -107,6 +107,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Ntfy App](https://github.com/rubix-studios-pty-ltd/ntfy-app) - Tauri/Rust desktop client for Windows, Linux and MacOS with push notifications.
 - [mac_ntfy](https://github.com/wangty163/mac_ntfy) - Native macOS client for ntfy (Swift)
 - [NtfyBar](https://github.com/roypadina/NtfyBar) - Native macOS menu-bar client: per-topic popups that stay, notifications, clipboard or shell-command actions, rules, history and sandboxed JavaScript plugins (Swift)
+- [ntfy-admin](https://github.com/ksabev/ntfy-admin) - Web admin panel for self-hosted ntfy: users, access rules, tokens, onboarding QR codes, multiple servers (Go)
 
 ## Projects + scripts 
 

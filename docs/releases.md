@@ -12,6 +12,23 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
 
+## ntfy server v2.38.0
+Released November 15, 2026
+
+This release shares every visitor's rate limits across the nodes of a cluster: a client spread over several nodes
+is now limited once instead of once per node, and a node that restarts or crashes takes the limits over from its
+peers instead of forgetting them. It also fixes a denial-of-service bug in message templating, where a crafted
+template could build an oversized string and crash the server.
+
+**Features:**
+
+* Cluster: the nodes share every visitor's rate limits (requests, failed logins, signups and password resets, topic creation, e-mails, attachment bandwidth, Firebase pauses) over the mesh every second, so a client spread over several nodes gets its limits once, not once per node; a node that restarts or crashes takes the limits over from its peers before it serves ([#2182](https://github.com/binwiederhier/ntfy/pull/2182))
+
+**Bug fixes + maintenance:**
+
+* Message templating: the `replace`, `regexReplaceAll` and `join` functions now cap the size of the string they build, so a template can no longer amplify small inputs into a multi-gigabyte string and crash the server with an out-of-memory error (thanks to Robert Flosbach of Neodyme for the responsible disclosure)
+* WebSocket subscribers that a node closes while draining are no longer counted and logged as internal server errors (HTTP 500, ntfy error 50001); on ntfy.sh, each node's drain counted ~18k of them and tripped the 5xx alert, although clients never saw an error ([#2171](https://github.com/binwiederhier/ntfy/pull/2171))
+
 ## ntfy server v2.37.2
 Released November 3, 2026
 
@@ -2366,17 +2383,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.38.0 (UNRELEASED)
-
-**Features:**
-
-* Cluster: the nodes share every visitor's rate limits (requests, failed logins, signups and password resets, topic creation, e-mails, attachment bandwidth, Firebase pauses) over the mesh every second, so a client spread over several nodes gets its limits once, not once per node; a node that restarts or crashes takes the limits over from its peers before it serves ([#2182](https://github.com/binwiederhier/ntfy/pull/2182))
-
-**Bug fixes + maintenance:**
-* Message templating: the `replace`, `regexReplaceAll` and `join` functions now cap the size of the string they build, so a template can no longer amplify small inputs into a multi-gigabyte string and crash the server with an out-of-memory error (thanks to Robert Flosbach of Neodyme for the responsible disclosure)
-
-* WebSocket subscribers that a node closes while draining are no longer counted and logged as internal server errors (HTTP 500, ntfy error 50001); on ntfy.sh, each node's drain counted ~18k of them and tripped the 5xx alert, although clients never saw an error ([#2171](https://github.com/binwiederhier/ntfy/pull/2171))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

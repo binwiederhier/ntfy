@@ -23,7 +23,7 @@ import (
 
 const (
 	minBcryptTimingMillis = int64(40) // Ideally should be >100ms, but this should also run on a Raspberry Pi without massive resources
-	latestSchemaVersion   = 11        // The user schema's version after all migrations; bump with every migration
+	latestSchemaVersion   = 12        // The user schema's version after all migrations; bump with every migration
 )
 
 // newManagerFunc creates a Manager with the given config. Calling it multiple
@@ -3231,10 +3231,9 @@ func TestManager_Authenticate_EmailIdentifierIsCaseInsensitive(t *testing.T) {
 	})
 }
 
-// Two accounts can each hold the same address in a different case: the primary-email index is
-// case-sensitive, so both rows are allowed. Both logins must keep working, and a third casing must
-// resolve to a deterministic account instead of failing the lookup entirely.
-func TestManager_Authenticate_EmailCaseTieBreak(t *testing.T) {
+// One address in two casings is one address: the second account cannot take it as its primary,
+// and the account that owns it still resolves under any casing.
+func TestManager_SetPrimaryEmail_CaseInsensitiveConflict(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		a := newTestManager(t, newManager, PermissionDenyAll)
 		require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
@@ -3245,21 +3244,19 @@ func TestManager_Authenticate_EmailCaseTieBreak(t *testing.T) {
 		require.Nil(t, err)
 		require.Nil(t, a.AddEmail(phil.ID, "phil@example.com"))
 		require.Nil(t, a.SetPrimaryEmail(phil.ID, "phil@example.com"))
-		require.Nil(t, a.AddEmail(phil2.ID, "Phil@Example.com"))
-		require.Nil(t, a.SetPrimaryEmail(phil2.ID, "Phil@Example.com"))
 
-		// Each account still logs in with its own casing
-		u, err := a.Authenticate("phil@example.com", "phil")
+		// The same address in another casing is the same address, so it cannot become a second
+		// account's primary email, and the partial unique index now covers the casing too
+		require.Nil(t, a.AddEmail(phil2.ID, "Phil@Example.com"))
+		require.Equal(t, ErrEmailPrimaryElsewhere, a.SetPrimaryEmail(phil2.ID, "Phil@Example.com"))
+
+		// The owner keeps logging in with any casing, and the reset lookup agrees
+		u, err := a.Authenticate("PHIL@EXAMPLE.COM", "phil")
 		require.Nil(t, err)
 		require.Equal(t, "phil", u.Name)
-		u, err = a.Authenticate("Phil@Example.com", "phil2")
+		userID, err := a.UserIDByPrimaryEmail("Phil@Example.com")
 		require.Nil(t, err)
-		require.Equal(t, "phil2", u.Name)
-
-		// Any other casing still resolves to one of the two accounts, and the reset lookup agrees
-		userID, err := a.UserIDByPrimaryEmail("PHIL@EXAMPLE.COM")
-		require.Nil(t, err)
-		require.Contains(t, []string{phil.ID, phil2.ID}, userID)
+		require.Equal(t, phil.ID, userID)
 	})
 }
 
@@ -3286,7 +3283,7 @@ func TestManager_VerifyEmail_PromotionIsCaseInsensitive(t *testing.T) {
 		require.Equal(t, "", primary)
 		emails, err := a.Emails(phil2.ID)
 		require.Nil(t, err)
-		require.True(t, emails.Contains("Phil@Example.com"))
+		require.True(t, emails.Contains("phil@example.com"))
 	})
 }
 
@@ -3787,6 +3784,119 @@ func TestMigrationFrom10To11SQLite(t *testing.T) {
 	checkMigratedSqliteSchema(t, filename)
 }
 
+// Version 11 could hold one address in several casings, because the primary-address index is
+// case-sensitive. The 11 -> 12 migration stores addresses lowercase, so it has to fold those rows
+// together first: one row per account and address, and one account keeping the address as primary.
+func TestMigrationFrom11To12SQLite(t *testing.T) {
+	filename := filepath.Join(t.TempDir(), "user.db")
+	a := newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+	phil, err := a.User("phil")
+	require.Nil(t, err)
+	ben, err := a.User("ben")
+	require.Nil(t, err)
+
+	// phil has had the account longer, so phil keeps the address as primary
+	_, err = a.db.Exec(`UPDATE user SET created = 1 WHERE id = ?`, phil.ID)
+	require.Nil(t, err)
+	_, err = a.db.Exec(`UPDATE user SET created = 2 WHERE id = ?`, ben.ID)
+	require.Nil(t, err)
+
+	// One account, same address in two casings, plus another account holding it as primary
+	_, err = a.db.Exec(`INSERT INTO user_email (user_id, email, is_primary) VALUES (?, 'Phil@Example.COM', 1), (?, 'phil@example.com', 0)`, phil.ID, phil.ID)
+	require.Nil(t, err)
+	_, err = a.db.Exec(`INSERT INTO user_email (user_id, email, is_primary) VALUES (?, 'PHIL@example.com', 1)`, ben.ID)
+	require.Nil(t, err)
+	_, err = a.db.Exec(`UPDATE schemaVersion SET version = 11 WHERE id = 1`)
+	require.Nil(t, err)
+	require.Nil(t, a.Close())
+
+	a = newTestManagerFromFile(t, filename, "", PermissionDenyAll, bcrypt.MinCost, DefaultUserStatsQueueWriterInterval)
+	defer a.Close()
+	var version int
+	require.Nil(t, a.db.QueryRow(`SELECT version FROM schemaVersion WHERE id = 1`).Scan(&version))
+	require.Equal(t, latestSchemaVersion, version)
+
+	// Every stored address is lowercase, phil holds it once, and ben kept it as a verified
+	// secondary address instead of losing it
+	rows, err := a.db.Query(`SELECT user_id, email, is_primary FROM user_email ORDER BY email, is_primary`)
+	require.Nil(t, err)
+	defer rows.Close()
+	type emailRow struct {
+		userID    string
+		email     string
+		isPrimary int
+	}
+	actual := make([]emailRow, 0)
+	for rows.Next() {
+		var r emailRow
+		require.Nil(t, rows.Scan(&r.userID, &r.email, &r.isPrimary))
+		actual = append(actual, r)
+	}
+	require.Nil(t, rows.Err())
+	require.Equal(t, []emailRow{
+		{ben.ID, "phil@example.com", 0},
+		{phil.ID, "phil@example.com", 1},
+	}, actual)
+}
+
+// Same as TestMigrationFrom11To12SQLite, on PostgreSQL: the DELETE ... USING and the row-value
+// UPDATE have to fold the duplicate casings before the addresses are lowered, or the partial
+// unique index rejects the migration at startup.
+func TestMigrationFrom11To12Postgres(t *testing.T) {
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	open := func() *Manager {
+		host, err := pg.Open(schemaDSN)
+		require.Nil(t, err)
+		a, err := NewPostgresManager(db.New(host, nil), &Config{DefaultAccess: PermissionDenyAll, BcryptCost: bcrypt.MinCost, QueueWriterInterval: DefaultUserStatsQueueWriterInterval})
+		require.Nil(t, err)
+		t.Cleanup(func() { a.Close() })
+		return a
+	}
+	a := open()
+	require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+	require.Nil(t, a.AddUser("ben", "ben", RoleUser, false))
+	phil, err := a.User("phil")
+	require.Nil(t, err)
+	ben, err := a.User("ben")
+	require.Nil(t, err)
+	_, err = a.db.Exec(`UPDATE "user" SET created = 1 WHERE id = $1`, phil.ID)
+	require.Nil(t, err)
+	_, err = a.db.Exec(`UPDATE "user" SET created = 2 WHERE id = $1`, ben.ID)
+	require.Nil(t, err)
+	_, err = a.db.Exec(`INSERT INTO user_email (user_id, email, is_primary) VALUES ($1, 'Phil@Example.COM', TRUE), ($1, 'phil@example.com', FALSE)`, phil.ID)
+	require.Nil(t, err)
+	_, err = a.db.Exec(`INSERT INTO user_email (user_id, email, is_primary) VALUES ($1, 'PHIL@example.com', TRUE)`, ben.ID)
+	require.Nil(t, err)
+	_, err = a.db.Exec(`UPDATE schema_version SET version = 11 WHERE store = 'user'`)
+	require.Nil(t, err)
+	require.Nil(t, a.Close())
+
+	a = open()
+	var version int
+	require.Nil(t, a.db.QueryRow(`SELECT version FROM schema_version WHERE store = 'user'`).Scan(&version))
+	require.Equal(t, latestSchemaVersion, version)
+	rows, err := a.db.Query(`SELECT user_id, email, is_primary FROM user_email ORDER BY email, is_primary`)
+	require.Nil(t, err)
+	defer rows.Close()
+	type emailRow struct {
+		userID    string
+		email     string
+		isPrimary bool
+	}
+	actual := make([]emailRow, 0)
+	for rows.Next() {
+		var r emailRow
+		require.Nil(t, rows.Scan(&r.userID, &r.email, &r.isPrimary))
+		actual = append(actual, r)
+	}
+	require.Nil(t, rows.Err())
+	require.Equal(t, []emailRow{
+		{ben.ID, "phil@example.com", false},
+		{phil.ID, "phil@example.com", true},
+	}, actual)
+}
 func TestMigrationFrom10To11Postgres(t *testing.T) {
 	schemaDSN := dbtest.CreateTestPostgresSchema(t)
 	open := func() *Manager {

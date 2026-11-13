@@ -36,7 +36,7 @@ const (
 		FROM "user" u
 		LEFT JOIN tier t on t.id = u.tier_id
 		WHERE u.user_name = $1
-		   OR u.id = (SELECT user_id FROM user_email WHERE LOWER(email) = $2 AND is_primary ORDER BY (email = $4) DESC, email LIMIT 1)
+		   OR u.id = (SELECT user_id FROM user_email WHERE email = $2 AND is_primary)
 		ORDER BY CASE WHEN u.user_name = $3 THEN 0 ELSE 1 END
 		LIMIT 1
 	`
@@ -233,7 +233,7 @@ const (
 	postgresInsertEmailIgnoreQuery       = `INSERT INTO user_email (user_id, email) VALUES ($1, $2) ON CONFLICT (user_id, email) DO NOTHING`
 	postgresDeleteEmailQuery             = `DELETE FROM user_email WHERE user_id = $1 AND email = $2`
 	postgresSelectPrimaryEmailQuery      = `SELECT email FROM user_email WHERE user_id = $1 AND is_primary`
-	postgresSelectUserIDByPrimaryQuery   = `SELECT user_id FROM user_email WHERE LOWER(email) = $1 AND is_primary ORDER BY (email = $2) DESC, email LIMIT 1`
+	postgresSelectUserIDByPrimaryQuery   = `SELECT user_id FROM user_email WHERE email = $1 AND is_primary`
 	postgresUpdateEmailSetPrimaryQuery   = `UPDATE user_email SET is_primary = TRUE WHERE user_id = $1 AND email = $2`
 	postgresUpdateEmailClearPrimaryQuery = `UPDATE user_email SET is_primary = FALSE WHERE user_id = $1 AND is_primary`
 

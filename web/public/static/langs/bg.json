@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "Потребител от външна система",
     "account_usage_emails_none": "Профилът не може да изпраща известия по ел. поща",
     "prefs_users_dialog_base_url_invalid": "Неприемлив формат на адрес. Трябва да започва с http:// или https://",
-    "prefs_users_dialog_base_url_exists": "Потребител за този адрес на услуга вече съществува"
+    "prefs_users_dialog_base_url_exists": "Потребител за този адрес на услуга вече съществува",
+    "prefs_legal_contact_title": "Контакт:",
+    "prefs_legal_name": "Име",
+    "prefs_legal_email": "Имейл",
+    "prefs_legal_notice": "Правна информация",
+    "prefs_privacy_policy": "Политика за поверителност"
 }

@@ -403,5 +403,10 @@
     "web_push_subscription_expiring_body": "Åpne ntfy for å fortsette å motta varslinger",
     "web_push_unknown_notification_title": "Ukjent varsel mottatt fra server",
     "web_push_unknown_notification_body": "Du må muligens oppdatere ntfy ved å åpne web-appen",
-    "account_usage_attachment_storage_description": "{{filesize}} pr. fil, slettet etter {{expiry}}"
+    "account_usage_attachment_storage_description": "{{filesize}} pr. fil, slettet etter {{expiry}}",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Navn",
+    "prefs_legal_email": "E-post",
+    "prefs_legal_notice": "Juridisk merknad",
+    "prefs_privacy_policy": "Personvernerklæring"
 }

@@ -462,5 +462,10 @@
     "account_basics_tier_provisioned": "Aktivované",
     "account_usage_emails_none": "Z tohto účtu nie je možné odosielať e-mailové upozornenia",
     "prefs_users_dialog_base_url_invalid": "Neplatný formát URL. Musí začínať http:// alebo https://",
-    "prefs_users_dialog_base_url_exists": "Používateľ s touto adresou URL služby už existuje"
+    "prefs_users_dialog_base_url_exists": "Používateľ s touto adresou URL služby už existuje",
+    "prefs_legal_contact_title": "Kontakt:",
+    "prefs_legal_name": "Meno",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Právne upozornenie",
+    "prefs_privacy_policy": "Zásady ochrany osobných údajov"
 }

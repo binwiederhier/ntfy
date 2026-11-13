@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -50,6 +51,39 @@ func TestCLI_Publish_Subscribe_Poll(t *testing.T) {
 	require.Nil(t, app2.Run([]string{"ntfy", "subscribe", "--poll", topic}))
 	m = toMessage(t, stdout.String())
 	require.Equal(t, "some message", m.Message)
+}
+
+func TestCLI_Publish_Stdin_ReadsFullInput(t *testing.T) {
+	input := strings.Repeat("x", 1024*1024+123)
+	var received int
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		received = len(body)
+
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write([]byte(`{"id":"abc","time":1,"event":"message","topic":"mytopic","message":"ok"}`))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	app, stdin, stdout, _ := newTestApp()
+	_, err := stdin.WriteString(input)
+	require.NoError(t, err)
+
+	f, err := os.CreateTemp(t.TempDir(), "stdin")
+	require.NoError(t, err)
+	oldStdin := os.Stdin
+	os.Stdin = f
+	t.Cleanup(func() {
+		os.Stdin = oldStdin
+		require.NoError(t, f.Close())
+	})
+
+	require.NoError(t, app.Run([]string{"ntfy", "publish", server.URL + "/mytopic"}))
+	require.Equal(t, len(input), received)
+	require.Contains(t, stdout.String(), `"message":"ok"`)
 }
 
 func TestCLI_Publish_All_The_Things(t *testing.T) {

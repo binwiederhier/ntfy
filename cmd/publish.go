@@ -123,6 +123,8 @@ func execPublish(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	// Stream redirected stdin directly instead of buffering it into memory first.
+	useStdinMessage := file == "" && message == "" && isStdinRedirected()
 	var options []client.PublishOption
 	if title != "" {
 		options = append(options, client.WithTitle(title))
@@ -196,20 +198,24 @@ func execPublish(c *cli.Context) error {
 		newMessage, err := waitForProcess(pid)
 		if err != nil {
 			return err
-		} else if message == "" {
+		} else if message == "" && !useStdinMessage {
 			message = newMessage
 		}
 	} else if len(command) > 0 {
 		newMessage, err := runAndWaitForCommand(command)
 		if err != nil {
 			return err
-		} else if message == "" {
+		} else if message == "" && !useStdinMessage {
 			message = newMessage
 		}
 	}
 	var body io.Reader
 	if file == "" {
-		body = strings.NewReader(message)
+		if useStdinMessage {
+			body = c.App.Reader
+		} else {
+			body = strings.NewReader(message)
+		}
 	} else {
 		if message != "" {
 			options = append(options, client.WithMessage(message))
@@ -265,15 +271,6 @@ func parseTopicMessageCommand(c *cli.Context) (topic string, message string, com
 	}
 	if c.String("message") != "" {
 		message = c.String("message")
-	}
-	if message == "" && isStdinRedirected() {
-		var data []byte
-		data, err = io.ReadAll(io.LimitReader(c.App.Reader, 1024*1024))
-		if err != nil {
-			log.Debug("Failed to read from stdin: %s", err.Error())
-			return
-		}
-		message = strings.TrimSpace(string(data))
 	}
 	return
 }

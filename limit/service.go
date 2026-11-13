@@ -64,30 +64,31 @@ const (
 
 // Service decides on usage from memory; see the package comment
 type Service struct {
-	now       func() time.Time          // Injectable clock, for tests
-	counters  [shardCount]*counterShard // Daily counts, kept until their period ends
-	buckets   [shardCount]*bucketShard  // Token buckets, per node, forgotten when settled (see Prune)
-	store     *Store                    // Nil: memory only
-	watermark int64                     // Time of the last read, unix seconds; the sync worker's only
-	prunedAt  int64                     // Time of the last prune, unix seconds; the sync worker's only
-	interval  time.Duration             // How often the worker syncs (syncInterval); tests change it
-	ctx       context.Context           // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
-	cancel    context.CancelFunc
-	closeOnce sync.Once
-	wg        sync.WaitGroup
+	now         func() time.Time          // Injectable clock, for tests
+	counters    [shardCount]*counterShard // Daily counts, kept until their period ends
+	buckets     [shardCount]*bucketShard  // Token buckets, per node, forgotten when settled (see Prune)
+	store       *Store                    // Nil: memory only
+	watermark   int64                     // Time of the last read, unix seconds; the sync worker's only
+	prunedAt    int64                     // Time of the last prune, unix seconds; the sync worker's only
+	interval    time.Duration             // How often the worker syncs (syncInterval); tests change it
+	trackDeltas bool                      // Whether takeTokens and refundTokens record deltas (see Config.TrackDeltas)
+	ctx         context.Context           // Done on Close; the sync worker's store calls derive from it, so Close never waits on a stuck one
+	cancel      context.CancelFunc
+	closeOnce   sync.Once
+	wg          sync.WaitGroup
 }
 
-// New creates the service; the store shares the daily counts and keeps them across restarts, nil
-// for memory only
-func New(store *Store) *Service {
-	return newService(store, time.Now)
+// New creates the service (see Config)
+func New(conf *Config) *Service {
+	return newService(conf, time.Now)
 }
 
-func newService(store *Store, now func() time.Time) *Service {
+func newService(conf *Config, now func() time.Time) *Service {
 	s := &Service{
-		now:      now,
-		store:    store,
-		interval: syncInterval,
+		now:         now,
+		store:       conf.Store,
+		interval:    syncInterval,
+		trackDeltas: conf.TrackDeltas,
 	}
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	for i := 0; i < shardCount; i++ {
@@ -96,6 +97,7 @@ func newService(store *Store, now func() time.Time) *Service {
 		}
 		s.buckets[i] = &bucketShard{
 			entries: make(map[string]*bucketEntry),
+			deltas:  make(map[string]*[numKinds]float64),
 		}
 	}
 	return s

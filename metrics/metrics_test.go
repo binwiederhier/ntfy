@@ -65,6 +65,7 @@ var expectedMetricNames = []string{
 func TestRegisteredMetricNames(t *testing.T) {
 	HTTPRequests.WithLabelValues("200", "20000", "GET").Inc() // Vectors are only gathered once they have a series
 	ClusterPeerBatchesSent.WithLabelValues("node-b", "ok").Inc()
+	ClusterSendErrors.WithLabelValues("/v1/cluster/message")
 	ClusterPeerBatchesReceived.WithLabelValues("node-b").Inc()
 	ClusterPeerLastSendSuccess.WithLabelValues("node-b").Set(1)
 	SetDBPoolsFunc(func() []*DBPool {

@@ -3,16 +3,19 @@ package cluster
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
@@ -83,6 +86,80 @@ func TestMesh_PeerAPI_SelfOrigin(t *testing.T) {
 	mesh.ServeHTTP(rr, req)
 	require.Equal(t, 200, rr.Code)
 	require.Equal(t, 0, delivered)
+}
+
+func TestMesh_BucketsEndpointBodyLimit(t *testing.T) {
+	// A round of deltas is at most ~4 MB (bucketDeltasMax keys); a larger body is refused before it
+	// is decoded into memory, whoever sends it
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.Limiter = limit.New(&limit.Config{})
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	post := func(keys int) int {
+		var body strings.Builder
+		body.WriteString(`{`)
+		for i := 0; i < keys; i++ {
+			if i > 0 {
+				body.WriteString(",")
+			}
+			fmt.Fprintf(&body, `"ip:10.%d.%d.%d":{"requests":{"u":1,"b":60,"r":5000000000}}`, i>>16&255, i>>8&255, i&255)
+		}
+		body.WriteString("}")
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest("POST", BucketsPath, strings.NewReader(body.String()))
+		req.Header.Set(secretHeader, testSecret)
+		req.Header.Set(originHeader, "node-b")
+		mesh.ServeHTTP(rr, req)
+		return rr.Code
+	}
+	require.Equal(t, http.StatusOK, post(1000))
+	require.Equal(t, 1000, mesh.conf.Limiter.Size())
+	require.Equal(t, http.StatusBadRequest, post(200000)) // ~12 MB
+	require.Equal(t, 1000, mesh.conf.Limiter.Size())
+}
+
+func TestMesh_BucketsEndpointSkipsAbandonedRound(t *testing.T) {
+	// A round whose sender gave up (timeout) is not charged: it could otherwise land after the
+	// sender's next round and undo a refund in it
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.Limiter = limit.New(&limit.Config{})
+	mesh, err := newMeshCluster(conf, pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(ctx, "POST", BucketsPath, strings.NewReader(`{"ip:1.2.3.4":{"requests":{"u":20,"b":60,"r":5000000000}}}`))
+	req.Header.Set(secretHeader, testSecret)
+	req.Header.Set(originHeader, "node-b")
+	mesh.ServeHTTP(rr, req)
+	require.Equal(t, 0, mesh.conf.Limiter.Size())
+}
+
+func TestMesh_LargestRoundFitsBodyLimit(t *testing.T) {
+	// The largest round a node sends (limit.BucketDeltasMax buckets) fits the body limit of its
+	// peers, also with long keys (IPv6 prefixes, user IDs) and the largest values
+	round := make(limit.Buckets)
+	kinds := []limit.Kind{limit.KindRequests, limit.KindBandwidth, limit.KindTopics, limit.KindEmails, limit.KindAuth}
+	for i := 0; len(round)*len(kinds) < limit.BucketDeltasMax; i++ {
+		buckets := make(map[limit.Kind]*limit.BucketUsage)
+		for _, kind := range kinds {
+			buckets[kind] = &limit.BucketUsage{
+				Used:   -1234567.891234,
+				Burst:  10_000_000_000_000,
+				Refill: 24 * time.Hour,
+			}
+		}
+		round[fmt.Sprintf("ip:2001:db8:%04x:%04x::", i>>16, i&0xffff)] = buckets
+	}
+	body, err := json.Marshal(round)
+	require.Nil(t, err)
+	require.Less(t, len(body), bucketsMaxBytes)
 }
 
 func TestMesh_HealthEndpoint(t *testing.T) {

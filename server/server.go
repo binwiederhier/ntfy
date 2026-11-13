@@ -358,7 +358,10 @@ func New(conf *Config) (*Server, error) {
 		firebaseClient = newFirebaseClient(sender, auther)
 	}
 	s.userManager = userManager
-	s.limiter = limit.New(createUsageStore(pool, userDB))
+	s.limiter = limit.New(&limit.Config{
+		Store:       createUsageStore(pool, userDB),
+		TrackDeltas: conf.ClusterListen != "", // Drained by the cluster's bucket gossip
+	})
 	s.visitors = newVisitorEnv(conf, s.limiter, messageCache, userManager)
 	s.topicService = tp.New(createTopicStore(pool, userDB))
 	s.firebaseClient = firebaseClient
@@ -375,6 +378,7 @@ func New(conf *Config) (*Server, error) {
 		UsersDeletedFunc:  s.handleUsersDeleted,
 		AccessChangedFunc: s.handlePeerAccessChanged,
 		IsolatedFunc:      s.maybeCloseLocalSubscribers,
+		Limiter:           s.limiter,
 		MaxMessageBytes:   int64(conf.MessageSizeLimit)*4 + 1024, // Envelope overhead over the raw message
 	}, pool, s.deliverFromBus)
 	if err != nil {
@@ -629,6 +633,9 @@ func (s *Server) stopBounded() {
 func (s *Server) stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.closeChan != nil {
+		close(s.closeChan) // Ends the background loops first, before what they use closes
+	}
 	for _, httpServer := range s.httpServers {
 		httpServer.Close()
 	}
@@ -654,16 +661,13 @@ func (s *Server) stop() {
 		s.tail.Close() // Before the databases close under it
 	}
 	if s.cluster != nil {
-		s.cluster.Close() // Before the databases close, so it can deregister the node and its heartbeat stops
+		s.cluster.Close() // After the listeners, so its last round of buckets has all they used; before the databases, so it can deregister the node
 	}
 	s.limiter.Close()      // Writes the unflushed daily counts, before the databases close under it
 	s.topicService.Close() // Likewise, the changed topics
 	s.closeDatabases()
 	if s.ban != nil {
 		s.ban.Close()
-	}
-	if s.closeChan != nil {
-		close(s.closeChan)
 	}
 }
 

@@ -3,6 +3,7 @@ package cluster
 import (
 	"time"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/util"
 )
@@ -23,6 +24,7 @@ type Config struct {
 	AccessChangedFunc AccessChangedFunc // Told that a peer changed access entries; may be nil
 	TopicsAddedFunc   TopicsAddedFunc   // Told about topics that just gained their first subscriber on a peer; may be nil
 	IsolatedFunc      IsolatedFunc      // Called while this node is cut off from the cluster; may be nil
+	Limiter           *limit.Service    // Its visitors' buckets are exchanged with the peers (see gossipBuckets)
 }
 
 // DeliverFunc hands a message received from a peer node to this node's local subscribers. The
@@ -119,7 +121,8 @@ type apiHealth struct {
 }
 
 // apiState is the peer state-exchange envelope. Each concern is an optional section; future
-// concerns (rate limit counters, stats) become siblings of Topics.
+// concerns (stats) become siblings of Topics. A node that does not know a section ignores it,
+// which keeps mixed-version clusters working during rolling deploys.
 type apiState struct {
 	Topics         *apiStateTopics `json:"topics,omitempty"`
 	DeletedUserIDs []string        `json:"deleted_user_ids,omitempty"`

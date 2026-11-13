@@ -91,9 +91,9 @@ var (
 	ClusterBatchesSent = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_batches_sent_total",
 	})
-	ClusterSendErrors = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "ntfy_cluster_send_errors_total",
-	})
+	ClusterSendErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ntfy_cluster_send_errors_total", // Per peer API path (cluster.MessagePath, ...)
+	}, []string{"path"})
 	ClusterQueueDropped = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_queue_dropped_total",
 	})

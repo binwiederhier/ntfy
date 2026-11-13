@@ -4,6 +4,12 @@ import (
 	"time"
 )
 
+// Config configures the limit service
+type Config struct {
+	Store       *Store // Shares the daily counts and keeps them across restarts; nil for memory only
+	TrackDeltas bool   // Record the tokens used per key and kind, for BucketDeltas to hand to the peers; off on a single node, where nothing would drain them
+}
+
 // Kind is what a key is being limited on: a request, a message, an email, ... Each kind has its
 // own token bucket per key; messages, emails and calls also have a daily count.
 type Kind uint8
@@ -53,6 +59,19 @@ type Decision struct {
 	Reset      time.Duration // RateLimit t=: until the period ends, or until the bucket's next token (0 if it never refills)
 }
 
+// Buckets is what the nodes of a cluster exchange about their token buckets, per key and kind: what
+// a node used since its last round (Service.BucketDeltas), or what is used below each bucket's burst,
+// for a peer that starts (Service.BucketSnapshot)
+type Buckets map[string]map[Kind]*BucketUsage
+
+// BucketUsage is one bucket's used tokens: since the last exchange (a delta), or below its burst (a
+// snapshot); with the bucket's rule, so a node that never saw the key can create it
+type BucketUsage struct {
+	Used   float64       `json:"u"`
+	Burst  int64         `json:"b"`
+	Refill time.Duration `json:"r"` // Nanoseconds on the wire
+}
+
 // Usage is a key's daily counts in its current period
 type Usage struct {
 	counts [numDaily]int64 // Indexed like a counter's arrays (see dailyIndex)
@@ -64,6 +83,22 @@ func (k Kind) String() string {
 		return kindNames[k]
 	}
 	return "unknown"
+}
+
+// MarshalText returns the kind's stable name, so kinds are names on the wire (also as map keys)
+func (k Kind) MarshalText() ([]byte, error) {
+	return []byte(k.String()), nil
+}
+
+// UnmarshalText parses a kind's name. A name this node does not know (a newer peer's kind) is not
+// an error, so the rest of the message still counts; it becomes an invalid kind that callers skip.
+func (k *Kind) UnmarshalText(text []byte) error {
+	kind, ok := ParseKind(string(text))
+	if !ok {
+		kind = numKinds
+	}
+	*k = kind
+	return nil
 }
 
 // ParseKind returns the kind with the given name

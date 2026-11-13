@@ -26,6 +26,8 @@ const (
 	batchMaxMessages   = 100             // Flush a batch early when it reaches this many messages
 	batchMaxBytes      = 256 * 1024      // Flush a batch early when it reaches this size
 	stateMaxBytes      = 1024 * 1024     // Upper bound for inbound state bodies (announcements, deleted users)
+	bucketsMaxBytes    = 8 * 1024 * 1024 // Upper bound for a round of buckets: at most limit's 50k keys, ~80 bytes each
+	bucketsSendTimeout = time.Second     // A round of buckets that takes longer is given up, so the next one is not held up
 )
 
 // meshCluster fans messages out directly to peer nodes over HTTP (the data plane), using
@@ -100,15 +102,22 @@ func newMeshCluster(conf *Config, pool *db.DB, deliver DeliverFunc) (*meshCluste
 		ctx:            ctx,
 		cancel:         cancel,
 	}
+	c.restoreBuckets() // Before the server serves, so it does not forgive what the peers know
 	c.mux = http.NewServeMux()
 	c.mux.HandleFunc("POST "+MessagePath, c.authenticated(c.handleMessage))
 	c.mux.HandleFunc("POST "+StatePath, c.authenticated(c.handleState))
 	c.mux.HandleFunc("GET "+MembersPath, c.secretAuthenticated(c.handleMembers))
 	c.mux.HandleFunc("GET "+HealthPath, c.secretAuthenticated(c.handleHealth))
 	c.mux.HandleFunc("GET "+StatusPath, c.secretAuthenticated(c.handleStatus))
-	c.wg.Add(2)
+	c.mux.HandleFunc("POST "+BucketsPath, c.authenticated(c.handleBuckets))
+	c.mux.HandleFunc("GET "+BucketsPath, c.secretAuthenticated(c.handleBucketSnapshot))
+	for _, path := range []string{MessagePath, StatePath, BucketsPath} {
+		metrics.ClusterSendErrors.WithLabelValues(path) // At zero, so the series exist before the first error
+	}
+	c.wg.Add(3)
 	go c.heartbeatLoop()
 	go c.isolationLoop()
+	go c.runBucketGossip()
 	return c, nil
 }
 
@@ -146,7 +155,7 @@ func (c *meshCluster) ForwardMessage(msg *model.Message) error {
 
 // BroadcastState tells all live peers about state changes that must not wait: topics that
 // gained their first local subscriber (a hint for peers' cached rate-visitor lookups, never
-// used for routing), changed access entries and deleted users.
+// used for routing), changed access entries, and deleted users.
 func (c *meshCluster) BroadcastState(state *State) {
 	if len(state.AddedTopics) == 0 && len(state.DeletedUserIDs) == 0 && !state.AccessChanged {
 		return
@@ -169,7 +178,7 @@ func (c *meshCluster) BroadcastState(state *State) {
 	log.Tag(tag).Debug("Broadcasting state (%d new topics, %d deleted users, access changed: %t) to %d peer(s)", len(state.AddedTopics), len(state.DeletedUserIDs), state.AccessChanged, len(peers))
 	for _, p := range peers {
 		go func(p *registry.Peer) {
-			_ = c.sendToPeer(NodeID(p.NodeID), stateURL(p.AdvertiseURL), func() error {
+			_ = c.sendToPeer(NodeID(p.NodeID), StatePath, stateURL(p.AdvertiseURL), func() error {
 				return c.client.SendState(c.ctx, p.AdvertiseURL, body)
 			})
 		}(p)
@@ -305,11 +314,13 @@ func (c *meshCluster) Ready() bool {
 // Close stops the mesh: it deregisters this node, releases leadership, stops all peer workers,
 // and waits for them to exit.
 func (c *meshCluster) Close() error {
-	c.cancel() // Stops the heartbeat loop and aborts in-flight peer deliveries
+	c.mu.Lock()
+	c.closed = true // No new peer queues from here on
+	c.mu.Unlock()
+	c.cancel() // Stops the loops and aborts in-flight peer deliveries; the gossip loop first sends the last round of buckets
 	// Close the peer queues so their workers flush and exit; final sends are best-effort since
 	// the context is already canceled (parity with fire-and-forget delivery)
 	c.mu.Lock()
-	c.closed = true
 	for nodeID, q := range c.queues {
 		q.queue.Close()
 		delete(c.queues, nodeID)
@@ -502,7 +513,7 @@ func (c *meshCluster) peerWorker(nodeID NodeID, q *peerQueue) {
 	for lines := range q.queue.Dequeue() {
 		body := assembleMessageBody(lines)
 		log.Tag(tag).Debug("Sending batch of %d message(s) (%d bytes) to peer %s", len(lines), len(body), nodeID)
-		err := c.sendToPeer(nodeID, messageURL(q.advertiseURL), func() error {
+		err := c.sendToPeer(nodeID, MessagePath, messageURL(q.advertiseURL), func() error {
 			return c.client.SendMessages(c.ctx, q.advertiseURL, body)
 		})
 		if err != nil {
@@ -595,16 +606,16 @@ func deletePeerMetrics(nodeID NodeID) {
 // sendToPeer runs one peer API POST (via the client, authenticated with the shared cluster
 // secret). Failures are logged, counted and returned; the caller decides what a failure means (a
 // message batch is dropped, state is retried on the next heartbeat).
-func (c *meshCluster) sendToPeer(nodeID NodeID, url string, send func() error) error {
+func (c *meshCluster) sendToPeer(nodeID NodeID, path, url string, send func() error) error {
 	err := send()
 	var httpErr *HTTPError
 	if errors.As(err, &httpErr) {
-		metrics.ClusterSendErrors.Inc()
+		metrics.ClusterSendErrors.WithLabelValues(path).Inc()
 		log.Tag(tag).Warn("Peer %s (%s) rejected request with HTTP %d", nodeID, url, httpErr.StatusCode)
 		return fmt.Errorf("peer %s rejected request with HTTP %d", nodeID, httpErr.StatusCode)
 	} else if err != nil {
 		if c.ctx.Err() == nil {
-			metrics.ClusterSendErrors.Inc()
+			metrics.ClusterSendErrors.WithLabelValues(path).Inc()
 			log.Tag(tag).Err(err).Warn("Failed to send to peer %s (%s)", nodeID, url)
 		}
 		return err

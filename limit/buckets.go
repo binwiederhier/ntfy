@@ -9,7 +9,8 @@ import (
 // bucketShard is one independently locked part of the token buckets
 type bucketShard struct {
 	entries map[string]*bucketEntry
-	mu      sync.Mutex // Protects entries and everything inside them
+	deltas  map[string]*[numKinds]float64 // Tokens used here per kind since the last BucketDeltas, for the peers; empty unless Config.TrackDeltas
+	mu      sync.Mutex                    // Protects entries, deltas and everything inside them
 }
 
 // bucketEntry is one key's token buckets
@@ -22,9 +23,10 @@ type bucketEntry struct {
 // bucket is a token bucket. It is created full: last is zero until the first use, and tokens
 // then start at the rule's burst. Tokens may go negative (debt) when a burst shrinks.
 type bucket struct {
-	tokens float64
-	last   int64 // Unix nanoseconds of the last refill, 0 if never used
-	burst  int64 // Burst of the rule the bucket was last used with; caps refunds and debt
+	tokens     float64
+	last       int64         // Unix nanoseconds of the last refill, 0 if never used
+	burst      int64         // Burst of the rule the bucket was last used with; caps refunds and debt
+	refillTime time.Duration // Refill of the rule the bucket was last used with, to charge peers' usage without a rule
 }
 
 // takeTokens marks the key as used and takes n tokens from its bucket for the rule, if the rule
@@ -46,6 +48,9 @@ func (s *Service) takeTokens(key string, rule *Rule, n int64, now time.Time) Dec
 	}
 	b.tokens -= float64(n)
 	e.noteFull(b, rule)
+	if s.trackDeltas {
+		bs.noteDeltaNoLock(key, rule.Kind, float64(n))
+	}
 	return b.decision(Decision{OK: true}, rule)
 }
 
@@ -57,7 +62,11 @@ func (s *Service) refundTokens(key string, kind Kind, n int64) {
 	if e, ok := bs.entries[key]; ok {
 		b := &e.buckets[kind]
 		if b.last != 0 {
+			before := b.tokens
 			b.tokens = math.Min(b.tokens+float64(n), float64(b.burst))
+			if s.trackDeltas {
+				bs.noteDeltaNoLock(key, kind, before-b.tokens)
+			}
 		}
 	}
 }
@@ -126,6 +135,7 @@ func (b *bucket) refill(now time.Time, rule *Rule) {
 		b.last = nowNanos
 	}
 	b.burst = rule.Burst
+	b.refillTime = rule.Refill
 }
 
 // decision adds the bucket's quota to d: the whole tokens left, and the time until the next one,

@@ -16,7 +16,7 @@ import (
 )
 
 // The cluster API: every kind of node-to-node communication is a path under /v1/cluster/,
-// served only on the dedicated cluster listener. Future concerns (rate limit counters, stats)
+// served only on the dedicated cluster listener. Future concerns (e.g. stats)
 // become new paths or new sections of the state envelope.
 const (
 	// MessagePath receives batches of published messages (NDJSON, one apiMessage per line).
@@ -35,6 +35,10 @@ const (
 	// StatusPath reports this node's view of the cluster for operators: its role and leadership,
 	// and per peer what it sent there and received from there (see Status)
 	StatusPath = "/v1/cluster/status"
+	// BucketsPath exchanges the visitors' token buckets (JSON limit.Buckets): a POST carries
+	// what the sending node used since its last one, a GET returns this node's buckets that are
+	// not full, for a node that starts (see meshCluster.gossipBuckets and restoreBuckets)
+	BucketsPath = "/v1/cluster/buckets"
 )
 
 // NodeID identifies a cluster node; it keys the registry, the per-peer queues, and the peer
@@ -158,6 +162,9 @@ func New(conf *Config, pool *db.DB, deliver DeliverFunc) (Cluster, error) {
 	}
 	if conf.NodeID == "" {
 		return nil, errors.New("cluster mode requires a stable node ID (set experimental-cluster-node-id)")
+	}
+	if conf.Limiter == nil {
+		return nil, errors.New("cluster mode requires a limiter, whose buckets it shares with the peers")
 	}
 	if conf.Role == "" {
 		conf.Role = RoleActive

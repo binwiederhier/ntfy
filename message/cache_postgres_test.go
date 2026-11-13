@@ -59,7 +59,7 @@ func TestPostgresStore_Migration_From14(t *testing.T) {
 	// added, (topic, published, id) index created
 	var version int
 	require.Nil(t, testDB.QueryRow(`SELECT version FROM schema_version WHERE store = 'message'`).Scan(&version))
-	require.Equal(t, 17, version)
+	require.Equal(t, 18, version)
 	var claimedAtCount int
 	require.Nil(t, testDB.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'message' AND column_name = 'claimed_at' AND table_schema = current_schema()`).Scan(&claimedAtCount))
 	require.Equal(t, 1, claimedAtCount)

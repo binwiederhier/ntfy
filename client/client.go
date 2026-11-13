@@ -50,6 +50,8 @@ type Message struct { // TODO combine with server.message
 	Tags       []string
 	Click      string
 	Icon       string
+	SmallIcon  string `json:"small_icon"`
+	Color      string
 	Attachment *Attachment
 
 	// Additional fields

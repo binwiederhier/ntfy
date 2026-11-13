@@ -66,6 +66,8 @@ func TestCLI_Publish_All_The_Things(t *testing.T) {
 		// No --delay, --email
 		"--click", "https://ntfy.sh",
 		"--icon", "https://ntfy.sh/static/img/ntfy.png",
+		"--small-icon", "mdi:mailbox",
+		"--color", "#009688",
 		"--attach", "https://f-droid.org/F-Droid.apk",
 		"--filename", "fdroid.apk",
 		"--no-cache",
@@ -88,6 +90,8 @@ func TestCLI_Publish_All_The_Things(t *testing.T) {
 	require.Equal(t, int64(0), m.Attachment.Expires)
 	require.Equal(t, "", m.Attachment.Type)
 	require.Equal(t, "https://ntfy.sh/static/img/ntfy.png", m.Icon)
+	require.Equal(t, "mdi:mailbox", m.SmallIcon)
+	require.Equal(t, "#009688", m.Color)
 }
 
 func TestCLI_Publish_Wait_PID_And_Cmd(t *testing.T) {

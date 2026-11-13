@@ -158,6 +158,8 @@ func nindent(spaces int, v string) string {
 // Returns:
 //   - string: The resulting string after all replacements
 func replace(old, new, src string) string {
+	count := strings.Count(src, old)
+	checkResultLength(len(src) + count*(len(new)-len(old)))
 	return strings.Replace(src, old, new, -1)
 }
 
@@ -315,7 +317,16 @@ func title(s string) string {
 // Returns:
 //   - string: The joined string
 func join(sep string, v any) string {
-	return strings.Join(strslice(v), sep)
+	elems := strslice(v)
+	n := 0
+	if len(elems) > 0 {
+		n = (len(elems) - 1) * len(sep)
+		for _, e := range elems {
+			n += len(e)
+		}
+	}
+	checkResultLength(n)
+	return strings.Join(elems, sep)
 }
 
 // split splits a string by a separator and returns a map.

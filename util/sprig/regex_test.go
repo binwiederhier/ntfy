@@ -1,6 +1,8 @@
 package sprig
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,6 +107,28 @@ func TestRegexReplaceAll(t *testing.T) {
 	assert.Equal(t, "--xx-", regexReplaceAll(regex, "-ab-axxb-", "$1"))
 	assert.Equal(t, "---", regexReplaceAll(regex, "-ab-axxb-", "$1W"))
 	assert.Equal(t, "-W-xxW-", regexReplaceAll(regex, "-ab-axxb-", "${1}W"))
+}
+
+func TestRegexReplaceAllLimit(t *testing.T) {
+	// An empty-ish pattern matches at every position, so regexReplaceAll can emit
+	// (len(s)+1) * len(repl) bytes from small inputs (same DoS class as replace).
+	big := strings.Repeat("a", 2000) // (len+1)*len ~ 4 MB result, past the 100k limit
+	for _, f := range []func() string{
+		func() string { return regexReplaceAll("x?", big, big) },
+		func() string { return regexReplaceAllLiteral("x?", big, big) },
+	} {
+		func() {
+			defer func() {
+				r := recover()
+				if r == nil {
+					t.Error("expected the oversized regex replace to panic")
+				} else if !strings.Contains(fmt.Sprint(r), "exceeds limit") {
+					t.Errorf("expected a limit panic, got: %v", r)
+				}
+			}()
+			f()
+		}()
+	}
 }
 
 func TestMustRegexReplaceAll(t *testing.T) {

@@ -2,6 +2,7 @@ package sprig
 
 import (
 	"regexp"
+	"strings"
 )
 
 // regexMatch checks if a string matches a regular expression pattern.
@@ -111,6 +112,7 @@ func mustRegexFind(regex string, s string) (string, error) {
 //   - string: The resulting string after all replacements
 func regexReplaceAll(regex string, s string, repl string) string {
 	r := regexp.MustCompile(regex)
+	checkResultLength(regexReplaceResultLen(r, s, repl, false))
 	return r.ReplaceAllString(s, repl)
 }
 
@@ -131,6 +133,7 @@ func mustRegexReplaceAll(regex string, s string, repl string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	checkResultLength(regexReplaceResultLen(r, s, repl, false))
 	return r.ReplaceAllString(s, repl), nil
 }
 
@@ -147,6 +150,7 @@ func mustRegexReplaceAll(regex string, s string, repl string) (string, error) {
 //   - string: The resulting string after all replacements
 func regexReplaceAllLiteral(regex string, s string, repl string) string {
 	r := regexp.MustCompile(regex)
+	checkResultLength(regexReplaceResultLen(r, s, repl, true))
 	return r.ReplaceAllLiteralString(s, repl)
 }
 
@@ -167,6 +171,7 @@ func mustRegexReplaceAllLiteral(regex string, s string, repl string) (string, er
 	if err != nil {
 		return "", err
 	}
+	checkResultLength(regexReplaceResultLen(r, s, repl, true))
 	return r.ReplaceAllLiteralString(s, repl), nil
 }
 
@@ -214,4 +219,17 @@ func mustRegexSplit(regex string, s string, n int) ([]string, error) {
 //   - string: The escaped string with all regex metacharacters quoted
 func regexQuoteMeta(s string) string {
 	return regexp.QuoteMeta(s)
+}
+
+// regexReplaceResultLen returns an upper bound on the size of r.ReplaceAllString(s, repl) (or the
+// literal form), so a caller can reject an oversized result before building it. Each of the up to
+// len(s)+1 matches emits repl, and in the non-literal form every "$" reference in repl expands to
+// at most len(s) bytes. It never under-estimates, so it never lets an oversized replace through.
+func regexReplaceResultLen(r *regexp.Regexp, s, repl string, literal bool) int {
+	matches := len(r.FindAllStringIndex(s, -1))
+	perMatch := len(repl)
+	if !literal {
+		perMatch += strings.Count(repl, "$") * len(s)
+	}
+	return len(s) + matches*perMatch
 }

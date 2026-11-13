@@ -2374,6 +2374,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Cluster: the nodes share every visitor's rate limits (requests, failed logins, signups and password resets, topic creation, e-mails, attachment bandwidth, Firebase pauses) over the mesh every second, so a client spread over several nodes gets its limits once, not once per node; a node that restarts or crashes takes the limits over from its peers before it serves ([#2182](https://github.com/binwiederhier/ntfy/pull/2182))
 
 **Bug fixes + maintenance:**
+* Message templating: the `replace`, `regexReplaceAll` and `join` functions now cap the size of the string they build, so a template can no longer amplify small inputs into a multi-gigabyte string and crash the server with an out-of-memory error (thanks to Robert Flosbach of Neodyme for the responsible disclosure)
 
 * WebSocket subscribers that a node closes while draining are no longer counted and logged as internal server errors (HTTP 500, ntfy error 50001); on ntfy.sh, each node's drain counted ~18k of them and tripped the 5xx alert, although clients never saw an error ([#2171](https://github.com/binwiederhier/ntfy/pull/2171))
 

@@ -241,6 +241,40 @@ func TestReplace(t *testing.T) {
 	}
 }
 
+func TestReplaceLimit(t *testing.T) {
+	// replace builds len(src) + count*(len(new)-len(old)) bytes in one call, so a short
+	// template can request gigabytes from small inputs (unauthenticated DoS, reported privately).
+	ok := `{{$b := repeat 200 "a"}}{{len (replace "a" $b $b)}}` // ~40 KB, under the limit
+	if _, err := runRaw(ok, nil); err != nil {
+		t.Errorf("expected a modest replace to render, got: %v", err)
+	}
+	huge := `{{$b := repeat 10000 "a"}}{{len (replace "a" $b $b)}}` // ~100 MB result, far past the limit
+	if _, err := runRaw(huge, nil); err == nil {
+		t.Error("expected the oversized replace to be rejected")
+	} else if !strings.Contains(err.Error(), "exceeds limit") {
+		t.Errorf("expected a limit error, got: %v", err)
+	}
+}
+
+func TestJoinLimit(t *testing.T) {
+	// join concatenates every element plus the separator in one call, so a long list of
+	// large elements builds a huge string at once (same DoS class as replace).
+	assert.Equal(t, "a-b-c", join("-", []string{"a", "b", "c"}))
+	big := make([]string, 2000)
+	for i := range big {
+		big[i] = strings.Repeat("a", 2000)
+	}
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("expected the oversized join to panic")
+		} else if !strings.Contains(fmt.Sprint(r), "exceeds limit") {
+			t.Errorf("expected a limit panic, got: %v", r)
+		}
+	}()
+	_ = join("", big)
+}
+
 func TestPlural(t *testing.T) {
 	tpl := `{{$num := len "two"}}{{$num}} {{$num | plural "1 char" "chars"}}`
 	if err := runt(tpl, "3 chars"); err != nil {

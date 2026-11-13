@@ -1116,9 +1116,14 @@ func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v
 	if err != nil {
 		return nil, err
 	}
-	body, err := util.Peek(r.Body, s.config.MessageSizeLimit)
+	// Peek one extra byte to distinguish an exact-size message from an
+	// attachment. Cap the preview; the reader still replays every byte.
+	body, err := util.Peek(r.Body, s.config.MessageSizeLimit+1)
 	if err != nil {
 		return nil, err
+	}
+	if len(body.PeekedBytes) > s.config.MessageSizeLimit {
+		body.PeekedBytes = body.PeekedBytes[:s.config.MessageSizeLimit]
 	}
 	m := model.NewDefaultMessage(t.ID, "")
 	cache, firebase, email, call, template, unifiedpush, priorityStr, e := s.parsePublishParams(r, m)

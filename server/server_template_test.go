@@ -20,6 +20,20 @@ func TestServer_MessageTemplate_TooLarge(t *testing.T) {
 	})
 }
 
+func TestServer_MessageTemplate_UntilNegativeStepTooManyIterations(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		// A decreasing sequence must hit the same iteration limit as an increasing one
+		response := request(t, s, "PUT", "/mytopic", `{"foo":"bar"}`, map[string]string{
+			"X-Message":  `{{len (until -20000)}}`,
+			"X-Template": "1",
+		})
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40045, toHTTPError(t, response.Body.String()).Code)
+	})
+}
+
 func TestServer_MessageTemplate_PrintfWidthTooLarge(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()

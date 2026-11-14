@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -35,6 +36,30 @@ func TestUntilStep(t *testing.T) {
 	}
 
 }
+
+func TestUntilStep_LoopExecutionLimit(t *testing.T) {
+	// A span just above loopExecutionLimit must be rejected in both directions; a negative step
+	// once made the iteration count negative, so decreasing sequences skipped the limit check
+	tests := []string{
+		`{{len (untilStep 0 20000 1)}}`,
+		`{{len (untilStep 0 -20000 -1)}}`,
+		`{{len (untilStep 20000 0 -1)}}`,
+		`{{len (until 20000)}}`,
+		`{{len (until -20000)}}`,
+		`{{seq 20000}}`,
+		`{{seq -20000}}`,
+		`{{seq 0 -1 -20000}}`,
+	}
+	for _, tpl := range tests {
+		_, err := runRaw(tpl, nil)
+		if err == nil {
+			t.Errorf("%s: expected an error, got none", tpl)
+		} else if !strings.Contains(err.Error(), "too many iterations") {
+			t.Errorf("%s: expected an iteration limit error, got: %v", tpl, err)
+		}
+	}
+}
+
 func TestBiggest(t *testing.T) {
 	tpl := `{{ biggest 1 2 3 345 5 6 7}}`
 	if err := runt(tpl, `345`); err != nil {

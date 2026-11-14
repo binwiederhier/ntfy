@@ -2388,6 +2388,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.38.1 (UNRELEASED)
+
+**Security:**
+
+* Templating: apply the iteration limit of `until`, `untilStep` and `seq` to decreasing sequences too, so a negative step can no longer build an unbounded list
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

@@ -436,6 +436,20 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(r *http.Request,
 		return err
 	}
 	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
+	// A non-paying event for a different subscription of the same customer (e.g. an abandoned checkout
+	// expiring as "incomplete_expired" after the user paid for another one) must not replace the current one.
+	if u.Billing.StripeSubscriptionID != "" && subscriptionID != u.Billing.StripeSubscriptionID && !stripeStatusGrantsPaidTier(ev.Status) {
+		logvr(v, r).
+			Tag(tagStripe).
+			Fields(log.Context{
+				"stripe_webhook_type":            event.Type,
+				"stripe_subscription_id":         subscriptionID,
+				"stripe_subscription_status":     ev.Status,
+				"stripe_current_subscription_id": u.Billing.StripeSubscriptionID,
+			}).
+			Info("Ignoring %s event for subscription %s; current subscription is %s", ev.Status, subscriptionID, u.Billing.StripeSubscriptionID)
+		return nil
+	}
 	tier, err := s.userManager.TierByStripePrice(priceID)
 	if err != nil {
 		return err

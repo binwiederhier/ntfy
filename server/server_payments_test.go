@@ -1108,3 +1108,85 @@ func loadStripeEventObjects(t *testing.T, dir string) map[string][]byte {
 	}
 	return objects
 }
+
+func TestPayments_Webhook_Subscription_Updated_Expired_Other_Subscription_Ignored(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+
+		// A user abandons a yearly checkout (subscription stays "incomplete") and then completes a monthly
+		// one. 23h later Stripe expires the abandoned subscription and sends customer.subscription.updated
+		// with "incomplete_expired". That event is for a different subscription of the same customer and
+		// must not replace the user's current, paying subscription.
+
+		stripeMock := &testStripeAPI{}
+		defer stripeMock.AssertExpectations(t)
+
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.StripeSecretKey = "secret key"
+		c.StripeWebhookKey = "webhook key"
+		s := newTestServer(t, c)
+		s.stripe = stripeMock
+
+		stripeMock.
+			On("ConstructWebhookEvent", mock.Anything, "stripe signature", "webhook key").
+			Return(jsonToStripeEvent(t, subscriptionUpdatedExpiredOtherEventJSON), nil)
+
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			ID:                   "ti_1",
+			Code:                 "pro",
+			StripeMonthlyPriceID: "price_1234",
+			StripeYearlyPriceID:  "price_5678",
+			ReservationLimit:     1,
+		}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		require.Nil(t, s.userManager.ChangeBilling(u.Name, &user.Billing{
+			StripeCustomerID:            "acct_5555",
+			StripeSubscriptionID:        "sub_monthly",
+			StripeSubscriptionStatus:    payments.SubscriptionStatus(stripe.SubscriptionStatusActive),
+			StripeSubscriptionInterval:  payments.PriceRecurringInterval(stripe.PriceRecurringIntervalMonth),
+			StripeSubscriptionPaidUntil: time.Unix(123, 0),
+		}))
+
+		rr := request(t, s, "POST", "/v1/account/billing/webhook", "dummy", map[string]string{
+			"Stripe-Signature": "stripe signature",
+		})
+		require.Equal(t, 200, rr.Code)
+
+		u, err = s.userManager.User("phil")
+		require.Nil(t, err)
+		require.NotNil(t, u.Tier)
+		require.Equal(t, "pro", u.Tier.Code)
+		require.Equal(t, "sub_monthly", u.Billing.StripeSubscriptionID)
+		require.Equal(t, payments.SubscriptionStatus(stripe.SubscriptionStatusActive), u.Billing.StripeSubscriptionStatus)
+		require.Equal(t, payments.PriceRecurringInterval(stripe.PriceRecurringIntervalMonth), u.Billing.StripeSubscriptionInterval)
+		require.Equal(t, int64(123), u.Billing.StripeSubscriptionPaidUntil.Unix())
+	})
+}
+
+const subscriptionUpdatedExpiredOtherEventJSON = `
+{
+	"type": "customer.subscription.updated",
+	"data": {
+		"object": {
+			"id": "sub_yearly",
+			"customer": "acct_5555",
+			"status": "incomplete_expired",
+			"current_period_end": 1826120020,
+			"items": {
+				"data": [
+					{
+						"price": {
+							"id": "price_5678",
+							"recurring": {
+								"interval": "year"
+							}
+						}
+					}
+				]
+			}
+		}
+	}
+}`

@@ -2394,6 +2394,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 * Stripe billing: a `customer.subscription.deleted` webhook is now applied only when its subscription ID matches the user's current subscription, so a stale or replayed event for an old subscription of the same customer no longer clears the current tier, reservations and messages ([#2137](https://github.com/binwiederhier/ntfy/pull/2137), thanks to [@skeletonsec](https://github.com/skeletonsec) for reporting)
 * Stripe billing: the paid tier is granted only for a subscription Stripe reports as paying; a never-cleared (`incomplete`) or canceled subscription no longer keeps paid limits, while `past_due` and `unpaid` keep them until the subscription is deleted ([#2137](https://github.com/binwiederhier/ntfy/pull/2137), thanks to [@skeletonsec](https://github.com/skeletonsec) for reporting)
+* Stripe billing: when an abandoned checkout expires (`incomplete_expired`) after the user paid for another subscription, the webhook no longer replaces the paying subscription with the expired one ([#2199](https://github.com/binwiederhier/ntfy/pull/2199))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

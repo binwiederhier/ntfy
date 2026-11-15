@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/urfave/cli/v2/altsrc"
 	"heckel.io/ntfy/v2/client"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/test"
@@ -776,4 +777,38 @@ func TestCLI_Serve_BanThresholdTooLarge(t *testing.T) {
 	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--ban-file=" + banFile, "--ban-threshold=10000000000000000", "--auth-default-access=invalid"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "ban-threshold")
+}
+
+func TestCLI_Serve_UpstreamRetryDuration(t *testing.T) {
+	for _, source := range []string{"flag", "environment", "config"} {
+		for _, value := range []string{"0", "15m", "-1s", "invalid"} {
+			t.Run(source+"/"+value, func(t *testing.T) {
+				// urfave/cli mutates environment-backed flags across app runs.
+				for _, flag := range flagsServe {
+					if f, ok := flag.(*altsrc.StringFlag); ok && f.Name == "upstream-retry-duration" {
+						original := *f.StringFlag
+						f.Value, f.HasBeenSet = "0", false
+						t.Cleanup(func() { *f.StringFlag = original })
+					}
+				}
+				configFile := newEmptyFile(t)
+				args := []string{"ntfy", "serve", "--config=" + configFile, "--auth-default-access=invalid"}
+				switch source {
+				case "flag":
+					args = append(args, "--upstream-retry-duration="+value)
+				case "environment":
+					t.Setenv("NTFY_UPSTREAM_RETRY_DURATION", value)
+				case "config":
+					require.NoError(t, os.WriteFile(configFile, []byte(fmt.Sprintf("upstream-retry-duration: %q\n", value)), 0o600))
+				}
+				app, _, _, _ := newTestApp()
+				err := app.Run(args)
+				if value == "-1s" || value == "invalid" {
+					require.ErrorContains(t, err, "invalid upstream retry duration")
+				} else {
+					require.ErrorContains(t, err, "auth-default-access")
+				}
+			})
+		}
+	}
 }

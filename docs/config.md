@@ -1655,10 +1655,22 @@ To configure it, simply set `upstream-base-url` like so:
 ``` yaml
 upstream-base-url: "https://ntfy.sh"
 upstream-access-token: "..." # optional, only if rate limits exceeded, or upstream server protected
+upstream-retry-duration: 15m # optional, retry failed poll requests (default: 0, disabled)
 ```
 
 If set, all incoming messages will publish a poll request to the configured upstream server, containing
 the message ID of the original message, instructing the iOS app to poll this server for the actual message contents.
+
+By default, a failed upstream poll request is not retried. Set `upstream-retry-duration` to retry network
+failures and HTTP 408, 429, and 5xx responses with exponential backoff and jitter. Other HTTP errors,
+such as invalid credentials, are not retried. Retries stop after the configured duration or when the
+cached message expires, whichever comes first. Messages published without caching are not retried.
+
+The retry delay starts between 2.5 and 5 seconds and increases to at most one minute. An upstream
+`Retry-After` header can extend the delay, but not the retry deadline. At most 100 failed poll requests
+are retried concurrently; additional failures are dropped. Pending retries are held in memory and
+are discarded when the server stops or restarts. A lost upstream response can cause the same poll
+request to be sent more than once.
 
 If `upstream-base-url` is not set, notifications will still eventually get to your device, but delivery can take hours,
 depending on the state of the phone. If you are using your phone, it shouldn't take more than 20-30 minutes though.
@@ -2618,6 +2630,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `global-topic-limit`                       | `NTFY_GLOBAL_TOPIC_LIMIT`                       | *number*                                            | 15,000            | Rate limiting: Total number of topics before the server rejects new topics.                                                                                                                                                             |
 | `upstream-base-url`                        | `NTFY_UPSTREAM_BASE_URL`                        | *URL*                                               | `https://ntfy.sh` | Forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers                                                                                                                           |
 | `upstream-access-token`                    | `NTFY_UPSTREAM_ACCESS_TOKEN`                    | *string*                                            | `tk_zyYLYj...`    | Access token to use for the upstream server; needed only if upstream rate limits are exceeded or upstream server requires auth                                                                                                          |
+| `upstream-retry-duration` | `NTFY_UPSTREAM_RETRY_DURATION` | *duration* | `0` | Maximum time to retry failed upstream poll requests, limited by message expiry; `0` disables retries |
 | `visitor-attachment-total-size-limit`      | `NTFY_VISITOR_ATTACHMENT_TOTAL_SIZE_LIMIT`      | *size*                                              | 100M              | Rate limiting: Total storage limit used for attachments per visitor, for all attachments combined. Storage is freed after attachments expire. See `attachment-expiry-duration`.                                                         |
 | `visitor-attachment-daily-bandwidth-limit` | `NTFY_VISITOR_ATTACHMENT_DAILY_BANDWIDTH_LIMIT` | *size*                                              | 500M              | Rate limiting: Total daily traffic limit per visitor, covering attachment downloads/uploads and messages replayed from the cache by poll requests. This is to protect your bandwidth costs from exploding.                              |
 | `visitor-email-limit-burst`                | `NTFY_VISITOR_EMAIL_LIMIT_BURST`                | *number*                                            | 16                | Rate limiting:Initial limit of e-mails per visitor                                                                                                                                                                                      |
@@ -2719,6 +2732,7 @@ OPTIONS:
    --enable-reservations, --enable_reservations                                                                           allows users to reserve topics (if their tier allows it) (default: false) [$NTFY_ENABLE_RESERVATIONS]
    --upstream-base-url value, --upstream_base_url value                                                                   forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers [$NTFY_UPSTREAM_BASE_URL]
    --upstream-access-token value, --upstream_access_token value                                                           access token to use for the upstream server; needed only if upstream rate limits are exceeded or upstream server requires auth [$NTFY_UPSTREAM_ACCESS_TOKEN]
+   --upstream-retry-duration value, --upstream_retry_duration value                                                     maximum time to retry failed upstream poll requests (0 disables retries) (default: "0") [$NTFY_UPSTREAM_RETRY_DURATION]
    --smtp-sender-addr value, --smtp_sender_addr value                                                                     SMTP server address (host:port) for outgoing emails [$NTFY_SMTP_SENDER_ADDR]
    --smtp-sender-user value, --smtp_sender_user value                                                                     SMTP user (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_USER]
    --smtp-sender-pass value, --smtp_sender_pass value                                                                     SMTP password (if e-mail sending is enabled) [$NTFY_SMTP_SENDER_PASS]

@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
@@ -71,6 +70,7 @@ type Server struct {
 	topicService      *tp.Service    // Cluster-wide topic state: subscriber activity and rate visitors of the UnifiedPush topics
 	ban               *ban.Service   // Abuse ban-feed; nil when the feature is disabled (no ban file)
 	firebaseClient    *firebaseClient
+	upstream          *upstreamForwarder
 	twilio            *twilio.Client
 	messages          int64                               // Total number of messages (persisted if messageCache enabled)
 	messagesHistory   []int64                             // Last n values of the messages counter, used to determine rate
@@ -201,6 +201,9 @@ const (
 // New instantiates a new Server. It creates the cache and adds a Firebase
 // subscriber (if configured).
 func New(conf *Config) (*Server, error) {
+	if conf.UpstreamRetryDuration < 0 {
+		return nil, errors.New("upstream-retry-duration must not be negative")
+	}
 	var sender mail.Sender
 	if conf.SMTPSenderAddr != "" {
 		sender = mail.NewSender(&mail.Config{
@@ -398,6 +401,7 @@ func New(conf *Config) (*Server, error) {
 	if err := s.topicService.Start(context.Background()); err != nil {
 		return nil, err
 	}
+	s.upstream = newUpstreamForwarder(conf)
 	return s, nil
 }
 
@@ -612,6 +616,9 @@ func (s *Server) Run() error {
 // the serve command both call it, and the second call waits for the first to finish.
 func (s *Server) Stop() {
 	s.stopped.Store(true) // Before the lock: Run must see this even if stop() is stuck
+	if s.upstream != nil {
+		s.upstream.cancel()
+	}
 	s.stopOnce.Do(s.stopBounded)
 }
 
@@ -1350,38 +1357,6 @@ func (s *Server) sendEmail(v *visitor, m *model.Message, email string) {
 		return
 	}
 	metrics.EmailsPublishedSuccess.Inc()
-}
-
-func (s *Server) forwardPollRequest(v *visitor, m *model.Message) {
-	topicURL := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
-	topicHash := fmt.Sprintf("%x", sha256.Sum256([]byte(topicURL)))
-	forwardURL := fmt.Sprintf("%s/%s", s.config.UpstreamBaseURL, topicHash)
-	logvm(v, m).Debug("Publishing poll request to %s", forwardURL)
-	req, err := http.NewRequest("POST", forwardURL, strings.NewReader(""))
-	if err != nil {
-		logvm(v, m).Err(err).Warn("Unable to publish poll request")
-		return
-	}
-	req.Header.Set("User-Agent", "ntfy/"+s.config.BuildVersion)
-	req.Header.Set("X-Poll-ID", m.ID)
-	if s.config.UpstreamAccessToken != "" {
-		req.Header.Set("Authorization", util.BearerAuth(s.config.UpstreamAccessToken))
-	}
-	var httpClient = &http.Client{
-		Timeout: time.Second * 10,
-	}
-	response, err := httpClient.Do(req)
-	if err != nil {
-		logvm(v, m).Err(err).Warn("Unable to publish poll request")
-		return
-	} else if response.StatusCode != http.StatusOK {
-		if response.StatusCode == http.StatusTooManyRequests {
-			logvm(v, m).Err(err).Warn("Unable to publish poll request, the upstream server %s responded with HTTP %s; you may solve this by sending fewer daily messages, or by configuring upstream-access-token (assuming you have an account with higher rate limits) ", s.config.UpstreamBaseURL, response.Status)
-		} else {
-			logvm(v, m).Err(err).Warn("Unable to publish poll request, the upstream server %s responded with HTTP %s", s.config.UpstreamBaseURL, response.Status)
-		}
-		return
-	}
 }
 
 func (s *Server) parsePublishParams(r *http.Request, m *model.Message) (cache bool, firebase bool, email, call string, template templateMode, unifiedpush bool, priorityStr string, err *errHTTP) {

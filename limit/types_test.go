@@ -30,38 +30,14 @@ func TestUsage_Count(t *testing.T) {
 		Burst:  100,
 		Refill: time.Second,
 	}, 42).OK)
+	require.True(t, s.Allow("k", Rule{
+		Kind:   KindRequests,
+		Burst:  100,
+		Refill: time.Second,
+	}, 1).OK)
 	u := s.Usage("k")
 	require.Equal(t, int64(3), u.Count(KindMessages))
-	require.Equal(t, int64(42), u.Count(KindBandwidth)) // In memory only, but counted
 	require.Equal(t, int64(0), u.Count(KindEmails))
-}
-
-func TestLimiter_Value_Bandwidth(t *testing.T) {
-	s := newTestService(t)
-	l := s.Limiter("k", Rule{
-		Kind:   KindBandwidth,
-		Burst:  1000,
-		Refill: time.Second,
-	})
-	require.True(t, l.AllowN(300))
-	require.Equal(t, int64(300), l.Value())
-	require.True(t, l.AllowN(-100))
-	require.Equal(t, int64(200), l.Value())
-}
-
-func TestLimiter_AllowNRefundsNegative(t *testing.T) {
-	s := newTestService(t)
-	l := s.Limiter("k", Rule{
-		Kind:   KindMessages,
-		Burst:  10,
-		Refill: time.Hour,
-	})
-	require.True(t, l.AllowN(8))
-	require.False(t, l.AllowN(3))
-	require.Equal(t, int64(8), l.Value())
-	require.True(t, l.AllowN(-5)) // Refund, as the limit reader does when a later limiter rejects
-	require.True(t, l.AllowN(3))
-	require.Equal(t, int64(6), l.Value())
-	require.True(t, l.Allow())
-	require.Equal(t, int64(7), l.Value())
+	require.Equal(t, int64(0), u.Count(KindBandwidth)) // No daily count, so that it does not hold the key (see Prune)
+	require.Equal(t, int64(0), u.Count(KindRequests))
 }

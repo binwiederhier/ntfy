@@ -142,6 +142,9 @@ func TestAccount_Signup_LimitReached(t *testing.T) {
 		rr := request(t, s, "POST", "/v1/account", `{"username":"thiswontwork", "password":"mypass"}`, nil)
 		require.Equal(t, 429, rr.Code)
 		require.Equal(t, 42906, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr) // One token refills per DefaultVisitorAccountCreationLimitReplenish
+		require.Greater(t, retryAfter, int(DefaultVisitorAccountCreationLimitReplenish.Seconds())-60)
+		require.LessOrEqual(t, retryAfter, int(DefaultVisitorAccountCreationLimitReplenish.Seconds()))
 	})
 }
 

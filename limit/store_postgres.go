@@ -11,7 +11,7 @@ import (
 )
 
 // The upsert is one fixed statement per chunk (unnest), because SQL built per call bloats pgx's statement cache.
-// Same period: add; a newer one: replace; an older one (a leftover): add to the stored period.
+// Same period: add; a newer one: replace; an older one (a node's leftover of the old day): drop it.
 const (
 	postgresSelectSinceQuery = `SELECT key, period_start, messages, emails, calls FROM usage WHERE updated_at >= $1`
 	postgresUpsertQuery      = `
@@ -19,9 +19,9 @@ const (
 		SELECT key, ps, m, e, c, $6::BIGINT
 		FROM unnest($1::TEXT[], $2::BIGINT[], $3::BIGINT[], $4::BIGINT[], $5::BIGINT[]) AS d(key, ps, m, e, c)
 		ON CONFLICT (key) DO UPDATE SET
-			messages = CASE WHEN u.period_start >= EXCLUDED.period_start THEN u.messages + EXCLUDED.messages ELSE EXCLUDED.messages END,
-			emails = CASE WHEN u.period_start >= EXCLUDED.period_start THEN u.emails + EXCLUDED.emails ELSE EXCLUDED.emails END,
-			calls = CASE WHEN u.period_start >= EXCLUDED.period_start THEN u.calls + EXCLUDED.calls ELSE EXCLUDED.calls END,
+			messages = CASE WHEN u.period_start = EXCLUDED.period_start THEN u.messages + EXCLUDED.messages WHEN u.period_start < EXCLUDED.period_start THEN EXCLUDED.messages ELSE u.messages END,
+			emails = CASE WHEN u.period_start = EXCLUDED.period_start THEN u.emails + EXCLUDED.emails WHEN u.period_start < EXCLUDED.period_start THEN EXCLUDED.emails ELSE u.emails END,
+			calls = CASE WHEN u.period_start = EXCLUDED.period_start THEN u.calls + EXCLUDED.calls WHEN u.period_start < EXCLUDED.period_start THEN EXCLUDED.calls ELSE u.calls END,
 			period_start = GREATEST(u.period_start, EXCLUDED.period_start),
 			updated_at = EXCLUDED.updated_at
 	`

@@ -1,6 +1,7 @@
 package sprig
 
 import (
+	"fmt"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -14,6 +15,19 @@ const (
 	sliceSizeLimit     = 10_000  // Limit the size of slices to prevent memory issues
 	indentSpacesLimit  = 100     // Limit indentation width to prevent memory issues; indent allocates spaces*lines bytes
 )
+
+// checkResultLength panics if n, the byte size of a string a function is about to build in a single
+// allocation, exceeds stringLengthLimit. Functions that grow a string from their inputs (replace,
+// regexReplaceAll, join) measure the result first and call this, so an oversized render fails with a
+// recoverable error instead of allocating gigabytes and crashing the whole process with an
+// unrecoverable out-of-memory fatal error. Small inputs can amplify a lot (replace "a" with two
+// 10k strings builds 100 MB; nesting reaches terabytes), and a publisher controls the template, so
+// this is a denial-of-service guard. The template executor recovers the panic into a render error.
+func checkResultLength(n int) {
+	if n > stringLengthLimit {
+		panic(fmt.Sprintf("result length %d exceeds limit of %d", n, stringLengthLimit))
+	}
+}
 
 // TxtFuncMap produces the function map.
 //

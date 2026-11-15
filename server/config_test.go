@@ -11,6 +11,7 @@ func TestConfig_New(t *testing.T) {
 	c := server.NewConfig()
 	assert.Equal(t, []string{server.DefaultListenHTTP}, c.ListenHTTP)
 	assert.Equal(t, server.DefaultKeepaliveInterval, c.KeepaliveInterval)
+	assert.Equal(t, "", c.ListenAdminUnix) // Experimental, off unless configured
 }
 
 func TestConfig_HashExcludesSecrets(t *testing.T) {

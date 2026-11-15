@@ -93,3 +93,80 @@ func TestDB_HealthCheck(t *testing.T) {
 		return !d.Stats()[0].Healthy
 	}, 15*time.Second, 50*time.Millisecond)
 }
+
+func TestDB_ReadOnly_PrefersLeastBusyReplica(t *testing.T) {
+	// A replica that stalls piles up connections in use; new reads go to the other one
+	primary := openSQLite(t, "primary.db", 5)
+	busy := openSQLite(t, "busy.db", 5)
+	idle := openSQLite(t, "idle.db", 5)
+	d := db.New(&db.Host{DB: primary}, []*db.Host{{DB: busy}, {DB: idle}})
+	defer d.Close()
+	d.MarkReplicasHealthyForTest()
+
+	// Hold two connections on the busy replica
+	for i := 0; i < 2; i++ {
+		conn, err := busy.Conn(context.Background())
+		require.Nil(t, err)
+		defer conn.Close()
+	}
+	for i := 0; i < 10; i++ {
+		require.Same(t, idle, d.ReadOnly())
+	}
+}
+
+func TestDB_ReadOnly_RoundRobinWhenEquallyBusy(t *testing.T) {
+	primary := openSQLite(t, "primary.db", 5)
+	r1 := openSQLite(t, "r1.db", 5)
+	r2 := openSQLite(t, "r2.db", 5)
+	d := db.New(&db.Host{DB: primary}, []*db.Host{{DB: r1}, {DB: r2}})
+	defer d.Close()
+	d.MarkReplicasHealthyForTest()
+
+	seen := map[*sql.DB]int{}
+	for i := 0; i < 10; i++ {
+		seen[d.ReadOnly()]++
+	}
+	require.Equal(t, 5, seen[r1])
+	require.Equal(t, 5, seen[r2])
+}
+
+func TestDB_ReadOnly_ReplicaWhenReplicaPoolsFull(t *testing.T) {
+	// Full pools wait for a connection on the least busy replica; the primary, which takes every
+	// write, does not take the reads of stalled replicas
+	primary := openSQLite(t, "primary.db", 5)
+	r1 := openSQLite(t, "r1.db", 1)
+	r2 := openSQLite(t, "r2.db", 2)
+	d := db.New(&db.Host{DB: primary}, []*db.Host{{DB: r1}, {DB: r2}})
+	defer d.Close()
+	d.MarkReplicasHealthyForTest()
+
+	// Fill both pools, r1 with one connection, r2 with two
+	held := []*sql.DB{r1, r2, r2}
+	for _, replica := range held {
+		conn, err := replica.Conn(context.Background())
+		require.Nil(t, err)
+		defer conn.Close()
+	}
+	for i := 0; i < 10; i++ {
+		require.Same(t, r1, d.ReadOnly())
+	}
+}
+
+func TestDB_Stats_PingDuration(t *testing.T) {
+	// The health check records how long each database took to answer, for ntfy_db_ping_seconds
+	primary := openSQLite(t, "primary.db", 5)
+	replica := openSQLite(t, "replica.db", 5)
+	d := db.New(&db.Host{DB: primary}, []*db.Host{{DB: replica}})
+	defer d.Close()
+	require.Eventually(t, func() bool {
+		stats := d.Stats()
+		return stats[0].PingDuration > 0 && stats[1].PingDuration > 0
+	}, 15*time.Second, 50*time.Millisecond)
+}
+
+func openSQLite(t *testing.T, name string, maxOpen int) *sql.DB {
+	conn, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), name))
+	require.Nil(t, err)
+	conn.SetMaxOpenConns(maxOpen)
+	return conn
+}

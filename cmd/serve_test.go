@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -498,7 +499,7 @@ func TestCLI_Serve_ListenAdminUnixDisabled(t *testing.T) {
 	configFile := newEmptyFile(t)
 	go func() {
 		app, _, _, _ := newTestApp()
-		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile, "--auth-file=" + filepath.Join(dir, "user.db"), "--listen-admin-unix=-"})
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + sockFile, "--auth-file=" + filepath.Join(dir, "user.db"), "--experimental-listen-admin-unix=-"})
 		require.Nil(t, err)
 	}()
 	for i := 0; i < 40 && !util.FileExists(sockFile); i++ {
@@ -506,6 +507,21 @@ func TestCLI_Serve_ListenAdminUnixDisabled(t *testing.T) {
 	}
 	require.True(t, util.FileExists(sockFile))
 	require.False(t, util.FileExists(filepath.Join(dir, "-")))
+}
+
+func TestCLI_Serve_ExperimentalListenAdminUnix(t *testing.T) {
+	dir := t.TempDir()
+	adminSockFile := filepath.Join(dir, "admin.sock")
+	configFile := newEmptyFile(t)
+	go func() {
+		app, _, _, _ := newTestApp()
+		err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--listen-http=-", "--listen-unix=" + filepath.Join(dir, "ntfy.sock"), "--auth-file=" + filepath.Join(dir, "user.db"), "--experimental-listen-admin-unix=" + adminSockFile})
+		require.Nil(t, err)
+	}()
+	for i := 0; i < 40 && !util.FileExists(adminSockFile); i++ {
+		time.Sleep(50 * time.Millisecond)
+	}
+	require.True(t, util.FileExists(adminSockFile))
 }
 
 func TestCLI_Serve_WebSocket(t *testing.T) {
@@ -685,8 +701,8 @@ func TestCLI_Serve_ClusterValidation(t *testing.T) {
 
 func TestCLI_Serve_AttachmentExpiryLongerThanCacheDurationWarning(t *testing.T) {
 	configFile := newEmptyFile(t) // Avoid issues with existing server.yml file on system
-	var buf bytes.Buffer
-	log.SetOutput(&buf)
+	buf := &syncBuffer{}          // Background goroutines of other tests' servers may log meanwhile, too
+	log.SetOutput(buf)
 	defer log.SetOutput(os.Stderr)
 
 	// An invalid auth-default-access fails right after validation, before the server starts
@@ -725,4 +741,39 @@ func newEmptyFile(t *testing.T) string {
 	filename := filepath.Join(t.TempDir(), "empty")
 	require.Nil(t, os.WriteFile(filename, []byte{}, 0600))
 	return filename
+}
+
+// syncBuffer is a bytes.Buffer that the log package and a test can use at the same time
+type syncBuffer struct {
+	buf bytes.Buffer
+	mu  sync.Mutex
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func (b *syncBuffer) Reset() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.buf.Reset()
+}
+
+func TestCLI_Serve_BanThresholdTooLarge(t *testing.T) {
+	// Strikes are counted in thousandths, so a huge threshold would overflow and never ban; an
+	// invalid auth-default-access fails right after the checks, so the server never starts
+	configFile := newEmptyFile(t)
+	app, _, _, _ := newTestApp()
+	banFile := filepath.Join(t.TempDir(), "ban.log")
+	err := app.Run([]string{"ntfy", "serve", "--config=" + configFile, "--ban-file=" + banFile, "--ban-threshold=10000000000000000", "--auth-default-access=invalid"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ban-threshold")
 }

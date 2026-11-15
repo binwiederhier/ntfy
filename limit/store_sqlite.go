@@ -15,9 +15,9 @@ const (
 		INSERT INTO usage (key, period_start, messages, emails, calls, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT (key) DO UPDATE SET
-			messages = CASE WHEN period_start >= excluded.period_start THEN messages + excluded.messages ELSE excluded.messages END,
-			emails = CASE WHEN period_start >= excluded.period_start THEN emails + excluded.emails ELSE excluded.emails END,
-			calls = CASE WHEN period_start >= excluded.period_start THEN calls + excluded.calls ELSE excluded.calls END,
+			messages = CASE WHEN period_start = excluded.period_start THEN messages + excluded.messages WHEN period_start < excluded.period_start THEN excluded.messages ELSE messages END,
+			emails = CASE WHEN period_start = excluded.period_start THEN emails + excluded.emails WHEN period_start < excluded.period_start THEN excluded.emails ELSE emails END,
+			calls = CASE WHEN period_start = excluded.period_start THEN calls + excluded.calls WHEN period_start < excluded.period_start THEN excluded.calls ELSE calls END,
 			period_start = MAX(period_start, excluded.period_start),
 			updated_at = excluded.updated_at
 	`

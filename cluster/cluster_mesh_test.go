@@ -16,12 +16,15 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster/registry"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
+	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 )
 
@@ -53,6 +56,7 @@ func newTestMeshConfig(nodeID, advertiseURL string) *Config {
 		// every test that waits for a peer to appear or leave a coin flip
 		NodeTTL:         time.Second,
 		MaxMessageBytes: 1 << 20,
+		Limiter:         limit.New(&limit.Config{TrackDeltas: true}), // Like the server's with clustering on
 	}
 }
 
@@ -642,7 +646,8 @@ func TestMesh_MembersOfAnIsolatedNodeAreNotReportedHealthy(t *testing.T) {
 	require.Equal(t, 1, healthyPeers()) // While the view is fresh, the peer counts
 
 	require.Nil(t, pool.Close()) // The database goes away: heartbeats and reads fail
-	waitFor(t, func() bool { return healthyPeers() == 0 })
+	// Not healthyPeers: the fake peer, which never heartbeats, can lapse first
+	waitFor(t, func() bool { return !mesh.Healthy() })
 	for _, m := range mesh.Members() {
 		require.False(t, m.Healthy, "an isolated node reported %s as healthy", m.NodeID)
 	}
@@ -921,4 +926,28 @@ func TestMesh_AccessChangedBroadcast(t *testing.T) {
 		return changedB.Load() == 1
 	})
 	require.Equal(t, int32(0), changedA.Load())
+}
+
+func TestMesh_SendErrorsPerPath(t *testing.T) {
+	// A peer that rejects a state broadcast counts under the state path, not the message path,
+	// which the send errors alert tells apart from the buckets path
+	peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer peer.Close()
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	registerFakePeer(t, pool, "node-b", peer.URL)
+	mesh, err := newMeshCluster(newTestMeshConfig("node-a", "http://127.0.0.1:2"), pool, nil)
+	require.Nil(t, err)
+	defer mesh.Close()
+
+	stateErrors := testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(StatePath))
+	messageErrors := testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(MessagePath))
+	mesh.BroadcastState(&State{
+		AccessChanged: true,
+	})
+	waitFor(t, func() bool {
+		return testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(StatePath)) == stateErrors+1
+	})
+	require.Equal(t, messageErrors, testutil.ToFloat64(metrics.ClusterSendErrors.WithLabelValues(MessagePath)))
 }

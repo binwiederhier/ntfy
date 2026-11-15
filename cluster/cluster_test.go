@@ -91,6 +91,15 @@ func TestNew_EnabledRequiresDatabase(t *testing.T) {
 	require.Contains(t, err.Error(), "database")
 }
 
+func TestNew_EnabledRequiresLimiter(t *testing.T) {
+	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
+	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")
+	conf.Limiter = nil
+	_, err := New(conf, pool, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "limiter")
+}
+
 func TestNew_Role(t *testing.T) {
 	pool := openTestPool(t, dbtest.CreateTestPostgresSchema(t))
 	conf := newTestMeshConfig("node-a", "http://127.0.0.1:1")

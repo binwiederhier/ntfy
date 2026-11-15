@@ -37,3 +37,13 @@ func TestKey(t *testing.T) {
 	require.Equal(t, "ip:1.2.0.0", Key(netip.MustParseAddr("1.2.3.4"), nil, confWithShortenedPrefixes))
 	require.Equal(t, "ip:2a01:599:b26:2300::", Key(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), nil, confWithShortenedPrefixes))
 }
+
+func TestMask(t *testing.T) {
+	conf := &Config{
+		PrefixBitsIPv4: 16,
+		PrefixBitsIPv6: 56,
+	}
+	require.Equal(t, "1.2.0.0", Mask(netip.MustParseAddr("1.2.3.4"), conf).String())
+	require.Equal(t, "2a01:599:b26:2300::", Mask(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), conf).String())
+	require.Equal(t, "1.2.0.0", Mask(netip.MustParseAddr("1.2.0.0"), conf).String()) // Masking again changes nothing
+}

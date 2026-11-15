@@ -437,8 +437,9 @@ You can also set this via the environment variable `NTFY_DATABASE_URL` or the co
 
 To offload read-heavy queries from the primary database, you can optionally configure one or more read replicas
 using the `database-replica-urls` option. When configured, non-critical read-only queries (e.g. fetching messages, checking access permissions, etc)
-are distributed across the replicas using round-robin, while all writes and correctness-critical reads continue to go
-to the primary. If a replica becomes unhealthy, ntfy automatically falls back to the primary until the replica recovers.
+go to the replica with the fewest connections in use (round-robin among equally busy ones), while all writes and
+correctness-critical reads continue to go to the primary. A replica that slows down piles up connections and stops
+getting new reads until it catches up. If every replica becomes unhealthy, ntfy falls back to the primary.
 You can also set this via the environment variable `NTFY_DATABASE_REPLICA_URLS` (comma-separated) or the command line
 flag `--database-replica-urls`.
 
@@ -919,27 +920,22 @@ defines access tokens for these users. `phil` has a token `tk_3gd7d2yftt4b8ixyfe
 has a token `tk_f099we8uzj7xi5qshzajwp6jffvkz` with the label "Backup script".
 
 ### Admin socket
-The `ntfy user`, `ntfy access`, `ntfy token` and `ntfy tier` commands talk to the running ntfy server through a local
-admin socket, by default `/run/ntfy/admin.sock` (`/var/run/ntfy/admin.sock` on macOS). That way, changes take effect
-immediately: a removed user is disconnected right away, a new tier applies to the user's next request, and there is no
-delay until the server reloads its access control list.
+!!! warning
+    The admin socket is **experimental**. Options and behavior may still change between releases. The `ntfy user`,
+    `ntfy access`, `ntfy token` and `ntfy tier` commands do not use it yet; they still write to the database directly.
+
+ntfy can serve its admin API on a local unix socket, set with `experimental-listen-admin-unix` (e.g.
+`/run/ntfy/admin.sock`). It is off by default.
 
 The socket needs no password or token: **being able to open the socket is the authorization**. It is created with
 mode `0660` in a directory with mode `0750`, both owned by the user ntfy runs as, so only that user, members of its group
 and `root` can use it. With the Debian/Ubuntu/Fedora packages, the shipped systemd unit creates `/run/ntfy` (via
-`RuntimeDirectory=ntfy`), so `sudo ntfy user add ...` and members of the `ntfy` group just work.
+`RuntimeDirectory=ntfy`), so a socket there just works.
 
 The socket is only opened if [access control](#access-control) is configured (`auth-file` or `database-url`). If the
-server cannot create the socket, it logs a warning at startup and runs without it:
-
-```
-WARN Admin socket /run/ntfy/admin.sock not available, 'ntfy user/access/token/tier' will write to the database directly, which is deprecated, see https://ntfy.sh/docs/deprecations/ (error=mkdir /run/ntfy: permission denied, tag=startup)
-```
-
-To change the path, set `listen-admin-unix` in the `server.yml` file; the commands read it from there, too. To disable the
-socket, set `listen-admin-unix: "-"`. The admin socket is not available on Windows. If you change the path, pick a
-directory that only the ntfy user can write to; otherwise the server logs a warning at startup, since other users may be
-able to use or replace the socket.
+server cannot create the socket, it logs a warning at startup and runs without it. The admin socket is not available on
+Windows. Pick a directory that only the ntfy user can write to; otherwise the server logs a warning at startup, since
+other users may be able to use or replace the socket.
 
 ### Example: Private instance
 The easiest way to configure a private instance is to set `auth-default-access` to `deny-all` in the `server.yml`,
@@ -1928,6 +1924,21 @@ There are various limits and rate limits in place that you can use to configure 
 During normal usage, you shouldn't encounter these limits at all, and even if you burst a few requests or emails
 (e.g. when you reconnect after a connection drop), it shouldn't have any effect.
 
+When a rate limit is hit, the server responds with HTTP 429 (Too Many Requests). If the server knows when the request
+would be allowed again, the response carries a `Retry-After` header with the number of seconds to wait: until the
+visitor's bucket has refilled enough (e.g. for the request, e-mail or topic creation limits), or until the visitor's
+day is over for a daily limit (e.g. messages, e-mails, phone calls or attachment bandwidth). Limits without a known
+wait, such as the subscription limit or the global topic limit, do not send the header.
+
+Publish responses, and every 429 caused by one of these limits, also carry the `RateLimit-Policy` and `RateLimit` headers of the IETF draft
+[RateLimit header fields for HTTP](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/)
+(draft-ietf-httpapi-ratelimit-headers-11), so clients can slow down before they hit a limit. There is one policy for the
+request limit (`q` is the burst, `r` the requests left, `t` the seconds until the next request is refilled) and one for
+the daily message limit (`q` is the daily limit, `r` the messages left today, `t` the seconds until the visitor's day is
+over), e.g. `RateLimit-Policy: "messages";q=250;w=86400` and `RateLimit: "messages";r=249;t=3600`. Exempt visitors (see
+`visitor-request-limit-exempt-hosts`) and unlimited limits do not get a policy. With multiple ntfy nodes, the remaining
+daily messages are the answering node's view, which may lag the others' by a few seconds.
+
 ### General limits
 Let's do the easy limits first:
 
@@ -2041,6 +2052,14 @@ requires **read-write permission** on the topic.
 If this setting is enabled, publishing to UnifiedPush topics will lead to an `HTTP 507 Insufficient Storage`
 response if no "rate visitor" has been previously registered. This is to avoid burning the publisher's 
 `visitor-message-daily-limit`.
+
+The rate visitor stays registered while the subscriber keeps a stream open, and for 24 hours after it was last seen
+(subscribe, poll, or a stream that closed). Messages are counted against the subscriber's account if it has a tier at
+the time of publishing, and against its IP address otherwise. If the topic has had no subscriber for 4 days, publishing
+a UnifiedPush message to it leads to an `HTTP 410 Gone` response instead (error code 41002), which tells app servers
+such as Mastodon to remove the subscription; a Matrix push gateway request to such a topic gets its pushkey rejected.
+With a user database (`auth-file` or `database-url`), the rate visitors are stored there, so they survive a restart,
+and with PostgreSQL all servers know them.
 
 To enable subscriber-based rate limiting, set `visitor-subscriber-rate-limiting: true`.
 
@@ -2210,7 +2229,8 @@ every line is already a confirmed offender, the fail2ban jail can ban on first s
 - `ban-weights` assigns a strike weight per matcher key, formatted as `KEY:WEIGHT`. A key is an exact
   ntfy error code (`42909`), a code family (`429*`, `403*`, `4*`), a bare HTTP status (`403`, short for
   `403*`), or `*`. The longest matching key wins. A weight of `0` exempts a code entirely (it never
-  counts toward a ban), useful to spare a specific code from a `*` catch-all. Heavier weights ban faster. If you do not
+  counts toward a ban), useful to spare a specific code from a `*` catch-all. Heavier weights ban faster;
+  weights may be fractional down to `0.001` (e.g. `0.05`: 20 rejections make one strike). If you do not
   include a `*` rule, any code that matches nothing defaults to weight `1` (i.e. it can be banned);
   set `*:0` to exempt everything that is not explicitly weighted.
 
@@ -2235,7 +2255,9 @@ applies the prefix):
     ban-window: "10m"
     ban-threshold: 100
     ban-weights:
-      - "42909:10"   # too many auth failures -> brute force, ban fast
+      - "42909:2"      # too many auth failures -> brute force, ban at half the threshold
+      - "50701:0.05"   # UnifiedPush push without a subscriber -> app servers with many offline phones
+      - "41002:0.05"   # UnifiedPush topic abandoned (410 Gone) -> the same app servers
       # everything else 4xx/5xx defaults to weight 1
     ```
 
@@ -2319,9 +2341,12 @@ A few important notes:
 * **Draining on shutdown:** when an active node gets `SIGTERM` (e.g. `systemctl restart ntfy` during a deploy) and
   another active node is up, it moves its clients to the other nodes gradually before it exits, so a restart does not
   cause a reconnect storm. See [draining on shutdown](#draining-on-shutdown).
-* **Limits are per node.** Rate limits and daily quotas are counted on each node separately, so a visitor spreading
-  requests across N nodes gets N times the limits. Access changes (e.g. a revoked token) reach the other nodes when
-  their access cache reloads.
+* **Limits are shared.** Daily quotas (messages, emails, calls) are counted in the database. The rate limits (requests,
+  failed logins, signups, topic creation, emails, attachment bandwidth) are exchanged between the nodes every second,
+  so a visitor spreading requests across N nodes gets its limits once, give or take one burst per node in the first
+  second. A node that restarts takes the rate limits over from the other nodes before it serves; only if all nodes
+  restart at once do they start over. The number of open subscriptions is limited per node. Access changes (e.g. a
+  revoked token) reach the other nodes when their access cache reloads.
 * Messages published with `cache: no` are not in the database, so for those, delivery across nodes is best effort.
 
 ### Draining on shutdown
@@ -2355,15 +2380,14 @@ once.
 `/v1/health` only covers a node's own database heartbeat. A link between two nodes that works in one direction only,
 e.g. because a firewall drops the cluster port one way, keeps both nodes healthy while messages published on one of them
 reach the other only late, through the database. To see each node's view of its peers, run `ntfy cluster status` on the
-node. It reads `experimental-cluster-listen` and `experimental-cluster-secret` from the server config, and shows per
-peer the message batches sent there and received from there:
+node. It reads `experimental-cluster-listen` and `experimental-cluster-secret` from the server config, and lists the
+node itself (its role, and whether it leads), then per peer the message batches sent there and received from there:
 
 ```
 $ ntfy cluster status
-Node nyc3-app-2: passive, not leader, healthy
-
-PEER        ROLE    LIVE  HEARTBEAT  SENT OK  FAILED  QUEUED  DROPPED  LAST SENT  RECEIVED  LAST RECEIVED
-nyc3-app-1  active  yes   2s ago     0        219     0       0        never      5120      1s ago
+NODE                    ROLE     LIVE  HEARTBEAT  SENT OK  FAILED  QUEUED  DROPPED  LAST SENT  RECEIVED  LAST RECEIVED
+nyc3-app-2 (this node)  passive  yes   -          -        -       -       -        -          -         -
+nyc3-app-1              active   yes   2s ago     0        219     0       0        never      5120      1s ago
 
 Problems:
   nyc3-app-1: no batch accepted, 219 failed; last error 10s ago: Post "http://10.108.0.2:2587/v1/cluster/message": context deadline exceeded
@@ -2546,7 +2570,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `listen-https`                             | `NTFY_LISTEN_HTTPS`                             | `[host]:port`                                       | -                 | Listen address for the HTTPS web server. If set, you also need to set `key-file` and `cert-file`.                                                                                                                                       |
 | `listen-unix`                              | `NTFY_LISTEN_UNIX`                              | *filename*                                          | -                 | Path to a Unix socket to listen on                                                                                                                                                                                                      |
 | `listen-unix-mode`                         | `NTFY_LISTEN_UNIX_MODE`                         | *file mode*                                         | *system default*  | File mode of the Unix socket, e.g. 0700 or 0777                                                                                                                                                                                         |
-| `listen-admin-unix`                        | `NTFY_LISTEN_ADMIN_UNIX`                        | *filename*                                          | `/run/ntfy/admin.sock` | Path of the local [admin socket](#admin-socket) the `ntfy user/access/token/tier` commands use; `"-"` disables it. Only opened if auth is configured; not available on Windows                                                           |
+| `experimental-listen-admin-unix`           | `NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX`           | *filename*                                          | -                 | Experimental. Path of the local [admin socket](#admin-socket), e.g. `/run/ntfy/admin.sock`; off if empty or `"-"`. Only opened if auth is configured; not available on Windows |
 | `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*                                          | -                 | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
@@ -2559,7 +2583,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `experimental-cluster-role`                | `NTFY_EXPERIMENTAL_CLUSTER_ROLE`                | `active` or `passive`                               | `active`          | Experimental, not ready for production. A `passive` node never leads the cluster's singleton jobs and never closes its subscribers to send them to another node; other active nodes do not count it as a place for theirs. Use it for a node that is not behind the load balancer (check `/v1/ready`, see [Health checks](#health-checks)). While a passive node is cut off from the database, its clients can miss messages published on other nodes, so give it test clients only. |
 | `experimental-cluster-drain-delay`         | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DELAY`         | *duration*                                          | `15s`             | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long a node withdraws: it is not ready but still serves everything, so the load balancer stops sending it requests before the node turns read-only. |
 | `experimental-cluster-drain-duration`      | `NTFY_EXPERIMENTAL_CLUSTER_DRAIN_DURATION`      | *duration*                                          | `1m`              | Experimental, not ready for production. When [draining on shutdown](#draining-on-shutdown), how long an active node takes to close its subscriber connections, so they reconnect to the other nodes gradually; `0` closes them all at once. The service manager's stop timeout must be longer than the delay plus this. |
-| `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries are distributed across replicas (round-robin) with automatic fallback to primary. Requires `database-url`.                                                   |
+| `database-replica-urls`                    | `NTFY_DATABASE_REPLICA_URLS`                    | *list of strings (connection URLs)*                 | -                 | PostgreSQL read replica connection strings. Non-critical read-only queries go to the least busy replica, with automatic fallback to primary.   Requires `database-url`.                                                   |
 | `cache-file`                               | `NTFY_CACHE_FILE`                               | *filename*                                          | -                 | If set, messages are cached in a local SQLite database instead of only in-memory. This allows for service restarts without losing messages in support of the since= parameter. See [message cache](#message-cache).                     |
 | `cache-duration`                           | `NTFY_CACHE_DURATION`                           | *duration*                                          | 12h               | Duration for which messages will be buffered before they are deleted. This is required to support the `since=...` and `poll=1` parameter. Set this to `0` to disable the cache entirely.                                                |
 | `cache-startup-queries`                    | `NTFY_CACHE_STARTUP_QUERIES`                    | *string (SQL queries)*                              | -                 | SQL queries to run during database startup; this is useful for tuning and [enabling WAL mode](#message-cache)                                                                                                                           |
@@ -2611,7 +2635,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `ban-file`                                 | `NTFY_BAN_FILE`                                 | *filename*                                          | -                 | Abuse ban-feed: file confirmed abusive visitor IPs are appended to, for fail2ban to tail. Empty disables the feature. See [Banning bad actors](#banning-bad-actors-fail2ban)                                                             |
 | `ban-window`                               | `NTFY_BAN_WINDOW`                               | *duration*                                          | 10m               | Abuse ban-feed: rolling window over which weighted strikes are counted, per IP prefix                                                                                                                                                     |
 | `ban-threshold`                            | `NTFY_BAN_THRESHOLD`                            | *number*                                            | 100               | Abuse ban-feed: weighted strikes per `ban-window` before a prefix is written to `ban-file`                                                                                                                                             |
-| `ban-weights`                              | `NTFY_BAN_WEIGHTS`                              | *list of KEY:WEIGHT*                                | `42909:10`| Abuse ban-feed: per-code strike weights (exact code, family `429*`, or `*`; longest match wins; `0` exempts). See [Banning bad actors](#banning-bad-actors-fail2ban)                                                                     |
+| `ban-weights`                              | `NTFY_BAN_WEIGHTS`                              | *list of KEY:WEIGHT*                                | `42909:2`, `50701:0.05`, `41002:0.05`| Abuse ban-feed: per-code strike weights (exact code, family `429*`, or `*`; longest match wins; `0` exempts). See [Banning bad actors](#banning-bad-actors-fail2ban)                                                                     |
 | `web-root`                                 | `NTFY_WEB_ROOT`                                 | *path*, e.g. `/` or `/app`, or `disable`            | `/`               | Sets root of the web app (e.g. /, or /app), or disables it entirely (disable)                                                                                                                                                           |
 | `enable-signup`                            | `NTFY_ENABLE_SIGNUP`                            | *boolean* (`true` or `false`)                       | `false`           | Allows users to sign up via the web app, or API                                                                                                                                                                                         |
 | `enable-login`                             | `NTFY_ENABLE_LOGIN`                             | *boolean* (`true` or `false`)                       | `false`           | Allows users to log in via the web app, or API                                                                                                                                                                                          |
@@ -2669,7 +2693,7 @@ OPTIONS:
    --listen-https value, --listen_https value, -L value                                                                   ip:port used as HTTPS listen address [$NTFY_LISTEN_HTTPS]
    --listen-unix value, --listen_unix value, -U value                                                                     listen on unix socket path [$NTFY_LISTEN_UNIX]
    --listen-unix-mode value, --listen_unix_mode value                                                                     file permissions of unix socket, e.g. 0700 (default: system default) [$NTFY_LISTEN_UNIX_MODE]
-   --listen-admin-unix value, --listen_admin_unix value                                                                   unix socket path for credential-less local admin access (ntfy user/access/token/tier); "-" disables it (default: /run/ntfy/admin.sock (empty on Windows)) [$NTFY_LISTEN_ADMIN_UNIX]
+   --experimental-listen-admin-unix value, --experimental_listen_admin_unix value                                         experimental: unix socket path for credential-less local admin API access, e.g. /run/ntfy/admin.sock; empty or "-" disables it [$NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX]
    --key-file value, --key_file value, -K value                                                                           private key file, if listen-https is set [$NTFY_KEY_FILE]
    --cert-file value, --cert_file value, -E value                                                                         certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --firebase-key-file value, --firebase_key_file value, -F value                                                         Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]

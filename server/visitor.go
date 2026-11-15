@@ -16,12 +16,6 @@ const (
 	// oneDay is an approximation of a day as a time.Duration
 	oneDay = 24 * time.Hour
 
-	// visitorExpungeAfter is how long a limiter key may go unused before its buckets and counts are
-	// forgotten (see Server.pruneVisitors), and how long a topic keeps a rate visitor whose subscriber
-	// is gone. This number has to be very high to prevent e-mail abuse, but it doesn't really affect
-	// the other limits anyway, since they are replenished faster (typically).
-	visitorExpungeAfter = oneDay
-
 	// promoteRate is the divisor of the daily message cap (cap / promoteRate, i.e. 10%) from which
 	// the count of a visitor without a user is written to the usage table; below it, a restart
 	// forgets it, and N nodes may admit up to N x (threshold - 1) without a row. A larger
@@ -166,11 +160,12 @@ func visitorExtendedInfoContext(info *visitorInfo) log.Context {
 
 }
 
-func (v *visitor) RequestAllowed() bool {
+// RequestAllowed takes a request from the visitor's bucket, if it has one; a denial says how long to wait
+func (v *visitor) RequestAllowed() limit.Decision {
 	if v.limits.RequestLimitBurst <= 0 {
-		return false // A bucket of nothing admits nothing, as before
+		return limit.Decision{} // A bucket of nothing admits nothing, as before
 	}
-	return v.env.limiter.Allow(v.key, v.requestRule(), 1).OK
+	return v.env.limiter.Allow(v.key, v.requestRule(), 1)
 }
 
 // FirebaseAllowed returns false while Firebase sends are paused for the key (see FirebaseTemporarilyDeny)
@@ -191,27 +186,27 @@ func (v *visitor) FirebaseTemporarilyDeny() {
 	v.env.limiter.Allow(v.key, rule, 1)
 }
 
-func (v *visitor) MessageAllowed() bool {
+func (v *visitor) MessageAllowed() limit.Decision {
 	if v.limits.MessageLimit <= 0 {
-		return false // A daily limit of zero admits nothing; the limit service reads it as "no cap"
+		return limit.Decision{} // A daily limit of zero admits nothing; the limit service reads it as "no cap"
 	}
-	return v.env.limiter.Allow(v.key, v.messageRule(), 1).OK
+	return v.env.limiter.Allow(v.key, v.messageRule(), 1)
 }
 
-func (v *visitor) EmailAllowed() bool {
+func (v *visitor) EmailAllowed() limit.Decision {
 	if v.limits.EmailLimitBurst <= 0 {
-		return false // No email bucket
+		return limit.Decision{} // No email bucket
 	} else if v.limits.Basis == vis.BasisTier && v.limits.EmailLimit <= 0 {
-		return false // No emails on the tier: the limit service reads a daily limit of zero as "no cap"
+		return limit.Decision{} // No emails on the tier: the limit service reads a daily limit of zero as "no cap"
 	}
-	return v.env.limiter.Allow(v.key, v.emailRule(), 1).OK
+	return v.env.limiter.Allow(v.key, v.emailRule(), 1)
 }
 
-func (v *visitor) CallAllowed() bool {
+func (v *visitor) CallAllowed() limit.Decision {
 	if v.limits.CallLimit <= 0 {
-		return false // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
+		return limit.Decision{} // A daily limit of zero admits nothing (e.g. a tier without calls, verified number or not)
 	}
-	return v.env.limiter.Allow(v.key, v.callRule(), 1).OK
+	return v.env.limiter.Allow(v.key, v.callRule(), 1)
 }
 
 // SubscriptionAllowed takes one of the visitor key's subscription slots on this node, if one is free.
@@ -220,18 +215,18 @@ func (v *visitor) SubscriptionAllowed() bool {
 	return v.env.subscriptions.Acquire(v.key, int64(v.env.config.VisitorSubscriptionLimit))
 }
 
-// TopicCreationAllowed returns true if the visitor is allowed to cause a new topic to be
-// inserted into the server's in-memory topic map. Returns true if no limiter is configured.
-func (v *visitor) TopicCreationAllowed() bool {
+// TopicCreationAllowed returns OK if the visitor is allowed to cause a new topic to be
+// inserted into the server's in-memory topic map. Returns OK if no limiter is configured.
+func (v *visitor) TopicCreationAllowed() limit.Decision {
 	if !v.topicCreationLimited() {
-		return true
+		return limit.Decision{OK: true}
 	}
-	return v.env.limiter.Allow(v.key, v.topicCreationRule(), 1).OK
+	return v.env.limiter.Allow(v.key, v.topicCreationRule(), 1)
 }
 
-// AuthAllowed returns true if an auth request can be attempted (a token is available)
-func (v *visitor) AuthAllowed() bool {
-	return v.env.limiter.Tokens(v.key, v.authRule()) >= 1
+// AuthAllowed returns OK if an auth request can be attempted (a token is available)
+func (v *visitor) AuthAllowed() limit.Decision {
+	return v.env.limiter.Check(v.key, v.authRule())
 }
 
 // AuthFailed records an auth failure
@@ -239,10 +234,10 @@ func (v *visitor) AuthFailed() {
 	v.env.limiter.Allow(v.key, v.authRule(), 1)
 }
 
-// AccountActionAllowed returns true if a rate-limited account action (signup or password-reset
+// AccountActionAllowed returns OK if a rate-limited account action (signup or password-reset
 // request) is currently allowed for this visitor
-func (v *visitor) AccountActionAllowed() bool {
-	return v.env.limiter.Tokens(v.key, v.accountRule()) >= 1
+func (v *visitor) AccountActionAllowed() limit.Decision {
+	return v.env.limiter.Check(v.key, v.accountRule())
 }
 
 // AccountActionPerformed decreases the account limiter. This is to be called after a rate-limited
@@ -251,11 +246,11 @@ func (v *visitor) AccountActionPerformed() {
 	v.env.limiter.Allow(v.key, v.accountRule(), 1)
 }
 
-func (v *visitor) BandwidthAllowed(bytes int64) bool {
+func (v *visitor) BandwidthAllowed(bytes int64) limit.Decision {
 	if v.limits.AttachmentBandwidthLimit <= 0 {
-		return false // A bandwidth limit of zero admits nothing, as before
+		return limit.Decision{} // A bandwidth limit of zero admits nothing, as before
 	}
-	return v.env.limiter.Allow(v.key, v.bandwidthRule(), bytes).OK
+	return v.env.limiter.Allow(v.key, v.bandwidthRule(), bytes)
 }
 
 // RemoveSubscription gives back a slot taken by SubscriptionAllowed
@@ -295,6 +290,12 @@ func (v *visitor) User() *user.User {
 // IP returns the visitor IP address
 func (v *visitor) IP() netip.Addr {
 	return v.ip
+}
+
+// MaskedIP returns the visitor's IP masked to the configured prefix bits, which is what a rate
+// visitor keeps of a subscriber
+func (v *visitor) MaskedIP() string {
+	return vis.Mask(v.ip, v.env.limitsConfig).String()
 }
 
 // Authenticated returns true if a user successfully authenticated

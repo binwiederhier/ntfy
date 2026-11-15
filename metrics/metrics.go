@@ -6,6 +6,7 @@ package metrics
 import (
 	"database/sql"
 	"sync/atomic"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -75,6 +76,9 @@ var (
 	Topics = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "ntfy_topics_total",
 	})
+	TopicsUnifiedPush = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "ntfy_topics_unifiedpush_total",
+	})
 	HTTPRequests = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ntfy_http_requests_total",
 	}, []string{"http_code", "ntfy_code", "http_method"})
@@ -87,9 +91,9 @@ var (
 	ClusterBatchesSent = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_batches_sent_total",
 	})
-	ClusterSendErrors = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "ntfy_cluster_send_errors_total",
-	})
+	ClusterSendErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ntfy_cluster_send_errors_total", // Per peer API path (cluster.MessagePath, ...)
+	}, []string{"path"})
 	ClusterQueueDropped = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_cluster_queue_dropped_total",
 	})
@@ -158,6 +162,7 @@ func init() {
 		Users,
 		Subscribers,
 		Topics,
+		TopicsUnifiedPush,
 		HTTPRequests,
 		dbPools,
 	)
@@ -169,6 +174,8 @@ type DBPool struct {
 	Addr  string // "host:port"
 	Up    bool   // The last health check of the pool's database succeeded
 	Stats sql.DBStats
+
+	PingDuration time.Duration // How long the last health check ping took
 }
 
 // SetDBPoolsFunc sets the function that the ntfy_db_* metrics read their values from on
@@ -200,6 +207,9 @@ func newDBPoolCollector() *dbPoolCollector {
 					return 1
 				}
 				return 0
+			}),
+			newDBPoolMetric("ntfy_db_ping_seconds", "How long the last health check ping took (every 30s), including any wait for a free connection, per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
+				return pool.PingDuration.Seconds()
 			}),
 			newDBPoolMetric("ntfy_db_pool_connections_max", "Maximum open database connections (pool_max_conns), per pool", prometheus.GaugeValue, func(pool *DBPool) float64 {
 				return float64(pool.Stats.MaxOpenConnections)

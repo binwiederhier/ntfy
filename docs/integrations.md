@@ -107,6 +107,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Ntfy App](https://github.com/rubix-studios-pty-ltd/ntfy-app) - Tauri/Rust desktop client for Windows, Linux and MacOS with push notifications.
 - [mac_ntfy](https://github.com/wangty163/mac_ntfy) - Native macOS client for ntfy (Swift)
 - [NtfyBar](https://github.com/roypadina/NtfyBar) - Native macOS menu-bar client: per-topic popups that stay, notifications, clipboard or shell-command actions, rules, history and sandboxed JavaScript plugins (Swift)
+- [ntfy-admin](https://github.com/ksabev/ntfy-admin) - Web admin panel for self-hosted ntfy: users, access rules, tokens, onboarding QR codes, multiple servers (Go)
 
 ## Projects + scripts 
 
@@ -157,7 +158,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [nlog-ntfy](https://github.com/MichelMichels/nlog-ntfy) - Send NLog messages over ntfy (C# / .NET / NLog)
 - [helm-charts](https://github.com/sarab97/helm-charts) - Helm charts of some of the selfhosted services, incl. ntfy
 - [ntfy_ansible_role](https://github.com/stevenengland/ntfy_ansible_role) (on [Ansible Galaxy](https://galaxy.ansible.com/stevenengland/ntfy)) - Ansible role to install ntfy
-- [MASH playbook](https://github.com/mother-of-all-self-hosting/mash-playbook/blob/main/docs/services/ntfy.md) - Ansible playbook to install ntfy (and 250+ other self-hosted services) as Docker containers
+- [MASH playbook](https://github.com/mother-of-all-self-hosting/mash-playbook/blob/main/components/ntfy/README.md) - Ansible playbook to install ntfy (and 250+ other self-hosted services) as Docker containers
 - [easy2ntfy](https://github.com/chromoxdor/easy2ntfy) - Gateway for ESPeasy to receive commands through ntfy and using easyfetch (HTML/JS)
 - [ntfy_lite](https://github.com/MPI-IS/ntfy_lite) - Minimalist python API for pushing ntfy notifications (Python)
 - [notify](https://github.com/guanguans/notify) - 推送通知 (PHP)
@@ -205,9 +206,12 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Sanctumd](https://github.com/Phioster/sanctum_daemon) - Android app for Jellyfin and the *arr stack; subscribes to ntfy topics for live pushes with images, priorities and action buttons (Kotlin)
 - [MeetAlert](https://github.com/roypadina/MeetAlert) - macOS meeting alerts from your calendars; when you're away from the Mac it escalates to your phone via ntfy with Ack/Join/Snooze actions (Swift)
 - [aibot-hostkit](https://github.com/monarchsofchaos004-gif/aibot-hostkit) - Keeps an AI coding agent (Claude Code, Codex, Gemini CLI) running on a cloud Linux box and pushes an ntfy alert to your phone whenever it restarts (Bash)
+- [Wudland](https://github.com/joexk1/wudland) - Pixel-art iPhone village that receives end-to-end encrypted coding-agent status through ntfy, with [plugins for Claude Code, Codex, opencode and terminal commands](https://github.com/joexk1/wudland-plugins) (Node.js, MIT; iOS app GPL-3.0, in App Store review)
+- [Topic Watch](https://github.com/0xzerolight/topic_watch) - Self-hosted news monitor that uses an LLM to only send ntfy notifications on genuinely new information (Python)
 
 ## Blog + forum posts
 
+- [Get a free alert when a web page changes (price, stock, version), using GitHub Actions](https://caelum-kr-11.github.io/blog/website-change-alert-github-actions.html) - caelum-kr-11.github.io - 11/2026
 - [Push alerts for WHM using ntfy](https://rubixstudios.com.au/insights/push-alerts-for-whm-using-ntfy) - rubixstudios.com.au - 5/2026
 - [Device notifications via HTTP with ntfy](https://alistairshepherd.uk/writing/ntfy/) - alistairshepherd.uk - 6/2025
 - [Notifications about (almost) anything with ntfy.sh](https://hamatti.org/posts/notifications-about-almost-anything-with-ntfy-sh/) - hamatti.org - 6/2025

@@ -32,6 +32,7 @@ import (
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/message"
 	"heckel.io/ntfy/v2/model"
@@ -1731,7 +1732,7 @@ func TestServer_AccountEmailVerify_UserWithoutTier_EmailLimitZero(t *testing.T) 
 	})
 }
 
-func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
+func TestServer_PublishAndExpungeTopicAfter6Hours(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()
 		s := newTestServer(t, newTestConfig(t, databaseURL))
@@ -1770,12 +1771,12 @@ func TestServer_PublishAndExpungeTopicAfter16Hours(t *testing.T) {
 		// Fudge with last access, but subscribe, and see that it won't get pruned (because of subscriber)
 		subID := s.topics["mytopic"].Subscribe(subFn, nil, func() {})
 		s.topics["mytopic"].mu.Lock()
-		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+		s.topics["mytopic"].lastAccess = time.Now().Add(-7 * time.Hour)
 		s.topics["mytopic"].mu.Unlock()
 		s.execManager()
 		require.NotNil(t, s.topics["mytopic"])
 
-		// It'll finally get pruned now that there are no subscribers and last access is 17 hours ago
+		// It'll finally get pruned now that there are no subscribers and last access is 7 hours ago
 		s.topics["mytopic"].Unsubscribe(subID)
 		s.execManager()
 		require.Nil(t, s.topics["mytopic"])
@@ -1792,7 +1793,7 @@ func TestServer_TopicKeepaliveOnPoll(t *testing.T) {
 		require.Equal(t, 200, response.Code)
 
 		// Mess with last access time
-		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+		s.topics["mytopic"].lastAccess = time.Now().Add(-7 * time.Hour)
 
 		// Poll again and check keepalive time
 		response = request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
@@ -1966,6 +1967,8 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber(t *testing.T) {
 }
 
 func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.T) {
+	// A topic nobody subscribed to is a 507 for however long this node has known it: the pushkey is
+	// only rejected after unifiedPushAbandonedAfter, see TestServer_MatrixGateway_AbandonedTopicRejectsPushKey
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		c := newTestConfig(t, databaseURL)
 		c.VisitorSubscriberRateLimiting = true
@@ -1976,18 +1979,15 @@ func TestServer_MatrixGateway_Push_Failure_NoSubscriber_After13Hours(t *testing.
 		response := request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
 		require.Equal(t, 507, response.Code)
 		require.Equal(t, 50701, toHTTPError(t, response.Body.String()).Code)
-		require.Nil(t, s.topics["mytopic"].rateVisitor)
+		require.Nil(t, s.topicService.State("mytopic"))
 
 		// Fake: This topic has been around for 13 hours without a rate visitor
 		s.topics["mytopic"].lastAccess = time.Now().Add(-13 * time.Hour)
-
-		// Same request should now return HTTP 200 with a rejected pushkey
 		response = request(t, s, "POST", "/_matrix/push/v1/notify", notification, nil)
-		require.Equal(t, 200, response.Code)
-		require.Equal(t, `{"rejected":["http://127.0.0.1:12345/mytopic?up=1"]}`, strings.TrimSpace(response.Body.String()))
+		require.Equal(t, 507, response.Code)
 
-		// Slightly unrelated: Test that topic is pruned after 16 hours
-		s.topics["mytopic"].lastAccess = time.Now().Add(-17 * time.Hour)
+		// Slightly unrelated: Test that topic is pruned after 6 hours
+		s.topics["mytopic"].lastAccess = time.Now().Add(-7 * time.Hour)
 		s.execManager()
 		require.Nil(t, s.topics["mytopic"])
 	})
@@ -3270,7 +3270,7 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriber1Fn)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
+		require.Equal(t, "ip:1.2.3.4", rateVisitorKey(s, "upAAAAAAAAAAAA"))
 
 		// "Register" visitor 8.7.7.1 to topic "up012345678912" as a rate limit visitor (implicitly via topic name)
 		subscriber2Fn := func(r *http.Request) {
@@ -3279,7 +3279,7 @@ func TestServer_SubscriberRateLimiting_Success(t *testing.T) {
 		rr = request(t, s, "GET", "/up012345678912/json?poll=1", "", nil, subscriber2Fn)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Equal(t, "8.7.7.1", s.topics["up012345678912"].rateVisitor.ip.String())
+		require.Equal(t, "ip:8.7.7.1", rateVisitorKey(s, "up012345678912"))
 
 		// Publish 2 messages to "subscriber1topic" as visitor 9.9.9.9. It'd be 3 normally, but the
 		// GET request before is also counted towards the request limiter.
@@ -3324,9 +3324,9 @@ func TestServer_SubscriberRateLimiting_NotWrongTopic(t *testing.T) {
 		rr := request(t, s, "GET", "/alerts,upAAAAAAAAAAAA,upBBBBBBBBBBBB/json?poll=1", "", nil, subscriberFn)
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Nil(t, s.topics["alerts"].rateVisitor)
-		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
-		require.Equal(t, "1.2.3.4", s.topics["upBBBBBBBBBBBB"].rateVisitor.ip.String())
+		require.Equal(t, "", rateVisitorKey(s, "alerts"))
+		require.Equal(t, "ip:1.2.3.4", rateVisitorKey(s, "upAAAAAAAAAAAA"))
+		require.Equal(t, "ip:1.2.3.4", rateVisitorKey(s, "upBBBBBBBBBBBB"))
 	})
 }
 
@@ -3345,7 +3345,7 @@ func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 		})
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
+		require.Equal(t, "", rateVisitorKey(s, "upAAAAAAAAAAAA"))
 
 		// Registering visitor 8.7.7.1 to topic has no effect
 		rr = request(t, s, "GET", "/up012345678912/json?poll=1", "", nil, func(r *http.Request) {
@@ -3353,7 +3353,7 @@ func TestServer_SubscriberRateLimiting_NotEnabled_Failed(t *testing.T) {
 		})
 		require.Equal(t, 200, rr.Code)
 		require.Equal(t, "", rr.Body.String())
-		require.Nil(t, s.topics["up012345678912"].rateVisitor)
+		require.Equal(t, "", rateVisitorKey(s, "up012345678912"))
 
 		// Publish 3 messages to "upAAAAAAAAAAAA" as visitor 9.9.9.9
 		for i := 0; i < 3; i++ {
@@ -3425,7 +3425,7 @@ func TestServer_Matrix_SubscriberRateLimiting_UP_Only(t *testing.T) {
 
 func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
-		c := newTestConfig(t, databaseURL)
+		c := newTestConfigWithAuthFile(t, databaseURL)
 		c.VisitorRequestLimitBurst = 3
 		c.VisitorSubscriberRateLimiting = true
 		s := newTestServer(t, c)
@@ -3436,26 +3436,22 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 		}
 		rr := request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 		require.Equal(t, 200, rr.Code)
-		require.Equal(t, "1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.ip.String())
-		require.Equal(t, "ip:1.2.3.4", s.topics["upAAAAAAAAAAAA"].rateVisitor.key)
+		require.Equal(t, "ip:1.2.3.4", rateVisitorKey(s, "upAAAAAAAAAAAA"))
 
 		// Publish message, observe rate visitor tokens being decreased
 		publisher := s.visitor(netip.MustParseAddr("9.9.9.9"), nil)
 		response := request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
 		require.Equal(t, int64(0), publisher.Stats().Messages)
-		require.Equal(t, int64(1), s.topics["upAAAAAAAAAAAA"].rateVisitor.Stats().Messages)
+		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
 
-		// Expire visitor: its subscriber has been gone for a day, and its key is pruned after a day without use
-		ageRateVisitor(s.topics["upAAAAAAAAAAAA"], 25*time.Hour)
-		s.limiter.Prune(-time.Hour) // Everything is idle for longer than -1h
-		require.True(t, s.topics["upAAAAAAAAAAAA"].rateVisitorStaleNoLock())
+		// Expire visitor: its subscriber has been gone for a day
+		ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 
-		// Publish message again, observe that rateVisitor is not used anymore and is reset
+		// Publish message again, observe that the rate visitor is not used anymore
 		response = request(t, s, "POST", "/upAAAAAAAAAAAA", "some message", nil)
 		require.Equal(t, 200, response.Code)
 		require.Equal(t, int64(1), publisher.Stats().Messages)
-		require.Nil(t, s.topics["upAAAAAAAAAAAA"].rateVisitor)
 		require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages) // Daily counts outlive pruning until their period ends
 	})
 }
@@ -3463,7 +3459,7 @@ func TestServer_SubscriberRateLimiting_VisitorExpiration(t *testing.T) {
 func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T) {
 	// A poll from the subscriber of an open stream sets its own visitor on the topic; the open stream
 	// must keep that one alive too, or UnifiedPush publishes fail a day after the poll
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	subscriberFn := func(r *http.Request) {
@@ -3486,14 +3482,14 @@ func TestServer_SubscriberRateLimiting_PollKeepsStreamAsRateVisitor(t *testing.T
 	require.Equal(t, 200, rr.Code)
 
 	// A day later, the stream is still there and keeps the topic's rate visitor
-	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 }
 
 func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testing.T) {
 	// A subscriber that only polls stays the topic's rate visitor for as long as it keeps polling
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	subscriberFn := func(r *http.Request) {
@@ -3503,20 +3499,16 @@ func TestServer_SubscriberRateLimiting_PollKeepsPollingSubscriberAlive(t *testin
 	require.Equal(t, 200, rr.Code)
 
 	// Polled 23 hours ago; polling again keeps it the rate visitor for another day
-	to := lockedTopic(s, "upAAAAAAAAAAAA")
-	ageRateVisitor(to, 23*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 23*time.Hour, s)
 	rr = request(t, s, "GET", "/upAAAAAAAAAAAA/json?poll=1", "", nil, subscriberFn)
 	require.Equal(t, 200, rr.Code)
-	to.mu.Lock()
-	seen := to.rateSeen
-	to.mu.Unlock()
-	require.WithinDuration(t, time.Now(), seen, time.Minute)
+	require.WithinDuration(t, time.Now(), time.Unix(s.topicService.State("upAAAAAAAAAAAA").SubscribedAt, 0), time.Minute)
 }
 
 func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testing.T) {
 	// Two streams from the same subscriber overlap (e.g. a reconnect), and the newer one closes: the
 	// older one must keep the topic's rate visitor alive, though the topic holds the newer one
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	subscriberFn := func(r *http.Request) {
@@ -3550,7 +3542,7 @@ func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testi
 	<-doneB
 
 	// A day later, stream A is still there
-	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 }
@@ -3558,7 +3550,7 @@ func TestServer_SubscriberRateLimiting_OverlappingStreamsKeepTopicAlive(t *testi
 func TestServer_SubscriberRateLimiting_OpenStreamKeepsPollerAsRateVisitor(t *testing.T) {
 	// A poll from another key (e.g. the same device over IPv4) takes the topic from an open stream
 	// (IPv6). While the stream is open, the topic keeps billing the poller, even a day later.
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	s := newTestServer(t, c)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -3579,7 +3571,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsPollerAsRateVisitor(t *tes
 	require.Equal(t, 200, rr.Code)
 
 	// A day later, only the stream is still there; the publish is billed to the poller's key
-	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
@@ -3618,8 +3610,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	to := lockedTopic(s, "upAAAAAAAAAAAA")
-	require.True(t, to.RateVisitor().MessageAllowed())
+	require.True(t, rateVisitorOf(t, s, "upAAAAAAAAAAAA").MessageAllowed().OK)
 	require.Nil(t, s.userManager.AllowAccess("alice", "upAAAAAAAAAAAA", user.PermissionRead))
 
 	// Bob takes the topic with a poll, and is gone a day later
@@ -3627,7 +3618,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 		r.RemoteAddr = "2.2.2.2:1234"
 	})
 	require.Equal(t, 200, response.Code)
-	ageRateVisitor(to, 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 
 	// Alice's open stream keeps the topic alive, but it is still billed to Bob
 	response = request(t, s, "PUT", "/upAAAAAAAAAAAA", "some message", bobHeaders, func(r *http.Request) {
@@ -3639,7 +3630,7 @@ func TestServer_SubscriberRateLimiting_StreamDoesNotReclaimTopicAfterWriteRevoke
 func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalives(t *testing.T) {
 	// A topic is billed to its subscriber for as long as a stream is open on it, however long ago
 	// the subscriber was last seen otherwise
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	c.KeepaliveInterval = time.Hour // No keepalives during the test
 	s := newTestServer(t, c)
@@ -3655,7 +3646,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalive
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	ageRateVisitor(lockedTopic(s, "upAAAAAAAAAAAA"), 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 	require.Equal(t, int64(1), s.visitor(netip.MustParseAddr("1.2.3.4"), nil).Stats().Messages)
@@ -3664,7 +3655,7 @@ func TestServer_SubscriberRateLimiting_OpenStreamKeepsTopicAliveWithoutKeepalive
 func TestServer_SubscriberRateLimiting_ClosedStreamIsLastSeen(t *testing.T) {
 	// When the last stream closes, the subscriber counts as seen then: the topic keeps billing it
 	// for another day, and not longer
-	c := newTestConfig(t, "")
+	c := newTestConfigWithAuthFile(t, "")
 	c.VisitorSubscriberRateLimiting = true
 	c.KeepaliveInterval = time.Hour // No keepalives during the test
 	s := newTestServer(t, c)
@@ -3681,24 +3672,16 @@ func TestServer_SubscriberRateLimiting_ClosedStreamIsLastSeen(t *testing.T) {
 		to := lockedTopic(s, "upAAAAAAAAAAAA")
 		return to != nil && to.SubscribersCount() == 1
 	})
-	to := lockedTopic(s, "upAAAAAAAAAAAA")
-	ageRateVisitor(to, 25*time.Hour) // Subscribed more than a day ago
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s) // Subscribed more than a day ago
 	cancel()
 	<-done
 	response := request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 200, response.Code)
 
 	// A day after the stream closed, the subscriber is gone
-	ageRateVisitor(to, 25*time.Hour)
+	ageTopic(t, "upAAAAAAAAAAAA", 25*time.Hour, s)
 	response = request(t, s, "PUT", "/upAAAAAAAAAAAA?up=1", "some message", nil)
 	require.Equal(t, 507, response.Code)
-}
-
-// ageRateVisitor makes the topic's rate visitor look as if it was last seen d ago
-func ageRateVisitor(t *topic, d time.Duration) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.rateSeen = time.Now().Add(-d)
 }
 
 // lockedTopic returns the topic with the given ID, or nil, reading the topics map under the server's lock
@@ -3725,8 +3708,8 @@ func TestServer_SubscriberRateLimiting_ProtectedTopics_WithDefaultReadWrite(t *t
 			r.RemoteAddr = "1.2.3.4:1234"
 		})
 		require.Equal(t, 200, rr.Code)
-		require.Equal(t, "1.2.3.4", s.topics["up123456789012"].rateVisitor.ip.String())
-		require.Nil(t, s.topics["announcements"].rateVisitor)
+		require.Equal(t, "ip:1.2.3.4", rateVisitorKey(s, "up123456789012"))
+		require.Equal(t, "", rateVisitorKey(s, "announcements"))
 	})
 }
 
@@ -5677,6 +5660,217 @@ func TestServer_HandleError_SkipsWriteHeaderOnHijackedConnection(t *testing.T) {
 	})
 }
 
+func TestServer_HandleError_RetryAfter(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A 429 with a known wait carries Retry-After in whole seconds, rounded up; one without
+		// (e.g. the subscription gauge) carries none
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		r, _ := http.NewRequest("GET", "/mytopic/json", nil)
+		v := newVisitor(s.visitors, netip.MustParseAddr("1.2.3.4"), nil)
+		rr := httptest.NewRecorder()
+		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitRequests.WithLimitDecision(limit.Decision{
+			RetryAfter: 1500 * time.Millisecond,
+			Kind:       limit.KindRequests,
+			Quota:      60,
+			Window:     5 * time.Minute,
+			Reset:      1500 * time.Millisecond,
+		}))
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, "2", rr.Header().Get("Retry-After"))
+		require.Equal(t, []string{`"requests";q=60;w=300`}, rr.Header().Values("RateLimit-Policy")) // The decision also names the limit
+		require.Equal(t, []string{`"requests";r=0;t=2`}, rr.Header().Values("RateLimit"))
+		require.Equal(t, 42901, toHTTPError(t, rr.Body.String()).Code)
+
+		rr = httptest.NewRecorder()
+		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitRequests.WithLimitDecision(limit.Decision{RetryAfter: time.Millisecond}))
+		require.Equal(t, "1", rr.Header().Get("Retry-After"))
+		require.Empty(t, rr.Header().Values("RateLimit")) // No quota, no policy
+
+		rr = httptest.NewRecorder()
+		s.handleError(rr, r, v, errHTTPTooManyRequestsLimitSubscriptions)
+		require.Equal(t, 429, rr.Code)
+		require.Empty(t, rr.Header().Get("Retry-After"))
+	})
+}
+
+func TestServer_RetryAfter_RequestLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorRequestLimitBurst = 3
+		c.VisitorRequestLimitReplenish = 5 * time.Second
+		s := newTestServer(t, c)
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+		}
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42901, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr)
+		require.GreaterOrEqual(t, retryAfter, 1)
+		require.LessOrEqual(t, retryAfter, 5)
+	})
+}
+
+func TestServer_RetryAfter_DailyMessageLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorMessageDailyLimit = 2
+		s := newTestServer(t, c)
+		for i := 0; i < 2; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+		}
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42908, toHTTPError(t, rr.Body.String()).Code)
+		resetAt := s.limiter.ResetAt(s.visitor(netip.MustParseAddr("9.9.9.9"), nil).key)
+		require.InDelta(t, time.Until(resetAt).Seconds(), retryAfterSeconds(t, rr), 2) // The wait is until the key's period ends
+	})
+}
+
+func TestServer_RetryAfter_EmailLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorEmailLimitBurst = 1
+		c.VisitorEmailLimitReplenish = time.Hour
+		s := newTestServer(t, c)
+		s.mailer = &testMailer{}
+		headers := map[string]string{
+			"E-Mail": "test@example.com",
+		}
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", headers).Code)
+		rr := request(t, s, "PUT", "/mytopic", "hi", headers)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42902, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr)
+		require.Greater(t, retryAfter, 3500)
+		require.LessOrEqual(t, retryAfter, 3600)
+	})
+}
+
+func TestServer_RetryAfter_AuthFailureLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.VisitorAuthFailureLimitBurst = 2
+		c.VisitorAuthFailureLimitReplenish = time.Minute
+		s := newTestServer(t, c)
+		headers := map[string]string{
+			"Authorization": util.BasicAuth("phil", "phil"),
+		}
+		for i := 0; i < 2; i++ {
+			require.Equal(t, 401, request(t, s, "PUT", "/announcements", "test", headers).Code)
+		}
+		rr := request(t, s, "PUT", "/announcements", "test", headers)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42909, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr)
+		require.Greater(t, retryAfter, 50)
+		require.LessOrEqual(t, retryAfter, 60)
+	})
+}
+
+func TestServer_RetryAfter_TopicCreationLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorTopicCreationLimitBurst = 1
+		c.VisitorTopicCreationLimitReplenish = time.Minute
+		s := newTestServer(t, c)
+		require.Equal(t, 200, request(t, s, "PUT", "/fresh-topic-1", "hi", nil).Code)
+		rr := request(t, s, "PUT", "/fresh-topic-2", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42911, toHTTPError(t, rr.Body.String()).Code)
+		retryAfter := retryAfterSeconds(t, rr)
+		require.Greater(t, retryAfter, 50)
+		require.LessOrEqual(t, retryAfter, 60)
+	})
+}
+
+func TestServer_RateLimitHeaders_Publish(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// Each publish carries the request bucket and the daily message limit, and the 429 of
+		// the daily limit says 0 remaining until the same time as Retry-After
+		c := newTestConfig(t, databaseURL)
+		c.VisitorRequestLimitBurst = 60
+		c.VisitorRequestLimitReplenish = 5 * time.Second
+		c.VisitorMessageDailyLimit = 3
+		s := newTestServer(t, c)
+		resetAt := s.limiter.ResetAt(s.visitor(netip.MustParseAddr("9.9.9.9"), nil).key)
+		for i := 0; i < 3; i++ {
+			rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+			require.Equal(t, 200, rr.Code)
+			require.Equal(t, []string{`"requests";q=60;w=300`, `"messages";q=3;w=86400`}, rr.Header().Values("RateLimit-Policy"))
+			limits := rr.Header().Values("RateLimit")
+			require.Len(t, limits, 2)
+			require.Equal(t, fmt.Sprintf(`"requests";r=%d;t=5`, 59-i), limits[0])
+			r, reset := parseRateLimit(t, limits[1], "messages")
+			require.Equal(t, 2-i, r)
+			require.InDelta(t, time.Until(resetAt).Seconds(), reset, 2)
+		}
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, []string{`"requests";q=60;w=300`, `"messages";q=3;w=86400`}, rr.Header().Values("RateLimit-Policy"))
+		require.Equal(t, `"requests";r=56;t=5`, rr.Header().Values("RateLimit")[0])
+		require.Equal(t, fmt.Sprintf(`"messages";r=0;t=%d`, retryAfterSeconds(t, rr)), rr.Header().Values("RateLimit")[1])
+	})
+}
+
+func TestServer_RateLimitHeaders_RequestLimit(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// The 429 of the request bucket says 0 remaining until the next token, as Retry-After does
+		c := newTestConfig(t, databaseURL)
+		c.VisitorRequestLimitBurst = 3
+		c.VisitorRequestLimitReplenish = 5 * time.Second
+		s := newTestServer(t, c)
+		for i := 0; i < 3; i++ {
+			require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+		}
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, []string{`"requests";q=3;w=15`}, rr.Header().Values("RateLimit-Policy")) // The handler, and the daily limit, are never reached
+		require.Equal(t, []string{fmt.Sprintf(`"requests";r=0;t=%d`, retryAfterSeconds(t, rr))}, rr.Header().Values("RateLimit"))
+	})
+}
+
+func TestServer_RateLimitHeaders_Exempt(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		c := newTestConfig(t, databaseURL)
+		c.VisitorRequestExemptPrefixes = []netip.Prefix{netip.MustParsePrefix("9.9.9.9/32")} // see request()
+		s := newTestServer(t, c)
+		rr := request(t, s, "PUT", "/mytopic", "hi", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Empty(t, rr.Header().Values("RateLimit-Policy"))
+		require.Empty(t, rr.Header().Values("RateLimit"))
+	})
+}
+
+func TestServer_RateLimitHeaders_NotOnPoll(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		require.Equal(t, 200, request(t, s, "PUT", "/mytopic", "hi", nil).Code)
+		rr := request(t, s, "GET", "/mytopic/json?poll=1", "", nil)
+		require.Equal(t, 200, rr.Code)
+		require.Empty(t, rr.Header().Values("RateLimit-Policy"))
+		require.Empty(t, rr.Header().Values("RateLimit"))
+	})
+}
+
+// parseRateLimit parses one RateLimit item, e.g. "messages";r=2;t=3600, into r and t
+func parseRateLimit(t *testing.T, item, name string) (int, float64) {
+	t.Helper()
+	var r, reset int
+	_, err := fmt.Sscanf(item, `"`+name+`";r=%d;t=%d`, &r, &reset)
+	require.NoError(t, err, "invalid RateLimit item: %s", item)
+	return r, float64(reset)
+}
+
+func retryAfterSeconds(t *testing.T, rr *httptest.ResponseRecorder) int {
+	t.Helper()
+	header := rr.Header().Get("Retry-After")
+	require.NotEmpty(t, header, "Retry-After header missing")
+	seconds, err := strconv.Atoi(header)
+	require.NoError(t, err)
+	return seconds
+}
+
 func TestServer_Publish_InvalidUTF8InBody(t *testing.T) {
 	// All byte sequences from production logs, sent as message body
 	tests := []struct {
@@ -5769,9 +5963,9 @@ func TestServer_BanFeed_RateLimitedIPBanned(t *testing.T) {
 	c := newTestConfig(t, "")
 	c.BanFile = banFile
 	c.BanWindow = time.Minute
-	c.BanThreshold = 2                    // Ban after the weighted budget of 2 is exhausted
-	c.BanWeights = map[string]int{"*": 1} // Every rejection costs 1 strike
-	c.VisitorRequestLimitBurst = 2        // 429 quickly
+	c.BanThreshold = 2                        // Ban after the weighted budget of 2 is exhausted
+	c.BanWeights = map[string]float64{"*": 1} // Every rejection costs 1 strike
+	c.VisitorRequestLimitBurst = 2            // 429 quickly
 	s := newTestServer(t, c)
 	got429 := 0
 	for i := 0; i < 10; i++ {
@@ -5793,9 +5987,9 @@ func TestServer_BanFeed_SuccessfulRequestsNotBanned(t *testing.T) {
 	c := newTestConfig(t, "")
 	c.BanFile = banFile
 	c.BanWindow = time.Minute
-	c.BanThreshold = 3                    // Low threshold that would catch 200s if 2xx were not skipped
-	c.BanWeights = map[string]int{"*": 1} // Every rejection costs 1 strike
-	c.VisitorRequestLimitBurst = 100      // Stay under the request limit so every request is 200
+	c.BanThreshold = 3                        // Low threshold that would catch 200s if 2xx were not skipped
+	c.BanWeights = map[string]float64{"*": 1} // Every rejection costs 1 strike
+	c.VisitorRequestLimitBurst = 100          // Stay under the request limit so every request is 200
 	s := newTestServer(t, c)
 	for i := 0; i < 10; i++ {
 		rr := request(t, s, "PUT", "/mytopic", fmt.Sprintf("m%d", i), nil)
@@ -6190,4 +6384,13 @@ func TestServer_AnonymousEmailDailyCapShared(t *testing.T) {
 		require.Equal(t, 429, response.Code)
 		require.Equal(t, 42902, toHTTPError(t, response.Body.String()).Code)
 	})
+}
+
+func TestServer_SingleNodeDoesNotTrackBucketDeltas(t *testing.T) {
+	// Without a cluster nothing drains the deltas, so the limiter does not keep them
+	s := newTestServer(t, newTestConfig(t, ""))
+	for i := 0; i < 5; i++ {
+		require.Equal(t, 200, request(t, s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	require.Empty(t, s.limiter.BucketDeltas())
 }

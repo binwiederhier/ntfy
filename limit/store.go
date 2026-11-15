@@ -49,8 +49,9 @@ type queries struct {
 }
 
 // write adds the rows' counts to their keys' rows if the periods match, or replaces them if the
-// row's period is older. Rows of an older period than the stored one are added to the stored
-// one (a node's leftover of a finished period, see the usage queries). Rows are written sorted
+// row's period is older. Rows of an older period than the stored one are dropped: a node's
+// leftover of a finished period is the old day's usage, and adding it to the new day would count
+// it twice (see the usage queries). Rows are written sorted
 // by key in chunks, so two nodes lock overlapping keys in the same order; it returns how many
 // rows (in sorted order) are committed: on an error, the chunks before it are, plus the failed
 // chunk if it may have been written anyway (errMaybeWritten). The rows' updated_at is now (unix

@@ -1,6 +1,7 @@
 package sprig
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -193,4 +194,14 @@ func TestTernary(t *testing.T) {
 	if err := runt(tpl, "bar"); err != nil {
 		t.Error(err)
 	}
+}
+
+func TestToPrettyJSONLimit(t *testing.T) {
+	// Each nesting level indents every line below it, so deep nesting is quadratic
+	deep := strings.Repeat("[", 5000) + strings.Repeat("]", 5000)
+	for _, tpl := range []string{`{{ fromJSON .a | toPrettyJSON }}`, `{{ fromJSON .a | mustToPrettyJSON }}`} {
+		_, err := runRaw(tpl, map[string]string{"a": deep})
+		assert.ErrorContains(t, err, "exceeds limit", tpl)
+	}
+	assert.Nil(t, runtv(`{{ toPrettyJSON .a }}`, "{\n  \"x\": [\n    1,\n    2\n  ],\n  \"y\": {}\n}", map[string]any{"a": map[string]any{"x": []int{1, 2}, "y": map[string]any{}}}))
 }

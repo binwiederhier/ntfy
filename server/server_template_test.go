@@ -143,3 +143,18 @@ func TestServer_MessageTemplate_DisallowedCallInChain(t *testing.T) {
 		require.Equal(t, 40044, toHTTPError(t, response.Body.String()).Code)
 	})
 }
+
+func TestServer_MessageTemplate_ReplaceAmplification(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+		s := newTestServer(t, newTestConfig(t, databaseURL))
+		// replace with an empty old string is len^2 inside one function call: 8 KB -> 64 MB
+		response := request(t, s, "PUT", "/mytopic", `{"a":"`+strings.Repeat("A", 8*1024)+`"}`, map[string]string{
+			"X-Message":  `{{ len (replace "" .a .a) }}`,
+			"X-Template": "1",
+		})
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, 40045, toHTTPError(t, response.Body.String()).Code)
+		require.Contains(t, response.Body.String(), "exceeds limit")
+	})
+}

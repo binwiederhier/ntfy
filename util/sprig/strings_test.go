@@ -285,3 +285,19 @@ func TestPlural(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestCatLimit(t *testing.T) {
+	a := strings.Repeat("A", stringLengthLimit/2)
+	_, err := runRaw(`{{ cat .a .a .a }}`, map[string]string{"a": a})
+	assert.ErrorContains(t, err, "exceeds limit")
+	assert.Nil(t, runtv(`{{ cat .a .a }}`, "x x", map[string]string{"a": "x"}))
+}
+
+func TestIndentResultLimit(t *testing.T) {
+	// 100 spaces per line on a string of newlines is a 100x amplification
+	nl := strings.Repeat("\n", 10_000)
+	for _, tpl := range []string{`{{ indent 100 .a }}`, `{{ nindent 100 .a }}`} {
+		_, err := runRaw(tpl, map[string]string{"a": nl})
+		assert.ErrorContains(t, err, "exceeds limit")
+	}
+}

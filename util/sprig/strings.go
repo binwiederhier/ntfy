@@ -111,8 +111,16 @@ func squote(str ...any) string {
 //   - string: The concatenated string
 func cat(v ...any) string {
 	v = removeNilElements(v)
-	r := strings.TrimSpace(strings.Repeat("%v ", len(v)))
-	return fmt.Sprintf(r, v...)
+	parts := make([]string, len(v))
+	length := 0
+	for i, s := range v {
+		parts[i] = fmt.Sprintf("%v", s)
+		length += len(parts[i]) + 1
+	}
+	if err := checkStringLength("cat", length-1, 0); err != nil {
+		panic(err)
+	}
+	return strings.Join(parts, " ")
 }
 
 // indent adds a specified number of spaces at the beginning of each line in a string.
@@ -127,9 +135,12 @@ func cat(v ...any) string {
 //
 // Panics:
 //   - If spaces exceeds indentSpacesLimit
+//   - If the resulting string length would exceed stringLengthLimit
 func indent(spaces int, v string) string {
 	if spaces > indentSpacesLimit {
 		panic(fmt.Sprintf("indent %d exceeds limit of %d", spaces, indentSpacesLimit))
+	} else if err := checkStringLength("indent", len(v)+(strings.Count(v, "\n")+1)*spaces, len(v)); err != nil {
+		panic(err)
 	}
 	pad := strings.Repeat(" ", spaces)
 	return pad + strings.Replace(v, "\n", "\n"+pad, -1)
@@ -157,6 +168,9 @@ func nindent(spaces int, v string) string {
 //
 // Returns:
 //   - string: The resulting string after all replacements
+//
+// Panics:
+//   - If the resulting string length would exceed stringLengthLimit
 func replace(old, new, src string) string {
 	count := strings.Count(src, old)
 	checkResultLength(len(src) + count*(len(new)-len(old)))
@@ -316,6 +330,9 @@ func title(s string) string {
 //
 // Returns:
 //   - string: The joined string
+//
+// Panics:
+//   - If the resulting string length would exceed stringLengthLimit
 func join(sep string, v any) string {
 	elems := strslice(v)
 	n := 0
@@ -502,4 +519,13 @@ func hasPrefix(substr string, str string) bool {
 //   - bool: True if str ends with substr, false otherwise
 func hasSuffix(substr string, str string) bool {
 	return strings.HasSuffix(str, substr)
+}
+
+// checkStringLength returns an error if a function would build a string longer than stringLengthLimit.
+// Results no longer than their input are allowed, so that shrinking an already long string still works.
+func checkStringLength(fn string, length, inputLength int) error {
+	if length > stringLengthLimit && length > inputLength {
+		return fmt.Errorf("%s result length %d exceeds limit of %d", fn, length, stringLengthLimit)
+	}
+	return nil
 }

@@ -2392,6 +2392,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 **Security:**
 
+* Limit the result size of the `cat` and `toPrettyJSON` template functions, and the list size of `uniq`, `without` and `has`, to prevent excessive memory and CPU use in message templates
 * Templating: apply the iteration limit of `until`, `untilStep` and `seq` to decreasing sequences too, so a negative step can no longer build an unbounded list
 * Limit the result size of the `concat` and `keys` template functions, so passing the same list or dict many times can no longer build a huge slice in a single call
 

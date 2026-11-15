@@ -2388,6 +2388,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.38.1 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Stripe billing: when an abandoned checkout expires (`incomplete_expired`) after the user paid for another subscription, the webhook no longer replaces the paying subscription with the expired one ([#2199](https://github.com/binwiederhier/ntfy/pull/2199))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

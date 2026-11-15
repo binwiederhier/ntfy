@@ -438,7 +438,7 @@ func (s *Server) handleAccountBillingWebhookSubscriptionUpdated(r *http.Request,
 	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
 	// A non-paying event for a different subscription of the same customer (e.g. an abandoned checkout
 	// expiring as "incomplete_expired" after the user paid for another one) must not replace the current one.
-	if u.Billing.StripeSubscriptionID != "" && subscriptionID != u.Billing.StripeSubscriptionID && !stripeSubscriptionPaying(ev.Status) {
+	if u.Billing.StripeSubscriptionID != "" && subscriptionID != u.Billing.StripeSubscriptionID && !stripeStatusGrantsPaidTier(ev.Status) {
 		logvr(v, r).
 			Tag(tagStripe).
 			Fields(log.Context{
@@ -473,6 +473,20 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(r *http.Request,
 		return err
 	}
 	v = s.visitor(v.IP(), u) // The webhook acts on behalf of the user
+	// Only the user's current subscription may purge their state. A deleted event for a different
+	// (stale or replayed) subscription of the same customer is ignored, so a retried or captured
+	// old event cannot downgrade the tier and wipe reservations and messages of the live subscription.
+	if ev.ID != "" && u.Billing.StripeSubscriptionID != "" && ev.ID != u.Billing.StripeSubscriptionID {
+		logvr(v, r).
+			Tag(tagStripe).
+			Fields(log.Context{
+				"stripe_webhook_type":            event.Type,
+				"stripe_subscription_id":         ev.ID,
+				"stripe_current_subscription_id": u.Billing.StripeSubscriptionID,
+			}).
+			Info("Ignoring stale subscription deleted event for subscription %s; current subscription is %s", ev.ID, u.Billing.StripeSubscriptionID)
+		return nil
+	}
 	logvr(v, r).
 		Tag(tagStripe).
 		Field("stripe_webhook_type", event.Type).
@@ -485,6 +499,13 @@ func (s *Server) handleAccountBillingWebhookSubscriptionDeleted(r *http.Request,
 }
 
 func (s *Server) updateSubscriptionAndTier(r *http.Request, v *visitor, u *user.User, tier *user.Tier, customerID, subscriptionID, status, interval string, paidUntil, cancelAt int64) error {
+	// The paid tier is only granted for a subscription that has actually paid. A never-paid or canceled
+	// status (e.g. an "incomplete" checkout with a delayed payment method that never clears) does not grant
+	// the tier; the real status is still recorded below. past_due and unpaid keep the tier, so a failed
+	// renewal retains access until Stripe deletes the subscription.
+	if tier != nil && !stripeStatusGrantsPaidTier(status) {
+		tier = nil
+	}
 	reservationsLimit := vis.DefaultReservationsLimit
 	if tier != nil {
 		reservationsLimit = tier.ReservationLimit
@@ -524,11 +545,15 @@ func (s *Server) updateSubscriptionAndTier(r *http.Request, v *visitor, u *user.
 	return nil
 }
 
-// stripeSubscriptionPaying reports whether a subscription with the given Stripe status was ever paid for and
-// is not over: never-paid (incomplete, incomplete_expired) and canceled subscriptions are not.
-func stripeSubscriptionPaying(status string) bool {
+// stripeStatusGrantsPaidTier reports whether a subscription with the given Stripe status may hold a paid
+// tier. A never-paid or canceled subscription (incomplete, incomplete_expired, canceled) may not; every
+// other status, including past_due and unpaid, keeps the tier. An empty status (e.g. on deletion) does
+// not grant a tier either, but those paths pass a nil tier anyway.
+func stripeStatusGrantsPaidTier(status string) bool {
 	switch stripe.SubscriptionStatus(status) {
 	case stripe.SubscriptionStatusIncomplete, stripe.SubscriptionStatusIncompleteExpired, stripe.SubscriptionStatusCanceled:
+		return false
+	case "":
 		return false
 	default:
 		return true

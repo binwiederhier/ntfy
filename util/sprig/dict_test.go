@@ -1,8 +1,11 @@
 package sprig
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDict(t *testing.T) {
@@ -78,6 +81,26 @@ func TestKeys(t *testing.T) {
 			t.Error(err)
 		}
 	}
+}
+
+func TestKeysSizeLimit(t *testing.T) {
+	// Passing the same 101-key dict 100 times would build 10,100 keys in one call
+	tpl := `{{ $d := dict` + dictPairs(101) + ` }}{{ keys` + strings.Repeat(" $d", 100) + ` | len }}`
+	err := runt(tpl, "10100")
+	assert.ErrorContains(t, err, "keys result size 10100 exceeds limit of 10000")
+
+	// Exactly at the limit is fine
+	tpl = `{{ $d := dict` + dictPairs(100) + ` }}{{ keys` + strings.Repeat(" $d", 100) + ` | len }}`
+	assert.NoError(t, runt(tpl, "10000"))
+}
+
+// dictPairs returns n distinct key/value argument pairs for the dict function.
+func dictPairs(n int) string {
+	var b strings.Builder
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&b, ` "k%d" 0`, i)
+	}
+	return b.String()
 }
 
 func TestPick(t *testing.T) {

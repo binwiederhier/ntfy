@@ -1,5 +1,7 @@
 package sprig
 
+import "fmt"
+
 // get retrieves a value from a map by its key.
 // If the key exists, returns the corresponding value.
 // If the key doesn't exist, returns an empty string.
@@ -88,7 +90,15 @@ func pluck(key string, d ...map[string]any) []any {
 // Returns:
 //   - []string: A slice containing all keys from all provided maps
 func keys(dicts ...map[string]any) []string {
-	var k []string
+	// Passing the same dict many times would otherwise multiply it in a single call
+	total := 0
+	for _, dict := range dicts {
+		total += len(dict)
+	}
+	if total > sliceSizeLimit {
+		panic(fmt.Sprintf("keys result size %d exceeds limit of %d", total, sliceSizeLimit))
+	}
+	k := make([]string, 0, total)
 	for _, dict := range dicts {
 		for key := range dict {
 			k = append(k, key)

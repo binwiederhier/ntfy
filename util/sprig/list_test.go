@@ -365,3 +365,14 @@ func TestConcat(t *testing.T) {
 		assert.NoError(t, runt(tpl, expect))
 	}
 }
+
+func TestConcatSizeLimit(t *testing.T) {
+	// Passing the same 101-element list 100 times would build 10,100 elements in one call
+	tpl := `{{ $l := tuple` + strings.Repeat(" 0", 101) + ` }}{{ concat` + strings.Repeat(" $l", 100) + ` | len }}`
+	err := runt(tpl, "10100")
+	assert.ErrorContains(t, err, "concat result size 10100 exceeds limit of 10000")
+
+	// Exactly at the limit is fine
+	tpl = `{{ $l := tuple` + strings.Repeat(" 0", 100) + ` }}{{ concat` + strings.Repeat(" $l", 100) + ` | len }}`
+	assert.NoError(t, runt(tpl, "10000"))
+}

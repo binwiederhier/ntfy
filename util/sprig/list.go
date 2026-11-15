@@ -487,8 +487,20 @@ func mustSlice(list any, indices ...any) (any, error) {
 // concat combines multiple lists into a single list.
 // It takes any number of lists and returns a new list containing all elements.
 // This function will panic if any argument is not a slice or array.
+// It also panics if the combined length exceeds sliceSizeLimit, since passing the same list many
+// times would otherwise multiply it in a single call.
 func concat(lists ...any) any {
-	var res []any
+	total := 0
+	for _, list := range lists {
+		switch reflect.TypeOf(list).Kind() {
+		case reflect.Slice, reflect.Array:
+			total += reflect.ValueOf(list).Len()
+		}
+	}
+	if total > sliceSizeLimit {
+		panic(fmt.Sprintf("concat result size %d exceeds limit of %d", total, sliceSizeLimit))
+	}
+	res := make([]any, 0, total)
 	for _, list := range lists {
 		tp := reflect.TypeOf(list).Kind()
 		switch tp {

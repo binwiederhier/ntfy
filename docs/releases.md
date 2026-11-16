@@ -33,6 +33,11 @@ allow message templates (`Template: yes`), which any publisher can use.
 * Web push: use a timeout for deliveries and always close the push service response, so slow or unresponsive push endpoints can no longer leak connections and goroutines; a timeout or network error no longer removes the subscription
 * Web push: count the subscription limit per IP prefix (the same IPv6 /64 or configured prefix as all other limits) instead of per full IP address, so rotating addresses within one prefix no longer bypasses it
 
+**Bug fixes + maintenance:**
+
+* Stripe billing: when an abandoned checkout expires (`incomplete_expired`) after the user paid for another subscription, the webhook no longer replaces the paying subscription with the expired one ([#2199](https://github.com/binwiederhier/ntfy/pull/2199))
+* Message templating: errors in an inline message template (`X-Message` with `X-Template: yes`) now name the message parameter instead of the priority parameter
+
 ## ntfy server v2.38.0
 Released November 15, 2026
 
@@ -2408,12 +2413,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.38.1 (UNRELEASED)
-
-**Bug fixes + maintenance:**
-
-* Stripe billing: when an abandoned checkout expires (`incomplete_expired`) after the user paid for another subscription, the webhook no longer replaces the paying subscription with the expired one ([#2199](https://github.com/binwiederhier/ntfy/pull/2199))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

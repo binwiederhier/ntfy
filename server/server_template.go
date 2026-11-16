@@ -17,8 +17,8 @@ import (
 	"gopkg.in/yaml.v2"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/template/gotext"
+	"heckel.io/ntfy/v2/template/sprig"
 	"heckel.io/ntfy/v2/util"
-	"heckel.io/ntfy/v2/util/sprig"
 )
 
 var (

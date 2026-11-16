@@ -44,7 +44,7 @@ const (
 		WHERE topic = ? AND time >= ?
 		ORDER BY time DESC, id DESC
 	`
-	sqliteSelectMessageRowIDQuery = `SELECT id, time FROM messages WHERE mid = ? LIMIT 1`
+	sqliteSelectMessageRowIDQuery = `SELECT id, time, topic, sequence_id FROM messages WHERE mid = ? LIMIT 1`
 	sqliteSelectRecentRowIDsQuery = `SELECT id FROM messages ORDER BY id DESC LIMIT ?`
 	// sqliteSelectMessagesAfterRowIDQuery: see postgresSelectMessagesAfterRowIDQuery
 	sqliteSelectMessagesAfterRowIDQuery = `
@@ -62,6 +62,7 @@ const (
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM (
 			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id <> ?2
+				AND (time > ?3 OR id > ?2 OR sequence_id <> ?4 OR ?4 = '')
 			UNION ALL
 			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2 AND time + 0 < ?3
 		)
@@ -71,6 +72,7 @@ const (
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user, content_type, encoding
 		FROM (
 			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND time >= ?3 AND id <> ?2
+				AND (time > ?3 OR id > ?2 OR sequence_id <> ?4 OR ?4 = '')
 			UNION ALL
 			SELECT * FROM messages WHERE topic = ?1 AND published = 1 AND id > ?2 AND time + 0 < ?3
 			UNION ALL

@@ -6,14 +6,14 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.38.1 | Nov 17, 2026  |
+| ntfy server      | v2.38.1 | Nov 16, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
 
 ## ntfy server v2.38.1
-Released November 17, 2026
+Released November 16, 2026
 
 This is a security release. It hardens message templating against a set of denial-of-service attacks, where a
 crafted template could crash the server, exhaust its memory or outrun the execution deadline in a single request.

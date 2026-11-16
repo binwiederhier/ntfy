@@ -301,3 +301,13 @@ func TestIndentResultLimit(t *testing.T) {
 		assert.ErrorContains(t, err, "exceeds limit")
 	}
 }
+
+func TestQuoteSquoteCatSharedValueLimit(t *testing.T) {
+	// These format every argument before joining them; a list of references to one large string
+	// costs almost nothing to build but prints every copy
+	refs := strings.Repeat(" $b", 3) // 270 KB, past the 256 KiB budget
+	for _, fn := range []string{"quote", "squote", "cat"} {
+		_, err := runRaw(`{{$b := repeat 9000 "aaaaaaaaaa"}}{{len (`+fn+` (list`+refs+`))}}`, nil)
+		assert.ErrorContains(t, err, "value is too large", fn)
+	}
+}

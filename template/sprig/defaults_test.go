@@ -197,8 +197,9 @@ func TestTernary(t *testing.T) {
 }
 
 func TestToPrettyJSONLimit(t *testing.T) {
-	// Each nesting level indents every line below it, so deep nesting is quadratic
-	deep := strings.Repeat("[", 5000) + strings.Repeat("]", 5000)
+	// Each nesting level indents every line below it, so 1,000 numbers nested 90 levels deep (2 KB
+	// compact, below the CheckPrintable depth and size limits) indent to about 180 KB
+	deep := strings.Repeat("[", 90) + strings.Repeat("1,", 999) + "1" + strings.Repeat("]", 90)
 	for _, tpl := range []string{`{{ fromJSON .a | toPrettyJSON }}`, `{{ fromJSON .a | mustToPrettyJSON }}`} {
 		_, err := runRaw(tpl, map[string]string{"a": deep})
 		assert.ErrorContains(t, err, "exceeds limit", tpl)

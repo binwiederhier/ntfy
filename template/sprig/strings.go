@@ -74,6 +74,7 @@ func base32decode(v string) string {
 // Returns:
 //   - string: The quoted strings joined with spaces
 func quote(str ...any) string {
+	checkPrintable(str...) // Check all at once, so many values cannot each use up the full budget
 	out := make([]string, 0, len(str))
 	for _, s := range str {
 		if s != nil {
@@ -92,6 +93,7 @@ func quote(str ...any) string {
 // Returns:
 //   - string: The single-quoted values joined with spaces
 func squote(str ...any) string {
+	checkPrintable(str...)
 	out := make([]string, 0, len(str))
 	for _, s := range str {
 		if s != nil {
@@ -111,6 +113,7 @@ func squote(str ...any) string {
 //   - string: The concatenated string
 func cat(v ...any) string {
 	v = removeNilElements(v)
+	checkPrintable(v...)
 	parts := make([]string, len(v))
 	length := 0
 	for i, s := range v {
@@ -208,9 +211,11 @@ func plural(one, many string, count int) string {
 // Returns:
 //   - []string: A slice of strings
 func strslice(v any) []string {
+	if s, ok := v.([]string); ok {
+		return s
+	}
+	checkPrintable(v) // Check the whole list, so many elements cannot each use up the full budget
 	switch v := v.(type) {
-	case []string:
-		return v
 	case []any:
 		b := make([]string, 0, len(v))
 		for _, s := range v {
@@ -284,6 +289,7 @@ func strval(v any) string {
 	case fmt.Stringer:
 		return v.String()
 	default:
+		checkPrintable(v)
 		return fmt.Sprintf("%v", v)
 	}
 }

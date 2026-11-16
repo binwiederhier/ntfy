@@ -1161,6 +1161,11 @@ func (s *state) printValue(n parse.Node, v reflect.Value) {
 	if !ok {
 		s.errorf("can't print %s of type %s", n, v.Type())
 	}
+	if check := s.tmpl.option.printCheck; check != nil {
+		if err := check(iface); err != nil {
+			s.errorf("can't print %s: %s", n, err)
+		}
+	}
 	_, err := fmt.Fprint(s.wr, iface)
 	if err != nil {
 		s.writeError(err)

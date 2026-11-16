@@ -2395,6 +2395,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Limit the result size of the `cat` and `toPrettyJSON` template functions, and the list size of `uniq`, `without` and `has`, to prevent excessive memory and CPU use in message templates
 * Templating: apply the iteration limit of `until`, `untilStep` and `seq` to decreasing sequences too, so a negative step can no longer build an unbounded list
 * Limit the result size of the `concat` and `keys` template functions, so passing the same list or dict many times can no longer build a huge slice in a single call
+* Message templating: values are now checked before they are printed or JSON-encoded, so a template can no longer crash the server by printing a value that references itself, or build a huge string by printing a list of many references to one value; `printf` only accepts plain directives (no explicit argument indexes or `%p`) and no lists or dicts as arguments, and the `html`, `js` and `urlquery` functions are no longer allowed
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

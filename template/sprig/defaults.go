@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+
+	"heckel.io/ntfy/v2/template"
 )
 
 // defaultValue checks whether `given` is set, and returns default if not set.
@@ -156,6 +158,7 @@ func mustFromJSON(v string) (any, error) {
 // Returns:
 //   - string: The JSON string representation of the value
 func toJSON(v any) string {
+	checkPrintable(v)
 	output, _ := json.Marshal(v)
 	return string(output)
 }
@@ -170,6 +173,9 @@ func toJSON(v any) string {
 //   - string: The JSON string representation of the value
 //   - error: Any error that occurred during encoding
 func mustToJSON(v any) (string, error) {
+	if err := template.CheckPrintable(v); err != nil {
+		return "", err
+	}
 	output, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -187,6 +193,7 @@ func mustToJSON(v any) (string, error) {
 // Returns:
 //   - string: The indented JSON string representation of the value
 func toPrettyJSON(v any) string {
+	checkPrintable(v)
 	output, err := json.Marshal(v)
 	if err != nil {
 		return ""
@@ -208,6 +215,9 @@ func toPrettyJSON(v any) string {
 //   - string: The indented JSON string representation of the value
 //   - error: Any error that occurred during encoding
 func mustToPrettyJSON(v any) (string, error) {
+	if err := template.CheckPrintable(v); err != nil {
+		return "", err
+	}
 	output, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -243,6 +253,9 @@ func toRawJSON(v any) string {
 //   - string: The JSON string representation of the value without HTML escaping
 //   - error: Any error that occurred during encoding
 func mustToRawJSON(v any) (string, error) {
+	if err := template.CheckPrintable(v); err != nil {
+		return "", err
+	}
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)

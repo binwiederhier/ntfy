@@ -414,6 +414,7 @@ func round(a any, p int, rOpt ...float64) float64 {
 // Returns:
 //   - int64: The decimal representation of the octal value
 func toDecimal(v any) int64 {
+	checkPrintable(v)
 	result, err := strconv.ParseInt(fmt.Sprint(v), 8, 64)
 	if err != nil {
 		return 0

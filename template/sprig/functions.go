@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"heckel.io/ntfy/v2/template"
 )
 
 const (
@@ -27,6 +29,17 @@ const (
 func checkResultLength(n int) {
 	if n > stringLengthLimit {
 		panic(fmt.Sprintf("result length %d exceeds limit of %d", n, stringLengthLimit))
+	}
+}
+
+// checkPrintable panics if the values reference themselves or expand to too large a size when
+// printed or JSON-encoded. Functions like set mutate maps in place, so a template can build a
+// value that contains itself (fmt recurses forever and crashes the process) or that references
+// one value many times (fmt and encoding/json expand it exponentially). The template executor
+// recovers the panic into a render error.
+func checkPrintable(values ...any) {
+	if err := template.CheckPrintable(values...); err != nil {
+		panic(err)
 	}
 }
 
@@ -226,5 +239,10 @@ func TxtFuncMap() map[string]any {
 		// URLs
 		"urlParse": urlParse,
 		"urlJoin":  urlJoin,
+
+		// Template builtins, guarded (see builtins.go)
+		"print":   templatePrint,
+		"println": templatePrintln,
+		"printf":  templatePrintf,
 	}
 }

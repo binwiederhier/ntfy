@@ -1,9 +1,10 @@
 # `template/gotext/` -- vendored `text/template` with context cancellation
 
-This directory is a **verbatim copy of Go's standard-library `text/template` package**, plus one
-small patch that adds context-aware execution (`ExecuteContext`). It exists for exactly one reason:
-to stop **user-supplied** message templates (`Template: yes`, see the [templating docs](https://ntfy.sh/docs/publish/#message-templating))
-from burning CPU.
+This directory is a **verbatim copy of Go's standard-library `text/template` package**, plus two
+small patches: one adds context-aware execution (`ExecuteContext`), the other a hook that vets values
+before they are printed (`PrintCheck`). Both exist to stop **user-supplied** message templates
+(`Template: yes`, see the [templating docs](https://ntfy.sh/docs/publish/#message-templating)) from
+burning CPU or memory.
 
 - **Source:** Go stdlib `text/template` (+ `internal/fmtsort`), `$(go env GOROOT)/src`
 - **Version:** pinned in the repo-root [`.go-version`](../../.go-version); recorded in `GENERATED_FROM`
@@ -41,7 +42,8 @@ are not user-supplied.
 |------|--------|
 | `*.go` (`exec.go`, `funcs.go`, `template.go`, `option.go`, `helper.go`, `doc.go`) | verbatim from `$(go env GOROOT)/src/text/template/`, enumerated with `go list` so files added/removed upstream are picked up automatically |
 | `fmtsort/sort.go` | verbatim from `$(go env GOROOT)/src/internal/fmtsort/` -- `exec.go` needs it, and `internal/...` packages can't be imported from outside GOROOT, so it comes along |
-| `patches/0001-exec-context.patch` | our only real change (see below) |
+| `patches/0001-exec-context.patch` | context cancellation (see below) |
+| `patches/0002-print-check.patch` | print hook (see below) |
 | `GENERATED_FROM` | the exact Go version `make update-template` last regenerated this copy from; provenance, written by that target |
 
 The Go toolchain version this copy is pinned to lives in the repo-root [`.go-version`](../../.go-version)
@@ -53,7 +55,8 @@ plain import.
 
 ## The patch
 
-`patches/` is a quilt-style ordered series (apply `0001-*`, then `0002-*`, ...). Today there is just
+`patches/` is a quilt-style ordered series (apply `0001-*`, then `0002-*`, ...). Today there are two.
+
 `0001-exec-context.patch` -- small, purely additive, and touching only `exec.go`:
 
 - adds `ctx context.Context` and a shared `cancelled *atomic.Bool` to the executor `state`
@@ -67,13 +70,24 @@ The flag is a `*atomic.Bool` (not a value) because `walkTemplate` copies `state`
 `{{template}}` invocations; a shared pointer keeps one flag across all copies and avoids `go vet`
 copylocks. `template.go` is unchanged -- the context is per-call, not stored on the `Template`.
 
+`0002-print-check.patch` -- purely additive, touching `option.go` and `exec.go`:
+
+- adds `PrintCheck(func(...any) error)`, stored in the template's `option` like `missingkey`
+- `printValue` calls it right before `fmt.Fprint`, and aborts execution if it returns an error
+
+The executor prints an action's value (`{{$x}}`) with `fmt` directly, and `fmt` has no cycle
+detection and expands shared values, so a template could otherwise crash the server or allocate
+without bound by printing a value that references itself or nests shared lists. `printValue` is the
+single place every action's output goes through, so one check there covers every template shape.
+`renderTemplate` passes `template.CheckPrintable` (`template/printable.go`).
+
 Two *mechanical* transforms are applied by `make update-template` with `sed`, **not** the patch --
 renaming the package to `gotext`, and rewriting the `internal/fmtsort` import to
-`heckel.io/ntfy/v2/template/gotext/fmtsort`. Keeping them out of the patch means they apply to
+`heckel.io/ntfy/v2/template/gotext/fmtsort`. Keeping them out of the patches means they apply to
 whatever files `go list` returns, so they survive upstream files being added or removed. (These two
-transforms are also the only difference between our patch and the upstream `text/template` diff.)
+transforms are also the only difference between our 0001 patch and the upstream `text/template` diff.)
 
-Keeping the patch tiny (cancellation only, on one stable file) is deliberate: it makes re-basing
+Keeping the patches tiny (a few additive hunks on stable files) is deliberate: it makes re-basing
 onto a new Go release cheap.
 
 ## Updating (when bumping the Go toolchain)

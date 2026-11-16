@@ -153,7 +153,7 @@ what's up
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
-func TestSmtpBackend_Plaintext_TooLongTruncate(t *testing.T) {
+func TestSmtpBackend_Plaintext_TooLong(t *testing.T) {
 	email := `EHLO example.com
 MAIL FROM: phil@example.com
 RCPT TO: mytopic@ntfy.sh
@@ -295,12 +295,44 @@ pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp
 and with BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
 BBBBBBBBBBBBBBBBBBBBBBBBB`
 		require.Equal(t, 4096, len(expected)) // Sanity check
-		require.Equal(t, expected, readAll(t, r.Body))
+		body := readAll(t, r.Body)
+		require.Greater(t, len(body), 4096) // Not truncated, the server turns it into an attachment
+		require.True(t, strings.HasPrefix(body, expected))
+		require.True(t, strings.HasSuffix(body, "that should do it"))
 	})
 	defer s.Close()
 	defer c.Close()
 	conf.SMTPServerAddrPrefix = ""
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+}
+
+func TestSmtpBackend_Plaintext_TooLongAttachment(t *testing.T) {
+	body := strings.Repeat("this line is repeated until the body is way over 4096 bytes\n", 200)
+	email := `EHLO example.com
+MAIL FROM: phil@example.com
+RCPT TO: ntfy-mytopic@ntfy.sh
+DATA
+Subject: long email
+Content-Type: text/plain; charset="UTF-8"
+
+` + body + `.
+`
+	server := newTestServer(t, newTestConfig(t, ""))
+	s, c, _, scanner := newTestSMTPServer(t, server.handle)
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
+
+	response := request(t, server, "GET", "/mytopic/json?poll=1", "", nil)
+	m := toMessage(t, response.Body.String())
+	require.Equal(t, "long email", m.Title)
+	require.Equal(t, "You received a file: attachment.txt", m.Message)
+	require.NotNil(t, m.Attachment)
+	expected := strings.TrimSpace(body)
+	require.Equal(t, int64(len(expected)), m.Attachment.Size)
+
+	response = request(t, server, "GET", strings.TrimPrefix(m.Attachment.URL, "http://127.0.0.1:12345"), "", nil)
+	require.Equal(t, expected, response.Body.String())
 }
 
 func TestSmtpBackend_Plaintext_QuotedPrintable(t *testing.T) {

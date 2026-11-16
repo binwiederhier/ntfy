@@ -426,5 +426,10 @@
     "reset_password_sent_title": "Checa tu bandeja de entrada",
     "reset_password_sent_description": "Si una cuenta existe, un enlace para reiniciar tu contraseña se acaba de enviar a tu correo.",
     "reset_password_back_to_login": "Regresar a iniciar sesión",
-    "reset_password_disabled": "Reinicio de contraseña ha sido deshabilitado"
+    "reset_password_disabled": "Reinicio de contraseña ha sido deshabilitado",
+    "prefs_legal_contact_title": "Contacto:",
+    "prefs_legal_name": "Nombre",
+    "prefs_legal_email": "Correo electrónico",
+    "prefs_legal_notice": "Aviso legal",
+    "prefs_privacy_policy": "Política de privacidad"
 }

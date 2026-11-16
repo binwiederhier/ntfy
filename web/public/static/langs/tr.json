@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "Yetkilendirildi",
     "account_usage_emails_none": "Bu hesapla e-posta bildirimi gönderilemez",
     "prefs_users_dialog_base_url_invalid": "Geçersiz URL biçimi. http:// veya https:// ile başlamalıdır",
-    "prefs_users_dialog_base_url_exists": "Bu hizmet URL'si için zaten bir kullanıcı var"
+    "prefs_users_dialog_base_url_exists": "Bu hizmet URL'si için zaten bir kullanıcı var",
+    "prefs_legal_contact_title": "İletişim:",
+    "prefs_legal_name": "Ad",
+    "prefs_legal_email": "E-posta",
+    "prefs_legal_notice": "Yasal Bildirim",
+    "prefs_privacy_policy": "Gizlilik Politikası"
 }

@@ -1,8 +1,18 @@
 package sprig
 
 import (
+	"fmt"
 	"regexp"
+	"regexp/syntax"
 	"strings"
+)
+
+// Limits for user-supplied patterns. Go happily compiles programs with millions of instructions,
+// which are slow to compile and to match, so templates are capped well below that. Realistic
+// patterns compile to a few hundred instructions at most.
+const (
+	maxRegexPatternLength = 1024
+	maxRegexProgramInsts  = 5000
 )
 
 // regexMatch checks if a string matches a regular expression pattern.
@@ -15,8 +25,11 @@ import (
 // Returns:
 //   - bool: True if the string matches the pattern, false otherwise
 func regexMatch(regex string, s string) bool {
-	match, _ := regexp.MatchString(regex, s)
-	return match
+	r, err := compileRegex(regex)
+	if err != nil {
+		return false
+	}
+	return r.MatchString(s)
 }
 
 // mustRegexMatch checks if a string matches a regular expression pattern.
@@ -30,7 +43,11 @@ func regexMatch(regex string, s string) bool {
 //   - bool: True if the string matches the pattern, false otherwise
 //   - error: Any error that occurred during regex compilation
 func mustRegexMatch(regex string, s string) (bool, error) {
-	return regexp.MatchString(regex, s)
+	r, err := compileRegex(regex)
+	if err != nil {
+		return false, err
+	}
+	return r.MatchString(s), nil
 }
 
 // regexFindAll finds all matches of a regular expression in a string.
@@ -44,7 +61,7 @@ func mustRegexMatch(regex string, s string) (bool, error) {
 // Returns:
 //   - []string: A slice containing all matched substrings
 func regexFindAll(regex string, s string, n int) []string {
-	r := regexp.MustCompile(regex)
+	r := mustCompileRegex(regex)
 	return r.FindAllString(s, n)
 }
 
@@ -60,7 +77,7 @@ func regexFindAll(regex string, s string, n int) []string {
 //   - []string: A slice containing all matched substrings
 //   - error: Any error that occurred during regex compilation
 func mustRegexFindAll(regex string, s string, n int) ([]string, error) {
-	r, err := regexp.Compile(regex)
+	r, err := compileRegex(regex)
 	if err != nil {
 		return []string{}, err
 	}
@@ -77,7 +94,7 @@ func mustRegexFindAll(regex string, s string, n int) ([]string, error) {
 // Returns:
 //   - string: The first matched substring, or an empty string if no match
 func regexFind(regex string, s string) string {
-	r := regexp.MustCompile(regex)
+	r := mustCompileRegex(regex)
 	return r.FindString(s)
 }
 
@@ -92,7 +109,7 @@ func regexFind(regex string, s string) string {
 //   - string: The first matched substring, or an empty string if no match
 //   - error: Any error that occurred during regex compilation
 func mustRegexFind(regex string, s string) (string, error) {
-	r, err := regexp.Compile(regex)
+	r, err := compileRegex(regex)
 	if err != nil {
 		return "", err
 	}
@@ -111,7 +128,7 @@ func mustRegexFind(regex string, s string) (string, error) {
 // Returns:
 //   - string: The resulting string after all replacements
 func regexReplaceAll(regex string, s string, repl string) string {
-	r := regexp.MustCompile(regex)
+	r := mustCompileRegex(regex)
 	checkResultLength(regexReplaceResultLen(r, s, repl, false))
 	return r.ReplaceAllString(s, repl)
 }
@@ -129,7 +146,7 @@ func regexReplaceAll(regex string, s string, repl string) string {
 //   - string: The resulting string after all replacements
 //   - error: Any error that occurred during regex compilation
 func mustRegexReplaceAll(regex string, s string, repl string) (string, error) {
-	r, err := regexp.Compile(regex)
+	r, err := compileRegex(regex)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +166,7 @@ func mustRegexReplaceAll(regex string, s string, repl string) (string, error) {
 // Returns:
 //   - string: The resulting string after all replacements
 func regexReplaceAllLiteral(regex string, s string, repl string) string {
-	r := regexp.MustCompile(regex)
+	r := mustCompileRegex(regex)
 	checkResultLength(regexReplaceResultLen(r, s, repl, true))
 	return r.ReplaceAllLiteralString(s, repl)
 }
@@ -167,7 +184,7 @@ func regexReplaceAllLiteral(regex string, s string, repl string) string {
 //   - string: The resulting string after all replacements
 //   - error: Any error that occurred during regex compilation
 func mustRegexReplaceAllLiteral(regex string, s string, repl string) (string, error) {
-	r, err := regexp.Compile(regex)
+	r, err := compileRegex(regex)
 	if err != nil {
 		return "", err
 	}
@@ -186,7 +203,7 @@ func mustRegexReplaceAllLiteral(regex string, s string, repl string) (string, er
 // Returns:
 //   - []string: A slice containing the substrings between regex matches
 func regexSplit(regex string, s string, n int) []string {
-	r := regexp.MustCompile(regex)
+	r := mustCompileRegex(regex)
 	return r.Split(s, n)
 }
 
@@ -202,7 +219,7 @@ func regexSplit(regex string, s string, n int) []string {
 //   - []string: A slice containing the substrings between regex matches
 //   - error: Any error that occurred during regex compilation
 func mustRegexSplit(regex string, s string, n int) ([]string, error) {
-	r, err := regexp.Compile(regex)
+	r, err := compileRegex(regex)
 	if err != nil {
 		return []string{}, err
 	}
@@ -219,6 +236,35 @@ func mustRegexSplit(regex string, s string, n int) ([]string, error) {
 //   - string: The escaped string with all regex metacharacters quoted
 func regexQuoteMeta(s string) string {
 	return regexp.QuoteMeta(s)
+}
+
+// compileRegex compiles a user-supplied pattern, rejecting patterns that are too long or that
+// compile to a program larger than maxRegexProgramInsts, before handing it to regexp.Compile.
+func compileRegex(regex string) (*regexp.Regexp, error) {
+	if len(regex) > maxRegexPatternLength {
+		return nil, fmt.Errorf("regex pattern length %d exceeds limit of %d", len(regex), maxRegexPatternLength)
+	}
+	re, err := syntax.Parse(regex, syntax.Perl)
+	if err != nil {
+		return nil, err
+	}
+	prog, err := syntax.Compile(re.Simplify())
+	if err != nil {
+		return nil, err
+	}
+	if len(prog.Inst) > maxRegexProgramInsts {
+		return nil, fmt.Errorf("regex program size %d exceeds limit of %d", len(prog.Inst), maxRegexProgramInsts)
+	}
+	return regexp.Compile(regex)
+}
+
+// mustCompileRegex is like compileRegex, but panics on error, like regexp.MustCompile.
+func mustCompileRegex(regex string) *regexp.Regexp {
+	r, err := compileRegex(regex)
+	if err != nil {
+		panic(err)
+	}
+	return r
 }
 
 // regexReplaceResultLen returns an upper bound on the size of r.ReplaceAllString(s, repl) (or the

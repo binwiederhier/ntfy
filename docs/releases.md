@@ -2398,6 +2398,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Message templating: values are now checked before they are printed or JSON-encoded, so a template can no longer crash the server by printing a value that references itself, or build a huge string by printing a list of many references to one value; `printf` only accepts plain directives (no explicit argument indexes or `%p`) and no lists or dicts as arguments, and the `html`, `js` and `urlquery` functions are no longer allowed
 * Enforce the message template execution deadline inside a single template action, so a long pipeline or deeply nested function calls can no longer outrun it
 * Message templating: the `regexMatch`, `regexFind`, `regexFindAll`, `regexReplaceAll`, `regexReplaceAllLiteral` and `regexSplit` functions (and their `must` variants) now reject patterns longer than 1024 bytes or that compile to more than 5000 instructions, so a template can no longer make the server compile and run a huge regular expression
+* Buffer S3 attachment uploads of unknown size in small chunks as data arrives, instead of allocating a full 5 MB part up front (and a second one for multipart uploads), so that slow or stalled uploads no longer pin 5-10 MB of memory each
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

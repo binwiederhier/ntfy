@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+	"time"
 
 	"heckel.io/ntfy/v2/user"
 	vis "heckel.io/ntfy/v2/visitor"
@@ -163,4 +164,17 @@ func TestVisitorID(t *testing.T) {
 
 	require.Equal(t, "ip:1.2.0.0", vis.Key(netip.MustParseAddr("1.2.3.4"), nil, visitorConfigFrom(confWithShortenedPrefixes)))
 	require.Equal(t, "ip:2a01:599:b26:2300::", vis.Key(netip.MustParseAddr("2a01:599:b26:2397:dbe7:5aa2:95ce:1e83"), nil, visitorConfigFrom(confWithShortenedPrefixes)))
+}
+
+func TestTCPKeepAliveConfig_IdleAboveKeepaliveInterval(t *testing.T) {
+	// A stream gets ntfy's keepalive event every keepalive-interval, and the kernel counts idle time
+	// from the last packet received (the client's ACK). With the probes' idle time above the
+	// interval, a stream is never probed (no extra radio wake-ups for phones), while an idle
+	// keep-alive connection still is, so one from a client that silently went away is closed.
+	config := tcpKeepAliveConfig(45 * time.Second)
+	require.True(t, config.Enable)
+	require.Equal(t, 75*time.Second, config.Idle)
+	require.Equal(t, 15*time.Second, config.Interval)
+	require.Equal(t, 4, config.Count)
+	require.Equal(t, 10*time.Minute+30*time.Second, tcpKeepAliveConfig(10*time.Minute).Idle)
 }

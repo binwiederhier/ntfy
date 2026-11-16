@@ -16,6 +16,7 @@ import (
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
+	vis "heckel.io/ntfy/v2/visitor" // Aliased: the server has its own visitor type
 	wpush "heckel.io/ntfy/v2/webpush"
 )
 
@@ -87,7 +88,9 @@ func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *
 			}
 		}
 	}
-	if err := s.webPush.UpsertSubscription(req.Endpoint, req.Auth, req.P256dh, v.MaybeUserID(), v.IP(), req.Topics); err != nil {
+	// Store the masked IP, so the per-subscriber cap covers a whole prefix like all other limits
+	subscriberIP := vis.Mask(v.IP(), v.env.limitsConfig)
+	if err := s.webPush.UpsertSubscription(req.Endpoint, req.Auth, req.P256dh, v.MaybeUserID(), subscriberIP, req.Topics); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())

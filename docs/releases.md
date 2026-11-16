@@ -2400,6 +2400,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 * Message templating: the `regexMatch`, `regexFind`, `regexFindAll`, `regexReplaceAll`, `regexReplaceAllLiteral` and `regexSplit` functions (and their `must` variants) now reject patterns longer than 1024 bytes or that compile to more than 5000 instructions, so a template can no longer make the server compile and run a huge regular expression
 * Buffer S3 attachment uploads of unknown size in small chunks as data arrives, instead of allocating a full 5 MB part up front (and a second one for multipart uploads), so that slow or stalled uploads no longer pin 5-10 MB of memory each
 * Use a timeout for web push deliveries and always close the push service response, so slow or unresponsive push endpoints can no longer leak connections and goroutines; a timeout or network error no longer removes the web push subscription
+* Count the web push subscription limit per IP prefix (the same IPv6 /64 or configured prefix as all other limits) instead of per full IP address, so rotating addresses within one prefix no longer bypasses it
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

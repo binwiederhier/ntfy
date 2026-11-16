@@ -176,6 +176,35 @@ func TestServer_WebPush_TopicAdd_TooManyTopics(t *testing.T) {
 	})
 }
 
+func TestServer_WebPush_TopicAdd_TooManySubscriptionsSamePrefix(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfigWithWebPush(t, databaseURL))
+
+		// Rotating addresses within one /64 must not bypass the per-subscriber cap
+		for i := 0; i < 10; i++ {
+			overrideRemoteAddr := func(r *http.Request) {
+				r.RemoteAddr = fmt.Sprintf("[2001:db8:9999:8888:%x::1]:1234", i+1)
+			}
+			response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, fmt.Sprintf("%s%d", testWebPushEndpoint, i)), nil, overrideRemoteAddr)
+			require.Equal(t, 200, response.Code)
+		}
+		overrideRemoteAddrSamePrefix := func(r *http.Request) {
+			r.RemoteAddr = "[2001:db8:9999:8888:ffff::1]:1234"
+		}
+		response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint+"10"), nil, overrideRemoteAddrSamePrefix)
+		require.NotEqual(t, 200, response.Code)
+		requireSubscriptionCount(t, s, "test-topic", 10)
+
+		// A different /64 is unaffected
+		overrideRemoteAddrOtherPrefix := func(r *http.Request) {
+			r.RemoteAddr = "[2001:db8:9999:7777::1]:1234"
+		}
+		response = request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint+"11"), nil, overrideRemoteAddrOtherPrefix)
+		require.Equal(t, 200, response.Code)
+		requireSubscriptionCount(t, s, "test-topic", 11)
+	})
+}
+
 func TestServer_WebPush_TopicUnsubscribe(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		s := newTestServer(t, newTestConfigWithWebPush(t, databaseURL))

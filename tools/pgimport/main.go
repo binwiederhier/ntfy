@@ -468,6 +468,16 @@ func openSQLite(filename string) (*sql.DB, error) {
 	return sql.Open("sqlite3", filename+"?mode=ro")
 }
 
+// sqliteHasColumn reports whether the SQLite table has the column, for columns added after the
+// schema version this tool was written against
+func sqliteHasColumn(sqlDB *sql.DB, table, column string) (bool, error) {
+	var count int
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, table, column).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // User import
 
 func importUsers(sqliteFile string, pgDB *sql.DB) error {
@@ -728,7 +738,17 @@ func importMessages(sqliteFile string, pgDB *sql.DB, sinceTime int64) error {
 	}
 	defer sqlDB.Close()
 
-	query := `SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, published FROM messages`
+	// The apple column (X-Apple-* headers) was added in message cache v18; a SQLite file from an
+	// older ntfy doesn't have it, and its messages are imported without Apple options
+	hasApple, err := sqliteHasColumn(sqlDB, "messages", "apple")
+	if err != nil {
+		return fmt.Errorf("checking for apple column: %w", err)
+	}
+	appleColumn := `'' AS apple`
+	if hasApple {
+		appleColumn = `apple`
+	}
+	query := `SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user, content_type, encoding, ` + appleColumn + `, published FROM messages`
 	var rows *sql.Rows
 	if sinceTime > 0 {
 		fmt.Printf("Importing messages from %s (since time %d) ...\n", sqliteFile, sinceTime)
@@ -745,8 +765,13 @@ func importMessages(sqliteFile string, pgDB *sql.DB, sinceTime int64) error {
 	if _, err := pgDB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_message_mid_unique ON message (mid)`); err != nil {
 		return fmt.Errorf("creating unique index on mid: %w", err)
 	}
+	// The v14 schema has no apple column; the server's 17 -> 18 migration adds it with the same
+	// statement, so adding it here keeps the imported Apple options and the migration is a no-op
+	if _, err := pgDB.Exec(`ALTER TABLE message ADD COLUMN IF NOT EXISTS apple TEXT NOT NULL DEFAULT ''`); err != nil {
+		return fmt.Errorf("adding apple column: %w", err)
+	}
 
-	insertQuery := `INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user_id, content_type, encoding, published) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24) ON CONFLICT (mid) DO NOTHING`
+	insertQuery := `INSERT INTO message (mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, attachment_deleted, sender, user_id, content_type, encoding, apple, published) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25) ON CONFLICT (mid) DO NOTHING`
 
 	count := 0
 	batchCount := 0
@@ -764,12 +789,12 @@ func importMessages(sqliteFile string, pgDB *sql.DB, sinceTime int64) error {
 
 	for rows.Next() {
 		var mid, sequenceID, event, topic, message, title, tags, click, icon, actions string
-		var attachmentName, attachmentType, attachmentURL, sender, userID, contentType, encoding string
+		var attachmentName, attachmentType, attachmentURL, sender, userID, contentType, encoding, apple string
 		var msgTime, expires, attachmentExpires int64
 		var priority int
 		var attachmentSize int64
 		var attachmentDeleted, published int
-		if err := rows.Scan(&mid, &sequenceID, &msgTime, &event, &expires, &topic, &message, &title, &priority, &tags, &click, &icon, &actions, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentURL, &attachmentDeleted, &sender, &userID, &contentType, &encoding, &published); err != nil {
+		if err := rows.Scan(&mid, &sequenceID, &msgTime, &event, &expires, &topic, &message, &title, &priority, &tags, &click, &icon, &actions, &attachmentName, &attachmentType, &attachmentSize, &attachmentExpires, &attachmentURL, &attachmentDeleted, &sender, &userID, &contentType, &encoding, &apple, &published); err != nil {
 			return fmt.Errorf("scanning message: %w", err)
 		}
 		mid = toUTF8(mid)
@@ -789,9 +814,10 @@ func importMessages(sqliteFile string, pgDB *sql.DB, sinceTime int64) error {
 		userID = toUTF8(userID)
 		contentType = toUTF8(contentType)
 		encoding = toUTF8(encoding)
+		apple = toUTF8(apple)
 		attachmentDeletedBool := attachmentDeleted != 0
 		publishedBool := published != 0
-		if _, err := stmt.Exec(mid, sequenceID, msgTime, event, expires, topic, message, title, priority, tags, click, icon, actions, attachmentName, attachmentType, attachmentSize, attachmentExpires, attachmentURL, attachmentDeletedBool, sender, userID, contentType, encoding, publishedBool); err != nil {
+		if _, err := stmt.Exec(mid, sequenceID, msgTime, event, expires, topic, message, title, priority, tags, click, icon, actions, attachmentName, attachmentType, attachmentSize, attachmentExpires, attachmentURL, attachmentDeletedBool, sender, userID, contentType, encoding, apple, publishedBool); err != nil {
 			return fmt.Errorf("inserting message: %w", err)
 		}
 		count++

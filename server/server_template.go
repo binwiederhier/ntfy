@@ -118,7 +118,7 @@ func (s *Server) renderTemplateFromFile(ctx context.Context, m *model.Message, t
 // message, title, and priority parameters.
 func (s *Server) renderTemplateFromParams(ctx context.Context, m *model.Message, peekedBody string, priorityStr string) error {
 	var err error
-	if m.Message, err = s.renderTemplate(ctx, "priority query parameter", m.Message, peekedBody); err != nil {
+	if m.Message, err = s.renderTemplate(ctx, "message query parameter", m.Message, peekedBody); err != nil {
 		return err
 	}
 	if m.Title, err = s.renderTemplate(ctx, "title query parameter", m.Title, peekedBody); err != nil {

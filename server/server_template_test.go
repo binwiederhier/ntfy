@@ -264,3 +264,23 @@ func TestServer_renderTemplate_OutputActionsUnchanged(t *testing.T) {
 		require.Equal(t, want, out, "template %s", tpl)
 	}
 }
+
+func TestServer_MessageTemplate_ExecuteErrorNamesParameter(t *testing.T) {
+	// An error in an inline template must name the parameter that contains the broken template
+	s := newTestServer(t, newTestConfig(t, ""))
+	tests := map[string]string{
+		"X-Message":  "template message query parameter: ",
+		"X-Title":    "template title query parameter: ",
+		"X-Priority": "template priority query parameter: ",
+	}
+	for header, want := range tests {
+		response := request(t, s, "PUT", "/mytopic", `{"foo":"bar"}`, map[string]string{
+			header:       `{{fail "boom"}}`,
+			"X-Template": "1",
+		})
+		require.Equal(t, 400, response.Code, header)
+		err := toHTTPError(t, response.Body.String())
+		require.Equal(t, errHTTPBadRequestTemplateExecuteFailed.Code, err.Code, header)
+		require.Contains(t, err.Message, want, header)
+	}
+}

@@ -6,11 +6,32 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.37.2 | Nov 3, 2026   |
+| ntfy server      | v2.38.1 | Nov 17, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.38.1
+Released November 17, 2026
+
+This is a security release. It hardens message templating against a set of denial-of-service attacks, where a
+crafted template could crash the server, exhaust its memory or outrun the execution deadline in a single request.
+It also stops slow S3 attachment uploads and unresponsive web push endpoints from tying up memory, connections and
+goroutines, and applies the web push subscription limit per IP prefix. Upgrading is strongly recommended if you
+allow message templates (`Template: yes`), which any publisher can use.
+
+**Security:**
+
+* Message templating: values are now checked before they are printed or JSON-encoded, so a template can no longer crash the server by printing a value that references itself, or build a huge string by printing a list of many references to one value
+* Message templating: `printf` only accepts plain directives (no explicit argument indexes or `%p`) and no lists or dicts as arguments, and the `html`, `js` and `urlquery` functions are no longer allowed
+* Message templating: the execution deadline is now also enforced inside a single template action, so a long pipeline or deeply nested function calls can no longer outrun it
+* Message templating: the `regexMatch`, `regexFind`, `regexFindAll`, `regexReplaceAll`, `regexReplaceAllLiteral` and `regexSplit` functions (and their `must` variants) now reject patterns longer than 1024 bytes or that compile to more than 5000 instructions, so a template can no longer make the server compile and run a huge regular expression
+* Message templating: limit the result size of the `cat`, `toPrettyJSON`, `concat` and `keys` functions, and the list size of `uniq`, `without` and `has`, so a small template can no longer build a huge string or list in a single call
+* Message templating: apply the iteration limit of `until`, `untilStep` and `seq` to decreasing sequences too, so a negative step can no longer build an unbounded list
+* Attachments: buffer S3 uploads of unknown size in small chunks as data arrives, instead of allocating a full 5 MB part up front (and a second one for multipart uploads), so that slow or stalled uploads no longer pin 5-10 MB of memory each
+* Web push: use a timeout for deliveries and always close the push service response, so slow or unresponsive push endpoints can no longer leak connections and goroutines; a timeout or network error no longer removes the subscription
+* Web push: count the subscription limit per IP prefix (the same IPv6 /64 or configured prefix as all other limits) instead of per full IP address, so rotating addresses within one prefix no longer bypasses it
 
 ## ntfy server v2.38.0
 Released November 15, 2026
@@ -2387,20 +2408,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.38.1 (UNRELEASED)
-
-**Security:**
-
-* Limit the result size of the `cat` and `toPrettyJSON` template functions, and the list size of `uniq`, `without` and `has`, to prevent excessive memory and CPU use in message templates
-* Templating: apply the iteration limit of `until`, `untilStep` and `seq` to decreasing sequences too, so a negative step can no longer build an unbounded list
-* Limit the result size of the `concat` and `keys` template functions, so passing the same list or dict many times can no longer build a huge slice in a single call
-* Message templating: values are now checked before they are printed or JSON-encoded, so a template can no longer crash the server by printing a value that references itself, or build a huge string by printing a list of many references to one value; `printf` only accepts plain directives (no explicit argument indexes or `%p`) and no lists or dicts as arguments, and the `html`, `js` and `urlquery` functions are no longer allowed
-* Enforce the message template execution deadline inside a single template action, so a long pipeline or deeply nested function calls can no longer outrun it
-* Message templating: the `regexMatch`, `regexFind`, `regexFindAll`, `regexReplaceAll`, `regexReplaceAllLiteral` and `regexSplit` functions (and their `must` variants) now reject patterns longer than 1024 bytes or that compile to more than 5000 instructions, so a template can no longer make the server compile and run a huge regular expression
-* Buffer S3 attachment uploads of unknown size in small chunks as data arrives, instead of allocating a full 5 MB part up front (and a second one for multipart uploads), so that slow or stalled uploads no longer pin 5-10 MB of memory each
-* Use a timeout for web push deliveries and always close the push service response, so slow or unresponsive push endpoints can no longer leak connections and goroutines; a timeout or network error no longer removes the web push subscription
-* Count the web push subscription limit per IP prefix (the same IPv6 /64 or configured prefix as all other limits) instead of per full IP address, so rotating addresses within one prefix no longer bypasses it
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

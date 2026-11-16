@@ -14,7 +14,8 @@ const routes = {
   subscriptionExternal: "/:baseUrl/:topic",
   forSubscription: (subscription) => {
     if (subscription.baseUrl !== config.base_url) {
-      return `/${shortUrl(subscription.baseUrl)}/${subscription.topic}`;
+      // Encode the base URL so a path in it (https://host/path) stays one route segment
+      return `/${encodeURIComponent(shortUrl(subscription.baseUrl))}/${subscription.topic}`;
     }
     return `/${subscription.topic}`;
   },

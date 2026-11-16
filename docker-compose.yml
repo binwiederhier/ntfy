@@ -13,3 +13,18 @@ services:
     ports:
       - 80:80
     restart: unless-stopped
+    tmpfs:
+      - /tmp
+      - /run
+      - /var/cache
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
+    security_opt:
+      - "apparmor=docker-default"

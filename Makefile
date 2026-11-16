@@ -357,7 +357,7 @@ update-template:
 		exit 1; \
 	fi
 	src="$$(go env GOROOT)/src"; \
-	rm -f template/gotext/*.go template/gotext/fmtsort/*.go; \
+	find template/gotext -name '*.go' ! -name 'patches_test.go' -delete; \
 	for f in $$(go list -f '{{range .GoFiles}}{{.}} {{end}}' text/template); do cp "$$src/text/template/$$f" template/gotext/; done; \
 	for f in $$(go list -f '{{range .GoFiles}}{{.}} {{end}}' internal/fmtsort); do cp "$$src/internal/fmtsort/$$f" template/gotext/fmtsort/; done; \
 	sed -i 's/^package template$$/package gotext/' template/gotext/*.go; \
@@ -383,11 +383,11 @@ template-check: FORCE
 	sed -i 's#"internal/fmtsort"#"heckel.io/ntfy/v2/template/gotext/fmtsort"#' "$$tmp/gotext/"*.go; \
 	cp template/gotext/patches/*.patch "$$tmp/"; \
 	( cd "$$tmp/gotext" && for p in "$$tmp"/*.patch; do git apply "$$p" || exit 1; done ); \
-	if diff -rq -x 'README.md' -x 'GENERATED_FROM' -x 'patches' "$$tmp/gotext" template/gotext >/dev/null 2>&1; then \
+	if diff -rq -x 'README.md' -x 'GENERATED_FROM' -x 'patches' -x 'patches_test.go' "$$tmp/gotext" template/gotext >/dev/null 2>&1; then \
 		rm -rf "$$tmp"; \
 	else \
 		echo "ERROR: template/gotext/ drifted from GOROOT+patches (or its file set changed). Run 'make update-template' on Go $(TEMPLATE_GO_VERSION):"; \
-		diff -rq -x 'README.md' -x 'GENERATED_FROM' -x 'patches' "$$tmp/gotext" template/gotext; \
+		diff -rq -x 'README.md' -x 'GENERATED_FROM' -x 'patches' -x 'patches_test.go' "$$tmp/gotext" template/gotext; \
 		rm -rf "$$tmp"; exit 1; \
 	fi
 

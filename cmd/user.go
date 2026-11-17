@@ -256,6 +256,8 @@ func execUserAdd(c *cli.Context) error {
 			return err
 		}
 		password = p
+	} else {
+		printPasswordFromEnvNotice(c, hashed)
 	}
 	if err := manager.AddUser(username, password, role, hashed); err != nil {
 		return err
@@ -308,12 +310,25 @@ func execUserChangePass(c *cli.Context) error {
 		if err != nil {
 			return err
 		}
+	} else {
+		printPasswordFromEnvNotice(c, hashed)
 	}
 	if err := manager.ChangePassword(username, password, hashed); err != nil {
 		return err
 	}
 	fmt.Fprintf(c.App.Writer, "changed password for user %s\n", username)
 	return nil
+}
+
+// printPasswordFromEnvNotice prints to stderr that the password came from NTFY_PASSWORD or
+// NTFY_PASSWORD_HASH instead of a prompt. Without it, a variable left over from the initial
+// setup sets the password with no hint, see #1253.
+func printPasswordFromEnvNotice(c *cli.Context, hashed bool) {
+	envVar := "NTFY_PASSWORD"
+	if hashed {
+		envVar = "NTFY_PASSWORD_HASH"
+	}
+	fmt.Fprintf(c.App.ErrWriter, "using password from %s environment variable (unset it to be prompted instead)\n", envVar)
 }
 
 func execUserResetPass(c *cli.Context) error {

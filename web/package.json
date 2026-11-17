@@ -46,7 +46,7 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.13.0",
     "prettier": "^3.9.4",
-    "vite": "^8.0.16",
+    "vite": "^8.3.7",
     "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.4"
   },

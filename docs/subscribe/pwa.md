@@ -60,6 +60,11 @@ On iOS Safari, tap on the Share menu, then tap "Add to Home Screen":
     <a href="../../static/img/pwa-install-safari-ios-add-icon.jpg"><img src="../../static/img/pwa-install-safari-ios-add-icon.jpg"/></a>
 </div>
 
+## Sharing text and links on Android
+
+After installing ntfy with Chrome on Android, choose **ntfy** from the Android share menu to open the publish dialog
+with the shared text or link. Review or edit the draft, enter a topic, and tap **Send** to publish it.
+
 ## Background notifications
 Background notifications via web push are enabled by default and cannot be turned off when the app is installed, as notifications would
 not be delivered reliably otherwise. You can mute topics you don't want to receive notifications for.

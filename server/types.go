@@ -538,15 +538,29 @@ func newWebPushSubscriptionExpiringPayload() *webPushControlMessagePayload {
 
 // https://developer.mozilla.org/en-US/docs/Web/Manifest
 type webManifestResponse struct {
-	Name            string             `json:"name"`
-	Description     string             `json:"description"`
-	ShortName       string             `json:"short_name"`
-	Scope           string             `json:"scope"`
-	StartURL        string             `json:"start_url"`
-	Display         string             `json:"display"`
-	BackgroundColor string             `json:"background_color"`
-	ThemeColor      string             `json:"theme_color"`
-	Icons           []*webManifestIcon `json:"icons"`
+	Name            string                 `json:"name"`
+	Description     string                 `json:"description"`
+	ShortName       string                 `json:"short_name"`
+	Scope           string                 `json:"scope"`
+	StartURL        string                 `json:"start_url"`
+	Display         string                 `json:"display"`
+	BackgroundColor string                 `json:"background_color"`
+	ThemeColor      string                 `json:"theme_color"`
+	Icons           []*webManifestIcon     `json:"icons"`
+	ShareTarget     webManifestShareTarget `json:"share_target"`
+}
+
+type webManifestShareTarget struct {
+	Action  string                 `json:"action"`
+	Method  string                 `json:"method"`
+	Enctype string                 `json:"enctype"`
+	Params  webManifestShareParams `json:"params"`
+}
+
+type webManifestShareParams struct {
+	Title string `json:"title"`
+	Text  string `json:"text"`
+	URL   string `json:"url"`
 }
 
 type webManifestIcon struct {

@@ -53,7 +53,7 @@ const PublishDialog = (props) => {
   const [topic, setTopic] = useState("");
   const [message, setMessage] = useState("");
   const [messageFocused, setMessageFocused] = useState(true);
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(props.title ?? "");
   const [tags, setTags] = useState("");
   const [priority, setPriority] = useState(3);
   const [clickUrl, setClickUrl] = useState("");

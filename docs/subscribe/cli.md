@@ -250,6 +250,13 @@ Here's an example config file that subscribes to three different topics, executi
       command: calc
     ```
 
+!!! warning
+    On Windows, ntfy rewrites `%VARIABLE%` references to the message variables
+    above as delayed-expansion references (`!VARIABLE!`) before executing your
+    command. This prevents message content (such as `&`, `|` or quotes) from being
+    interpreted as batch commands by `cmd.exe`. As a side effect, a literal `!` in
+    your command must be escaped as `^^!`.
+
 In this example, when `ntfy subscribe --from-config` is executed:
 
 * Messages to `echo-this` simply echos to standard out

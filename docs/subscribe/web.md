@@ -7,6 +7,13 @@ will appear in the web app, and pop up as a notification.**
     <a href="../../static/img/web-subscribe.png"><img src="../../static/img/web-subscribe.png"/></a> 
 </div>
 
+## Search notifications
+
+Use **Search notifications** above the notification list to find text in message titles, bodies, or tags. Search is
+case-insensitive and covers notifications stored in your browser, including older messages further down the list.
+Search within a topic to limit results to that topic, or open **All notifications** to search across your subscriptions.
+Use **Clear search** or press Escape in the search field to show the full list again.
+
 ## Publish messages
 To learn how to send messages, check out the [publishing page](../publish.md).
 

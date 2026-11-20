@@ -45,6 +45,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Simple Observability](https://simpleobservability.com/docs/alerts/ntfy) - Server monitoring and observability platform
 - [Sifio](https://sifio.net) - Aggregate updates from RSS, social media, and other sources, then deliver them to ntfy, Slack, Notion and more
 - [SolidPing](https://docs.solidping.io/docs/configuration/notifications#ntfy) - Uptime and synthetic monitoring
+- [Spooky Particles](https://spookyparticles.com/docs/check-ins) - Monitoring for Vercel apps and scheduled jobs: failed deploys, down sites and missed cron runs
 
 ## Integration via HTTP/SMTP/etc.
 

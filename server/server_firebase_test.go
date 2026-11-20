@@ -12,7 +12,9 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"firebase.google.com/go/v4/messaging"
 	"github.com/stretchr/testify/require"
@@ -38,6 +40,7 @@ func (t testAuther) Authorize(_ *user.User, _ string, _ user.Permission) error {
 type testFirebaseSender struct {
 	allowed  int
 	messages []*messaging.Message
+	onSend   func(m *messaging.Message) // Called before a message is accepted, if set
 	mu       sync.Mutex
 }
 
@@ -49,6 +52,9 @@ func newTestFirebaseSender(allowed int) *testFirebaseSender {
 }
 
 func (s *testFirebaseSender) Send(m *messaging.Message) error {
+	if s.onSend != nil {
+		s.onSend(m)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.messages)+1 > s.allowed {
@@ -348,16 +354,61 @@ func TestToFirebaseSender_Abuse(t *testing.T) {
 	client := newFirebaseClient(sender, &testAuther{})
 	visitor := newVisitor(newVisitorEnv(newTestConfig(t, ""), limit.New(&limit.Config{}), newMemTestCache(t), nil), netip.MustParseAddr("1.2.3.4"), nil)
 
-	require.Nil(t, client.Send(visitor, &model.Message{Topic: "mytopic"}))
+	require.Nil(t, client.Send(visitor, &model.Message{Topic: "mytopic"}, nil))
 	require.Equal(t, 1, len(sender.Messages()))
 
-	require.Nil(t, client.Send(visitor, &model.Message{Topic: "mytopic"}))
+	require.Nil(t, client.Send(visitor, &model.Message{Topic: "mytopic"}, nil))
 	require.Equal(t, 2, len(sender.Messages()))
 
-	require.Equal(t, errFirebaseQuotaExceeded, client.Send(visitor, &model.Message{Topic: "mytopic"}))
+	require.Equal(t, errFirebaseQuotaExceeded, client.Send(visitor, &model.Message{Topic: "mytopic"}, nil))
 	require.Equal(t, 2, len(sender.Messages()))
 
 	sender.messages = make([]*messaging.Message, 0) // Reset to test that time limit is working
-	require.Equal(t, errFirebaseTemporarilyBanned, client.Send(visitor, &model.Message{Topic: "mytopic"}))
+	require.Equal(t, errFirebaseTemporarilyBanned, client.Send(visitor, &model.Message{Topic: "mytopic"}, nil))
 	require.Equal(t, 0, len(sender.Messages()))
+}
+
+func TestServer_PublishWithFirebase_PollRequestSentAfterMessageIsWritten(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A poll_request makes the phone poll for the message right away, so it must not be sent
+		// before the batch writer stored the message, or the poll comes back empty
+		c := newTestConfig(t, databaseURL)
+		c.CacheBatchSize = 100
+		c.CacheBatchTimeout = time.Second
+		s := newTestServer(t, c)
+		var written atomic.Bool
+		sender := newTestFirebaseSender(10)
+		sender.onSend = func(m *messaging.Message) {
+			_, err := s.messageCache.Message(m.Data["id"])
+			written.Store(err == nil)
+		}
+		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: false}) // Protected topic -> poll_request
+
+		response := request(t, s, "PUT", "/mytopic", "my protected message", nil)
+		require.Equal(t, 200, response.Code)
+		waitFor(t, func() bool {
+			return len(sender.Messages()) == 1
+		})
+		require.Equal(t, model.PollRequestEvent, sender.Messages()[0].Data["event"])
+		require.True(t, written.Load())
+	})
+}
+
+func TestServer_PublishWithFirebase_MessageNotDelayedByBatchWrite(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// A normal message carries its content, so it is sent right away, without waiting for the batch writer
+		c := newTestConfig(t, databaseURL)
+		c.CacheBatchSize = 100
+		c.CacheBatchTimeout = 3 * time.Second
+		s := newTestServer(t, c)
+		sender := newTestFirebaseSender(10)
+		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+
+		response := request(t, s, "PUT", "/mytopic", "my message", nil)
+		require.Equal(t, 200, response.Code)
+		waitForWithMaxWait(t, time.Second, func() bool {
+			return len(sender.Messages()) == 1
+		})
+		require.Equal(t, model.MessageEvent, sender.Messages()[0].Data["event"])
+	})
 }

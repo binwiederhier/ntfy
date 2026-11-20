@@ -40,6 +40,10 @@ type dispatchOpts struct {
 	upstream bool   // Forward a poll request to the upstream server (if configured)
 	webPush  bool   // Publish to web push endpoints (if configured)
 	async    bool   // Deliver to local subscribers in a goroutine, logging errors instead of returning them
+
+	// written is closed once the message is stored in the message cache. Poll requests (Firebase,
+	// upstream) wait for it, so the client polling in response finds the message. nil = no wait.
+	written <-chan struct{}
 }
 
 // messageEncoder is a function that knows how to encode a message

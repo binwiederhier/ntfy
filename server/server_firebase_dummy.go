@@ -22,7 +22,7 @@ var (
 type firebaseClient struct {
 }
 
-func (c *firebaseClient) Send(v *visitor, m *model.Message) error {
+func (c *firebaseClient) Send(v *visitor, m *model.Message, written <-chan struct{}) error {
 	return errFirebaseNotAvailable
 }
 

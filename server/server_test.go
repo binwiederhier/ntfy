@@ -3911,6 +3911,38 @@ func TestServer_UpstreamBaseURL_Success(t *testing.T) {
 	})
 }
 
+func TestServer_UpstreamBaseURL_PollRequestSentAfterMessageIsWritten(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		// The upstream server wakes the iOS app, which polls this server right away, so the poll
+		// request must not be forwarded before the batch writer stored the message
+		var s *Server
+		var written atomic.Bool
+		var pollID atomic.Pointer[string]
+		upstreamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, err := s.messageCache.Message(r.Header.Get("X-Poll-ID"))
+			written.Store(err == nil)
+			pollID.Store(util.String(r.Header.Get("X-Poll-ID")))
+		}))
+		defer upstreamServer.Close()
+
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.BaseURL = "http://myserver.internal"
+		c.UpstreamBaseURL = upstreamServer.URL
+		c.CacheBatchSize = 100
+		c.CacheBatchTimeout = time.Second
+		s = newTestServer(t, c)
+
+		response := request(t, s, "PUT", "/mytopic", `hi there`, nil)
+		require.Equal(t, 200, response.Code)
+		m := toMessage(t, response.Body.String())
+		waitFor(t, func() bool {
+			pID := pollID.Load()
+			return pID != nil && *pID == m.ID
+		})
+		require.True(t, written.Load())
+	})
+}
+
 func TestServer_UpstreamBaseURL_With_Access_Token_Success(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		t.Parallel()

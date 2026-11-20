@@ -20,6 +20,17 @@ const publishInOneSecond = async (request, topic, messages) => {
   expect(new Set(times).size, `published in one second: ${times}`).toBe(1);
 };
 
+const sequenceEventsInOneSecond = async (request, topic, events) => {
+  await new Promise((resolve) => setTimeout(resolve, 1000 - (Date.now() % 1000)));
+  const messages = [];
+  for (const { method, data } of events) {
+    const response = await request[method](`/${topic}/download`, { data });
+    expect(response.ok()).toBeTruthy();
+    messages.push(await response.json());
+  }
+  expect(new Set(messages.map((m) => m.time)).size).toBe(1);
+};
+
 // Messages the topic's WebSocket received from the server, from now on
 const liveMessages = (page, topic) => {
   const received = [];
@@ -294,6 +305,54 @@ test.describe("sequences", () => {
 });
 
 test.describe("replays", () => {
+  test("a same-second delete replay keeps the recreated sequence", async ({ page, request }) => {
+    await request.post(`/${topic}/download`, { data: "Downloading" });
+    await expect(page.getByText("Downloading")).toBeVisible();
+    await sequenceEventsInOneSecond(request, topic, [{ method: "delete" }, { method: "post", data: "Download complete" }]);
+    await expect(page.getByText("Download complete")).toBeVisible();
+
+    const polled = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith(`/${topic}/json`));
+    await page.clock.fastForward("05:00");
+    await polled;
+    await page.waitForTimeout(1000);
+    await expect(page.getByText("Download complete")).toBeVisible();
+
+    await page.reload();
+    await page.clock.runFor(2000);
+    await page.waitForTimeout(1000);
+    await expect(page.getByText("Download complete")).toBeVisible();
+    await expect(page.getByRole("listitem", { name: "Notification" })).toHaveCount(1);
+    expect(await shown(page)).toEqual([]);
+  });
+
+  test("a same-second update replay keeps the latest version read", async ({ page, request }) => {
+    await sequenceEventsInOneSecond(request, topic, [
+      { method: "post", data: "Downloading" },
+      { method: "post", data: "Download complete" },
+    ]);
+    await expect(page.getByText("Download complete")).toBeVisible();
+    const other = unique("other");
+    await subscribe(page, other);
+    await page.getByRole("button", { name: topic, exact: true }).click();
+    await expect(page).toHaveTitle("ntfy");
+    await page.getByRole("button", { name: other, exact: true }).click();
+
+    const polled = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith(`/${topic}/json`));
+    await page.clock.fastForward("05:00");
+    await polled;
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveTitle("ntfy");
+
+    await page.reload();
+    await page.clock.runFor(2000);
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveTitle("ntfy");
+    expect(await shown(page)).toEqual([]);
+    await page.getByRole("button", { name: topic, exact: true }).click();
+    await expect(page.getByText("Download complete")).toBeVisible();
+    await expect(page.getByRole("listitem", { name: "Notification" })).toHaveCount(1);
+  });
+
   test("deleted messages don't come back when a reconnect replays them", async ({ page, request }) => {
     await publishInOneSecond(request, topic, ["first", "second", "third"]);
     const items = page.getByRole("listitem", { name: "Notification" });

@@ -39,16 +39,19 @@ const (
 		WHERE topic = $1 AND time >= $2
 		ORDER BY time DESC, id DESC
 	`
-	postgresSelectMessageRowIDQuery = `SELECT id, time FROM message WHERE mid = $1 LIMIT 1`
+	postgresSelectMessageRowIDQuery = `SELECT id, time, topic, sequence_id FROM message WHERE mid = $1 LIMIT 1`
 	// postgresSelectMessagesSinceIDQuery replays after a since=<mid> marker (see Cache.MessagesAfterMarker):
 	// rows published in the marker's second ($3) or later, except the marker ($2), and rows written after
 	// the marker but published before it. Each part starts its index scan at the marker; as one OR, every
 	// row of the topic was read (incident 2026-10-16). "time + 0" keeps the second part off the time index,
 	// whose scan would start at the topic's oldest row.
+	// $4 is the marker's sequence on this topic (empty for another topic). Earlier events of that
+	// sequence in the marker's second must not undo the state represented by the marker.
 	postgresSelectMessagesSinceIDQuery = `
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM (
 			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id <> $2
+				AND (time > $3 OR id > $2 OR sequence_id <> $4 OR $4 = '')
 			UNION ALL
 			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND id > $2 AND time + 0 < $3
 		) m
@@ -58,6 +61,7 @@ const (
 		SELECT mid, sequence_id, time, event, expires, topic, message, title, priority, tags, click, icon, actions, attachment_name, attachment_type, attachment_size, attachment_expires, attachment_url, sender, user_id, content_type, encoding
 		FROM (
 			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND time >= $3 AND id <> $2
+				AND (time > $3 OR id > $2 OR sequence_id <> $4 OR $4 = '')
 			UNION ALL
 			SELECT * FROM message WHERE topic = $1 AND published = TRUE AND id > $2 AND time + 0 < $3
 			UNION ALL

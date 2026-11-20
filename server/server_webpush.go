@@ -34,6 +34,16 @@ const (
 	// webPushResponseDrainLimit caps how much of a push service response body is read before
 	// closing it; draining small bodies lets the transport reuse the connection
 	webPushResponseDrainLimit = 4096
+
+	// webPushCompatRecordSize is the largest encrypted body Mozilla's push service accepts for
+	// devices behind its FCM bridge (Firefox for Android); larger bodies are rejected with HTTP 413.
+	// See https://mozilla-services.github.io/autopush-rs/http.html#send-notification
+	webPushCompatRecordSize = 2744
+
+	// webPushRecordOverhead is what the aes128gcm encoding adds to the payload in a single record:
+	// the header (16 byte salt, 4 byte record size, 1 byte key length, 65 byte key), the 16 byte
+	// AEAD tag and the 1 byte padding delimiter
+	webPushRecordOverhead = 86 + 16 + 1
 )
 
 // webPushHTTPClient is shared across deliveries (connection reuse); it is a var so tests can
@@ -184,6 +194,7 @@ func (s *Server) sendWebPushNotification(sub *wpush.Subscription, message []byte
 		Urgency:         webpush.UrgencyHigh, // iOS requires this to ensure delivery
 		TTL:             int(s.config.CacheDuration.Seconds()),
 		HTTPClient:      webPushHTTPClient,
+		RecordSize:      webPushRecordSize(len(message)),
 	})
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
@@ -207,6 +218,17 @@ func (s *Server) sendWebPushNotification(sub *wpush.Subscription, message []byte
 		return errHTTPInternalErrorWebPushUnableToPublish.With(sub).With(contexters...)
 	}
 	return nil
+}
+
+// webPushRecordSize returns the record size the payload is padded to. The library pads every
+// payload to the full record size, so the default of 4096 bytes makes even a short message too
+// large for Firefox for Android. Payloads that fit are padded to webPushCompatRecordSize instead,
+// and only larger payloads use the maximum record size.
+func webPushRecordSize(payloadLen int) uint32 {
+	if payloadLen+webPushRecordOverhead <= webPushCompatRecordSize {
+		return webPushCompatRecordSize
+	}
+	return webpush.MaxRecordSize
 }
 
 // closeWebPushResponse drains (bounded) and closes the response body, so the connection is

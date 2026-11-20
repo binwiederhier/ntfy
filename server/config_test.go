@@ -11,6 +11,7 @@ func TestConfig_New(t *testing.T) {
 	c := server.NewConfig()
 	assert.Equal(t, []string{server.DefaultListenHTTP}, c.ListenHTTP)
 	assert.Equal(t, server.DefaultKeepaliveInterval, c.KeepaliveInterval)
+	assert.Zero(t, c.UpstreamRetryDuration)
 	assert.Equal(t, "", c.ListenAdminUnix) // Experimental, off unless configured
 }
 
@@ -33,4 +34,11 @@ func TestConfig_HashExcludesSecrets(t *testing.T) {
 	conf3 := server.NewConfig()
 	conf3.BaseURL = "https://ntfy.example.com"
 	assert.NotEqual(t, conf1.Hash(), conf3.Hash())
+}
+
+func TestConfig_UpstreamRetryDuration(t *testing.T) {
+	conf := server.NewConfig()
+	conf.UpstreamRetryDuration = -1
+	_, err := server.New(conf)
+	assert.ErrorContains(t, err, "upstream-retry-duration must not be negative")
 }

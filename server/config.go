@@ -180,6 +180,7 @@ type Config struct {
 	FirebaseQuotaExceededPenaltyDuration time.Duration
 	UpstreamBaseURL                      string
 	UpstreamAccessToken                  string `hash:"-"`
+	UpstreamRetryDuration                time.Duration
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
 	SMTPSenderPass                       string `hash:"-"`
@@ -317,6 +318,7 @@ func NewConfig() *Config {
 		FirebaseQuotaExceededPenaltyDuration: DefaultFirebaseQuotaExceededPenaltyDuration,
 		UpstreamBaseURL:                      "",
 		UpstreamAccessToken:                  "",
+		UpstreamRetryDuration:                0,
 		SMTPSenderAddr:                       "",
 		SMTPSenderUser:                       "",
 		SMTPSenderPass:                       "",

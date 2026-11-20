@@ -382,6 +382,11 @@
 #
 # upstream-base-url:
 # upstream-access-token:
+#
+# Retry failed upstream poll requests for up to this duration, limited by message expiry.
+# Disabled by default; pending retries are kept in memory and discarded on restart.
+#
+# upstream-retry-duration: "0"
 
 # Configures message-specific limits
 #

@@ -80,6 +80,7 @@ var flagsServe = append(
 	altsrc.NewBoolFlag(&cli.BoolFlag{Name: "require-login", Aliases: []string{"require_login"}, EnvVars: []string{"NTFY_REQUIRE_LOGIN"}, Value: false, Usage: "all actions via the web app requires a login"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "upstream-base-url", Aliases: []string{"upstream_base_url"}, EnvVars: []string{"NTFY_UPSTREAM_BASE_URL"}, Value: "", Usage: "forward poll request to an upstream server, this is needed for iOS push notifications for self-hosted servers"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "upstream-access-token", Aliases: []string{"upstream_access_token"}, EnvVars: []string{"NTFY_UPSTREAM_ACCESS_TOKEN"}, Value: "", Usage: "access token to use for the upstream server; needed only if upstream rate limits are exceeded or upstream server requires auth"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "upstream-retry-duration", Aliases: []string{"upstream_retry_duration"}, EnvVars: []string{"NTFY_UPSTREAM_RETRY_DURATION"}, Value: "0", Usage: "maximum time to retry failed upstream poll requests (0 disables retries)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-addr", Aliases: []string{"smtp_sender_addr"}, EnvVars: []string{"NTFY_SMTP_SENDER_ADDR"}, Usage: "SMTP server address (host:port) for outgoing emails"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-user", Aliases: []string{"smtp_sender_user"}, EnvVars: []string{"NTFY_SMTP_SENDER_USER"}, Usage: "SMTP user (if e-mail sending is enabled)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "smtp-sender-pass", Aliases: []string{"smtp_sender_pass"}, EnvVars: []string{"NTFY_SMTP_SENDER_PASS"}, Usage: "SMTP password (if e-mail sending is enabled)"}),
@@ -210,6 +211,7 @@ func execServe(c *cli.Context) error {
 	enableReservations := c.Bool("enable-reservations")
 	upstreamBaseURL := c.String("upstream-base-url")
 	upstreamAccessToken := c.String("upstream-access-token")
+	upstreamRetryDurationStr := c.String("upstream-retry-duration")
 	smtpSenderAddr := c.String("smtp-sender-addr")
 	smtpSenderUser := c.String("smtp-sender-user")
 	smtpSenderPass := c.String("smtp-sender-pass")
@@ -255,6 +257,10 @@ func execServe(c *cli.Context) error {
 	profileListenHTTP := c.String("profile-listen-http")
 
 	// Convert durations
+	upstreamRetryDuration, err := util.ParseDuration(upstreamRetryDurationStr)
+	if err != nil || upstreamRetryDuration < 0 {
+		return fmt.Errorf("invalid upstream retry duration: %s", upstreamRetryDurationStr)
+	}
 	cacheDuration, err := util.ParseDuration(cacheDurationStr)
 	if err != nil {
 		return fmt.Errorf("invalid cache duration: %s", cacheDurationStr)
@@ -565,6 +571,7 @@ func execServe(c *cli.Context) error {
 	conf.WebRoot = webRoot
 	conf.UpstreamBaseURL = upstreamBaseURL
 	conf.UpstreamAccessToken = upstreamAccessToken
+	conf.UpstreamRetryDuration = upstreamRetryDuration
 	conf.SMTPSenderAddr = smtpSenderAddr
 	conf.SMTPSenderUser = smtpSenderUser
 	conf.SMTPSenderPass = smtpSenderPass

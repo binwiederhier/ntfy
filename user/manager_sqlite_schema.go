@@ -403,6 +403,40 @@ const (
 
 	// 10 -> 11: The topic table
 	sqliteMigrate10To11UpdateQueries = sqliteCreateTopicTableQuery
+
+	// 11 -> 12: Email addresses are stored lowercase, so a lookup can be a plain equality against
+	// idx_user_email_primary_addr. That index sits on the raw column, so comparing LOWER(email)
+	// cannot use it and turned every login and every password reset by email into a full scan of
+	// user_email. Two rows can currently hold one address in different casings, because the index
+	// is case-sensitive, so those are resolved before the addresses are lowered.
+	sqliteMigrate11To12UpdateQueries = `
+		-- Same account, one address in two casings: keep the primary row, else the smaller address
+		DELETE FROM user_email
+		WHERE (user_id, email) IN (
+			SELECT a.user_id, a.email
+			FROM user_email a
+			JOIN user_email b ON b.user_id = a.user_id
+				AND b.email <> a.email
+				AND LOWER(b.email) = LOWER(a.email)
+			WHERE a.is_primary = 0 OR (a.is_primary = b.is_primary AND a.email > b.email)
+		);
+		-- Two accounts holding the same address as primary: the account that has had it longest
+		-- keeps it, the other keeps it as a verified secondary address
+		UPDATE user_email
+		SET is_primary = 0
+		WHERE (user_id, email) IN (
+			SELECT l.user_id, l.email
+			FROM user_email l
+			JOIN user lu ON lu.id = l.user_id
+			JOIN user_email w ON w.is_primary = 1
+				AND w.user_id <> l.user_id
+				AND LOWER(w.email) = LOWER(l.email)
+			JOIN user wu ON wu.id = w.user_id
+			WHERE l.is_primary = 1
+				AND (wu.created < lu.created OR (wu.created = lu.created AND wu.id < lu.id))
+		);
+		UPDATE user_email SET email = LOWER(email) WHERE email <> LOWER(email);
+	`
 )
 
 var (
@@ -421,6 +455,7 @@ var (
 		{From: 8, To: 9}:   schema.Query(sqliteMigrate8To9UpdateQueries),
 		{From: 9, To: 10}:  schema.Query(sqliteMigrate9To10UpdateQueries),
 		{From: 10, To: 11}: schema.Query(sqliteMigrate10To11UpdateQueries),
+		{From: 11, To: 12}: schema.Query(sqliteMigrate11To12UpdateQueries),
 	}
 )
 

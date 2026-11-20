@@ -162,6 +162,37 @@ const (
 
 	// 10 -> 11: The topic table
 	postgresMigrate10To11UpdateQueries = postgresCreateTopicTableQuery
+
+	// 11 -> 12: Email addresses are stored lowercase, so a lookup can be a plain equality against
+	// idx_user_email_primary_addr. That index sits on the raw column, so comparing LOWER(email)
+	// cannot use it and turned every login and every password reset by email into a full scan of
+	// user_email. Two rows can currently hold one address in different casings, because the index
+	// is case-sensitive, so those are resolved before the addresses are lowered.
+	postgresMigrate11To12UpdateQueries = `
+		-- Same account, one address in two casings: keep the primary row, else the smaller address
+		DELETE FROM user_email a
+		USING user_email b
+		WHERE a.user_id = b.user_id
+			AND a.email <> b.email
+			AND LOWER(a.email) = LOWER(b.email)
+			AND (a.is_primary = FALSE OR (a.is_primary = b.is_primary AND a.email > b.email));
+		-- Two accounts holding the same address as primary: the account that has had it longest
+		-- keeps it, the other keeps it as a verified secondary address
+		UPDATE user_email
+		SET is_primary = FALSE
+		WHERE (user_id, email) IN (
+			SELECT l.user_id, l.email
+			FROM user_email l
+			JOIN "user" lu ON lu.id = l.user_id
+			JOIN user_email w ON w.is_primary
+				AND w.user_id <> l.user_id
+				AND LOWER(w.email) = LOWER(l.email)
+			JOIN "user" wu ON wu.id = w.user_id
+			WHERE l.is_primary
+				AND (wu.created < lu.created OR (wu.created = lu.created AND wu.id < lu.id))
+		);
+		UPDATE user_email SET email = LOWER(email) WHERE email <> LOWER(email);
+	`
 )
 
 var (
@@ -175,5 +206,6 @@ var (
 		{From: 8, To: 9}:   schema.Nop, // 8 -> 9 repairs a SQLite-only foreign key defect; nothing to do on Postgres
 		{From: 9, To: 10}:  schema.Query(postgresMigrate9To10UpdateQueries),
 		{From: 10, To: 11}: schema.Query(postgresMigrate10To11UpdateQueries),
+		{From: 11, To: 12}: schema.Query(postgresMigrate11To12UpdateQueries),
 	}
 )

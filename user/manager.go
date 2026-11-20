@@ -478,7 +478,7 @@ func (a *Manager) UserByEmailOrUsername(identifier string) (*User, error) {
 // on a password check, returning the username owner here never grants access to the email owner's
 // account. Returns ErrUserNotFound if neither matches.
 func (a *Manager) userByNameOrEmail(identifier string) (*User, error) {
-	rows, err := a.db.Query(a.queries.selectUserByNameOrPrimaryEmail, identifier, identifier, identifier)
+	rows, err := a.db.Query(a.queries.selectUserByNameOrPrimaryEmail, identifier, normalizeEmail(identifier), identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -1454,9 +1454,17 @@ func (a *Manager) Emails(userID string) (Emails, error) {
 	return emails, nil
 }
 
+// normalizeEmail returns the form an email address is stored in. Addresses are stored lowercase,
+// so a lookup can be a plain equality against idx_user_email_primary_addr, which indexes the raw
+// column: comparing LOWER(email) cannot use that index and scans the whole table on every login
+// and every password reset.
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
 // AddEmail adds a verified email address to the user with the given user ID
 func (a *Manager) AddEmail(userID, email string) error {
-	if _, err := a.db.Exec(a.queries.insertEmail, userID, email); err != nil {
+	if _, err := a.db.Exec(a.queries.insertEmail, userID, normalizeEmail(email)); err != nil {
 		if isUniqueConstraintError(err) {
 			return ErrEmailExists
 		}
@@ -1469,7 +1477,7 @@ func (a *Manager) AddEmail(userID, email string) error {
 // Removing the primary email leaves the account with no primary -- there is deliberately
 // no auto-promotion of another verified address; the user is nudged to pick a new one.
 func (a *Manager) RemoveEmail(userID, email string) error {
-	_, err := a.db.Exec(a.queries.deleteEmail, userID, email)
+	_, err := a.db.Exec(a.queries.deleteEmail, userID, normalizeEmail(email))
 	return err
 }
 
@@ -1492,7 +1500,7 @@ func (a *Manager) PrimaryEmail(userID string) (string, error) {
 // password-reset request flow to resolve an email identifier to a single account.
 func (a *Manager) UserIDByPrimaryEmail(email string) (string, error) {
 	var userID string
-	err := a.db.ReadOnly().QueryRow(a.queries.selectUserIDByPrimary, email).Scan(&userID)
+	err := a.db.ReadOnly().QueryRow(a.queries.selectUserIDByPrimary, normalizeEmail(email)).Scan(&userID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrUserNotFound
 	} else if err != nil {
@@ -1533,7 +1541,7 @@ func (a *Manager) SetPrimaryEmail(userID, email string) error {
 		if _, err := tx.Exec(a.queries.updateEmailClearPrimary, userID); err != nil {
 			return err
 		}
-		res, err := tx.Exec(a.queries.updateEmailSetPrimary, userID, email)
+		res, err := tx.Exec(a.queries.updateEmailSetPrimary, userID, normalizeEmail(email))
 		if err != nil {
 			if isUniqueConstraintError(err) {
 				return ErrEmailPrimaryElsewhere
@@ -1653,7 +1661,8 @@ func (a *Manager) VerifyEmail(rawToken string) (*MagicLink, error) {
 		if _, err := tx.Exec(a.queries.deleteMagicLinkByHash, tokenHash); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(a.queries.insertEmailIgnore, m.UserID, m.Email); err != nil {
+		email := normalizeEmail(m.Email)
+		if _, err := tx.Exec(a.queries.insertEmailIgnore, m.UserID, email); err != nil {
 			return err
 		}
 		// Promote to primary only if the user has none yet and the address is globally free.
@@ -1669,13 +1678,13 @@ func (a *Manager) VerifyEmail(rawToken string) (*MagicLink, error) {
 		}
 		// If the address is already another account's primary, leave it a verified secondary here
 		var ownerUserID string
-		if err = tx.QueryRow(a.queries.selectUserIDByPrimary, m.Email).Scan(&ownerUserID); err == nil {
+		if err = tx.QueryRow(a.queries.selectUserIDByPrimary, email).Scan(&ownerUserID); err == nil {
 			return nil // Address is primary elsewhere -> not promoted
 		} else if !errors.Is(err, sql.ErrNoRows) {
 			return err // Real query error
 		}
 		// Address is globally free -> promote it to this user's primary
-		if _, err := tx.Exec(a.queries.updateEmailSetPrimary, m.UserID, m.Email); err != nil {
+		if _, err := tx.Exec(a.queries.updateEmailSetPrimary, m.UserID, email); err != nil {
 			return err
 		}
 		return nil

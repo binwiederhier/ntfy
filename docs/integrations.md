@@ -211,6 +211,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 
 ## Blog + forum posts
 
+- [Self-host ntfy on a managed VPS: push notifications from your own server](https://www.simafri.com/en/guides/self-host-ntfy/) - simafri.com - 11/2026
 - [Get a free alert when a web page changes (price, stock, version), using GitHub Actions](https://caelum-kr-11.github.io/blog/website-change-alert-github-actions.html) - caelum-kr-11.github.io - 11/2026
 - [Push alerts for WHM using ntfy](https://rubixstudios.com.au/insights/push-alerts-for-whm-using-ntfy) - rubixstudios.com.au - 5/2026
 - [Device notifications via HTTP with ntfy](https://alistairshepherd.uk/writing/ntfy/) - alistairshepherd.uk - 6/2025

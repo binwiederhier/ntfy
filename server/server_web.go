@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"heckel.io/ntfy/v2/util"
 )
@@ -56,8 +57,36 @@ func (s *Server) handleWebManifest(w http.ResponseWriter, _ *http.Request, _ *vi
 			{SRC: "/static/images/pwa-192x192.png", Sizes: "192x192", Type: "image/png"},
 			{SRC: "/static/images/pwa-512x512.png", Sizes: "512x512", Type: "image/png"},
 		},
+		ShareTarget: webManifestShareTarget{
+			Action:  webAppSharePath,
+			Method:  http.MethodPost,
+			Enctype: "application/x-www-form-urlencoded",
+			Params:  webManifestShareParams{Title: "title", Text: "text", URL: "url"},
+		},
 	}
 	return s.writeJSONWithContentType(w, response, "application/manifest+json")
+}
+
+// handleWebShare opens a draft in the web app. A POST body and a redirect fragment keep
+// the shared text out of request URLs, including when the app fetches the following page.
+func (s *Server) handleWebShare(w http.ResponseWriter, r *http.Request, _ *visitor) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 32*1024)
+	if err := r.ParseForm(); err != nil {
+		return errHTTPBadRequest
+	}
+	params := url.Values{}
+	for _, name := range []string{"title", "text", "url"} {
+		if value := r.PostForm.Get(name); value != "" {
+			params.Set(name, value)
+		}
+	}
+	target := s.config.WebRoot
+	if len(params) > 0 {
+		target += "#share?" + params.Encode()
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	http.Redirect(w, r, target, http.StatusSeeOther)
+	return nil
 }
 
 // handleStatic returns all static resources (excluding the docs), including the web app

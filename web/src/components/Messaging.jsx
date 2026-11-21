@@ -22,6 +22,7 @@ const Messaging = (props) => {
 
   const handleDialogClose = () => {
     props.onDialogOpenModeChange("");
+    props.onClearShareDraft();
     setDialogKey((prev) => prev + 1);
     setAttachFile(null);
   };
@@ -53,7 +54,8 @@ const Messaging = (props) => {
         openMode={dialogOpenMode}
         baseUrl={subscription?.baseUrl ?? config.base_url}
         topic={subscription?.topic ?? ""}
-        message={message}
+        title={props.shareDraft?.title}
+        message={props.shareDraft?.message ?? message}
         attachFile={attachFile}
         getPastedImage={getPastedImage}
         onClose={handleDialogClose}

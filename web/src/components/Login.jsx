@@ -10,6 +10,7 @@ import accountApi from "../app/AccountApi";
 import AvatarBox from "./AvatarBox";
 import session from "../app/Session";
 import routes from "./routes";
+import { getShareFragment } from "../app/share";
 import { UnauthorizedError } from "../app/errors";
 import { fadeReload } from "../app/transition";
 
@@ -27,7 +28,7 @@ const Login = () => {
       const { token, username: canonicalUsername } = await accountApi.login(user);
       console.log(`[Login] User auth for user ${user.username} successful, logged in as ${canonicalUsername}`);
       await session.store(canonicalUsername, token);
-      fadeReload(routes.app);
+      fadeReload(routes.app + getShareFragment(window.location.hash));
     } catch (e) {
       console.log(`[Login] User auth for user ${user.username} failed`, e);
       if (e instanceof UnauthorizedError) {

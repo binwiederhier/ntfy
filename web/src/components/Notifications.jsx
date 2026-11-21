@@ -15,11 +15,14 @@ import {
   IconButton,
   Box,
   Button,
+  InputAdornment,
+  TextField,
 } from "@mui/material";
 import * as React from "react";
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
+import SearchIcon from "@mui/icons-material/Search";
 import InfiniteScroll from "react-infinite-scroll-component";
 import { Trans, useTranslation } from "react-i18next";
 import { useOutletContext } from "react-router-dom";
@@ -85,7 +88,7 @@ const SingleSubscriptionList = (props) => {
   if (notifications.length === 0) {
     return <NoNotifications subscription={subscription} />;
   }
-  return <NotificationList id={subscription.id} notifications={notifications} messageBar />;
+  return <NotificationList key={subscription.id} id={subscription.id} notifications={notifications} messageBar />;
 };
 
 const NotificationList = (props) => {
@@ -94,7 +97,32 @@ const NotificationList = (props) => {
   const { notifications } = props;
   const [snackOpen, setSnackOpen] = useState(false);
   const [maxCount, setMaxCount] = useState(pageSize);
-  const count = Math.min(notifications.length, maxCount);
+  const [query, setQuery] = useState("");
+  const searchInput = useRef();
+  const search = query.trim().toLowerCase();
+  const filteredNotifications = useMemo(
+    () =>
+      search
+        ? notifications.filter((notification) =>
+            [notification.title ?? "", notification.message ?? "", ...(notification.tags ?? [])].some((text) =>
+              text.toLowerCase().includes(search),
+            ),
+          )
+        : notifications,
+    [notifications, search],
+  );
+  const count = Math.min(filteredNotifications.length, maxCount);
+
+  const updateQuery = (value) => {
+    setQuery(value);
+    setMaxCount(pageSize);
+    document.getElementById("main")?.scrollTo(0, 0);
+  };
+
+  const clearSearch = () => {
+    updateQuery("");
+    searchInput.current?.focus();
+  };
 
   useEffect(
     () => () => {
@@ -108,36 +136,79 @@ const NotificationList = (props) => {
   );
 
   return (
-    <InfiniteScroll
-      dataLength={count}
-      next={() => setMaxCount((prev) => prev + pageSize)}
-      hasMore={count < notifications.length}
-      loader={<>Loading ...</>}
-      scrollThreshold={0.7}
-      scrollableTarget="main"
-    >
-      <Container
-        maxWidth="md"
-        role="list"
-        aria-label={t("notifications_list")}
-        sx={{
-          marginTop: 3,
-          marginBottom: props.messageBar ? "100px" : 3, // Hack to avoid hiding notifications behind the message bar
-        }}
-      >
-        <Stack spacing={3}>
-          {notifications.slice(0, count).map((notification) => (
-            <NotificationItem key={notification.id} notification={notification} onShowSnack={() => setSnackOpen(true)} />
-          ))}
-          <Snackbar
-            open={snackOpen}
-            autoHideDuration={3000}
-            onClose={() => setSnackOpen(false)}
-            message={t("notifications_copied_to_clipboard")}
-          />
-        </Stack>
+    <>
+      <Container maxWidth="md" sx={{ marginTop: 3 }}>
+        <TextField
+          fullWidth
+          size="small"
+          type="search"
+          sx={{ "& input::-webkit-search-cancel-button": { display: "none" } }}
+          label={t("notifications_search")}
+          inputRef={searchInput}
+          value={query}
+          onChange={(event) => updateQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              clearSearch();
+            }
+          }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: query && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={clearSearch} aria-label={t("notifications_search_clear")}>
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
       </Container>
-    </InfiniteScroll>
+      {filteredNotifications.length === 0 && (
+        <Container maxWidth="md" sx={{ marginTop: 3 }}>
+          <Typography role="status" color="text.secondary">
+            {t("notifications_search_no_results")}
+          </Typography>
+        </Container>
+      )}
+      <InfiniteScroll
+        key={search}
+        dataLength={count}
+        next={() => setMaxCount((prev) => prev + pageSize)}
+        hasMore={count < filteredNotifications.length}
+        loader={<>Loading ...</>}
+        scrollThreshold={0.7}
+        scrollableTarget="main"
+      >
+        <Container
+          maxWidth="md"
+          role="list"
+          aria-label={t("notifications_list")}
+          sx={{
+            marginTop: 3,
+            marginBottom: props.messageBar ? "100px" : 3, // Hack to avoid hiding notifications behind the message bar
+          }}
+        >
+          <Stack spacing={3}>
+            {filteredNotifications.slice(0, count).map((notification) => (
+              <NotificationItem key={notification.id} notification={notification} onShowSnack={() => setSnackOpen(true)} />
+            ))}
+            <Snackbar
+              open={snackOpen}
+              autoHideDuration={3000}
+              onClose={() => setSnackOpen(false)}
+              message={t("notifications_copied_to_clipboard")}
+            />
+          </Stack>
+        </Container>
+      </InfiniteScroll>
+    </>
   );
 };
 

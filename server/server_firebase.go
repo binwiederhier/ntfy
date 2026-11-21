@@ -181,6 +181,12 @@ func toFirebaseMessage(m *model.Message, auther user.Auther) (*messaging.Message
 			"content_type": m.ContentType,
 			"encoding":     m.Encoding,
 		}
+		if m.SmallIcon != "" {
+			data["small_icon"] = m.SmallIcon
+		}
+		if m.Color != "" {
+			data["color"] = m.Color
+		}
 		if len(m.Actions) > 0 {
 			actions, err := json.Marshal(m.Actions)
 			if err != nil {

@@ -2414,6 +2414,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.38.2 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Web app: the config hash is now the same on all nodes of a cluster, so the web app no longer asks for a refresh when a version check lands on another node, and it no longer covers the database and S3 URLs (which can contain credentials)
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

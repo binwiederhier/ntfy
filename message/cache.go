@@ -80,10 +80,16 @@ type queries struct {
 	updateMessageTime                string
 }
 
+// queuedMessage is a message waiting for the batch writer, along with the channel to close once it is written
+type queuedMessage struct {
+	message *model.Message
+	written chan<- struct{} // nil if nobody waits for the write
+}
+
 // Cache stores published messages
 type Cache struct {
 	db      *db.DB
-	queue   *util.BatchingQueue[*model.Message]
+	queue   *util.BatchingQueue[*queuedMessage]
 	written chan struct{} // Closed once the batch writer has drained the queue (after queue.Close)
 	nop     bool
 	mu      *sync.Mutex // nil for PostgreSQL (concurrent writes supported), set for SQLite (single writer)
@@ -102,9 +108,9 @@ type Marker struct {
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
-	var queue *util.BatchingQueue[*model.Message]
+	var queue *util.BatchingQueue[*queuedMessage]
 	if batchSize > 0 || batchTimeout > 0 {
-		queue = util.NewBatchingQueue[*model.Message](batchSize, batchTimeout, queueBufferedBatches)
+		queue = util.NewBatchingQueue[*queuedMessage](batchSize, batchTimeout, queueBufferedBatches)
 	}
 	c := &Cache{
 		db:           db,
@@ -134,11 +140,24 @@ func (c *Cache) maybeUnlock() {
 // AddMessage stores a message to the message cache synchronously, or queues it to be stored at a later date asynchronously.
 // The message is queued only if "batchSize" or "batchTimeout" are passed to the constructor.
 func (c *Cache) AddMessage(m *model.Message) error {
+	return c.AddMessageNotify(m, nil)
+}
+
+// AddMessageNotify is AddMessage, but also closes written (if not nil) once the message is written to the
+// database, or once writing it failed. If messages are queued, that is after the message's batch is written.
+func (c *Cache) AddMessageNotify(m *model.Message, written chan<- struct{}) error {
 	if c.queue != nil {
-		c.queue.Enqueue(m)
+		c.queue.Enqueue(&queuedMessage{
+			message: m,
+			written: written,
+		})
 		return nil
 	}
-	return c.addMessages([]*model.Message{m})
+	err := c.addMessages([]*model.Message{m})
+	if written != nil {
+		close(written)
+	}
+	return err
 }
 
 // AddMessages synchronously stores a batch of messages to the message cache
@@ -640,9 +659,18 @@ func (c *Cache) processMessageBatches() {
 	if c.queue == nil {
 		return
 	}
-	for messages := range c.queue.Dequeue() {
+	for queued := range c.queue.Dequeue() {
+		messages := make([]*model.Message, len(queued))
+		for i, q := range queued {
+			messages[i] = q.message
+		}
 		if err := c.addMessages(messages); err != nil {
 			log.Tag(tagMessageCache).Err(err).Error("Cannot write message batch")
+		}
+		for _, q := range queued {
+			if q.written != nil {
+				close(q.written)
+			}
 		}
 	}
 }

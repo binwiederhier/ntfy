@@ -188,6 +188,10 @@ const (
 	// (the attachment sync loop queries the database), and none of those waits has a deadline,
 	// so this is the backstop that keeps a wedged database from stalling us until SIGKILL.
 	stopTimeout = 10 * time.Second
+
+	// pollRequestWriteTimeout bounds how long a poll request waits for its message to be written
+	// (see waitForMessageWritten); well above the batch timeout, so it only hits if the database is stuck
+	pollRequestWriteTimeout = 5 * time.Second
 )
 
 // WebSocket constants
@@ -1086,7 +1090,7 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 	}
 	// Fire the requested side-effect targets
 	if s.firebaseClient != nil && opts.firebase {
-		go s.sendToFirebase(v, m)
+		go s.sendToFirebase(v, m, opts.written)
 	}
 	if s.mailer != nil && opts.email != "" {
 		go s.sendEmail(v, m, opts.email)
@@ -1095,7 +1099,7 @@ func (s *Server) dispatch(v *visitor, t *topic, m *model.Message, opts dispatchO
 		go s.callPhone(v, m, opts.call)
 	}
 	if s.config.UpstreamBaseURL != "" && opts.upstream {
-		go s.forwardPollRequest(v, m)
+		go s.forwardPollRequest(v, m, opts.written)
 	}
 	if s.config.WebPushPublicKey != "" && opts.webPush {
 		go s.publishToWebPushEndpoints(v, m)
@@ -1192,6 +1196,10 @@ func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v
 	} else if ev.IsDebug() {
 		ev.Debug("Received message")
 	}
+	var written chan struct{}
+	if cache {
+		written = make(chan struct{}) // Closed by the message cache, see AddMessageNotify below
+	}
 	if !delayed {
 		err := s.dispatch(v, t, m, dispatchOpts{
 			firebase: firebase,
@@ -1199,6 +1207,7 @@ func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v
 			call:     call,
 			upstream: !unifiedpush, // UP messages are not sent to upstream
 			webPush:  true,
+			written:  written,
 		})
 		if err != nil {
 			return nil, err
@@ -1222,7 +1231,7 @@ func (s *Server) handlePublishInternal(w http.ResponseWriter, r *http.Request, v
 			}
 		}
 		logvrm(v, r, m).Tag(tagPublish).Debug("Adding message to cache")
-		if err := s.messageCache.AddMessage(m); err != nil {
+		if err := s.messageCache.AddMessageNotify(m, written); err != nil {
 			return nil, err
 		}
 	}
@@ -1328,9 +1337,9 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 	return s.writeJSON(w, m.ForJSON())
 }
 
-func (s *Server) sendToFirebase(v *visitor, m *model.Message) {
+func (s *Server) sendToFirebase(v *visitor, m *model.Message, written <-chan struct{}) {
 	logvm(v, m).Tag(tagFirebase).Debug("Publishing to Firebase")
-	if err := s.firebaseClient.Send(v, m); err != nil {
+	if err := s.firebaseClient.Send(v, m, written); err != nil {
 		metrics.FirebasePublishedFailure.Inc()
 		if errors.Is(err, errFirebaseTemporarilyBanned) {
 			logvm(v, m).Tag(tagFirebase).Err(err).Debug("Unable to publish to Firebase: %v", err.Error())
@@ -1352,7 +1361,8 @@ func (s *Server) sendEmail(v *visitor, m *model.Message, email string) {
 	metrics.EmailsPublishedSuccess.Inc()
 }
 
-func (s *Server) forwardPollRequest(v *visitor, m *model.Message) {
+func (s *Server) forwardPollRequest(v *visitor, m *model.Message, written <-chan struct{}) {
+	waitForMessageWritten(written)
 	topicURL := fmt.Sprintf("%s/%s", s.config.BaseURL, m.Topic)
 	topicHash := fmt.Sprintf("%x", sha256.Sum256([]byte(topicURL)))
 	forwardURL := fmt.Sprintf("%s/%s", s.config.UpstreamBaseURL, topicHash)
@@ -1381,6 +1391,19 @@ func (s *Server) forwardPollRequest(v *visitor, m *model.Message) {
 			logvm(v, m).Err(err).Warn("Unable to publish poll request, the upstream server %s responded with HTTP %s", s.config.UpstreamBaseURL, response.Status)
 		}
 		return
+	}
+}
+
+// waitForMessageWritten blocks until written is closed, i.e. until the message cache stored the message, so
+// that a client polling in response to a poll request finds it. It returns right away if written is nil, and
+// gives up after pollRequestWriteTimeout, sending the poll request anyway.
+func waitForMessageWritten(written <-chan struct{}) {
+	if written == nil {
+		return
+	}
+	select {
+	case <-written:
+	case <-time.After(pollRequestWriteTimeout):
 	}
 }
 
@@ -2265,14 +2288,14 @@ func (s *Server) runFirebaseKeepaliver() {
 			if !s.cluster.IsLeader() {
 				continue
 			}
-			s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic))
+			s.sendToFirebase(v, model.NewKeepaliveMessage(firebaseControlTopic), nil)
 		/*
 			FIXME: Disable iOS polling entirely for now due to thundering herd problem (see #677)
 			       To solve this, we'd have to shard the iOS poll topics to spread out the polling evenly.
 			       Given that it's not really necessary to poll, turning it off for now should not have any impact.
 
 			case <-time.After(s.config.FirebasePollInterval):
-				s.sendToFirebase(v, model.NewKeepaliveMessage(firebasePollTopic))
+				s.sendToFirebase(v, model.NewKeepaliveMessage(firebasePollTopic), nil)
 		*/
 		case <-s.closeChan:
 			return

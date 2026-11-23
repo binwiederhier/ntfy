@@ -44,13 +44,18 @@ func newFirebaseClient(sender firebaseSender, auther user.Auther) *firebaseClien
 	}
 }
 
-func (c *firebaseClient) Send(v *visitor, m *model.Message) error {
+// Send sends a message to Firebase. A poll request is held back until written is closed (see
+// waitForMessageWritten), since the client polls for the message as soon as it receives it.
+func (c *firebaseClient) Send(v *visitor, m *model.Message, written <-chan struct{}) error {
 	if !v.FirebaseAllowed() {
 		return errFirebaseTemporarilyBanned
 	}
 	fbm, err := toFirebaseMessage(m, c.auther)
 	if err != nil {
 		return err
+	}
+	if fbm.Data["event"] == model.PollRequestEvent {
+		waitForMessageWritten(written)
 	}
 	ev := logvm(v, m).Tag(tagFirebase)
 	if ev.IsTrace() {

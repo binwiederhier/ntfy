@@ -2416,6 +2416,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.38.2 (UNRELEASED)
 
+**Features:**
+
+* Support [iOS critical alerts](publish.md#ios-critical-alerts) via the `X-Apple-(Critical|Sound|Volume)` headers: the publisher decides whether a message breaks through Focus, Do Not Disturb and the mute switch; without the header, max priority (5) messages are delivered as critical alerts ([#1235](https://github.com/binwiederhier/ntfy/issues/1235))
+
 **Bug fixes + maintenance:**
 
 * Web app: the config hash is now the same on all nodes of a cluster, so the web app no longer asks for a refresh when a version check lands on another node, and it no longer covers the database and S3 URLs (which can contain credentials)

@@ -391,7 +391,7 @@ func TestNewFirebaseResponse_TruncatesBody(t *testing.T) {
 
 func TestFirebaseSendError_Context(t *testing.T) {
 	err := &firebaseSendError{
-		err: errors.New("Resource has been exhausted (e.g. check quota)."),
+		err: errors.New("resource has been exhausted"),
 		response: &firebaseResponse{
 			status:     429,
 			retryAfter: "60",
@@ -399,8 +399,8 @@ func TestFirebaseSendError_Context(t *testing.T) {
 			duration:   250 * time.Millisecond,
 		},
 	}
-	require.Equal(t, "Resource has been exhausted (e.g. check quota).", err.Error())
-	require.Equal(t, "Resource has been exhausted (e.g. check quota).", err.Context()["error"])
+	require.Equal(t, "resource has been exhausted", err.Error())
+	require.Equal(t, "resource has been exhausted", err.Context()["error"])
 	require.Equal(t, 429, err.Context()["firebase_http_status"])
 	require.Equal(t, "60", err.Context()["firebase_retry_after"])
 	require.Equal(t, `{"error":{"code":429}}`, err.Context()["firebase_response_body"])

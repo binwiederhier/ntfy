@@ -32,6 +32,7 @@ enable e-mail publishing, reservations, or run ntfy behind a proxy.
 
 * Web app: the config hash is now the same on all nodes of a cluster, so the web app no longer asks for a refresh when a version check lands on another node, and it no longer covers the database and S3 URLs (which can contain credentials)
 * Firebase: log the HTTP status, `Retry-After` header and response body of failed sends, to help diagnose quota errors ([#2222](https://github.com/binwiederhier/ntfy/pull/2222))
+* E-mail publishing: line breaks in messages published by e-mail no longer contain a carriage return (`\r`) from the mail's CRLF line endings
 * Update Go and web app dependencies
 
 ## ntfy server v2.38.1

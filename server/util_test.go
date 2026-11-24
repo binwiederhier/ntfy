@@ -111,6 +111,22 @@ func TestExtractIPAddress(t *testing.T) {
 	require.Equal(t, "10.0.0.1", extractIPAddress(r, false, "X-Forwarded-For", trustedProxies).String())
 }
 
+func TestExtractIPAddress_MultipleHeaderLines(t *testing.T) {
+	// Proxies like HAProxy add their own header line instead of appending to the client's. The
+	// spoofed first line must not win over the one the proxy added.
+	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
+	r.RemoteAddr = "10.0.0.1:1234"
+	r.Header.Add("X-Forwarded-For", "6.6.6.6")
+	r.Header.Add("X-Forwarded-For", "5.6.7.8")
+	r.Header.Add("Forwarded", "for=6.6.6.6")
+	r.Header.Add("Forwarded", "for=17.18.19.20")
+
+	trustedProxies := []netip.Prefix{netip.MustParsePrefix("1.1.1.1/32")}
+
+	require.Equal(t, "5.6.7.8", extractIPAddress(r, true, "X-Forwarded-For", trustedProxies).String())
+	require.Equal(t, "17.18.19.20", extractIPAddress(r, true, "Forwarded", trustedProxies).String())
+}
+
 func TestExtractIPAddress_UnixSocket(t *testing.T) {
 	r, _ := http.NewRequest("GET", "http://ntfy.sh/mytopic/json?since=all", nil)
 	r.RemoteAddr = "@"

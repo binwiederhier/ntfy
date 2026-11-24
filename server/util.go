@@ -109,7 +109,7 @@ func extractIPAddress(r *http.Request, behindProxy bool, proxyForwardedHeader st
 // then take the right-most address in the list (as this is the one added by our proxy server).
 // See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For for details.
 func extractIPAddressFromHeader(r *http.Request, forwardedHeader string, trustedPrefixes []netip.Prefix) (netip.Addr, error) {
-	value := strings.TrimSpace(strings.ToLower(r.Header.Get(forwardedHeader)))
+	value := strings.TrimSpace(strings.ToLower(strings.Join(r.Header.Values(forwardedHeader), ","))) // Proxies may add a line rather than append
 	if value == "" {
 		return netip.IPv4Unspecified(), fmt.Errorf("no %s header found", forwardedHeader)
 	}

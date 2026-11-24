@@ -2419,6 +2419,7 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 **Security:**
 
 * E-mail publishing: upgrade the SMTP server library ([go-smtp](https://github.com/emersion/go-smtp)) from v0.17.0 to v0.26.0, which fixes unbounded memory allocation when a client sends a command between two `BDAT` chunks ([GO-2026-7029](https://pkg.go.dev/vuln/GO-2026-7029)); incoming mail now has to use CRLF line endings, as required by the SMTP standard
+* Reservations: wildcard access entries with an underscore (e.g. `mytopic_*`) now block reservations of topics they cover, so users can no longer reserve a topic inside such a namespace and become its owner
 
 **Bug fixes + maintenance:**
 

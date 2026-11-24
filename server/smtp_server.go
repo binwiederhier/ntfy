@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 	"github.com/microcosm-cc/bluemonday"
 	"heckel.io/ntfy/v2/metrics"
@@ -56,8 +57,10 @@ type smtpBackend struct {
 	mu      sync.Mutex
 }
 
-var _ smtp.Backend = (*smtpBackend)(nil)
-var _ smtp.Session = (*smtpSession)(nil)
+var (
+	_ smtp.Backend     = (*smtpBackend)(nil)
+	_ smtp.AuthSession = (*smtpSession)(nil)
+)
 
 func newMailBackend(conf *Config, handler func(http.ResponseWriter, *http.Request)) *smtpBackend {
 	return &smtpBackend{
@@ -87,12 +90,17 @@ type smtpSession struct {
 	mu        sync.Mutex
 }
 
-func (s *smtpSession) AuthPlain(username, password string) error {
-	logem(s.conn).Field("smtp_username", username).Debug("AUTH PLAIN (with username %s)", username)
-	s.mu.Lock()
-	s.basicAuth = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
-	s.mu.Unlock()
-	return nil
+func (s *smtpSession) AuthMechanisms() []string {
+	return []string{sasl.Plain}
+}
+
+func (s *smtpSession) Auth(mech string) (sasl.Server, error) {
+	if mech != sasl.Plain {
+		return nil, smtp.ErrAuthUnknownMechanism
+	}
+	return sasl.NewPlainServer(func(identity, username, password string) error {
+		return s.authPlain(username, password)
+	}), nil
 }
 
 func (s *smtpSession) Mail(from string, opts *smtp.MailOptions) error {
@@ -100,7 +108,7 @@ func (s *smtpSession) Mail(from string, opts *smtp.MailOptions) error {
 	return nil
 }
 
-func (s *smtpSession) Rcpt(to string) error {
+func (s *smtpSession) Rcpt(to string, opts *smtp.RcptOptions) error {
 	logem(s.conn).Field("smtp_rcpt_to", to).Debug("RCPT TO: %s", to)
 	return s.withFailCount(func() error {
 		token := ""
@@ -148,6 +156,7 @@ func (s *smtpSession) Data(r io.Reader) error {
 		if err != nil {
 			return err
 		}
+		b = bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")) // go-smtp passes DATA through as-is, with SMTP's CRLF line endings
 		ev := logem(s.conn)
 		if ev.IsTrace() {
 			ev.Field("smtp_data", string(b)).Trace("DATA")
@@ -233,6 +242,15 @@ func (s *smtpSession) Reset() {
 func (s *smtpSession) Logout() error {
 	s.mu.Lock()
 	s.basicAuth = ""
+	s.mu.Unlock()
+	return nil
+}
+
+// authPlain stores the AUTH PLAIN credentials; they are checked when the message is published
+func (s *smtpSession) authPlain(username, password string) error {
+	logem(s.conn).Field("smtp_username", username).Debug("AUTH PLAIN (with username %s)", username)
+	s.mu.Lock()
+	s.basicAuth = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	s.mu.Unlock()
 	return nil
 }

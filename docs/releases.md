@@ -2416,9 +2416,15 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.38.2 (UNRELEASED)
 
+**Security:**
+
+* E-mail publishing: upgrade the SMTP server library ([go-smtp](https://github.com/emersion/go-smtp)) from v0.17.0 to v0.26.0, which fixes unbounded memory allocation when a client sends a command between two `BDAT` chunks ([GO-2026-7029](https://pkg.go.dev/vuln/GO-2026-7029)); incoming mail now has to use CRLF line endings, as required by the SMTP standard
+
 **Bug fixes + maintenance:**
 
 * Web app: the config hash is now the same on all nodes of a cluster, so the web app no longer asks for a refresh when a version check lands on another node, and it no longer covers the database and S3 URLs (which can contain credentials)
+* Firebase: log the HTTP status, `Retry-After` header and response body of failed sends, to help diagnose quota errors ([#2222](https://github.com/binwiederhier/ntfy/pull/2222))
+* Update Go and web app dependencies
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

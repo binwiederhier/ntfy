@@ -459,5 +459,17 @@
     "account_basics_tier_provisioned": "事前割り当て",
     "account_usage_emails_none": "このアカウントではメール通知を送信できません",
     "prefs_users_dialog_base_url_invalid": "URL形式が不正です。 http:// あるいは https:// から始まる必要があります",
-    "prefs_users_dialog_base_url_exists": "このサービスURLにはユーザーが既に存在します"
+    "prefs_users_dialog_base_url_exists": "このサービスURLにはユーザーが既に存在します",
+    "login_form_username_label": "ユーザー名またはメールアドレス",
+    "account_usage_limits_reset_at": "一日の使用限度は24時間ごとにリセット、次は {{time}}",
+    "account_usage_limits_reset_rolling": "一日の使用限度は24時間ごとにリセットされます",
+    "account_usage_approximate": "使用状況の数値は数秒ごとに更新されるため反映が僅かに遅延することがあります。",
+    "prefs_appearance_date_format_title": "日付フォーマット",
+    "prefs_appearance_date_format_iso8601": "ISO 8601",
+    "prefs_appearance_date_format_dmy": "日/月/年",
+    "prefs_appearance_date_format_dmy_dot": "日.月.年",
+    "prefs_appearance_date_format_mdy": "月/日/年",
+    "prefs_appearance_time_format_title": "日時フォーマット",
+    "prefs_appearance_time_format_12h": "12時間",
+    "prefs_appearance_time_format_24h": "24時間"
 }

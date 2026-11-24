@@ -459,5 +459,17 @@
     "account_basics_tier_provisioned": "已开通",
     "account_usage_emails_none": "无法向此账户发送邮件通知",
     "prefs_users_dialog_base_url_invalid": "无效的 URL 格式。必须以 http:// 或 https:// 开头",
-    "prefs_users_dialog_base_url_exists": "此服务 URL 已存在一名用户"
+    "prefs_users_dialog_base_url_exists": "此服务 URL 已存在一名用户",
+    "login_form_username_label": "用户名或电子邮箱",
+    "account_usage_limits_reset_at": "每日用量限制每 24 小时重置，下次重置在 {{time}}",
+    "account_usage_limits_reset_rolling": "每日用量限制每隔 24 小时重置",
+    "account_usage_approximate": "用量数据几秒钟更新一次，可能略低于实际数字。",
+    "prefs_appearance_date_format_title": "日期格式",
+    "prefs_appearance_date_format_iso8601": "ISO 8601",
+    "prefs_appearance_date_format_dmy": "日/月/年",
+    "prefs_appearance_date_format_dmy_dot": "日.月.年",
+    "prefs_appearance_date_format_mdy": "月/日/年",
+    "prefs_appearance_time_format_title": "时间格式",
+    "prefs_appearance_time_format_12h": "12 小时",
+    "prefs_appearance_time_format_24h": "24 小时"
 }

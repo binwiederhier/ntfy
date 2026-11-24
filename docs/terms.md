@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last updated:** January 26, 2026
+**Last updated:** November 24, 2026
 
 Please read these Terms of Service ("Terms") carefully before using the ntfy.sh website and service (the "Service") 
 operated by ntfy LLC ("us", "we", or "our").
@@ -105,6 +105,20 @@ You agree not to use the Service to:
 We reserve the right to investigate and take appropriate action against anyone who, in our sole discretion, 
 violates this provision, including removing content, terminating accounts, and reporting to law enforcement.
 
+### No critical or high-risk use
+
+The Service is not designed, tested, or intended for use where a missed, delayed, or incorrect notification
+could lead to death, personal injury, property damage, environmental damage, or significant financial loss.
+You must not use the Service as the sole or primary means of delivering:
+
+- Life-safety, medical, or health alerts (for example, patient monitoring or medication reminders)
+- Emergency, fire, intrusion, or security alarms
+- Alerts for controlling or monitoring industrial systems, vehicles, or critical infrastructure
+- Any other alert where you or someone else depends on timely delivery to avoid serious harm
+
+If you use the Service in any of these ways anyway, you do so entirely at your own risk, and you must have
+an independent, reliable backup means of notification in place.
+
 ### Topic names
 
 Topic names on ntfy.sh are public. If you use the Service without access controls, your topic name functions 
@@ -134,11 +148,15 @@ limited license to process and transmit your content solely for the purpose of p
 
 ## Service availability
 
-The Service is provided on a "best effort" basis. We do not guarantee any specific uptime or availability.
+The Service is provided on a "best effort" basis, for free and paid plans alike. We do not guarantee any
+specific uptime, availability, delivery time, or delivery at all, and we do not offer a service level agreement.
 
 We strive to maintain high availability, but the Service may be interrupted for maintenance, updates, or 
-due to circumstances beyond our control. We will make reasonable efforts to notify users of planned 
-maintenance when possible.
+due to circumstances beyond our control. Interruptions may last minutes, hours, or in rare cases several
+days. During or after an interruption, messages may be delayed, delivered out of order, delivered more than
+once, or lost entirely. We will make reasonable efforts to notify users of planned maintenance when possible.
+
+Downtime, delays, or lost messages do not entitle you to a refund, service credit, or any other compensation.
 
 For applications requiring guaranteed uptime or specific service level agreements, we recommend 
 [self-hosting your own ntfy server](install.md).
@@ -191,9 +209,24 @@ for any indirect, incidental, special, consequential, or punitive damages, inclu
 - Damages resulting from any content obtained from the Service
 - Damages resulting from unauthorized access, use, or alteration of your transmissions or content
 
+To the maximum extent permitted by law, the total, aggregate liability of ntfy LLC and its owner, employees, 
+partners, agents, suppliers, and affiliates for all claims arising out of or relating to these Terms or the 
+Service is limited to the greater of (a) the fees you actually paid us for the Service in the 12 months before 
+the event giving rise to the claim, or (b) US $5. If you use the Service without a paid plan (including 
+anonymous use without an account), you have paid us nothing, and our total liability to you is limited to 
+US $5.
+
 This limitation applies whether based on warranty, contract, tort (including negligence), or any other legal 
 theory, whether or not we have been informed of the possibility of such damage, and even if a remedy set 
 forth herein is found to have failed of its essential purpose.
+
+These limitations are a fundamental part of the basis of the bargain between you and us. The Service is 
+offered for free or at a low price only because of them.
+
+Some jurisdictions do not allow the exclusion or limitation of certain damages. In those jurisdictions, our 
+liability is limited to the fullest extent permitted by law. Nothing in these Terms excludes or limits 
+liability that cannot be excluded or limited under applicable law, such as liability for fraud or, where 
+applicable consumer law requires it, for death or personal injury caused by negligence.
 
 ## Indemnification
 
@@ -229,8 +262,9 @@ infrastructure and data.
 These Terms shall be governed and construed in accordance with the laws of the State of Connecticut, United States,
 without regard to its conflict of law provisions.
 
-Any legal action or proceeding arising under these Terms shall be brought exclusively in the federal or state
-courts located in Connecticut, and the parties hereby consent to personal jurisdiction and venue therein.
+Except for disputes that are resolved by arbitration as described below, any legal action or proceeding
+arising under these Terms shall be brought exclusively in the federal or state courts located in Connecticut,
+and the parties hereby consent to personal jurisdiction and venue therein.
 
 Our failure to enforce any right or provision of these Terms will not be considered a waiver of those rights. 
 If any provision of these Terms is held to be invalid or unenforceable by a court, the remaining provisions 
@@ -238,6 +272,45 @@ of these Terms will remain in effect.
 
 These Terms constitute the entire agreement between us regarding our Service and supersede any prior agreements 
 we might have had regarding the Service.
+
+## Dispute resolution and class action waiver
+
+**Please read this section carefully. It affects your rights, including your right to sue in court and to
+take part in a class action.**
+
+**Informal resolution first.** Before starting any formal proceeding, you agree to contact us at
+[support@mail.ntfy.sh](mailto:support@mail.ntfy.sh) with a description of your claim and to try in good faith
+to resolve it informally for at least 60 days.
+
+**Binding arbitration.** If we cannot resolve a dispute informally, any dispute, claim, or controversy arising
+out of or relating to these Terms or the Service shall be resolved by final and binding individual
+arbitration, administered by the American Arbitration Association (AAA) under its applicable rules (the
+Consumer Arbitration Rules for consumer disputes), rather than in court. The Federal Arbitration Act governs
+this section. The arbitration may be conducted by video conference or, if in person, in Connecticut. Either
+party may instead bring an individual claim in small claims court if it qualifies.
+
+**Class action waiver.** You and ntfy LLC agree that each may bring claims against the other only in an
+individual capacity, and not as a plaintiff or class member in any purported class, collective,
+consolidated, or representative proceeding. The arbitrator may not consolidate claims of more than one
+person and may award relief only to the individual party seeking it.
+
+**Mass filings.** If 25 or more similar arbitration demands are filed against us by or with the assistance of
+the same law firm or organization, they shall be administered in batches of up to 25 demands, with one
+arbitrator per batch, to the extent permitted by the AAA rules.
+
+**30-day opt-out.** You may opt out of this arbitration agreement by emailing
+[support@mail.ntfy.sh](mailto:support@mail.ntfy.sh) within 30 days of first accepting these Terms (or of these
+Terms first including this section), stating your name, your account username or email address (if any), and
+that you opt out of arbitration. Opting out does not affect any other part of these Terms.
+
+**Exceptions.** This section does not apply to claims for infringement or misuse of intellectual property,
+or to requests for urgent injunctive relief, which may be brought in the courts named above. It also does not
+apply to you if you are a consumer residing in the European Union, the United Kingdom, or another
+jurisdiction whose laws do not permit pre-dispute arbitration agreements or class action waivers with
+consumers. In that case, you may bring claims in the courts available to you under those laws.
+
+If the class action waiver is found unenforceable for a particular claim, that claim (and only that claim)
+shall be severed and brought in the courts named above, and the rest of this section remains in effect.
 
 ## Changes to these Terms
 

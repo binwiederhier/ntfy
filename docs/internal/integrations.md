@@ -6,7 +6,7 @@ Stripe (billing) and attachment storage (local disk or S3). Templates and action
 because they are the untrusted-input surfaces that integrations feed.
 
 Every integration is optional and switched on by a non-empty config key. Paths are relative to the repo root. The
-iOS push path in depth is in [ios-push-architecture.md](ios-push-architecture.md).
+iOS push path in depth is in [ios.md](ios.md#push-delivery).
 
 ## Dispatch overview
 
@@ -880,4 +880,4 @@ sequenceDiagram
 
 Background pushes (delete, clear, keepalive) do not run the NSE and are effectively no-ops on iOS. Registration, FCM
 topic naming (`sha256` of the topic URL for non-default servers) and device-side event handling are in
-[ios-push-architecture.md](ios-push-architecture.md).
+[ios.md](ios.md#push-delivery).

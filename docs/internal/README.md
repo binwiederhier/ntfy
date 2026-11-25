@@ -52,8 +52,7 @@ flowchart LR
 | [cluster.md](cluster.md) | Multi-node mode: registry, leader, mesh fan-out, message tail, shared limits, drain |
 | [web-app.md](web-app.md) | The React web app and PWA, service worker, local database; cross-client feature matrix |
 | [android.md](android.md) | The Android app (ntfy-android): delivery modes, database, UnifiedPush distributor |
-| [ios.md](ios.md) | The iOS app (ntfy-ios): app and extension, Core Data, polling |
-| [ios-push-architecture.md](ios-push-architecture.md) | How a notification reaches the iOS app via Firebase and APNs |
+| [ios.md](ios.md) | The iOS app (ntfy-ios): app and extension, push delivery via Firebase and APNs, Core Data, polling |
 | [cli.md](cli.md) | The `ntfy` command: publish, subscribe, serve and the admin commands |
 
 ## Conventions

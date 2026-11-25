@@ -7,6 +7,10 @@ repo_name: binwiederhier/ntfy
 repo_url: https://github.com/binwiederhier/ntfy
 edit_uri: blob/main/docs/
 
+# Internal developer docs stay in the repo, off docs.ntfy.sh
+exclude_docs: |
+  internal/
+
 theme:
   name: material
   font: false

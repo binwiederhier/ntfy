@@ -24,6 +24,8 @@ const (
 			tags TEXT NOT NULL,
 			click TEXT NOT NULL,
 			icon TEXT NOT NULL,
+			small_icon TEXT NOT NULL DEFAULT '',
+			color TEXT NOT NULL DEFAULT '',
 			actions TEXT NOT NULL,
 			attachment_name TEXT NOT NULL,
 			attachment_type TEXT NOT NULL,
@@ -174,6 +176,10 @@ const (
 	sqliteMigrate16To17CreateIndexQuery = `
 		CREATE INDEX IF NOT EXISTS idx_topic_published_time ON messages (topic, published, time);
 	`
+	sqliteMigrate17To18AppearanceQuery = `
+		ALTER TABLE messages ADD COLUMN small_icon TEXT NOT NULL DEFAULT '';
+		ALTER TABLE messages ADD COLUMN color TEXT NOT NULL DEFAULT '';
+	`
 )
 
 var (
@@ -207,6 +213,7 @@ func sqliteMigrations(cacheDuration time.Duration) schema.Migrations {
 		{From: 14, To: 15}: schema.Nop, // Corresponds to Postgres migration
 		{From: 15, To: 16}: schema.Nop, // 15 -> 16 adds the Postgres claim column; SQLite is single-node
 		{From: 16, To: 17}: schema.Query(sqliteMigrate16To17CreateIndexQuery),
+		{From: 17, To: 18}: schema.Query(sqliteMigrate17To18AppearanceQuery),
 	}
 }
 

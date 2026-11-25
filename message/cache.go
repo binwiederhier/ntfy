@@ -38,7 +38,7 @@ const (
 
 	// insertMessageColumns is the number of values insertMessageArgs returns per message, which is
 	// the number of columns in each backend's INSERT statement
-	insertMessageColumns = 24
+	insertMessageColumns = 26
 )
 
 const (
@@ -215,6 +215,8 @@ func insertMessageArgs(m *model.Message) ([]any, error) {
 		tags,
 		util.SanitizeUTF8(m.Click),
 		util.SanitizeUTF8(m.Icon),
+		util.SanitizeUTF8(m.SmallIcon),
+		util.SanitizeUTF8(m.Color),
 		actionsStr,
 		attachmentName,
 		attachmentType,
@@ -703,7 +705,7 @@ func readMessages(rows *sql.Rows) ([]*model.Message, error) {
 func readMessage(rows *sql.Rows, extra ...any) (*model.Message, error) {
 	var timestamp, expires, attachmentSize, attachmentExpires int64
 	var priority int
-	var id, sequenceID, event, topic, msg, title, tagsStr, click, icon, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, contentType, encoding string
+	var id, sequenceID, event, topic, msg, title, tagsStr, click, icon, smallIcon, color, actionsStr, attachmentName, attachmentType, attachmentURL, sender, user, contentType, encoding string
 	dest := []any{
 		&id,
 		&sequenceID,
@@ -717,6 +719,8 @@ func readMessage(rows *sql.Rows, extra ...any) (*model.Message, error) {
 		&tagsStr,
 		&click,
 		&icon,
+		&smallIcon,
+		&color,
 		&actionsStr,
 		&attachmentName,
 		&attachmentType,
@@ -768,6 +772,8 @@ func readMessage(rows *sql.Rows, extra ...any) (*model.Message, error) {
 		Tags:        tags,
 		Click:       click,
 		Icon:        icon,
+		SmallIcon:   smallIcon,
+		Color:       color,
 		Actions:     actions,
 		Attachment:  att,
 		Sender:      senderIP,

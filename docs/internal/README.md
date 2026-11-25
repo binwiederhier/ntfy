@@ -54,6 +54,7 @@ flowchart LR
 | [android.md](android.md) | The Android app (ntfy-android): delivery modes, database, UnifiedPush distributor |
 | [ios.md](ios.md) | The iOS app (ntfy-ios): app and extension, push delivery via Firebase and APNs, Core Data, polling |
 | [cli.md](cli.md) | The `ntfy` command: publish, subscribe, serve and the admin commands |
+| [development.md](development.md) | Building, running and testing ntfy: make targets, the dev loop, test and web conventions |
 
 ## Conventions
 

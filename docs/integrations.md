@@ -22,6 +22,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Healthchecks.io](https://healthchecks.io/) ⭐ - Online service for monitoring regularly running tasks such as cron jobs
 - [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push notifications that work with just about every platform
 - [Uptime Kuma](https://uptime.kuma.pet/) ⭐ - A self-hosted monitoring tool
+- [Nightingale](https://n9e.io/) - Open-source alerting for your existing stack, with [built-in ntfy notifications](https://github.com/ccfos/nightingale/blob/v9.3.0/doc/api/notify-channel-native.md#ntfy) for firing and resolved alerts.
 - [Robusta](https://docs.robusta.dev/master/catalog/sinks/webhook.html) ⭐ - open source platform for Kubernetes troubleshooting
 - [borgmatic](https://torsion.org/borgmatic/docs/how-to/monitor-your-backups/#third-party-monitoring-services) ⭐ - configuration-driven backup software for servers and workstations
 - [Radarr](https://radarr.video/) ⭐ - Movie collection manager for Usenet and BitTorrent users
@@ -46,6 +47,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Sifio](https://sifio.net) - Aggregate updates from RSS, social media, and other sources, then deliver them to ntfy, Slack, Notion and more
 - [SolidPing](https://docs.solidping.io/docs/configuration/notifications#ntfy) - Uptime and synthetic monitoring
 - [Expiro](https://expiro.io/integrations) - Contract renewal reminders: alerts before every renewal and notice deadline, sent to ntfy, email, Slack, Teams and more
+- [Spooky Particles](https://spookyparticles.com/docs/check-ins) - Monitoring for Vercel apps and scheduled jobs: failed deploys, down sites and missed cron runs
 
 ## Integration via HTTP/SMTP/etc.
 
@@ -108,6 +110,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Ntfy App](https://github.com/rubix-studios-pty-ltd/ntfy-app) - Tauri/Rust desktop client for Windows, Linux and MacOS with push notifications.
 - [mac_ntfy](https://github.com/wangty163/mac_ntfy) - Native macOS client for ntfy (Swift)
 - [NtfyBar](https://github.com/roypadina/NtfyBar) - Native macOS menu-bar client: per-topic popups that stay, notifications, clipboard or shell-command actions, rules, history and sandboxed JavaScript plugins (Swift)
+- [mtfy](https://github.com/acidvegas/mtfy) - Native macOS menu bar client with notifications, searchable history, multiple servers, scheduled messages and an `mtfy` CLI (Swift)
 - [ntfy-admin](https://github.com/ksabev/ntfy-admin) - Web admin panel for self-hosted ntfy: users, access rules, tokens, onboarding QR codes, multiple servers (Go)
 
 ## Projects + scripts 
@@ -209,6 +212,9 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [aibot-hostkit](https://github.com/monarchsofchaos004-gif/aibot-hostkit) - Keeps an AI coding agent (Claude Code, Codex, Gemini CLI) running on a cloud Linux box and pushes an ntfy alert to your phone whenever it restarts (Bash)
 - [Wudland](https://github.com/joexk1/wudland) - Pixel-art iPhone village that receives end-to-end encrypted coding-agent status through ntfy, with [plugins for Claude Code, Codex, opencode and terminal commands](https://github.com/joexk1/wudland-plugins) (Node.js, MIT; iOS app GPL-3.0, in App Store review)
 - [Topic Watch](https://github.com/0xzerolight/topic_watch) - Self-hosted news monitor that uses an LLM to only send ntfy notifications on genuinely new information (Python)
+- [camsentry-mcp](https://github.com/14manj01/camsentry-mcp) - MCP server that lets a local vision model watch Wyze cameras and sends an ntfy push describing what happened, with urgent priority for intruder and package-taken alerts (Python)
+- [FX Logger](https://github.com/cppHusky/fx-logger) - Monitor the foreign exchange rate and send you notifications when you need (Rust)
+- [Spring Winter](https://docs.springwinter.dev/deploy/open-source/ntfy) - Deploy ntfy into your own AWS account, with PostgreSQL on Amazon RDS for the message cache, users and access control
 
 ## Blog + forum posts
 

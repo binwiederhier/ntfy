@@ -213,6 +213,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Topic Watch](https://github.com/0xzerolight/topic_watch) - Self-hosted news monitor that uses an LLM to only send ntfy notifications on genuinely new information (Python)
 - [camsentry-mcp](https://github.com/14manj01/camsentry-mcp) - MCP server that lets a local vision model watch Wyze cameras and sends an ntfy push describing what happened, with urgent priority for intruder and package-taken alerts (Python)
 - [FX Logger](https://github.com/cppHusky/fx-logger) - Monitor the foreign exchange rate and send you notifications when you need (Rust)
+- [Spring Winter](https://docs.springwinter.dev/deploy/open-source/ntfy) - Deploy ntfy into your own AWS account, with PostgreSQL on Amazon RDS for the message cache, users and access control
 
 ## Blog + forum posts
 

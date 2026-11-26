@@ -22,6 +22,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Healthchecks.io](https://healthchecks.io/) ⭐ - Online service for monitoring regularly running tasks such as cron jobs
 - [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push notifications that work with just about every platform
 - [Uptime Kuma](https://uptime.kuma.pet/) ⭐ - A self-hosted monitoring tool
+- [Nightingale](https://n9e.io/) - Open-source alerting for your existing stack, with [built-in ntfy notifications](https://github.com/ccfos/nightingale/blob/v9.3.0/doc/api/notify-channel-native.md#ntfy) for firing and resolved alerts.
 - [Robusta](https://docs.robusta.dev/master/catalog/sinks/webhook.html) ⭐ - open source platform for Kubernetes troubleshooting
 - [borgmatic](https://torsion.org/borgmatic/docs/how-to/monitor-your-backups/#third-party-monitoring-services) ⭐ - configuration-driven backup software for servers and workstations
 - [Radarr](https://radarr.video/) ⭐ - Movie collection manager for Usenet and BitTorrent users

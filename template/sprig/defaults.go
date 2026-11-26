@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+
+	"heckel.io/ntfy/v2/template"
 )
 
 // defaultValue checks whether `given` is set, and returns default if not set.
@@ -156,6 +158,7 @@ func mustFromJSON(v string) (any, error) {
 // Returns:
 //   - string: The JSON string representation of the value
 func toJSON(v any) string {
+	checkPrintable(v)
 	output, _ := json.Marshal(v)
 	return string(output)
 }
@@ -170,6 +173,9 @@ func toJSON(v any) string {
 //   - string: The JSON string representation of the value
 //   - error: Any error that occurred during encoding
 func mustToJSON(v any) (string, error) {
+	if err := template.CheckPrintable(v); err != nil {
+		return "", err
+	}
 	output, err := json.Marshal(v)
 	if err != nil {
 		return "", err
@@ -187,8 +193,16 @@ func mustToJSON(v any) (string, error) {
 // Returns:
 //   - string: The indented JSON string representation of the value
 func toPrettyJSON(v any) string {
-	output, _ := json.MarshalIndent(v, "", "  ")
-	return string(output)
+	checkPrintable(v)
+	output, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	pretty, err := indentJSON(output)
+	if err != nil {
+		panic(err)
+	}
+	return pretty
 }
 
 // mustToPrettyJSON encodes a value into a pretty (indented) JSON string.
@@ -201,11 +215,14 @@ func toPrettyJSON(v any) string {
 //   - string: The indented JSON string representation of the value
 //   - error: Any error that occurred during encoding
 func mustToPrettyJSON(v any) (string, error) {
-	output, err := json.MarshalIndent(v, "", "  ")
+	if err := template.CheckPrintable(v); err != nil {
+		return "", err
+	}
+	output, err := json.Marshal(v)
 	if err != nil {
 		return "", err
 	}
-	return string(output), nil
+	return indentJSON(output)
 }
 
 // toRawJSON encodes a value into a JSON string with no escaping of HTML characters.
@@ -236,6 +253,9 @@ func toRawJSON(v any) string {
 //   - string: The JSON string representation of the value without HTML escaping
 //   - error: Any error that occurred during encoding
 func mustToRawJSON(v any) (string, error) {
+	if err := template.CheckPrintable(v); err != nil {
+		return "", err
+	}
 	buf := new(bytes.Buffer)
 	enc := json.NewEncoder(buf)
 	enc.SetEscapeHTML(false)
@@ -261,4 +281,50 @@ func ternary(vt any, vf any, v bool) any {
 		return vt
 	}
 	return vf
+}
+
+// indentJSON indents compact JSON like json.MarshalIndent(v, "", "  "), but first checks the result
+// length, since every nesting level indents all lines below it (quadratic in the nesting depth).
+func indentJSON(compact []byte) (string, error) {
+	if err := checkStringLength("toPrettyJSON", prettyJSONLength(compact), len(compact)); err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, compact, "", "  "); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// prettyJSONLength returns an upper bound for the length of compact JSON after indenting it with two spaces
+func prettyJSONLength(compact []byte) int {
+	length, depth := len(compact), 0
+	inString, escaped := false, false
+	for _, c := range compact {
+		if inString {
+			if escaped {
+				escaped = false
+			} else if c == '\\' {
+				escaped = true
+			} else if c == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
+		case '{', '[':
+			depth++
+			length += 1 + 2*depth
+		case '}', ']':
+			depth--
+			length += 1 + 2*depth
+		case ',':
+			length += 1 + 2*depth
+		case ':':
+			length++
+		}
+	}
+	return length
 }

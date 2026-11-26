@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/netip"
-	"reflect"
 	"runtime"
 	"strconv"
 	"text/template"
@@ -142,7 +141,7 @@ type Config struct {
 	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; required in cluster mode
 	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
 	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
-	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
+	ClusterSecret                        string        // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	ClusterRole                          cluster.Role  // Active (default) or passive: a passive node never leads and never fences
 	ClusterDrainDelay                    time.Duration // On shutdown, how long a draining node withdraws (not ready, still serves everything) before it turns read-only
@@ -156,9 +155,9 @@ type Config struct {
 	AuthFile                             string
 	AuthStartupQueries                   string
 	AuthDefault                          user.Permission
-	AuthUsers                            []*user.User `hash:"-"`
+	AuthUsers                            []*user.User
 	AuthAccess                           map[string][]*user.Grant
-	AuthTokens                           map[string][]*user.Token `hash:"-"`
+	AuthTokens                           map[string][]*user.Token
 	AuthBcryptCost                       int
 	AuthStatsQueueWriterInterval         time.Duration
 	AuthAccessCacheEnabled               bool          // Enables the in-memory ACL cache (high volume servers only)
@@ -179,17 +178,17 @@ type Config struct {
 	FirebasePollInterval                 time.Duration
 	FirebaseQuotaExceededPenaltyDuration time.Duration
 	UpstreamBaseURL                      string
-	UpstreamAccessToken                  string `hash:"-"`
+	UpstreamAccessToken                  string
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
-	SMTPSenderPass                       string `hash:"-"`
+	SMTPSenderPass                       string
 	SMTPSenderFrom                       string
 	SMTPSenderVerify                     bool
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
 	TwilioAccount                        string
-	TwilioAuthToken                      string `hash:"-"`
+	TwilioAuthToken                      string
 	TwilioPhoneNumber                    string
 	TwilioCallsBaseURL                   string
 	TwilioVerifyBaseURL                  string
@@ -224,8 +223,8 @@ type Config struct {
 	BehindProxy                          bool           // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
 	ProxyForwardedHeader                 string         // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
 	ProxyTrustedPrefixes                 []netip.Prefix // List of trusted proxy networks (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
-	StripeSecretKey                      string         `hash:"-"`
-	StripeWebhookKey                     string         `hash:"-"`
+	StripeSecretKey                      string
+	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration
 	BillingContact                       string
 	EnableSignup                         bool // Enable creation of accounts via API and UI
@@ -234,7 +233,7 @@ type Config struct {
 	EnableReservations                   bool // Allow users with role "user" to own/reserve topics
 	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
-	WebPushPrivateKey                    string `hash:"-"`
+	WebPushPrivateKey                    string
 	WebPushPublicKey                     string
 	WebPushFile                          string
 	WebPushEmailAddress                  string
@@ -383,24 +382,13 @@ func NewConfig() *Config {
 	}
 }
 
-// Hash computes an SHA-256 hash of the configuration. This is used to detect
-// configuration changes for the web app version check feature. It uses reflection
-// to include all JSON-serializable fields automatically.
+// Hash computes an SHA-256 hash of the build and the configuration visible to the web app. This is used
+// to detect changes for the web app version check feature. It only covers what is served to every browser
+// anyway, so it contains no secrets, and is the same on all nodes of a cluster.
 func (c *Config) Hash() string {
-	v := reflect.ValueOf(*c)
-	t := v.Type()
-	var result string
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		fieldName := t.Field(i).Name
-		// Secrets must not feed the hash
-		if t.Field(i).Tag.Get("hash") == "-" {
-			continue
-		}
-		// Try to marshal the field and skip if it fails (e.g. *template.Template, netip.Prefix)
-		if b, err := json.Marshal(field.Interface()); err == nil {
-			result += fmt.Sprintf("%s:%s|", fieldName, string(b))
-		}
+	b, err := json.Marshal([]any{c.BuildVersion, c.BuildDate, c.BuildCommit, newConfigResponse(c)})
+	if err != nil {
+		return "" // Cannot happen, and the web app skips the version check without a hash
 	}
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(result)))
+	return fmt.Sprintf("%x", sha256.Sum256(b))
 }

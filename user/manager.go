@@ -1005,9 +1005,10 @@ func (a *Manager) RemoveExcessReservations(username string, limit int64) ([]stri
 	return removedTopics, nil
 }
 
-// otherAccessCount returns the number of access entries for the given topic that are not owned by the user
+// otherAccessCount returns the number of access entries for the given topic that are not owned by the user.
+// The exact match compares against the stored (escaped) form; the LIKE value must be the raw topic.
 func (a *Manager) otherAccessCount(username, topic string) (int, error) {
-	rows, err := a.db.Query(a.queries.selectOtherAccessCount, escapeUnderscore(topic), escapeUnderscore(topic), username)
+	rows, err := a.db.Query(a.queries.selectOtherAccessCount, escapeUnderscore(topic), topic, username)
 	if err != nil {
 		return 0, err
 	}

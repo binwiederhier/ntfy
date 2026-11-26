@@ -347,10 +347,18 @@ func mustUniq(list any) ([]any, error) {
 	case reflect.Slice, reflect.Array:
 		l2 := reflect.ValueOf(list)
 		l := l2.Len()
+		if l > loopExecutionLimit {
+			return nil, fmt.Errorf("uniq list length %d exceeds limit of %d", l, loopExecutionLimit)
+		}
 		var dest []any
 		var item any
+		comparisons := 0
 		for i := 0; i < l; i++ {
 			item = l2.Index(i).Interface()
+			comparisons += len(dest)
+			if comparisons > comparisonLimit {
+				return nil, fmt.Errorf("uniq number of comparisons exceeds limit of %d", comparisonLimit)
+			}
 			if !inList(dest, item) {
 				dest = append(dest, item)
 			}
@@ -391,6 +399,11 @@ func mustWithout(list any, omit ...any) ([]any, error) {
 	case reflect.Slice, reflect.Array:
 		l2 := reflect.ValueOf(list)
 		l := l2.Len()
+		if l > loopExecutionLimit {
+			return nil, fmt.Errorf("without list length %d exceeds limit of %d", l, loopExecutionLimit)
+		} else if l*len(omit) > comparisonLimit {
+			return nil, fmt.Errorf("without number of comparisons exceeds limit of %d", comparisonLimit)
+		}
 		res := []any{}
 		var item any
 		for i := 0; i < l; i++ {
@@ -428,6 +441,9 @@ func mustHas(needle any, haystack any) (bool, error) {
 		l2 := reflect.ValueOf(haystack)
 		var item any
 		l := l2.Len()
+		if l > loopExecutionLimit {
+			return false, fmt.Errorf("has list length %d exceeds limit of %d", l, loopExecutionLimit)
+		}
 		for i := 0; i < l; i++ {
 			item = l2.Index(i).Interface()
 			if reflect.DeepEqual(needle, item) {
@@ -487,8 +503,20 @@ func mustSlice(list any, indices ...any) (any, error) {
 // concat combines multiple lists into a single list.
 // It takes any number of lists and returns a new list containing all elements.
 // This function will panic if any argument is not a slice or array.
+// It also panics if the combined length exceeds sliceSizeLimit, since passing the same list many
+// times would otherwise multiply it in a single call.
 func concat(lists ...any) any {
-	var res []any
+	total := 0
+	for _, list := range lists {
+		switch reflect.TypeOf(list).Kind() {
+		case reflect.Slice, reflect.Array:
+			total += reflect.ValueOf(list).Len()
+		}
+	}
+	if total > sliceSizeLimit {
+		panic(fmt.Sprintf("concat result size %d exceeds limit of %d", total, sliceSizeLimit))
+	}
+	res := make([]any, 0, total)
 	for _, list := range lists {
 		tp := reflect.TypeOf(list).Kind()
 		switch tp {

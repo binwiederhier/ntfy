@@ -365,3 +365,31 @@ func TestConcat(t *testing.T) {
 		assert.NoError(t, runt(tpl, expect))
 	}
 }
+
+func TestConcatSizeLimit(t *testing.T) {
+	// Passing the same 101-element list 100 times would build 10,100 elements in one call
+	tpl := `{{ $l := tuple` + strings.Repeat(" 0", 101) + ` }}{{ concat` + strings.Repeat(" $l", 100) + ` | len }}`
+	err := runt(tpl, "10100")
+	assert.ErrorContains(t, err, "concat result size 10100 exceeds limit of 10000")
+
+	// Exactly at the limit is fine
+	tpl = `{{ $l := tuple` + strings.Repeat(" 0", 100) + ` }}{{ concat` + strings.Repeat(" $l", 100) + ` | len }}`
+	assert.NoError(t, runt(tpl, "10000"))
+}
+
+func TestUniqWithoutHasLimit(t *testing.T) {
+	// These compare elements pairwise in a single uninterruptible call
+	for _, tpl := range []string{
+		`{{ until 10000 | uniq | len }}`,
+		`{{ until 10000 | mustUniq | len }}`,
+		`{{ $l := until 10000 }}{{ without $l ` + strings.Repeat("1 ", 200) + `| len }}`,
+		`{{ has "x" (splitList "," .a) }}`,
+		`{{ mustHas "x" (splitList "," .a) }}`,
+	} {
+		_, err := runRaw(tpl, map[string]string{"a": strings.Repeat(",", loopExecutionLimit)})
+		assert.ErrorContains(t, err, "exceeds limit", tpl)
+	}
+	assert.Nil(t, runt(`{{ until 1000 | uniq | len }}`, "1000"))
+	assert.Nil(t, runt(`{{ until 1000 | has 999 }}`, "true"))
+	assert.Nil(t, runt(`{{ without (until 1000) 1 2 3 | len }}`, "997"))
+}

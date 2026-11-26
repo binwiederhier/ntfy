@@ -4,14 +4,19 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"regexp"
+	"time"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
+	vis "heckel.io/ntfy/v2/visitor" // Aliased: the server has its own visitor type
 	wpush "heckel.io/ntfy/v2/webpush"
 )
 
@@ -21,7 +26,21 @@ const (
 	WebPushAvailable = true
 
 	webPushTopicSubscribeLimit = 50
+
+	// webPushRequestTimeout bounds a single delivery, so a slow or stalled push service
+	// cannot pin connections and goroutines indefinitely
+	webPushRequestTimeout = 15 * time.Second
+
+	// webPushResponseDrainLimit caps how much of a push service response body is read before
+	// closing it; draining small bodies lets the transport reuse the connection
+	webPushResponseDrainLimit = 4096
 )
+
+// webPushHTTPClient is shared across deliveries (connection reuse); it is a var so tests can
+// swap in a client with a shorter timeout
+var webPushHTTPClient = &http.Client{
+	Timeout: webPushRequestTimeout,
+}
 
 // webPushAllowedEndpointsRegexes is the host-level allow-list of web push services ntfy
 // will deliver to. Each regex anchors the scheme and matches the stable service host,
@@ -69,7 +88,9 @@ func (s *Server) handleWebPushUpdate(w http.ResponseWriter, r *http.Request, v *
 			}
 		}
 	}
-	if err := s.webPush.UpsertSubscription(req.Endpoint, req.Auth, req.P256dh, v.MaybeUserID(), v.IP(), req.Topics); err != nil {
+	// Store the masked IP, so the per-subscriber cap covers a whole prefix like all other limits
+	subscriberIP := vis.Mask(v.IP(), v.env.limitsConfig)
+	if err := s.webPush.UpsertSubscription(req.Endpoint, req.Auth, req.P256dh, v.MaybeUserID(), subscriberIP, req.Topics); err != nil {
 		return err
 	}
 	return s.writeJSON(w, newSuccessResponse())
@@ -162,14 +183,22 @@ func (s *Server) sendWebPushNotification(sub *wpush.Subscription, message []byte
 		VAPIDPrivateKey: s.config.WebPushPrivateKey,
 		Urgency:         webpush.UrgencyHigh, // iOS requires this to ensure delivery
 		TTL:             int(s.config.CacheDuration.Seconds()),
+		HTTPClient:      webPushHTTPClient,
 	})
-	if err != nil {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		// Timeouts and network errors are temporary (the push service may be slow or down), so
+		// keep the subscription; removing it would silently cut off every user of that service
+		log.Tag(tagWebPush).With(sub).With(contexters...).Err(err).Debug("Unable to publish web push message, keeping endpoint")
+		return err
+	} else if err != nil {
 		log.Tag(tagWebPush).With(sub).With(contexters...).Err(err).Debug("Unable to publish web push message, removing endpoint")
 		if err := s.webPush.RemoveSubscriptionsByEndpoint(sub.Endpoint); err != nil {
 			return err
 		}
 		return err
 	}
+	defer closeWebPushResponse(resp)
 	if (resp.StatusCode < 200 || resp.StatusCode > 299) && resp.StatusCode != 429 {
 		log.Tag(tagWebPush).With(sub).With(contexters...).Field("response_code", resp.StatusCode).Debug("Unable to publish web push message, unexpected response")
 		if err := s.webPush.RemoveSubscriptionsByEndpoint(sub.Endpoint); err != nil {
@@ -178,4 +207,11 @@ func (s *Server) sendWebPushNotification(sub *wpush.Subscription, message []byte
 		return errHTTPInternalErrorWebPushUnableToPublish.With(sub).With(contexters...)
 	}
 	return nil
+}
+
+// closeWebPushResponse drains (bounded) and closes the response body, so the connection is
+// released and can be reused instead of leaking
+func closeWebPushResponse(resp *http.Response) {
+	_, _ = io.CopyN(io.Discard, resp.Body, webPushResponseDrainLimit)
+	_ = resp.Body.Close()
 }

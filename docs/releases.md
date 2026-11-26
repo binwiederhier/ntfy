@@ -6,11 +6,81 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.37.2 | Nov 3, 2026   |
+| ntfy server      | v2.38.2 | Nov 25, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.38.2
+Released November 25, 2026
+
+This is a security release. It upgrades the SMTP server library used for e-mail publishing, which fixes a memory
+exhaustion attack, and closes two holes in topic reservations, where a user could reserve topics covered by an
+admin's wildcard access entry, or reserve topics at all on a tier without reservations. It also stops clients behind
+proxies like HAProxy from spoofing their IP address to get around rate limits. Upgrading is recommended if you
+enable e-mail publishing, reservations, or run ntfy behind a proxy.
+
+**Security:**
+
+* E-mail publishing: upgrade the SMTP server library ([go-smtp](https://github.com/emersion/go-smtp)) from v0.17.0 to v0.26.0, which fixes unbounded memory allocation when a client sends a command between two `BDAT` chunks ([GO-2026-7029](https://pkg.go.dev/vuln/GO-2026-7029)); incoming mail now has to use CRLF line endings, as required by the SMTP standard
+* Reservations: wildcard access entries with an underscore (e.g. `mytopic_*`) now block reservations of topics they cover, so users can no longer reserve a topic inside such a namespace and become its owner (thanks to [@DogukanK](https://github.com/DogukanK) for reporting)
+* Reservations: users on a tier with a reservation limit of 0 can no longer reserve topics (the limit was treated as unlimited) (thanks to [@DogukanK](https://github.com/DogukanK) for reporting)
+* Rate limiting: read all `X-Forwarded-For` (or configured proxy header) lines, not just the first, so clients behind proxies like HAProxy can no longer spoof their IP address to bypass the per-IP rate and login limits (thanks to [@immanuel-lam](https://github.com/immanuel-lam) for reporting)
+
+**Bug fixes + maintenance:**
+
+* Web app: the config hash is now the same on all nodes of a cluster, so the web app no longer asks for a refresh when a version check lands on another node, and it no longer covers the database and S3 URLs (which can contain credentials)
+* Firebase: log the HTTP status, `Retry-After` header and response body of failed sends, to help diagnose quota errors ([#2222](https://github.com/binwiederhier/ntfy/pull/2222))
+* E-mail publishing: line breaks in messages published by e-mail no longer contain a carriage return (`\r`) from the mail's CRLF line endings
+* Update Go and web app dependencies
+
+## ntfy server v2.38.1
+Released November 16, 2026
+
+This is a security release. It hardens message templating against a set of denial-of-service attacks, where a
+crafted template could crash the server, exhaust its memory or outrun the execution deadline in a single request.
+It also stops slow S3 attachment uploads and unresponsive web push endpoints from tying up memory, connections and
+goroutines, and applies the web push subscription limit per IP prefix. Upgrading is strongly recommended if you
+allow message templates (`Template: yes`), which any publisher can use.
+
+**Security:**
+
+* Message templating: values are now checked before they are printed or JSON-encoded, so a template can no longer crash the server by printing a value that references itself, or build a huge string by printing a list of many references to one value
+* Message templating: `printf` only accepts plain directives (no explicit argument indexes or `%p`) and no lists or dicts as arguments, and the `html`, `js` and `urlquery` functions are no longer allowed
+* Message templating: the execution deadline is now also enforced inside a single template action, so a long pipeline or deeply nested function calls can no longer outrun it
+* Message templating: the `regexMatch`, `regexFind`, `regexFindAll`, `regexReplaceAll`, `regexReplaceAllLiteral` and `regexSplit` functions (and their `must` variants) now reject patterns longer than 1024 bytes or that compile to more than 5000 instructions, so a template can no longer make the server compile and run a huge regular expression
+* Message templating: limit the result size of the `cat`, `toPrettyJSON`, `concat` and `keys` functions, and the list size of `uniq`, `without` and `has`, so a small template can no longer build a huge string or list in a single call
+* Message templating: apply the iteration limit of `until`, `untilStep` and `seq` to decreasing sequences too, so a negative step can no longer build an unbounded list
+* Attachments: buffer S3 uploads of unknown size in small chunks as data arrives, instead of allocating a full 5 MB part up front (and a second one for multipart uploads), so that slow or stalled uploads no longer pin 5-10 MB of memory each
+* Web push: use a timeout for deliveries and always close the push service response, so slow or unresponsive push endpoints can no longer leak connections and goroutines; a timeout or network error no longer removes the subscription
+* Web push: count the subscription limit per IP prefix (the same IPv6 /64 or configured prefix as all other limits) instead of per full IP address, so rotating addresses within one prefix no longer bypasses it
+
+**Bug fixes + maintenance:**
+
+* Stripe billing: when an abandoned checkout expires (`incomplete_expired`) after the user paid for another subscription, the webhook no longer replaces the paying subscription with the expired one ([#2199](https://github.com/binwiederhier/ntfy/pull/2199))
+* Message templating: errors in an inline message template (`X-Message` with `X-Template: yes`) now name the message parameter instead of the priority parameter
+
+## ntfy server v2.38.0
+Released November 15, 2026
+
+This release shares every visitor's rate limits across the nodes of a cluster: a client spread over several nodes
+is now limited once instead of once per node, and a node that restarts or crashes takes the limits over from its
+peers instead of forgetting them. It also fixes a denial-of-service bug in message templating, where a crafted
+template could build an oversized string and crash the server, and builds ntfy with Go 1.27.4 (security fixes).
+
+**Features:**
+
+* Cluster: the nodes share every visitor's rate limits (requests, failed logins, signups and password resets, topic creation, e-mails, attachment bandwidth, Firebase pauses) over the mesh every second, so a client spread over several nodes gets its limits once, not once per node; a node that restarts or crashes takes the limits over from its peers before it serves ([#2182](https://github.com/binwiederhier/ntfy/pull/2182))
+
+**Bug fixes + maintenance:**
+
+* Message templating: the `replace`, `regexReplaceAll` and `join` functions now cap the size of the string they build, so a template can no longer amplify small inputs into a multi-gigabyte string and crash the server with an out-of-memory error (thanks to Robert Flosbach of Neodyme for the responsible disclosure)
+* WebSocket subscribers that a node closes while draining are no longer counted and logged as internal server errors (HTTP 500, ntfy error 50001); on ntfy.sh, each node's drain counted ~18k of them and tripped the 5xx alert, although clients never saw an error ([#2171](https://github.com/binwiederhier/ntfy/pull/2171))
+
+**Security:**
+
+* Build with Go 1.27.4, which includes security fixes to cgo, the go command, the compiler, the linker and `net/http`
 
 ## ntfy server v2.37.2
 Released November 3, 2026
@@ -2366,17 +2436,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.38.0 (UNRELEASED)
-
-**Features:**
-
-* Cluster: the nodes share every visitor's rate limits (requests, failed logins, signups and password resets, topic creation, e-mails, attachment bandwidth, Firebase pauses) over the mesh every second, so a client spread over several nodes gets its limits once, not once per node; a node that restarts or crashes takes the limits over from its peers before it serves ([#2182](https://github.com/binwiederhier/ntfy/pull/2182))
-
-**Bug fixes + maintenance:**
-* Message templating: the `replace`, `regexReplaceAll` and `join` functions now cap the size of the string they build, so a template can no longer amplify small inputs into a multi-gigabyte string and crash the server with an out-of-memory error (thanks to Robert Flosbach of Neodyme for the responsible disclosure)
-
-* WebSocket subscribers that a node closes while draining are no longer counted and logged as internal server errors (HTTP 500, ntfy error 50001); on ntfy.sh, each node's drain counted ~18k of them and tripped the 5xx alert, although clients never saw an error ([#2171](https://github.com/binwiederhier/ntfy/pull/2171))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

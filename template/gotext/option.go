@@ -19,6 +19,17 @@ const (
 
 type option struct {
 	missingKey missingKeyAction
+	printCheck func(...any) error // print-check: vets each value before an action prints it; nil if unset
+}
+
+// PrintCheck sets a function that is called with every value before an action prints it. If it
+// returns an error, execution stops with that error. It exists because fmt has no cycle detection
+// and expands shared values, so printing an untrusted value can recurse forever or allocate without
+// bound. The return value is the template, so calls can be chained.
+func (t *Template) PrintCheck(check func(...any) error) *Template {
+	t.init()
+	t.option.printCheck = check
+	return t
 }
 
 // Option sets options for the template. Options are described by

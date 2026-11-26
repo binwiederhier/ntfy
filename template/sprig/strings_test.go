@@ -285,3 +285,29 @@ func TestPlural(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestCatLimit(t *testing.T) {
+	a := strings.Repeat("A", stringLengthLimit/2)
+	_, err := runRaw(`{{ cat .a .a .a }}`, map[string]string{"a": a})
+	assert.ErrorContains(t, err, "exceeds limit")
+	assert.Nil(t, runtv(`{{ cat .a .a }}`, "x x", map[string]string{"a": "x"}))
+}
+
+func TestIndentResultLimit(t *testing.T) {
+	// 100 spaces per line on a string of newlines is a 100x amplification
+	nl := strings.Repeat("\n", 10_000)
+	for _, tpl := range []string{`{{ indent 100 .a }}`, `{{ nindent 100 .a }}`} {
+		_, err := runRaw(tpl, map[string]string{"a": nl})
+		assert.ErrorContains(t, err, "exceeds limit")
+	}
+}
+
+func TestQuoteSquoteCatSharedValueLimit(t *testing.T) {
+	// These format every argument before joining them; a list of references to one large string
+	// costs almost nothing to build but prints every copy
+	refs := strings.Repeat(" $b", 3) // 270 KB, past the 256 KiB budget
+	for _, fn := range []string{"quote", "squote", "cat"} {
+		_, err := runRaw(`{{$b := repeat 9000 "aaaaaaaaaa"}}{{len (`+fn+` (list`+refs+`))}}`, nil)
+		assert.ErrorContains(t, err, "value is too large", fn)
+	}
+}

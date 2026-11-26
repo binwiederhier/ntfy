@@ -520,6 +520,27 @@ func TestManager_Reservations(t *testing.T) {
 	})
 }
 
+func TestManager_AllowReservation_UnderscoreWildcard(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
+		a := newTestManager(t, newManager, PermissionDenyAll)
+		require.Nil(t, a.AddUser("phil", "phil", RoleUser, false))
+		require.Nil(t, a.AllowAccess(Everyone, "my*", PermissionRead))
+		require.Nil(t, a.AllowAccess(Everyone, "your_*", PermissionRead))
+		require.Nil(t, a.AllowAccess(Everyone, "exact_topic", PermissionRead))
+
+		// Admin-defined patterns with underscores must block reservations inside them
+		require.Equal(t, errTopicOwnedByOthers, a.AllowReservation("phil", "mytopic"))
+		require.Equal(t, errTopicOwnedByOthers, a.AllowReservation("phil", "your_topic"))
+		require.Equal(t, errTopicOwnedByOthers, a.AllowReservation("phil", "your_"))
+		require.Equal(t, errTopicOwnedByOthers, a.AllowReservation("phil", "exact_topic"))
+
+		// The underscore is a literal, not a single-character LIKE wildcard
+		require.Nil(t, a.AllowReservation("phil", "yourXtopic"))
+		require.Nil(t, a.AllowReservation("phil", "exactXtopic"))
+		require.Nil(t, a.AllowReservation("phil", "other_topic"))
+	})
+}
+
 func TestManager_ChangeRoleFromTierUserToAdmin(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, newManager newManagerFunc) {
 		a := newTestManager(t, newManager, PermissionDenyAll)

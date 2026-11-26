@@ -1,5 +1,7 @@
---- a/exec.go	2026-07-10 01:31:35.188129862 +0200
-+++ b/exec.go	2026-07-10 01:31:35.189129894 +0200
+diff --git a/exec.go b/exec.go
+index aa76257..7c574f7 100644
+--- a/exec.go
++++ b/exec.go
 @@ -5,14 +5,17 @@
  package gotext
  
@@ -19,7 +21,7 @@
  )
  
  // maxExecDepth specifies the maximum stack depth of templates within
-@@ -32,11 +35,13 @@
+@@ -32,11 +35,13 @@ func initMaxExecDepth() int {
  // template so that multiple executions of the same template
  // can execute in parallel.
  type state struct {
@@ -38,7 +40,7 @@
  }
  
  // variable holds the dynamic value of a variable such as $, $x etc.
-@@ -160,6 +165,14 @@
+@@ -160,6 +165,14 @@ func (s *state) writeError(err error) {
  	})
  }
  
@@ -53,7 +55,7 @@
  // errRecover is the handler that turns panics into returns from the top
  // level of Parse.
  func errRecover(errp *error) {
-@@ -170,6 +183,8 @@
+@@ -170,6 +183,8 @@ func errRecover(errp *error) {
  			panic(e)
  		case writeError:
  			*errp = err.Err // Strip the wrapper.
@@ -62,7 +64,7 @@
  		case ExecError:
  			*errp = err // Keep the wrapper.
  		default:
-@@ -186,11 +201,19 @@
+@@ -186,11 +201,19 @@ func errRecover(errp *error) {
  // A template may be executed safely in parallel, although if parallel
  // executions share a Writer the output may be interleaved.
  func (t *Template) ExecuteTemplate(wr io.Writer, name string, data any) error {
@@ -83,7 +85,7 @@
  }
  
  // Execute applies a parsed template to the specified data object,
-@@ -204,10 +227,27 @@
+@@ -204,10 +227,29 @@ func (t *Template) ExecuteTemplate(wr io.Writer, name string, data any) error {
  // If data is a [reflect.Value], the template applies to the concrete
  // value that the reflect.Value holds, as in [fmt.Print].
  func (t *Template) Execute(wr io.Writer, data any) error {
@@ -98,10 +100,12 @@
 +// completes.
 +//
 +// Cancellation is observed between node evaluations as the template is walked,
-+// so long-running renders -- including tight or nested {{range}} loops that
-+// write no output -- are aborted promptly. A template blocked inside a single
-+// function call is not interrupted until that call returns. Partial results may
-+// already have been written to wr.
++// and before every function or method call, so long-running renders --
++// including tight or nested {{range}} loops that write no output, and long
++// pipelines or deeply nested calls inside a single action -- are aborted
++// promptly. A template blocked inside a single function call is not
++// interrupted until that call returns. Partial results may already have been
++// written to wr.
 +func (t *Template) ExecuteContext(ctx context.Context, wr io.Writer, data any) error {
 +	if err := ctx.Err(); err != nil {
 +		return err
@@ -113,7 +117,7 @@
  	defer errRecover(&err)
  	value, ok := data.(reflect.Value)
  	if !ok {
-@@ -215,9 +255,20 @@
+@@ -215,9 +257,20 @@ func (t *Template) execute(wr io.Writer, data any) (err error) {
  	}
  	state := &state{
  		tmpl: t,
@@ -134,16 +138,39 @@
  	if t.Tree == nil || t.Root == nil {
  		state.errorf("%q is an incomplete or empty template", t.Name())
  	}
-@@ -260,6 +311,12 @@
+@@ -260,6 +313,10 @@ var (
  // generating output as they go.
  func (s *state) walk(dot reflect.Value, node parse.Node) {
  	s.at(node)
 +	// Abort if the context has been canceled or its deadline has passed. The
 +	// flag is set by the watcher installed in executeContext; observing it here
 +	// interrupts any template shape, including loops that write no output.
-+	if s.cancelled != nil && s.cancelled.Load() {
-+		panic(cancelError{s.ctx.Err()})
-+	}
++	s.checkCancelled()
  	switch node := node.(type) {
  	case *parse.ActionNode:
  		// Do not pop variables so they persist until next end.
+@@ -294,6 +351,14 @@ func (s *state) walk(dot reflect.Value, node parse.Node) {
+ 	}
+ }
+ 
++// checkCancelled aborts execution via a cancelError if the context is done. It is
++// polled per node in walk, and before every function or method call in evalCall.
++func (s *state) checkCancelled() {
++	if s.cancelled != nil && s.cancelled.Load() {
++		panic(cancelError{s.ctx.Err()})
++	}
++}
++
+ // walkIfOrWith walks an 'if' or 'with' node. The two control structures
+ // are identical in behavior except that 'with' sets dot.
+ func (s *state) walkIfOrWith(typ parse.NodeType, dot reflect.Value, pipe *parse.PipeNode, list, elseList *parse.ListNode) {
+@@ -867,6 +932,9 @@ func (s *state) evalCall(dot, fun reflect.Value, isBuiltin bool, node parse.Node
+ 		fun = reflect.ValueOf(call)
+ 	}
+ 
++	// ctx-ex: a single action can hold a long pipeline or deeply nested calls, none of
++	// which are walked, so check right before each invocation (after its args ran).
++	s.checkCancelled()
+ 	v, err := safeCall(fun, argv)
+ 	// If we have an error that is not nil, stop execution and return that
+ 	// error to the caller.

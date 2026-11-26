@@ -236,10 +236,12 @@ func (t *Template) Execute(wr io.Writer, data any) error {
 // completes.
 //
 // Cancellation is observed between node evaluations as the template is walked,
-// so long-running renders -- including tight or nested {{range}} loops that
-// write no output -- are aborted promptly. A template blocked inside a single
-// function call is not interrupted until that call returns. Partial results may
-// already have been written to wr.
+// and before every function or method call, so long-running renders --
+// including tight or nested {{range}} loops that write no output, and long
+// pipelines or deeply nested calls inside a single action -- are aborted
+// promptly. A template blocked inside a single function call is not
+// interrupted until that call returns. Partial results may already have been
+// written to wr.
 func (t *Template) ExecuteContext(ctx context.Context, wr io.Writer, data any) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -314,9 +316,7 @@ func (s *state) walk(dot reflect.Value, node parse.Node) {
 	// Abort if the context has been canceled or its deadline has passed. The
 	// flag is set by the watcher installed in executeContext; observing it here
 	// interrupts any template shape, including loops that write no output.
-	if s.cancelled != nil && s.cancelled.Load() {
-		panic(cancelError{s.ctx.Err()})
-	}
+	s.checkCancelled()
 	switch node := node.(type) {
 	case *parse.ActionNode:
 		// Do not pop variables so they persist until next end.
@@ -348,6 +348,14 @@ func (s *state) walk(dot reflect.Value, node parse.Node) {
 		s.walkIfOrWith(parse.NodeWith, dot, node.Pipe, node.List, node.ElseList)
 	default:
 		s.errorf("unknown node: %s", node)
+	}
+}
+
+// checkCancelled aborts execution via a cancelError if the context is done. It is
+// polled per node in walk, and before every function or method call in evalCall.
+func (s *state) checkCancelled() {
+	if s.cancelled != nil && s.cancelled.Load() {
+		panic(cancelError{s.ctx.Err()})
 	}
 }
 
@@ -924,6 +932,9 @@ func (s *state) evalCall(dot, fun reflect.Value, isBuiltin bool, node parse.Node
 		fun = reflect.ValueOf(call)
 	}
 
+	// ctx-ex: a single action can hold a long pipeline or deeply nested calls, none of
+	// which are walked, so check right before each invocation (after its args ran).
+	s.checkCancelled()
 	v, err := safeCall(fun, argv)
 	// If we have an error that is not nil, stop execution and return that
 	// error to the caller.
@@ -1160,6 +1171,11 @@ func (s *state) printValue(n parse.Node, v reflect.Value) {
 	iface, ok := printableValue(v)
 	if !ok {
 		s.errorf("can't print %s of type %s", n, v.Type())
+	}
+	if check := s.tmpl.option.printCheck; check != nil {
+		if err := check(iface); err != nil {
+			s.errorf("can't print %s: %s", n, err)
+		}
 	}
 	_, err := fmt.Fprint(s.wr, iface)
 	if err != nil {

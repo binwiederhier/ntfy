@@ -225,3 +225,84 @@ func TestRegexQuoteMeta(t *testing.T) {
 	assert.Equal(t, "1\\.2\\.3", regexQuoteMeta("1.2.3"))
 	assert.Equal(t, "pretzel", regexQuoteMeta("pretzel"))
 }
+
+func TestRegex_RejectsLargeProgram(t *testing.T) {
+	// Go rejects nested repeats like a{1000}{10} itself, but accepts concatenated ones; each
+	// "a{1000}" compiles to ~1000 instructions, so six of them exceed maxRegexProgramInsts
+	regex := strings.Repeat("a{1000}", 6)
+
+	assert.False(t, regexMatch(regex, strings.Repeat("a", 6000)))
+	_, err := mustRegexMatch(regex, "aaa")
+	assert.Error(t, err)
+
+	assert.Panics(t, func() { regexFindAll(regex, "aaa", -1) })
+	_, err = mustRegexFindAll(regex, "aaa", -1)
+	assert.Error(t, err)
+
+	assert.Panics(t, func() { regexFind(regex, "aaa") })
+	_, err = mustRegexFind(regex, "aaa")
+	assert.Error(t, err)
+
+	assert.Panics(t, func() { regexReplaceAll(regex, "aaa", "b") })
+	_, err = mustRegexReplaceAll(regex, "aaa", "b")
+	assert.Error(t, err)
+
+	assert.Panics(t, func() { regexReplaceAllLiteral(regex, "aaa", "b") })
+	_, err = mustRegexReplaceAllLiteral(regex, "aaa", "b")
+	assert.Error(t, err)
+
+	assert.Panics(t, func() { regexSplit(regex, "aaa", -1) })
+	_, err = mustRegexSplit(regex, "aaa", -1)
+	assert.Error(t, err)
+}
+
+func TestRegex_RejectsLongPattern(t *testing.T) {
+	regex := strings.Repeat("a", maxRegexPatternLength+1)
+	_, err := mustRegexMatch(regex, "aaa")
+	assert.Error(t, err)
+	assert.Panics(t, func() { regexFind(regex, "aaa") })
+}
+
+func TestRegex_AllowsNormalPatterns(t *testing.T) {
+	// Patterns people actually use in notification templates stay well below the limits; the
+	// largest here, an email pattern with RFC length bounds, compiles to about 760 instructions
+	tests := []struct {
+		regex string
+		s     string
+		want  string
+	}{
+		{`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`, "phil@example.com", "phil@example.com"},
+		{`\b[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63}\b`, "mail ops@example.org now", "ops@example.org"},
+		{`\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b`, "host 192.168.1.254 down", "192.168.1.254"},
+		{`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`, "id=123e4567-e89b-12d3-a456-426614174000", "123e4567-e89b-12d3-a456-426614174000"},
+		{`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})`, "at 2026-11-16T09:30:00.123Z", "2026-11-16T09:30:00.123Z"},
+		{`https?://[^\s/$.?#].[^\s]*`, "see https://ntfy.sh/docs for more", "https://ntfy.sh/docs"},
+		{`v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z.-]+)?`, "released v2.38.1-rc.1", "v2.38.1-rc.1"},
+		{`(?i)\b(error|fatal|panic|critical)\b`, "Disk CRITICAL on app-3", "CRITICAL"},
+		{`[\p{L}\p{N}]+`, "  Grüße ", "Grüße"},
+		{`\d{1,3}(,\d{3})*(\.\d{2})?`, "total $1,234,567.89", "1,234,567.89"},
+		{`a{1,100}`, "aaa", "aaa"},
+	}
+	for _, test := range tests {
+		got, err := mustRegexFind(test.regex, test.s)
+		assert.Nil(t, err, test.regex)
+		assert.Equal(t, test.want, got, test.regex)
+		assert.Equal(t, test.want, regexFind(test.regex, test.s), test.regex)
+	}
+
+	// The other functions, as used in a template
+	for tpl, want := range map[string]string{
+		`{{ regexMatch "^[A-Z]+-[0-9]+$" "OPS-1234" }}`:                                "true",
+		`{{ regexFindAll "[0-9]+" "cpu 93, mem 71, disk 88" -1 | join "," }}`:          "93,71,88",
+		`{{ regexReplaceAll "(?P<user>[a-z]+)@(?P<host>[a-z.]+)" "a@b.c" "${host}" }}`: "b.c",
+		`{{ regexReplaceAllLiteral "\\s+" "too   many    spaces" " " }}`:               "too many spaces",
+		`{{ regexSplit "\\s*,\\s*" "a, b ,c" -1 | join "|" }}`:                         "a|b|c",
+		`{{ mustRegexMatch "(?m)^ERROR" "ok\nERROR: boom" }}`:                          "true",
+	} {
+		assert.Nil(t, runt(tpl, want), tpl)
+	}
+
+	// A pattern of exactly the maximum length is fine
+	_, err := mustRegexMatch(strings.Repeat("a", maxRegexPatternLength), "aaa")
+	assert.Nil(t, err)
+}

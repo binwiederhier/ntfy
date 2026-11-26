@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -19,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	wpush "heckel.io/ntfy/v2/webpush"
 )
 
 const (
@@ -171,6 +173,35 @@ func TestServer_WebPush_TopicAdd_TooManyTopics(t *testing.T) {
 		response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, topicList, testWebPushEndpoint), nil)
 		require.Equal(t, 400, response.Code)
 		require.Equal(t, `{"code":40040,"http":400,"error":"invalid request: too many web push topic subscriptions"}`+"\n", response.Body.String())
+	})
+}
+
+func TestServer_WebPush_TopicAdd_TooManySubscriptionsSamePrefix(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfigWithWebPush(t, databaseURL))
+
+		// Rotating addresses within one /64 must not bypass the per-subscriber cap
+		for i := 0; i < 10; i++ {
+			overrideRemoteAddr := func(r *http.Request) {
+				r.RemoteAddr = fmt.Sprintf("[2001:db8:9999:8888:%x::1]:1234", i+1)
+			}
+			response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, fmt.Sprintf("%s%d", testWebPushEndpoint, i)), nil, overrideRemoteAddr)
+			require.Equal(t, 200, response.Code)
+		}
+		overrideRemoteAddrSamePrefix := func(r *http.Request) {
+			r.RemoteAddr = "[2001:db8:9999:8888:ffff::1]:1234"
+		}
+		response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint+"10"), nil, overrideRemoteAddrSamePrefix)
+		require.NotEqual(t, 200, response.Code)
+		requireSubscriptionCount(t, s, "test-topic", 10)
+
+		// A different /64 is unaffected
+		overrideRemoteAddrOtherPrefix := func(r *http.Request) {
+			r.RemoteAddr = "[2001:db8:9999:7777::1]:1234"
+		}
+		response = request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, testWebPushEndpoint+"11"), nil, overrideRemoteAddrOtherPrefix)
+		require.Equal(t, 200, response.Code)
+		requireSubscriptionCount(t, s, "test-topic", 11)
 	})
 }
 
@@ -354,6 +385,90 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 			return len(subs) == 0
 		})
 	})
+}
+
+func TestServer_WebPush_Send_ClosesResponseBody(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithWebPush(t, ""))
+
+	// A closed (and drained) body lets the transport reuse the connection, so both sends
+	// must share a single connection; an unclosed body forces a new connection per send.
+	var newConns atomic.Int32
+	pushService := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(strings.Repeat("x", 1024)))
+	}))
+	pushService.Config.ConnState = func(conn net.Conn, state http.ConnState) {
+		if state == http.StateNew {
+			newConns.Add(1)
+		}
+	}
+	pushService.Start()
+	defer pushService.Close()
+
+	sub := newTestWebPushSubscription(pushService.URL + "/push-receive")
+	require.Nil(t, s.sendWebPushNotification(sub, []byte("message 1")))
+	require.Nil(t, s.sendWebPushNotification(sub, []byte("message 2")))
+	require.Equal(t, int32(1), newConns.Load())
+}
+
+func TestServer_WebPush_Send_Timeout(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithWebPush(t, ""))
+
+	// Shorten the client timeout so a push service that never responds fails fast
+	originalClient := webPushHTTPClient
+	webPushHTTPClient = &http.Client{
+		Timeout: 300 * time.Millisecond,
+	}
+	defer func() {
+		webPushHTTPClient = originalClient
+	}()
+
+	unblock := make(chan struct{})
+	pushService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-unblock
+	}))
+	defer pushService.Close()
+	defer close(unblock)
+
+	endpoint := pushService.URL + "/push-receive"
+	addSubscription(t, s, endpoint, "test-topic")
+	done := make(chan error, 1)
+	go func() {
+		done <- s.sendWebPushNotification(newTestWebPushSubscription(endpoint), []byte("message"))
+	}()
+	select {
+	case err := <-done:
+		require.NotNil(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("web push send did not time out")
+	}
+
+	// A timeout is temporary, so the subscription is kept for the next message
+	requireSubscriptionCount(t, s, "test-topic", 1)
+}
+
+func TestServer_WebPush_Send_NetworkErrorKeepsSubscription(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithWebPush(t, ""))
+
+	// A push service that is down (connection refused) must not cost every user their subscription
+	pushService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	}))
+	endpoint := pushService.URL + "/push-receive"
+	pushService.Close()
+	addSubscription(t, s, endpoint, "test-topic")
+	require.NotNil(t, s.sendWebPushNotification(newTestWebPushSubscription(endpoint), []byte("message")))
+	requireSubscriptionCount(t, s, "test-topic", 1)
+}
+
+func newTestWebPushSubscription(endpoint string) *wpush.Subscription {
+	return &wpush.Subscription{
+		Endpoint: endpoint,
+		Auth:     "kSC3T8aN1JCQxxPdrFLrZg",
+		P256dh:   "BMKKbxdUU_xLS7G1Wh5AN8PvWOjCzkCuKZYb8apcqYrDxjOF_2piggBnoJLQYx9IeSD70fNuwawI3e9Y8m3S3PE",
+	}
 }
 
 func payloadForTopics(t *testing.T, topics []string, endpoint string) string {

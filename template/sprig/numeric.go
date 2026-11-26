@@ -324,7 +324,8 @@ func untilStep(start, stop, step int) []int {
 	if step == 0 {
 		return v
 	}
-	iterations := math.Abs(float64(stop)-float64(start)) / float64(step)
+	// Divide by |step|, or a negative step yields a negative count that slips past the limit
+	iterations := math.Abs(float64(stop)-float64(start)) / math.Abs(float64(step))
 	if iterations > loopExecutionLimit {
 		panic(fmt.Sprintf("too many iterations in untilStep; max allowed is %d, got %f", loopExecutionLimit, iterations))
 	}
@@ -413,6 +414,7 @@ func round(a any, p int, rOpt ...float64) float64 {
 // Returns:
 //   - int64: The decimal representation of the octal value
 func toDecimal(v any) int64 {
+	checkPrintable(v)
 	result, err := strconv.ParseInt(fmt.Sprint(v), 8, 64)
 	if err != nil {
 		return 0

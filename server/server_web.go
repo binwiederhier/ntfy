@@ -74,21 +74,27 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request, _ *visitor) 
 }
 
 func (s *Server) configResponse() *apiConfigResponse {
+	response := newConfigResponse(s.config)
+	response.ConfigHash = s.config.Hash()
+	return response
+}
+
+// newConfigResponse returns the config for the web app, without the hash (see Config.Hash)
+func newConfigResponse(conf *Config) *apiConfigResponse {
 	return &apiConfigResponse{
 		BaseURL:             "", // Will translate to window.location.origin
-		AppRoot:             s.config.WebRoot,
-		EnableLogin:         s.config.EnableLogin,
-		RequireLogin:        s.config.RequireLogin,
-		EnableSignup:        s.config.EnableSignup,
-		EnablePayments:      s.config.StripeSecretKey != "",
-		EnableCalls:         s.config.TwilioAccount != "",
-		EnableEmails:        s.config.SMTPSenderFrom != "",
-		EnableResetPassword: s.config.SMTPSenderFrom != "" && s.config.BaseURL != "", // Reset links need SMTP + an absolute base-url
-		EnableReservations:  s.config.EnableReservations,
-		EnableWebPush:       s.config.WebPushPublicKey != "",
-		BillingContact:      s.config.BillingContact,
-		WebPushPublicKey:    s.config.WebPushPublicKey,
-		DisallowedTopics:    s.config.DisallowedTopics,
-		ConfigHash:          s.config.Hash(),
+		AppRoot:             conf.WebRoot,
+		EnableLogin:         conf.EnableLogin,
+		RequireLogin:        conf.RequireLogin,
+		EnableSignup:        conf.EnableSignup,
+		EnablePayments:      conf.StripeSecretKey != "",
+		EnableCalls:         conf.TwilioAccount != "",
+		EnableEmails:        conf.SMTPSenderFrom != "",
+		EnableResetPassword: conf.SMTPSenderFrom != "" && conf.BaseURL != "", // Reset links need SMTP + an absolute base-url
+		EnableReservations:  conf.EnableReservations,
+		EnableWebPush:       conf.WebPushPublicKey != "",
+		BillingContact:      conf.BillingContact,
+		WebPushPublicKey:    conf.WebPushPublicKey,
+		DisallowedTopics:    conf.DisallowedTopics,
 	}
 }

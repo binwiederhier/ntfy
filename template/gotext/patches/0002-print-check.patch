@@ -1,0 +1,38 @@
+diff --git a/exec.go b/exec.go
+index b4ef0ca3..b406f240 100644
+--- a/exec.go
++++ b/exec.go
+@@ -1161,6 +1161,11 @@ func (s *state) printValue(n parse.Node, v reflect.Value) {
+ 	if !ok {
+ 		s.errorf("can't print %s of type %s", n, v.Type())
+ 	}
++	if check := s.tmpl.option.printCheck; check != nil {
++		if err := check(iface); err != nil {
++			s.errorf("can't print %s: %s", n, err)
++		}
++	}
+ 	_, err := fmt.Fprint(s.wr, iface)
+ 	if err != nil {
+ 		s.writeError(err)
+diff --git a/option.go b/option.go
+index 9e0344c1..8e914e1b 100644
+--- a/option.go
++++ b/option.go
+@@ -19,6 +19,17 @@ const (
+ 
+ type option struct {
+ 	missingKey missingKeyAction
++	printCheck func(...any) error // print-check: vets each value before an action prints it; nil if unset
++}
++
++// PrintCheck sets a function that is called with every value before an action prints it. If it
++// returns an error, execution stops with that error. It exists because fmt has no cycle detection
++// and expands shared values, so printing an untrusted value can recurse forever or allocate without
++// bound. The return value is the template, so calls can be chained.
++func (t *Template) PrintCheck(check func(...any) error) *Template {
++	t.init()
++	t.option.printCheck = check
++	return t
+ }
+ 
+ // Option sets options for the template. Options are described by

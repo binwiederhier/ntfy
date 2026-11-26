@@ -7,13 +7,16 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"heckel.io/ntfy/v2/template"
 )
 
 const (
-	loopExecutionLimit = 10_000  // Limit the number of loop executions to prevent execution from taking too long
-	stringLengthLimit  = 100_000 // Limit the length of strings to prevent memory issues
-	sliceSizeLimit     = 10_000  // Limit the size of slices to prevent memory issues
-	indentSpacesLimit  = 100     // Limit indentation width to prevent memory issues; indent allocates spaces*lines bytes
+	loopExecutionLimit = 10_000    // Limit the number of loop executions to prevent execution from taking too long
+	stringLengthLimit  = 100_000   // Limit the length of strings to prevent memory issues
+	sliceSizeLimit     = 10_000    // Limit the size of slices to prevent memory issues
+	indentSpacesLimit  = 100       // Limit indentation width to prevent memory issues; indent allocates spaces*lines bytes
+	comparisonLimit    = 1_000_000 // Limit element comparisons in list functions (uniq, without), which are O(n*m) in one call
 )
 
 // checkResultLength panics if n, the byte size of a string a function is about to build in a single
@@ -26,6 +29,17 @@ const (
 func checkResultLength(n int) {
 	if n > stringLengthLimit {
 		panic(fmt.Sprintf("result length %d exceeds limit of %d", n, stringLengthLimit))
+	}
+}
+
+// checkPrintable panics if the values reference themselves or expand to too large a size when
+// printed or JSON-encoded. Functions like set mutate maps in place, so a template can build a
+// value that contains itself (fmt recurses forever and crashes the process) or that references
+// one value many times (fmt and encoding/json expand it exponentially). The template executor
+// recovers the panic into a render error.
+func checkPrintable(values ...any) {
+	if err := template.CheckPrintable(values...); err != nil {
+		panic(err)
 	}
 }
 
@@ -225,5 +239,10 @@ func TxtFuncMap() map[string]any {
 		// URLs
 		"urlParse": urlParse,
 		"urlJoin":  urlJoin,
+
+		// Template builtins, guarded (see builtins.go)
+		"print":   templatePrint,
+		"println": templatePrintln,
+		"printf":  templatePrintf,
 	}
 }

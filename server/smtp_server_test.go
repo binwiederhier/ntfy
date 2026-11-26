@@ -377,7 +377,7 @@ what's up
 	})
 	defer s.Close()
 	defer c.Close()
-	writeAndReadUntilLine(t, email, c, scanner, "554 5.0.0 Error: transaction failed, blame it on the weather: unsupported content type")
+	writeAndReadUntilLine(t, email, c, scanner, "554 5.0.0 Error: transaction failed: unsupported content type")
 }
 
 func TestSmtpBackend_InvalidAddress(t *testing.T) {
@@ -586,7 +586,7 @@ L0VOIj4KClRoaXMgaXMgYSB0ZXN0IG1lc3NhZ2UgZnJvbSBUcnVlTkFTIENPUkUuCg==
 	})
 	defer s.Close()
 	defer c.Close()
-	writeAndReadUntilLine(t, email, c, scanner, "554 5.0.0 Error: transaction failed, blame it on the weather: multipart message nested too deep")
+	writeAndReadUntilLine(t, email, c, scanner, "554 5.0.0 Error: transaction failed: multipart message nested too deep")
 }
 
 func TestSmtpBackend_HTMLEmail(t *testing.T) {
@@ -1462,6 +1462,38 @@ what's up
 	writeAndReadUntilLine(t, email, c, scanner, "250 2.0.0 OK: queued")
 }
 
+func TestSmtpBackend_AuthLoginIsUnsupported(t *testing.T) {
+	email := `EHLO example.com
+AUTH LOGIN dGVzdA==
+`
+	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("Unexpected publish")
+	})
+	defer s.Close()
+	defer c.Close()
+	writeAndReadUntilLine(t, email, c, scanner, "504 5.7.4 Unsupported authentication mechanism")
+}
+
+func TestSmtpBackend_BDATDoesNotLiftLineLengthLimit(t *testing.T) {
+	// GO-2026-7029: a command sent between two BDAT chunks must still be bound by the line length limit
+	s, c, _, scanner := newTestSMTPServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("Unexpected publish")
+	})
+	defer s.Close()
+	defer c.Close()
+
+	// Send the first chunk and wait for it to be accepted, so the long line is read after it
+	start := "EHLO example.com\r\n" +
+		"MAIL FROM: phil@example.com\r\n" +
+		"RCPT TO: ntfy-mytopic@ntfy.sh\r\n" +
+		"BDAT 5\r\nhello"
+	writeAndReadUntilLine(t, start, c, scanner, "250 2.0.0 Continue")
+
+	// A command line longer than MaxLineLength must be rejected
+	longLine := "NOOP " + strings.Repeat("x", 5000) + "\r\n"
+	writeAndReadUntilLine(t, longLine, c, scanner, "500 5.4.0 Too long line, closing connection")
+}
+
 type smtpHandlerFunc func(http.ResponseWriter, *http.Request)
 
 func newTestSMTPServer(t *testing.T, handler smtpHandlerFunc) (s *smtp.Server, c net.Conn, conf *Config, scanner *bufio.Scanner) {
@@ -1489,6 +1521,9 @@ func newTestSMTPServer(t *testing.T, handler smtpHandlerFunc) (s *smtp.Server, c
 }
 
 func writeAndReadUntilLine(t *testing.T, email string, conn net.Conn, scanner *bufio.Scanner, expectedLine string) {
+	if !strings.Contains(email, "\r\n") {
+		email = strings.ReplaceAll(email, "\n", "\r\n") // SMTP requires CRLF, but the test emails are easier to read with LF
+	}
 	_, err := io.WriteString(conn, email)
 	require.Nil(t, err)
 	readUntilLine(t, conn, scanner, expectedLine)

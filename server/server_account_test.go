@@ -593,6 +593,33 @@ func TestAccount_Reservation_AddWithoutTierFails(t *testing.T) {
 	})
 }
 
+func TestAccount_Reservation_AddWithZeroLimitTierFails(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		conf := newTestConfigWithAuthFile(t, databaseURL)
+		conf.EnableSignup = true
+		conf.EnableReservations = true
+		s := newTestServer(t, conf)
+
+		// A tier without reservations: the limit 0 must not mean "unlimited"
+		rr := request(t, s, "POST", "/v1/account", `{"username":"phil", "password":"mypass"}`, nil)
+		require.Equal(t, 200, rr.Code)
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			Code:             "free",
+			ReservationLimit: 0,
+		}))
+		require.Nil(t, s.userManager.ChangeTier("phil", "free"))
+
+		rr = request(t, s, "POST", "/v1/account/reservation", `{"topic":"mytopic", "everyone":"deny-all"}`, map[string]string{
+			"Authorization": util.BasicAuth("phil", "mypass"),
+		})
+		require.Equal(t, 429, rr.Code)
+		require.Equal(t, 42907, toHTTPError(t, rr.Body.String()).Code)
+		reservations, err := s.userManager.Reservations("phil")
+		require.Nil(t, err)
+		require.Len(t, reservations, 0)
+	})
+}
+
 func TestAccount_Reservation_AddAdminSuccess(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		conf := newTestConfigWithAuthFile(t, databaseURL)

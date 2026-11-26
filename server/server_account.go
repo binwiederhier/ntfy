@@ -528,6 +528,8 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	// Check if we are allowed to reserve this topic
 	if u.IsUser() && u.Tier == nil {
 		return errHTTPUnauthorized
+	} else if u.IsUser() && u.Tier.ReservationLimit <= 0 {
+		return errHTTPTooManyRequestsLimitReservations // AddReservation treats a limit of 0 as unlimited (for admins)
 	} else if err := s.userManager.AllowReservation(u.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
 	}

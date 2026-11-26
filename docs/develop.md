@@ -231,7 +231,7 @@ $ make web
 ...
 ```
 
-This will build the web app using Create React App and then **copy the production build to the `server/site` folder**, so 
+This will build the web app using Vite and then **copy the production build to the `server/site` folder**, so
 that when you `make cli` (or `make cli-linux-amd64`, ...), you will have the web app included in the `ntfy` binary.
 
 If you're developing on the web app, it's best to just `cd web` and run `npm start` manually. This will open your browser
@@ -279,6 +279,32 @@ Reference: <https://stackoverflow.com/questions/34160509/options-for-testing-ser
 2. Run the server (step 2 above)
 
 3. Open <http://localhost/>
+
+### Run the web app unit tests
+The web app has [Vitest](https://vitest.dev/) unit tests in `web/src/`. These run in Node.js.
+The Playwright end-to-end tests in the next section exercise browser flows against a running ntfy server.
+
+From the repository root, install the web app dependencies and run all unit tests once:
+
+``` shell
+$ cd web
+$ npm ci
+$ npm test
+```
+
+To run a single test file, run the following command from `web/`:
+
+``` shell
+$ npm test -- src/app/utils.test.js
+```
+
+To run the unit tests in watch mode and rerun them when files change:
+
+``` shell
+$ npm run test:watch
+```
+
+Press `q` to exit watch mode.
 
 ### Run the web app end-to-end tests
 The web app has [Playwright](https://playwright.dev/) end-to-end tests in `web/e2e/`. They drive a real (headless) Chromium

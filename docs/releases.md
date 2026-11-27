@@ -6,11 +6,26 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 | Component        | Version | Release date  |
 |------------------|---------|---------------|
-| ntfy server      | v2.38.2 | Nov 25, 2026  |
+| ntfy server      | v2.38.3 | Nov 27, 2026  |
 | ntfy Android app | v1.25.2 | July 23, 2026 |
 | ntfy iOS app     | v1.7.0  | May 30, 2026  |
 
 Please check out the release notes for [upcoming releases](#not-released-yet) below.
+
+## ntfy server v2.38.3
+Released November 27, 2026
+
+This is a security release. It closes a gap in the web push endpoint check, which let anyone who can read a topic
+make the server send requests to hosts of their choosing, and adds an option to limit Firebase messages per visitor
+and topic. Upgrading is recommended if you enable web push.
+
+**Security:**
+
+* Web push: check endpoints against the parsed URL host instead of the raw string, so endpoints like `https://attacker.example?x.mozaws.net/` that only look like an allowed push service are rejected; such endpoints that were already stored are removed, and redirects are no longer followed ([GHSA-j5px-666m-5p3f](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-j5px-666m-5p3f), [GHSA-h4w9-5cmv-92hv](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-h4w9-5cmv-92hv), thanks to [@jpabeem](https://github.com/jpabeem) and [@brennocm](https://github.com/brennocm) for reporting)
+
+**Bug fixes + maintenance:**
+
+* Add `experimental-firebase-limit` option to limit Firebase messages per visitor and topic for users without a paid plan (this option will go away in a future release) to stay within FCM's hourly fanout budget, which recently caused about half of all Firebase messages to fail ([#2249](https://github.com/binwiederhier/ntfy/issues/2249))
 
 ## ntfy server v2.38.2
 Released November 25, 2026
@@ -2436,16 +2451,6 @@ For older releases, check out the GitHub releases pages for the [ntfy server](ht
 and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/releases).
 
 ## Not released yet
-
-### ntfy server v2.38.3 (UNRELEASED)
-
-**Security:**
-
-* Web push: check endpoints against the parsed URL host instead of the raw string, so endpoints like `https://attacker.example?x.mozaws.net/` that only look like an allowed push service are rejected; such endpoints that were already stored are removed, and redirects are no longer followed ([GHSA-j5px-666m-5p3f](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-j5px-666m-5p3f), [GHSA-h4w9-5cmv-92hv](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-h4w9-5cmv-92hv), thanks to [@jpabeem](https://github.com/jpabeem) and [@brennocm](https://github.com/brennocm) for reporting)
-
-**Bug fixes + maintenance:**
-
-* Add `experimental-firebase-limit` option to limit Firebase messages per visitor and topic for users without a paid plan (this option will go away in a future release) to stay within FCM's hourly fanout budget, which recently caused about half of all Firebase messages to fail ([#2249](https://github.com/binwiederhier/ntfy/issues/2249))
 
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 

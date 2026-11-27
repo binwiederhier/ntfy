@@ -2437,6 +2437,12 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ## Not released yet
 
+### ntfy server v2.38.3 (UNRELEASED)
+
+**Bug fixes + maintenance:**
+
+* Add `experimental-firebase-limit` option to limit Firebase messages per visitor and topic for users without a paid plan (this option will go away in a future release) to stay within FCM's hourly fanout budget, which recently caused about half of all Firebase messages to fail ([#2249](https://github.com/binwiederhier/ntfy/issues/2249))
+
 ### ntfy iOS app v1.8.0 (UNRELEASED)
 
 **Features:**

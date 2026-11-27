@@ -47,6 +47,15 @@
 #
 # firebase-key-file: <filename>
 
+# If set, limit the messages sent to Firebase for visitors without a paid tier. Each visitor and each topic
+# get a token bucket: a burst, then one more message per refill duration. Messages over the limit are still
+# published, just not sent to Firebase. "defaults" means visitor-burst=5, visitor-refill=1m, topic-burst=10,
+# topic-refill=6m (10 per hour); values that are not set keep these defaults. This option is experimental and will go away in
+# the future: it works around FCM's undocumented topic fanout limit until ntfy delivers to device tokens instead of
+# FCM topics.
+#
+# experimental-firebase-limit: "visitor-burst=5,visitor-refill=1m,topic-burst=10,topic-refill=6m"
+
 # If "database-url" is set, ntfy will use PostgreSQL for all database-backed stores (message cache,
 # user manager, and web push subscriptions) instead of SQLite. When set, the "cache-file",
 # "auth-file", and "web-push-file" options must not be set.

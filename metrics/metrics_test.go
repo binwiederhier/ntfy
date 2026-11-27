@@ -42,6 +42,7 @@ var expectedMetricNames = []string{
 	"ntfy_emails_received_success",
 	"ntfy_emails_sent_failure",
 	"ntfy_emails_sent_success",
+	"ntfy_firebase_limited_total",
 	"ntfy_firebase_published_failure",
 	"ntfy_firebase_published_success",
 	"ntfy_http_requests_total",

@@ -43,6 +43,7 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"key_file", "K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"cert_file", "E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-firebase-limit", Aliases: []string{"experimental_firebase_limit"}, EnvVars: []string{"NTFY_EXPERIMENTAL_FIREBASE_LIMIT"}, Usage: "limit Firebase messages per visitor and topic, e.g. 'defaults' or 'visitor-burst=5,visitor-refill=1m,topic-burst=10,topic-refill=6m' (experimental, for FCM's topic fanout limit; will be removed in a future release)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-node-id", Aliases: []string{"experimental_cluster_node_id"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (required in cluster mode)"}),
@@ -166,6 +167,7 @@ func execServe(c *cli.Context) error {
 	keyFile := c.String("key-file")
 	certFile := c.String("cert-file")
 	firebaseKeyFile := c.String("firebase-key-file")
+	firebaseLimitStr := c.String("experimental-firebase-limit")
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
 	clusterNodeID := c.String("experimental-cluster-node-id")
@@ -255,6 +257,10 @@ func execServe(c *cli.Context) error {
 	profileListenHTTP := c.String("profile-listen-http")
 
 	// Convert durations
+	firebaseLimit, err := server.ParseFirebaseLimits(firebaseLimitStr)
+	if err != nil {
+		return fmt.Errorf("invalid experimental-firebase-limit: %w", err)
+	}
 	cacheDuration, err := util.ParseDuration(cacheDurationStr)
 	if err != nil {
 		return fmt.Errorf("invalid cache duration: %s", cacheDurationStr)
@@ -542,6 +548,7 @@ func execServe(c *cli.Context) error {
 	conf.KeyFile = keyFile
 	conf.CertFile = certFile
 	conf.FirebaseKeyFile = firebaseKeyFile
+	conf.FirebaseLimit = firebaseLimit
 	conf.CacheFile = cacheFile
 	conf.CacheDuration = cacheDuration
 	conf.CacheStartupQueries = cacheStartupQueries

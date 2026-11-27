@@ -355,7 +355,7 @@ func New(conf *Config) (*Server, error) {
 		if userManager != nil {
 			auther = userManager
 		}
-		firebaseClient = newFirebaseClient(sender, auther)
+		firebaseClient = newFirebaseClient(sender, auther, newFirebaseLimiterFromConfig(conf))
 	}
 	s.userManager = userManager
 	s.limiter = limit.New(&limit.Config{
@@ -1330,7 +1330,10 @@ func (s *Server) handleActionMessage(w http.ResponseWriter, r *http.Request, v *
 
 func (s *Server) sendToFirebase(v *visitor, m *model.Message) {
 	logvm(v, m).Tag(tagFirebase).Debug("Publishing to Firebase")
-	if err := s.firebaseClient.Send(v, m); err != nil {
+	if err := s.firebaseClient.Send(v, m); errors.Is(err, errFirebaseLimited) {
+		metrics.FirebaseLimited.Inc()
+		return
+	} else if err != nil {
 		metrics.FirebasePublishedFailure.Inc()
 		if errors.Is(err, errFirebaseTemporarilyBanned) {
 			logvm(v, m).Tag(tagFirebase).Err(err).Debug("Unable to publish to Firebase: %v", err.Error())

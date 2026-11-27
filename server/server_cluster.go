@@ -18,6 +18,9 @@ import (
 // nodes keep publishing to. A subscriber that comes along later gets it from its since= read of
 // the cache, or from the tail (which sends what never went out here).
 func (s *Server) deliverFromBus(m *model.Message) {
+	if s.firebaseClient != nil {
+		s.firebaseClient.Observe(m) // Peers send to Firebase too, so the limit is cluster-wide
+	}
 	s.mu.RLock()
 	t, ok := s.topics[m.Topic]
 	s.mu.RUnlock()

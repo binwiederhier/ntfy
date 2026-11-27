@@ -2,7 +2,8 @@
 
 How to build, run and test ntfy from this repo, and the conventions the code follows. Run every
 `make` target from the repo root; `make help` lists them all. The build is serial on purpose
-(`MAKEFLAGS := --jobs=1`).
+(`MAKEFLAGS := --jobs=1`). For first-time setup (build requirements, dependencies, the Android
+and iOS apps), see [../develop.md](../develop.md).
 
 ## How a build fits together
 
@@ -34,7 +35,8 @@ make cli-deps-static-sites && CGO_ENABLED=1 go run main.go serve   # Go only, pl
 cd web && npm start                                          # Vite dev server on :3000
 ```
 
-The server listens on http://localhost:2586/ by default (`listen-http: :2586`).
+The built-in default is `listen-http: :80` (`DefaultListenHTTP`), so for an unprivileged dev
+server pass `--listen-http :2586` or set it in `server.yml`. The examples below assume :2586.
 
 **Stale service worker trap.** The web app registers a PWA service worker. In a persistent browser
 profile an old worker and its caches keep serving a stale bundle, sometimes with confusing
@@ -104,7 +106,7 @@ React, Vite, MUI, Dexie (IndexedDB) and i18next.
 
 | Rule | Detail |
 |------|--------|
-| Lint and format | ESLint (`airbnb` + `prettier`, `web/.eslintrc`); Prettier `printWidth: 140` |
+| Lint and format | ESLint flat config (`web/eslint.config.mjs`: former airbnb rules kept inline, plus `eslint-config-prettier`); Prettier `printWidth: 140` |
 | Style | Arrow functions for functions and components; hooks, no class components |
 | Banned | `for...in`, labels, `with`; `no-await-in-loop` is an error; avoid new import cycles |
 | Data access | Through the service layer (`Api.js`, `AccountApi.js`, `SubscriptionManager`, `Prefs`), not raw `fetch` in components |

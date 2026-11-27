@@ -40,6 +40,12 @@ If those screenshots are still not enough, here's a video:
   <figcaption>Sending push notifications to your Android phone</figcaption>
 </figure>
 
+## Test a subscription
+_Supported on:_ :material-android:
+
+To check a subscription, open its topic in the Android app, tap the three-dot menu, and select
+**Send test notification**. If the app cannot connect to the server, it may show **Reconnecting**.
+
 ## Message priority
 _Supported on:_ :material-android: :material-apple:
 

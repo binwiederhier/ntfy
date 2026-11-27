@@ -215,9 +215,11 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [camsentry-mcp](https://github.com/14manj01/camsentry-mcp) - MCP server that lets a local vision model watch Wyze cameras and sends an ntfy push describing what happened, with urgent priority for intruder and package-taken alerts (Python)
 - [FX Logger](https://github.com/cppHusky/fx-logger) - Monitor the foreign exchange rate and send you notifications when you need (Rust)
 - [Spring Winter](https://docs.springwinter.dev/deploy/open-source/ntfy) - Deploy ntfy into your own AWS account, with PostgreSQL on Amazon RDS for the message cache, users and access control
+- [pingaling](https://www.threeluckystars.com/pingaling) - iPhone and iPad app that watches headscale, Tailscale and NetBird networks and websites; with pingaling Pro it forwards alerts to an ntfy topic and takes ntfy-style Title/Priority posts (commercial, Swift)
 
 ## Blog + forum posts
 
+- [Self-host ntfy on a managed VPS: push notifications from your own server](https://www.simafri.com/en/guides/self-host-ntfy/) - simafri.com - 11/2026
 - [Get a free alert when a web page changes (price, stock, version), using GitHub Actions](https://caelum-kr-11.github.io/blog/website-change-alert-github-actions.html) - caelum-kr-11.github.io - 11/2026
 - [Push alerts for WHM using ntfy](https://rubixstudios.com.au/insights/push-alerts-for-whm-using-ntfy) - rubixstudios.com.au - 5/2026
 - [Device notifications via HTTP with ntfy](https://alistairshepherd.uk/writing/ntfy/) - alistairshepherd.uk - 6/2025

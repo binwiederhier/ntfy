@@ -18,6 +18,7 @@ import (
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/stretchr/testify/require"
+	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	wpush "heckel.io/ntfy/v2/webpush"
@@ -145,6 +146,59 @@ func TestServer_WebPush_EndpointRegex(t *testing.T) {
 	for _, endpoint := range denied {
 		require.Falsef(t, webPushEndpointAllowed(endpoint), "expected endpoint to be denied: %s", endpoint)
 	}
+}
+
+func TestServer_WebPush_EndpointAllowed_HostConfusion(t *testing.T) {
+	// The allow-list must be checked against the host Go actually dials, not the raw string
+	allowed := []string{
+		"https://FCM.GoogleAPIs.com/fcm/send/abc",
+		"https://AutoPush.MozAWS.net/wpush/v1/abc",
+		"https://WNS2-BN3P.Notify.Windows.com/w/?token=abc",
+		"https://fcm.googleapis.com:443/fcm/send/abc",
+		"https://push.services.mozaws.net/wpush/v2/abc",
+		// Harmless: the request still goes to the push service's host
+		"https://user:pass@autopush.mozaws.net/wpush/v1/abc",
+		"https://autopush.mozaws.net:9443/wpush/v1/abc",
+		"https://fcm.googleapis.com:8443/fcm/send/abc",
+		"https://fcm.googleapis.com",
+	}
+	denied := []string{
+		// Authority ends early at '?', '#', '@' or ':port', so the suffix lands in query/fragment/path
+		"https://10.0.0.5:9443?.mozaws.net/",
+		"https://127.0.0.1?.notify.windows.com/w/",
+		"https://10.0.0.5#.mozaws.net/",
+		"https://169.254.169.254#.notify.windows.com/",
+		"https://x.mozaws.net@10.0.0.5/wpush",
+		"https://autopush.mozaws.net@evil.test/",
+		"https://10.0.0.5:9443/.mozaws.net/",
+		// Trailing dots and empty labels
+		"https://fcm.googleapis.com./fcm/send/abc",
+		"https://autopush.mozaws.net./wpush/v1/abc",
+		"https://.mozaws.net/wpush/v1/abc",
+		"https://mozaws.net/wpush/v1/abc",
+		// Uppercase scheme tricks
+		"HTTP://fcm.googleapis.com/fcm/send/abc",
+		// Non-ASCII: lowercases to an allowed host, but is dialed as punycode (fcm.xn--googleapis-v2f.com)
+		"https://fcm.googleap\u0130s.com/fcm/send/abc",
+		"https://autopush.mozaws.ne\u0130/wpush/v1/abc",
+		"https://evil.test\\.mozaws.net/",
+	}
+	for _, endpoint := range denied {
+		require.Falsef(t, webPushEndpointAllowed(endpoint), "expected endpoint to be denied: %s", endpoint)
+	}
+	for _, endpoint := range allowed {
+		require.Truef(t, webPushEndpointAllowed(endpoint), "expected endpoint to be allowed: %s", endpoint)
+	}
+}
+
+func TestServer_WebPush_TopicAdd_HostConfusionBypass(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfigWithWebPush(t, databaseURL))
+
+		response := request(t, s, "POST", "/v1/webpush", payloadForTopics(t, []string{"test-topic"}, "https://10.0.0.5:9443?.mozaws.net/"), nil)
+		require.Equal(t, 400, response.Code)
+		require.Equal(t, `{"code":40039,"http":400,"error":"invalid request: web push endpoint unknown"}`+"\n", response.Body.String())
+	})
 }
 
 func TestServer_WebPush_TopicAdd_BypassAttempt(t *testing.T) {
@@ -387,6 +441,50 @@ func TestServer_WebPush_Expiry(t *testing.T) {
 	})
 }
 
+func TestServer_WebPush_Publish_SkipsStoredEndpointNotAllowed(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		s := newTestServer(t, newTestConfigWithWebPush(t, databaseURL))
+
+		// Stored before the allow-list was tightened; the real host is the local listener
+		var connections atomic.Int32
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		require.Nil(t, err)
+		defer listener.Close()
+		go func() {
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					return
+				}
+				connections.Add(1)
+				conn.Close()
+			}
+		}()
+		addSubscription(t, s, "https://"+listener.Addr().String()+"?.mozaws.net/", "test-topic")
+
+		s.publishToWebPushEndpoints(s.visitor(netip.MustParseAddr("9.9.9.9"), nil), model.NewDefaultMessage("test-topic", "message"))
+		require.Equal(t, int32(0), connections.Load())
+		requireSubscriptionCount(t, s, "test-topic", 0)
+	})
+}
+
+func TestServer_WebPush_Send_DoesNotFollowRedirects(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithWebPush(t, ""))
+
+	var redirected atomic.Int32
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redirected.Add(1)
+	}))
+	defer target.Close()
+	pushService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+"/internal", http.StatusTemporaryRedirect)
+	}))
+	defer pushService.Close()
+
+	require.NotNil(t, s.sendWebPushNotification(newTestWebPushSubscription(pushService.URL+"/push-receive"), []byte("message")))
+	require.Equal(t, int32(0), redirected.Load())
+}
+
 func TestServer_WebPush_Send_ClosesResponseBody(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t, ""))
 
@@ -461,6 +559,13 @@ func TestServer_WebPush_Send_NetworkErrorKeepsSubscription(t *testing.T) {
 	addSubscription(t, s, endpoint, "test-topic")
 	require.NotNil(t, s.sendWebPushNotification(newTestWebPushSubscription(endpoint), []byte("message")))
 	requireSubscriptionCount(t, s, "test-topic", 1)
+}
+
+func init() {
+	// Tests deliver to local push services (httptest), which the allow-list rejects
+	webPushSendAllowed = func(endpoint string) bool {
+		return webPushEndpointAllowed(endpoint) || strings.HasPrefix(endpoint, "http://127.0.0.1:")
+	}
 }
 
 func newTestWebPushSubscription(endpoint string) *wpush.Subscription {

@@ -2439,6 +2439,10 @@ and the [ntfy Android app](https://github.com/binwiederhier/ntfy-android/release
 
 ### ntfy server v2.38.3 (UNRELEASED)
 
+**Security:**
+
+* Web push: check endpoints against the parsed URL host instead of the raw string, so endpoints like `https://attacker.example?x.mozaws.net/` that only look like an allowed push service are rejected; such endpoints that were already stored are removed, and redirects are no longer followed ([GHSA-j5px-666m-5p3f](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-j5px-666m-5p3f), [GHSA-h4w9-5cmv-92hv](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-h4w9-5cmv-92hv), thanks to [@jpabeem](https://github.com/jpabeem) and [@brennocm](https://github.com/brennocm) for reporting)
+
 **Bug fixes + maintenance:**
 
 * Add `experimental-firebase-limit` option to limit Firebase messages per visitor and topic for users without a paid plan (this option will go away in a future release) to stay within FCM's hourly fanout budget, which recently caused about half of all Firebase messages to fail ([#2249](https://github.com/binwiederhier/ntfy/issues/2249))

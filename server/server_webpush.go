@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/SherClockHolmes/webpush-go"
@@ -40,26 +42,48 @@ const (
 // swap in a client with a shorter timeout
 var webPushHTTPClient = &http.Client{
 	Timeout: webPushRequestTimeout,
+	CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse // Push services do not redirect, and a redirect could lead outside the allow-list
+	},
 }
 
-// webPushAllowedEndpointsRegexes is the host-level allow-list of web push services ntfy
-// will deliver to. Each regex anchors the scheme and matches the stable service host,
-// followed by the authority/path boundary "/". Instance-specific labels (e.g. the
-// "wns2-<region>" prefix on Windows Notification Service hosts) are wildcarded with
-// a single-label pattern ([^/]+) that cannot span into the path.
-// See GHSA-w9hq-5jg7-q4j7 for why wildcarding the entire host is insufficient.
-var webPushAllowedEndpointsRegexes = []*regexp.Regexp{
-	regexp.MustCompile(`^https://fcm\.googleapis\.com/`),
-	regexp.MustCompile(`^https://jmt17\.google\.com/`),
-	regexp.MustCompile(`^https://updates\.push\.services\.mozilla\.com/`),
-	regexp.MustCompile(`^https://[^/]+\.mozaws\.net/`),
-	regexp.MustCompile(`^https://web\.push\.apple\.com/`),
-	regexp.MustCompile(`^https://[^/]+\.notify\.windows\.com/`),
-}
+// webPushSendAllowed checks endpoints again at send time, so subscriptions stored before the allow-list
+// was tightened get no requests; a var so tests can deliver to local push services
+var webPushSendAllowed = webPushEndpointAllowed
+
+// Host-level allow-list of web push services ntfy will deliver to. Hosts are compared against
+// the parsed URL's hostname (the host Go actually dials), never against the raw string, so '?',
+// '#' or '@' cannot end the authority early. Suffixes cover instance-specific labels (e.g. the
+// "wns2-<region>" prefix on Windows Notification Service hosts). See GHSA-w9hq-5jg7-q4j7 for why
+// wildcarding the entire host is insufficient.
+var (
+	webPushAllowedEndpointHosts = []string{
+		"fcm.googleapis.com",
+		"jmt17.google.com",
+		"updates.push.services.mozilla.com",
+		"web.push.apple.com",
+	}
+	webPushAllowedEndpointHostSuffixes = []string{
+		".mozaws.net",
+		".notify.windows.com",
+	}
+
+	// webPushEndpointHostRegex allows ASCII DNS labels only (no empty labels or trailing dot). Non-ASCII
+	// is rejected before lowercasing, since e.g. U+0130 lowercases to "i" but is dialed as punycode.
+	webPushEndpointHostRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*$`)
+)
 
 func webPushEndpointAllowed(endpoint string) bool {
-	for _, re := range webPushAllowedEndpointsRegexes {
-		if re.MatchString(endpoint) {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Scheme != "https" || !webPushEndpointHostRegex.MatchString(u.Hostname()) {
+		return false
+	}
+	hostname := strings.ToLower(u.Hostname())
+	if slices.Contains(webPushAllowedEndpointHosts, hostname) {
+		return true
+	}
+	for _, suffix := range webPushAllowedEndpointHostSuffixes {
+		if strings.HasSuffix(hostname, suffix) {
 			return true
 		}
 	}
@@ -170,6 +194,13 @@ func (s *Server) pruneAndNotifyWebPushSubscriptionsInternal() error {
 
 func (s *Server) sendWebPushNotification(sub *wpush.Subscription, message []byte, contexters ...log.Contexter) error {
 	log.Tag(tagWebPush).With(sub).With(contexters...).Debug("Sending web push message")
+	if !webPushSendAllowed(sub.Endpoint) {
+		log.Tag(tagWebPush).With(sub).With(contexters...).Debug("Web push endpoint not allowed, removing endpoint")
+		if err := s.webPush.RemoveSubscriptionsByEndpoint(sub.Endpoint); err != nil {
+			return err
+		}
+		return errHTTPBadRequestWebPushEndpointUnknown
+	}
 	payload := &webpush.Subscription{
 		Endpoint: sub.Endpoint,
 		Keys: webpush.Keys{

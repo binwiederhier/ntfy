@@ -215,6 +215,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [camsentry-mcp](https://github.com/14manj01/camsentry-mcp) - MCP server that lets a local vision model watch Wyze cameras and sends an ntfy push describing what happened, with urgent priority for intruder and package-taken alerts (Python)
 - [FX Logger](https://github.com/cppHusky/fx-logger) - Monitor the foreign exchange rate and send you notifications when you need (Rust)
 - [Spring Winter](https://docs.springwinter.dev/deploy/open-source/ntfy) - Deploy ntfy into your own AWS account, with PostgreSQL on Amazon RDS for the message cache, users and access control
+- [pingaling](https://www.threeluckystars.com/pingaling) - iPhone and iPad app that watches headscale, Tailscale and NetBird networks and websites; with pingaling Pro it forwards alerts to an ntfy topic and takes ntfy-style Title/Priority posts (commercial, Swift)
 
 ## Blog + forum posts
 

@@ -21,7 +21,7 @@ and topic. Upgrading is recommended if you enable web push.
 
 **Security:**
 
-* Web push: check endpoints against the parsed URL host instead of the raw string, so endpoints like `https://attacker.example?x.mozaws.net/` that only look like an allowed push service are rejected; such endpoints that were already stored are removed, and redirects are no longer followed ([GHSA-j5px-666m-5p3f](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-j5px-666m-5p3f), [GHSA-h4w9-5cmv-92hv](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-h4w9-5cmv-92hv), thanks to [@jpabeem](https://github.com/jpabeem) and [@brennocm](https://github.com/brennocm) for reporting)
+* Web push: check endpoints against the parsed URL host instead of the raw string, so endpoints like `https://attacker.example?x.mozaws.net/` that only look like an allowed push service are rejected; such endpoints that were already stored are removed, and redirects are no longer followed ([GHSA-j5px-666m-5p3f](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-j5px-666m-5p3f), [GHSA-h4w9-5cmv-92hv](https://github.com/binwiederhier/ntfy/security/advisories/GHSA-h4w9-5cmv-92hv), thanks to [@jpabeem](https://github.com/jpabeem), [@brennocm](https://github.com/brennocm), and a researcher via [VulnCheck](https://www.vulncheck.com) (VC-CVD-02258) for reporting)
 
 **Bug fixes + maintenance:**
 

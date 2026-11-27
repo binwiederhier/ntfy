@@ -1642,6 +1642,21 @@ Example:
 firebase-key-file: "/etc/ntfy/ntfy-sh-firebase-adminsdk-ahnce-9f4d6f14b5.json"
 ```
 
+FCM limits how many messages a project can deliver to devices through topics, and this limit is not documented
+and cannot be raised (see [#2249](https://github.com/binwiederhier/ntfy/issues/2249)). If you hit it, you can set
+`experimental-firebase-limit` to limit the messages sent to Firebase for visitors without a paid tier. Each visitor and
+each topic get a token bucket: a burst, then one more message per refill duration. Messages over the limit are still
+published and delivered to all other subscribers, just not sent to Firebase. `defaults` means a burst of 5 per visitor,
+then 1 per minute, and a burst of 10 per topic, then 10 per hour. Values that are not set keep these defaults:
+
+```
+experimental-firebase-limit: "visitor-burst=5,visitor-refill=1m,topic-burst=10,topic-refill=6m"
+```
+
+!!! warning
+    This option is experimental and will go away in the future, once ntfy delivers to device tokens instead of FCM
+    topics (see [#2249](https://github.com/binwiederhier/ntfy/issues/2249)).
+
 ## iOS instant notifications
 Unlike Android, iOS heavily restricts background processing, which sadly makes it impossible to implement instant 
 push notifications without a central server. 
@@ -2574,6 +2589,7 @@ variable before running the `ntfy` command (e.g. `export NTFY_LISTEN_HTTP=:80`).
 | `key-file`                                 | `NTFY_KEY_FILE`                                 | *filename*                                          | -                 | HTTPS/TLS private key file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `cert-file`                                | `NTFY_CERT_FILE`                                | *filename*                                          | -                 | HTTPS/TLS certificate file, only used if `listen-https` is set.                                                                                                                                                                         |
 | `firebase-key-file`                        | `NTFY_FIREBASE_KEY_FILE`                        | *filename*                                          | -                 | If set, also publish messages to a Firebase Cloud Messaging (FCM) topic for your app. This is optional and only required to save battery when using the Android app. See [Firebase (FCM)](#firebase-fcm).                               |
+| `experimental-firebase-limit`              | `NTFY_EXPERIMENTAL_FIREBASE_LIMIT`              | *string*, e.g. `defaults`                           | -                 | If set, limit the messages sent to Firebase per visitor and topic, against FCM's topic fanout limit. Experimental, will go away in the future. See [Firebase (FCM)](#firebase-fcm).                                                     |
 | `database-url`                             | `NTFY_DATABASE_URL`                             | *string (connection URL)*                           | -                 | PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/ntfy`). If set, uses PostgreSQL for all database-backed stores (message cache, user manager, web push) instead of SQLite. See [database options](#database-options). |
 | `experimental-cluster-node-id`             | `NTFY_EXPERIMENTAL_CLUSTER_NODE_ID`             | *string*                                            | -                 | Experimental, not ready for production. Stable per-node identifier (e.g. the hostname).                                                                                                                                                 |
 | `experimental-cluster-listen`              | `NTFY_EXPERIMENTAL_CLUSTER_LISTEN`              | `[host]:port`                                       | -                 | Experimental, not ready for production. Private listen address for node-to-node traffic; setting it enables clustering (requires `database-url`).                                                                                        |
@@ -2697,6 +2713,7 @@ OPTIONS:
    --key-file value, --key_file value, -K value                                                                           private key file, if listen-https is set [$NTFY_KEY_FILE]
    --cert-file value, --cert_file value, -E value                                                                         certificate file, if listen-https is set [$NTFY_CERT_FILE]
    --firebase-key-file value, --firebase_key_file value, -F value                                                         Firebase credentials file; if set additionally publish to FCM topic [$NTFY_FIREBASE_KEY_FILE]
+   --experimental-firebase-limit value, --experimental_firebase_limit value                                               limit Firebase messages per visitor and topic, e.g. 'defaults' or 'visitor-burst=5,visitor-refill=1m,topic-burst=10,topic-refill=6m' (experimental, for FCM's topic fanout limit; will be removed in a future release) [$NTFY_EXPERIMENTAL_FIREBASE_LIMIT]
    --cache-file value, --cache_file value, -C value                                                                       cache file used for message caching [$NTFY_CACHE_FILE]
    --cache-duration since, --cache_duration since, -b since                                                               buffer messages for this time to allow since requests (default: "12h") [$NTFY_CACHE_DURATION]
    --cache-batch-size value, --cache_batch_size value                                                                     max size of messages to batch together when writing to message cache (if zero, writes are synchronous) (default: 0) [$NTFY_BATCH_SIZE]

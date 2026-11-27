@@ -147,6 +147,7 @@ type Config struct {
 	ClusterDrainDelay                    time.Duration // On shutdown, how long a draining node withdraws (not ready, still serves everything) before it turns read-only
 	ClusterDrainDuration                 time.Duration // On shutdown, how long an active node takes to close its streams so they reconnect to other nodes; 0 disables
 	FirebaseKeyFile                      string
+	FirebaseLimit                        *FirebaseLimits // Limit Firebase messages per visitor and topic, against FCM's topic fanout limit; goes away with token-based delivery
 	CacheFile                            string
 	CacheDuration                        time.Duration
 	CacheStartupQueries                  string
@@ -287,6 +288,7 @@ func NewConfig() *Config {
 		ClusterDrainDelay:                    DefaultClusterDrainDelay,
 		ClusterDrainDuration:                 DefaultClusterDrainDuration,
 		FirebaseKeyFile:                      "",
+		FirebaseLimit:                        nil,
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
 		CacheStartupQueries:                  "",

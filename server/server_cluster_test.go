@@ -559,7 +559,7 @@ func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
 	c.FirebaseKeepaliveInterval = 20 * time.Millisecond
 	s := newTestServer(t, c)
 	sender := newTestFirebaseSender(100)
-	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true}, nil)
 	cl := &fakeCluster{notLeader: true}
 	s.cluster = cl
 	s.closeChan = make(chan bool) // Closed by Stop() in the test cleanup

@@ -85,7 +85,7 @@ func TestServer_PublishWithFirebase(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		sender := newTestFirebaseSender(10)
 		s := newTestServer(t, newTestConfig(t, databaseURL))
-		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true}, nil)
 
 		response := request(t, s, "PUT", "/mytopic", "my first message", nil)
 		msg1 := toMessage(t, response.Body.String())
@@ -104,7 +104,7 @@ func TestServer_PublishWithoutFirebase(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		sender := newTestFirebaseSender(10)
 		s := newTestServer(t, newTestConfig(t, databaseURL))
-		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true}, nil)
 
 		response := request(t, s, "PUT", "/mytopic", "my first message", map[string]string{
 			"firebase": "no",
@@ -2270,7 +2270,7 @@ func TestServer_PublishAsJSON_WithoutFirebase(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		sender := newTestFirebaseSender(10)
 		s := newTestServer(t, newTestConfig(t, databaseURL))
-		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true}, nil)
 
 		body := `{"topic":"mytopic","message": "my first message","firebase":"no"}`
 		response := request(t, s, "PUT", "/", body, nil)
@@ -5040,7 +5040,7 @@ func TestServer_DeleteMessage_WithFirebase(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		sender := newTestFirebaseSender(10)
 		s := newTestServer(t, newTestConfig(t, databaseURL))
-		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true}, nil)
 
 		// Publish a message
 		response := request(t, s, "PUT", "/mytopic/firebase-seq", "test message", nil)
@@ -5065,7 +5065,7 @@ func TestServer_ClearMessage_WithFirebase(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		sender := newTestFirebaseSender(10)
 		s := newTestServer(t, newTestConfig(t, databaseURL))
-		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+		s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true}, nil)
 
 		// Publish a message
 		response := request(t, s, "PUT", "/mytopic/firebase-clear-seq", "test message", nil)
@@ -5940,7 +5940,7 @@ func TestServer_Publish_InvalidUTF8WithFirebase(t *testing.T) {
 	// receives clean UTF-8 strings rather than invalid byte sequences
 	sender := newTestFirebaseSender(10)
 	s := newTestServer(t, newTestConfig(t, ""))
-	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true}, nil)
 
 	response := request(t, s, "PUT", "/mytopic", "", map[string]string{
 		"X-Message": "notificaci\xf3n: alerta",

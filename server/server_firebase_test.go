@@ -348,7 +348,7 @@ func TestMaybeTruncateFCMMessage_NotTooLong(t *testing.T) {
 
 func TestToFirebaseSender_Abuse(t *testing.T) {
 	sender := &testFirebaseSender{allowed: 2}
-	client := newFirebaseClient(sender, &testAuther{})
+	client := newFirebaseClient(sender, &testAuther{}, nil)
 	visitor := newVisitor(newVisitorEnv(newTestConfig(t, ""), limit.New(&limit.Config{}), newMemTestCache(t), nil), netip.MustParseAddr("1.2.3.4"), nil)
 
 	require.Nil(t, client.Send(visitor, &model.Message{Topic: "mytopic"}))

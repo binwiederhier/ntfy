@@ -34,6 +34,7 @@ const (
 var (
 	errFirebaseQuotaExceeded     = errors.New("quota exceeded for Firebase messages to topic")
 	errFirebaseTemporarilyBanned = errors.New("visitor temporarily banned from using Firebase")
+	errFirebaseLimited           = errors.New("not sent to Firebase, visitor or topic over the Firebase limit")
 )
 
 // firebaseResponse holds the details of a failed FCM HTTP response. The Firebase SDK reduces a failed
@@ -56,20 +57,24 @@ type firebaseSendError struct {
 // firebaseClient is a generic client that formats and sends messages to Firebase.
 // The actual Firebase implementation is implemented in firebaseSenderImpl, to make it testable.
 type firebaseClient struct {
-	sender firebaseSender
-	auther user.Auther
+	sender  firebaseSender
+	auther  user.Auther
+	limiter *firebaseLimiter // Only with experimental-firebase-limit; nil otherwise
 }
 
-func newFirebaseClient(sender firebaseSender, auther user.Auther) *firebaseClient {
+func newFirebaseClient(sender firebaseSender, auther user.Auther, limiter *firebaseLimiter) *firebaseClient {
 	return &firebaseClient{
-		sender: sender,
-		auther: auther,
+		sender:  sender,
+		auther:  auther,
+		limiter: limiter,
 	}
 }
 
 func (c *firebaseClient) Send(v *visitor, m *model.Message) error {
 	if !v.FirebaseAllowed() {
 		return errFirebaseTemporarilyBanned
+	} else if c.limiter != nil && !c.limiter.Allow(v, m) {
+		return errFirebaseLimited
 	}
 	fbm, err := toFirebaseMessage(m, c.auther)
 	if err != nil {
@@ -88,6 +93,13 @@ func (c *firebaseClient) Send(v *visitor, m *model.Message) error {
 		v.FirebaseTemporarilyDeny()
 	}
 	return err
+}
+
+// Observe counts a message a peer node sent to Firebase against the limit, so that it is cluster-wide
+func (c *firebaseClient) Observe(m *model.Message) {
+	if c.limiter != nil {
+		c.limiter.Observe(m)
+	}
 }
 
 // firebaseSender is an interface that represents a client that can send to Firebase Cloud Messaging.

@@ -34,6 +34,9 @@ var (
 	FirebasePublishedFailure = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_firebase_published_failure",
 	})
+	FirebaseLimited = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ntfy_firebase_limited_total", // Not sent to Firebase by the per-visitor or per-topic limit
+	})
 	EmailsPublishedSuccess = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "ntfy_emails_sent_success",
 	})
@@ -135,6 +138,7 @@ func init() {
 		MessagePublishDurationMillis,
 		FirebasePublishedSuccess,
 		FirebasePublishedFailure,
+		FirebaseLimited,
 		EmailsPublishedSuccess,
 		EmailsPublishedFailure,
 		EmailsReceivedSuccess,

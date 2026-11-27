@@ -413,6 +413,33 @@ func TestServer_WebPush_Send_ClosesResponseBody(t *testing.T) {
 	require.Equal(t, int32(1), newConns.Load())
 }
 
+func TestServer_WebPush_Send_RecordSize(t *testing.T) {
+	s := newTestServer(t, newTestConfigWithWebPush(t, ""))
+
+	// Firefox for Android rejects bodies above 2744 bytes with HTTP 413, so a payload that fits
+	// must not be padded to the 4096 byte maximum; a larger payload must still be delivered
+	var bodyLen atomic.Int64
+	pushService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		require.Nil(t, err)
+		bodyLen.Store(int64(len(body)))
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer pushService.Close()
+
+	sub := newTestWebPushSubscription(pushService.URL + "/push-receive")
+	require.Nil(t, s.sendWebPushNotification(sub, []byte("short message")))
+	require.Equal(t, int64(webPushCompatRecordSize), bodyLen.Load())
+
+	fits := []byte(strings.Repeat("x", webPushCompatRecordSize-webPushRecordOverhead))
+	require.Nil(t, s.sendWebPushNotification(sub, fits))
+	require.Equal(t, int64(webPushCompatRecordSize), bodyLen.Load())
+
+	large := []byte(strings.Repeat("x", webPushCompatRecordSize-webPushRecordOverhead+1))
+	require.Nil(t, s.sendWebPushNotification(sub, large))
+	require.Equal(t, int64(webpush.MaxRecordSize), bodyLen.Load())
+}
+
 func TestServer_WebPush_Send_Timeout(t *testing.T) {
 	s := newTestServer(t, newTestConfigWithWebPush(t, ""))
 

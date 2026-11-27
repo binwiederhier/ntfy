@@ -84,6 +84,45 @@ func TestCLI_User_ChangePass(t *testing.T) {
 	require.Error(t, runUserCommand(app, conf, "change-pass", "philuser"))
 }
 
+func TestCLI_User_AddAndChangePass_PasswordFromEnv(t *testing.T) {
+	s, conf, port := newTestServerWithAuth(t)
+	defer test.StopServer(t, s, port)
+
+	// Adding a user with NTFY_PASSWORD set skips the prompt and prints a notice to stderr
+	t.Setenv("NTFY_PASSWORD", "mypass")
+	app, _, stdout, stderr := newTestApp()
+	require.Nil(t, runUserCommand(app, conf, "add", "phil"))
+	require.Contains(t, stdout.String(), "user phil added with role user")
+	require.Contains(t, stderr.String(), "using password from NTFY_PASSWORD environment variable")
+
+	// Changing the password with NTFY_PASSWORD still set prints the notice too, see #1253
+	app, _, stdout, stderr = newTestApp()
+	require.Nil(t, runUserCommand(app, conf, "change-pass", "phil"))
+	require.Contains(t, stdout.String(), "changed password for user phil")
+	require.Contains(t, stderr.String(), "using password from NTFY_PASSWORD environment variable")
+
+	// NTFY_PASSWORD_HASH wins over NTFY_PASSWORD, and the notice names it
+	t.Setenv("NTFY_PASSWORD_HASH", "$2a$10$U4WSIYY6evyGmZaraavM2e2JeVG6EMGUKN1uUwufUeeRd4Jpg6cGC")
+	app, _, stdout, stderr = newTestApp()
+	require.Nil(t, runUserCommand(app, conf, "change-pass", "phil"))
+	require.Contains(t, stdout.String(), "changed password for user phil")
+	require.Contains(t, stderr.String(), "using password from NTFY_PASSWORD_HASH environment variable")
+}
+
+func TestCLI_User_ChangePass_Prompted_NoEnvNotice(t *testing.T) {
+	s, conf, port := newTestServerWithAuth(t)
+	defer test.StopServer(t, s, port)
+
+	app, stdin, _, _ := newTestApp()
+	stdin.WriteString("mypass\nmypass")
+	require.Nil(t, runUserCommand(app, conf, "add", "phil"))
+
+	app, stdin, _, stderr := newTestApp()
+	stdin.WriteString("newpass\nnewpass")
+	require.Nil(t, runUserCommand(app, conf, "change-pass", "phil"))
+	require.NotContains(t, stderr.String(), "environment variable")
+}
+
 func TestCLI_User_ChangeRole(t *testing.T) {
 	s, conf, port := newTestServerWithAuth(t)
 	defer test.StopServer(t, s, port)

@@ -48,6 +48,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [SolidPing](https://docs.solidping.io/docs/configuration/notifications#ntfy) - Uptime and synthetic monitoring
 - [Expiro](https://expiro.io/integrations) - Contract renewal reminders: alerts before every renewal and notice deadline, sent to ntfy, email, Slack, Teams and more
 - [Spooky Particles](https://spookyparticles.com/docs/check-ins) - Monitoring for Vercel apps and scheduled jobs: failed deploys, down sites and missed cron runs
+- [RealUptime](https://realuptime.io/kb/send-alerts-to-ntfy) - Uptime and server monitoring with status pages; sends monitor down and recovery alerts, and error alerts, to an ntfy topic
 
 ## Integration via HTTP/SMTP/etc.
 

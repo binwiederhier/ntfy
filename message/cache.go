@@ -93,12 +93,14 @@ type Cache struct {
 	claimTimeout time.Duration
 }
 
-// Marker is a resolved since=<mid> marker (see ResolveMarker): its row id and publish time, and
-// the database that knew it, which the replay is read from
+// Marker is a resolved since=<mid> marker (see ResolveMarker), including its sequence and the
+// database that knew it, which the replay is read from.
 type Marker struct {
-	rowID int64
-	time  int64
-	db    *sql.DB // The primary, if the replica did not know the marker yet: it lacks the newest rows too
+	rowID      int64
+	time       int64
+	topic      string
+	sequenceID string
+	db         *sql.DB // The primary, if the replica did not know the marker yet: it lacks the newest rows too
 }
 
 func newCache(db *db.DB, queries queries, mu *sync.Mutex, batchSize int, batchTimeout time.Duration, nop bool) *Cache {
@@ -277,11 +279,17 @@ func (c *Cache) messagesSinceTime(topic string, since model.SinceMarker, schedul
 // ResolveMarker looks up a since=<mid> marker once, for replaying any number of topics after it
 // (see MessagesAfterMarker); nil if the cache does not know it (not written yet, or expired)
 func (c *Cache) ResolveMarker(mid string) (*Marker, error) {
-	rowID, markerTime, rdb, err := c.resolveMarker(mid)
-	if err != nil || rowID == 0 {
+	rdb := c.db.ReadOnly()
+	marker, err := c.resolveMarkerOn(rdb, mid)
+	if err != nil {
 		return nil, err
 	}
-	return &Marker{rowID: rowID, time: markerTime, db: rdb}, nil
+	// A client can be ahead of replication. If only the primary knows its marker, read the
+	// replay there too: the replica also lacks messages published before the client arrived.
+	if marker == nil && rdb != c.db.Primary() {
+		return c.resolveMarkerOn(c.db.Primary(), mid)
+	}
+	return marker, nil
 }
 
 // MessagesAfterMarker is MessagesCapped for a resolved since=<mid> marker. The query matches
@@ -299,13 +307,19 @@ func (c *Cache) ResolveMarker(mid string) (*Marker, error) {
 // The cost is a duplicate for each message published in the marker's second before it; clients
 // drop duplicates by id. Times are whole seconds on purpose: they come from each node's clock,
 // and a second hides clock skew between nodes that milliseconds would turn into losses.
+// Earlier rows of the marker's own sequence in that second are excluded: replaying an old delete
+// or update without the marker would undo the version the client already has (#2189).
 func (c *Cache) MessagesAfterMarker(topic string, marker *Marker, scheduled bool, maxBytes int64) ([]*model.Message, bool, error) {
 	var rows *sql.Rows
 	var err error
+	sequenceID := ""
+	if marker.topic == topic {
+		sequenceID = marker.sequenceID
+	}
 	if scheduled {
-		rows, err = marker.db.Query(c.queries.selectMessagesSinceIDScheduled, topic, marker.rowID, marker.time)
+		rows, err = marker.db.Query(c.queries.selectMessagesSinceIDScheduled, topic, marker.rowID, marker.time, sequenceID)
 	} else {
-		rows, err = marker.db.Query(c.queries.selectMessagesSinceID, topic, marker.rowID, marker.time)
+		rows, err = marker.db.Query(c.queries.selectMessagesSinceID, topic, marker.rowID, marker.time, sequenceID)
 	}
 	if err != nil {
 		return nil, false, err
@@ -313,36 +327,20 @@ func (c *Cache) MessagesAfterMarker(topic string, marker *Marker, scheduled bool
 	return readMessagesCapped(rows, maxBytes)
 }
 
-// resolveMarker resolves a since=<mid> marker to its row id and time, the replay cut-offs, and
-// the database handle to read the replay from. It asks the replica first and, only if the mid is
-// unknown there, the primary: a client that reconnects right after receiving a message can be
-// ahead of replication. The replay is then read from the primary as well: what the replica lacks
-// went out live before the client arrived, so the tail does not resend it either. A marker
-// unknown to both (not written yet, or expired) resolves to 0, 0, which replays the topic's
-// entire retained history; the server avoids that for markers it saw go out (sinceForTopic).
-func (c *Cache) resolveMarker(mid string) (int64, int64, *sql.DB, error) {
-	rdb := c.db.ReadOnly()
-	rowID, markerTime, err := c.resolveMarkerOn(rdb, mid)
-	if err != nil {
-		return 0, 0, rdb, err
-	}
-	if rowID == 0 && rdb != c.db.Primary() {
-		rowID, markerTime, err = c.resolveMarkerOn(c.db.Primary(), mid)
-		return rowID, markerTime, c.db.Primary(), err
-	}
-	return rowID, markerTime, rdb, nil
-}
-
-// resolveMarkerOn looks the mid up on one database handle; 0 means unknown
-func (c *Cache) resolveMarkerOn(h *sql.DB, mid string) (int64, int64, error) {
-	var rowID, markerTime int64
-	err := h.QueryRow(c.queries.selectMessageRowID, mid).Scan(&rowID, &markerTime)
+// resolveMarkerOn looks the mid up on one database handle; nil means unknown (not written yet,
+// or expired). The server handles that case in sinceForTopic.
+func (c *Cache) resolveMarkerOn(h *sql.DB, mid string) (*Marker, error) {
+	marker := &Marker{db: h}
+	err := h.QueryRow(c.queries.selectMessageRowID, mid).Scan(&marker.rowID, &marker.time, &marker.topic, &marker.sequenceID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, 0, nil
+		return nil, nil
 	} else if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
-	return rowID, markerTime, nil
+	if marker.sequenceID == "" {
+		marker.sequenceID = mid
+	}
+	return marker, nil
 }
 
 func (c *Cache) messagesLatest(topic string) ([]*model.Message, error) {

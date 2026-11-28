@@ -18,8 +18,8 @@ func TestSQLiteQueries_SinceIDAndTailUseOnlyIndexConditions(t *testing.T) {
 		query string
 		args  []any
 	}{
-		"since id":                    {sqliteQueries.selectMessagesSinceID, []any{"mytopic", 1000, 1792160000}},
-		"since id, include scheduled": {sqliteQueries.selectMessagesSinceIDScheduled, []any{"mytopic", 1000, 1792160000}},
+		"since id":                    {sqliteQueries.selectMessagesSinceID, []any{"mytopic", 1000, 1792160000, "sequence"}},
+		"since id, include scheduled": {sqliteQueries.selectMessagesSinceIDScheduled, []any{"mytopic", 1000, 1792160000, "sequence"}},
 		"tail":                        {sqliteQueries.selectMessagesAfterRowID, []any{1000, "[998, 999]", 1000}},
 	} {
 		rows, err := c.db.Primary().Query("EXPLAIN QUERY PLAN "+q.query, q.args...)

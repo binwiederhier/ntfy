@@ -46,8 +46,8 @@ func TestPostgresQueries_GenericPlansUseOnlyIndexConditions(t *testing.T) {
 		args        string
 		topicScoped bool // A replay reads one topic, the tail all of them
 	}{
-		"since id":                    {postgresQueries.selectMessagesSinceID, `'mytopic', 1000, 1792160000`, true},
-		"since id, include scheduled": {postgresQueries.selectMessagesSinceIDScheduled, `'mytopic', 1000, 1792160000`, true},
+		"since id":                    {postgresQueries.selectMessagesSinceID, `'mytopic', 1000, 1792160000, 'sequence'`, true},
+		"since id, include scheduled": {postgresQueries.selectMessagesSinceIDScheduled, `'mytopic', 1000, 1792160000, 'sequence'`, true},
 		"tail":                        {postgresQueries.selectMessagesAfterRowID, `1000, '[998, 999]', 1000`, false},
 	} {
 		plan := postgresGenericPlan(t, d.Primary(), q.query, q.args)

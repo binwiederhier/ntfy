@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	// topicExpungeAfter defines how long a topic is active before it is removed from memory.
-	// This must be larger than matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter to give
-	// time for more requests to come in, so that we can send a {"rejected":["<pushkey>"]} response back.
-	topicExpungeAfter = 16 * time.Hour
+	// topicExpungeAfter defines how long a topic is active before it is removed from memory. What
+	// has to outlive it (a UnifiedPush topic's subscriber activity and rate visitor) is kept by
+	// the topic service, not here. A re-created topic costs its publisher a topic-creation token.
+	topicExpungeAfter = 6 * time.Hour
 
 	// topicDeliveredRetain is how long a topic at least remembers that a message went out to its
 	// subscribers, so the tail (see PublishMissed) does not send it again. It must cover the write
@@ -29,7 +29,6 @@ const (
 type topic struct {
 	ID          string
 	subscribers map[int]*topicSubscriber
-	rateVisitor *visitor
 	lastAccess  time.Time
 	delivered   map[string]time.Time // When recent messages went out to the subscribers, by message ID
 	mu          sync.RWMutex
@@ -109,9 +108,6 @@ func (t *topic) ExpireDelivered() {
 func (t *topic) Stale() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.rateVisitor != nil && !t.rateVisitor.Stale() {
-		return false
-	}
 	return len(t.subscribers) == 0 && time.Since(t.lastAccess) > topicExpungeAfter
 }
 
@@ -119,22 +115,6 @@ func (t *topic) LastAccess() time.Time {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.lastAccess
-}
-
-func (t *topic) SetRateVisitor(v *visitor) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.rateVisitor = v
-	t.lastAccess = time.Now()
-}
-
-func (t *topic) RateVisitor() *visitor {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if t.rateVisitor != nil && t.rateVisitor.Stale() {
-		t.rateVisitor = nil
-	}
-	return t.rateVisitor
 }
 
 // Unsubscribe removes the subscription from the list of subscribers
@@ -310,11 +290,6 @@ func (t *topic) Context() log.Context {
 		"topic":             t.ID,
 		"topic_subscribers": len(t.subscribers),
 		"topic_last_access": util.FormatTime(t.lastAccess),
-	}
-	if t.rateVisitor != nil {
-		for k, v := range t.rateVisitor.Context() {
-			fields["topic_rate_"+k] = v
-		}
 	}
 	return fields
 }

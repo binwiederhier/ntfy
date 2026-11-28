@@ -48,6 +48,9 @@ func (s *Server) execManager() {
 						ev.Trace("- topic %s: %d subscribers, accessed %s", t.ID, subs, util.FormatTime(lastAccess))
 					}
 					t.ExpireDelivered()
+					if subs > 0 && s.config.VisitorSubscriberRateLimiting && isUnifiedPushTopic(t.ID) {
+						s.topicService.Touch(t.ID) // An open stream keeps the rate visitor live on the other nodes too
+					}
 					subscribers += subs
 				}
 			}
@@ -75,11 +78,13 @@ func (s *Server) execManager() {
 
 	// Print stats
 	s.mu.RLock()
-	messagesCount, topicsCount, visitorsCount := s.messages, len(s.topics), len(s.visitors)
+	messagesCount, topicsCount := s.messages, len(s.topics)
 	s.mu.RUnlock()
+	visitorsCount := s.limiter.Size()
 
 	// Update stats
 	s.updateAndWriteStats(messagesCount)
+	topicsUnifiedPush := s.topicService.Size() // UnifiedPush topics this node keeps, to watch their memory
 
 	// Log stats
 	log.
@@ -88,6 +93,7 @@ func (s *Server) execManager() {
 			"messages_published":      messagesCount,
 			"messages_cached":         messagesCached,
 			"topics_active":           topicsCount,
+			"topics_unifiedpush":      topicsUnifiedPush,
 			"subscribers":             subscribers,
 			"visitors":                visitorsCount,
 			"users":                   usersCount,
@@ -104,28 +110,21 @@ func (s *Server) execManager() {
 	metrics.Users.Set(float64(usersCount))
 	metrics.Subscribers.Set(float64(subscribers))
 	metrics.Topics.Set(float64(topicsCount))
+	metrics.TopicsUnifiedPush.Set(float64(topicsUnifiedPush))
 	if s.attachment != nil {
 		metrics.AttachmentsTotalSize.Set(float64(s.attachment.Size()))
 	}
 }
 
 func (s *Server) pruneVisitors() {
-	staleVisitors := 0
+	pruned := 0
 	log.
 		Tag(tagManager).
 		Timing(func() {
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			for ip, v := range s.visitors {
-				if v.Stale() {
-					log.Tag(tagManager).With(v).Trace("Deleting stale visitor")
-					delete(s.visitors, ip)
-					staleVisitors++
-				}
-			}
+			pruned = s.limiter.Prune() // Visitors are per request; only their keys' buckets and counts stay, until they are settled
 		}).
-		Field("stale_visitors", staleVisitors).
-		Debug("Finished deleting stale visitors")
+		Field("pruned_keys", pruned).
+		Debug("Finished deleting stale visitor keys")
 }
 
 func (s *Server) pruneTokens() {

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // Matrix Push Gateway / UnifiedPush / ntfy integration:
@@ -72,14 +71,6 @@ type matrixResponse struct {
 	Rejected []string `json:"rejected"`
 }
 
-const (
-	// matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter is the time after which a Matrix response
-	// will return an HTTP 200 with the push key (i.e. "rejected":["<pushkey>"]}), if no rate visitor has been set on
-	// the topic. Rejecting the push key will instruct the Matrix server to invalidate the pushkey and stop sending
-	// messages to it. This must be longer than topicExpungeAfter. See https://spec.matrix.org/v1.6/push-gateway-api/
-	matrixRejectPushKeyForUnifiedPushTopicWithoutRateVisitorAfter = 12 * time.Hour
-)
-
 // errMatrixPushkeyRejected represents an error when handing Matrix gateway messages
 //
 // If the push key is set, the app server will remove it and will never send messages using the same
@@ -130,6 +121,11 @@ func newRequestFromMatrixJSON(r *http.Request, baseURL string, messageLimit int)
 	newRequest, err := http.NewRequest(http.MethodPost, pushKey, io.NopCloser(bytes.NewReader(body.PeekedBytes)))
 	if err != nil {
 		return nil, err
+	}
+	// The pushkey bypasses the router's topic path check, so check it here: publishing sanitizes the
+	// topic after authorization (e.g. strips a NUL), so an invalid topic could land on a protected one
+	if !topicPathRegex.MatchString(newRequest.URL.Path) {
+		return nil, errHTTPBadRequestTopicInvalid
 	}
 	newRequest.RemoteAddr = r.RemoteAddr // Not strictly necessary, since visitor was already extracted
 	if r.Header.Get("X-Forwarded-For") != "" {

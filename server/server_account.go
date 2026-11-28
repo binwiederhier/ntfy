@@ -30,8 +30,8 @@ func (s *Server) handleAccountCreate(w http.ResponseWriter, r *http.Request, v *
 		} else if u != nil {
 			return errHTTPUnauthorized // Cannot create account from user context
 		}
-		if !v.AccountActionAllowed() {
-			return errHTTPTooManyRequestsLimitAccountActions
+		if d := v.AccountActionAllowed(); !d.OK {
+			return errHTTPTooManyRequestsLimitAccountActions.WithLimitDecision(d)
 		}
 	}
 	newAccount, err := readJSONWithLimit[apiAccountCreateRequest](r.Body, jsonBodyBytesLimit, false)
@@ -96,6 +96,7 @@ func (s *Server) handleAccountGet(w http.ResponseWriter, r *http.Request, v *vis
 			ReservationsRemaining:        stats.ReservationsRemaining,
 			AttachmentTotalSize:          stats.AttachmentTotalSize,
 			AttachmentTotalSizeRemaining: stats.AttachmentTotalSizeRemaining,
+			ResetAt:                      stats.ResetAt.Unix(),
 		},
 	}
 	u := v.User()
@@ -326,9 +327,8 @@ func (s *Server) handleAccountTokenCreate(w http.ResponseWriter, r *http.Request
 func (s *Server) handleAccountTokenUpdate(w http.ResponseWriter, r *http.Request, v *visitor) error {
 	u := v.User()
 	if u == nil {
-		// ensureUser already checked, but the user can be nil'd between that check and this
-		// re-read: IP-keyed visitors are shared, and a concurrent anonymous request on the
-		// same IP calls SetUser(nil) on this very object (recurring production panic)
+		// ensureUser already checked; kept as a guard, since a nil user here was a recurring
+		// production panic while visitors were shared between requests (#1051)
 		return errHTTPUnauthorized
 	}
 	req, err := readJSONWithLimit[apiAccountTokenUpdateRequest](r.Body, jsonBodyBytesLimit, true) // Allow empty body!
@@ -528,6 +528,8 @@ func (s *Server) handleAccountReservationAdd(w http.ResponseWriter, r *http.Requ
 	// Check if we are allowed to reserve this topic
 	if u.IsUser() && u.Tier == nil {
 		return errHTTPUnauthorized
+	} else if u.IsUser() && u.Tier.ReservationLimit <= 0 {
+		return errHTTPTooManyRequestsLimitReservations // AddReservation treats a limit of 0 as unlimited (for admins)
 	} else if err := s.userManager.AllowReservation(u.Name, req.Topic); err != nil {
 		return errHTTPConflictTopicReserved
 	}
@@ -710,8 +712,8 @@ func (s *Server) handleAccountEmailAdd(w http.ResponseWriter, r *http.Request, v
 		return errHTTPConflictEmailExists
 	}
 	// Rate limit (counts against the user's email quota)
-	if !v.EmailAllowed() {
-		return errHTTPTooManyRequestsLimitEmails
+	if d := v.EmailAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitEmails.WithLimitDecision(d)
 	}
 	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Starting email verification")
 	if err := s.enqueueEmailVerification(u.ID, req.Email); err != nil {
@@ -803,8 +805,8 @@ func (s *Server) handleAccountEmailResend(w http.ResponseWriter, r *http.Request
 	} else if !util.Contains(pending, req.Email) {
 		return errHTTPBadRequestEmailAddressInvalid
 	}
-	if !v.EmailAllowed() {
-		return errHTTPTooManyRequestsLimitEmails
+	if d := v.EmailAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitEmails.WithLimitDecision(d)
 	}
 	logvr(v, r).Tag(tagAccount).Field("email", req.Email).Info("Resending email verification")
 	if err := s.enqueueEmailVerification(u.ID, req.Email); err != nil {
@@ -838,8 +840,8 @@ func (s *Server) handleAccountPasswordResetRequest(w http.ResponseWriter, r *htt
 		return err
 	}
 	// Rate limit via the shared per-visitor account-creation bucket (no new limiter/config)
-	if !v.AccountActionAllowed() {
-		return errHTTPTooManyRequestsLimitAccountActions
+	if d := v.AccountActionAllowed(); !d.OK {
+		return errHTTPTooManyRequestsLimitAccountActions.WithLimitDecision(d)
 	}
 	v.AccountActionPerformed() // Consume a token on every request (including no-match), to throttle probing
 	identifier := strings.TrimSpace(req.Identifier)

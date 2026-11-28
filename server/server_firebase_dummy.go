@@ -17,6 +17,7 @@ const (
 var (
 	errFirebaseNotAvailable      = errors.New("Firebase not available")
 	errFirebaseTemporarilyBanned = errors.New("visitor temporarily banned from using Firebase")
+	errFirebaseLimited           = errors.New("not sent to Firebase, visitor or topic over the Firebase limit")
 )
 
 type firebaseClient struct {
@@ -30,7 +31,11 @@ type firebaseSender interface {
 	Send(m string) error
 }
 
-func newFirebaseClient(sender firebaseSender, auther user.Auther) *firebaseClient {
+func (c *firebaseClient) Observe(m *model.Message) {
+	// Nothing to count without Firebase
+}
+
+func newFirebaseClient(sender firebaseSender, auther user.Auther, limiter *firebaseLimiter) *firebaseClient {
 	return nil
 }
 

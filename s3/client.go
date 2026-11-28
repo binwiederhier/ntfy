@@ -81,8 +81,8 @@ func New(config *Config) *Client {
 // single PUT request without buffering. The read is limited to untrustedLength bytes;
 // any extra data in the body is ignored. If the body is shorter than claimed, the upload fails.
 //
-// Otherwise (untrustedLength <= 0 or > 5 GB), the first 5 MB are buffered to decide
-// between a simple PUT and multipart upload.
+// Otherwise (untrustedLength <= 0 or > 5 GB), up to the first 5 MB are buffered to decide
+// between a simple PUT and multipart upload. The buffer grows only as data arrives.
 //
 // See https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
 // and https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html
@@ -92,15 +92,14 @@ func (c *Client) PutObject(ctx context.Context, key string, body io.Reader, untr
 		// untrustedLength bytes, and any extra data in body is ignored.
 		return c.putObject(ctx, key, io.LimitReader(body, untrustedLength), untrustedLength)
 	}
-	// Buffered path: read first 5 MB to decide simple vs multipart
-	first := make([]byte, partSize)
-	n, err := io.ReadFull(body, first)
-	if errors.Is(err, io.ErrUnexpectedEOF) || err == io.EOF {
-		return c.putObject(ctx, key, bytes.NewReader(first[:n]), int64(n))
+	// Buffered path: read up to the first 5 MB to decide simple vs multipart
+	buf := &partBuffer{}
+	if err := buf.fill(body); errors.Is(err, io.EOF) {
+		return c.putObject(ctx, key, buf.reader(), int64(buf.size))
 	} else if err != nil {
 		return fmt.Errorf("error reading object %s from client: %w", key, err)
 	}
-	return c.putObjectMultipart(ctx, key, io.MultiReader(bytes.NewReader(first), body))
+	return c.putObjectMultipart(ctx, key, buf, body)
 }
 
 // putObject uploads a body with known size using a simple PUT with UNSIGNED-PAYLOAD.

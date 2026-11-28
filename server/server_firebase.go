@@ -7,13 +7,18 @@ import (
 	"encoding/json"
 	"errors"
 	firebase "firebase.google.com/go/v4"
+	"firebase.google.com/go/v4/errorutils"
 	"firebase.google.com/go/v4/messaging"
 	"fmt"
 	"google.golang.org/api/option"
+	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
+	"io"
+	"net/http"
 	"strings"
+	"time"
 )
 
 const (
@@ -23,30 +28,53 @@ const (
 
 	fcmMessageLimit         = 4000
 	fcmApnsBodyMessageLimit = 100
+	fcmErrorBodyLogLimit    = 2048 // Bytes of a failed FCM response body to keep for logging
 )
 
 var (
 	errFirebaseQuotaExceeded     = errors.New("quota exceeded for Firebase messages to topic")
 	errFirebaseTemporarilyBanned = errors.New("visitor temporarily banned from using Firebase")
+	errFirebaseLimited           = errors.New("not sent to Firebase, visitor or topic over the Firebase limit")
 )
+
+// firebaseResponse holds the details of a failed FCM HTTP response. The Firebase SDK reduces a failed
+// response to its error message, which drops the error details (reason, quota metric) and the headers
+// we need to tell the different 429s apart.
+type firebaseResponse struct {
+	status     int
+	retryAfter string
+	body       string
+	duration   time.Duration // Total time of the send, including SDK retries
+}
+
+// firebaseSendError is a failed FCM send, along with the raw HTTP response details. It implements
+// log.Contexter, so the details end up as fields on the existing log line.
+type firebaseSendError struct {
+	err      error
+	response *firebaseResponse
+}
 
 // firebaseClient is a generic client that formats and sends messages to Firebase.
 // The actual Firebase implementation is implemented in firebaseSenderImpl, to make it testable.
 type firebaseClient struct {
-	sender firebaseSender
-	auther user.Auther
+	sender  firebaseSender
+	auther  user.Auther
+	limiter *firebaseLimiter // Only with experimental-firebase-limit; nil otherwise
 }
 
-func newFirebaseClient(sender firebaseSender, auther user.Auther) *firebaseClient {
+func newFirebaseClient(sender firebaseSender, auther user.Auther, limiter *firebaseLimiter) *firebaseClient {
 	return &firebaseClient{
-		sender: sender,
-		auther: auther,
+		sender:  sender,
+		auther:  auther,
+		limiter: limiter,
 	}
 }
 
 func (c *firebaseClient) Send(v *visitor, m *model.Message) error {
 	if !v.FirebaseAllowed() {
 		return errFirebaseTemporarilyBanned
+	} else if c.limiter != nil && !c.limiter.Allow(v, m) {
+		return errFirebaseLimited
 	}
 	fbm, err := toFirebaseMessage(m, c.auther)
 	if err != nil {
@@ -65,6 +93,13 @@ func (c *firebaseClient) Send(v *visitor, m *model.Message) error {
 		v.FirebaseTemporarilyDeny()
 	}
 	return err
+}
+
+// Observe counts a message a peer node sent to Firebase against the limit, so that it is cluster-wide
+func (c *firebaseClient) Observe(m *model.Message) {
+	if c.limiter != nil {
+		c.limiter.Observe(m)
+	}
 }
 
 // firebaseSender is an interface that represents a client that can send to Firebase Cloud Messaging.
@@ -95,11 +130,50 @@ func newFirebaseSender(credentialsFile string) (firebaseSender, error) {
 }
 
 func (c *firebaseSenderImpl) Send(m *messaging.Message) error {
+	start := time.Now()
 	_, err := c.client.Send(context.Background(), m)
 	if err != nil && messaging.IsQuotaExceeded(err) {
 		return errFirebaseQuotaExceeded
+	} else if err != nil {
+		if resp := errorutils.HTTPResponse(err); resp != nil {
+			response := newFirebaseResponse(resp)
+			response.duration = time.Since(start)
+			return &firebaseSendError{
+				err:      err,
+				response: response,
+			}
+		}
 	}
 	return err
+}
+
+// newFirebaseResponse extracts the status, Retry-After header and (truncated) body of a failed FCM
+// response. The SDK hands out a buffered copy of the response, so reading the body here is safe.
+func newFirebaseResponse(resp *http.Response) *firebaseResponse {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, fcmErrorBodyLogLimit))
+	return &firebaseResponse{
+		status:     resp.StatusCode,
+		retryAfter: resp.Header.Get("Retry-After"),
+		body:       string(body),
+	}
+}
+
+func (e *firebaseSendError) Error() string {
+	return e.err.Error()
+}
+
+func (e *firebaseSendError) Unwrap() error {
+	return e.err
+}
+
+func (e *firebaseSendError) Context() log.Context {
+	return log.Context{
+		"error":                  e.err.Error(),
+		"firebase_http_status":   e.response.status,
+		"firebase_retry_after":   e.response.retryAfter,
+		"firebase_response_body": e.response.body,
+		"firebase_duration_ms":   e.response.duration.Milliseconds(),
+	}
 }
 
 // toFirebaseMessage converts a message to a Firebase message.

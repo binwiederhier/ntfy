@@ -64,6 +64,11 @@ const handlePushMessage = async (data) => {
     }),
   );
 
+  // Don't store a message again that the user deleted (e.g. delivered via WebSocket first)
+  if ((await db.notifications.get(message.id))?.deleted) {
+    return;
+  }
+
   // Delete existing notification with same sequence ID (if any)
   const sequenceId = message.sequence_id || message.id;
   if (sequenceId) {

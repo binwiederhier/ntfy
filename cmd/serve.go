@@ -39,9 +39,11 @@ var flagsServe = append(
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-https", Aliases: []string{"listen_https", "L"}, EnvVars: []string{"NTFY_LISTEN_HTTPS"}, Usage: "ip:port used as HTTPS listen address"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "listen-unix", Aliases: []string{"listen_unix", "U"}, EnvVars: []string{"NTFY_LISTEN_UNIX"}, Usage: "listen on unix socket path"}),
 	altsrc.NewIntFlag(&cli.IntFlag{Name: "listen-unix-mode", Aliases: []string{"listen_unix_mode"}, EnvVars: []string{"NTFY_LISTEN_UNIX_MODE"}, DefaultText: "system default", Usage: "file permissions of unix socket, e.g. 0700"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-listen-admin-unix", Aliases: []string{"experimental_listen_admin_unix"}, EnvVars: []string{"NTFY_EXPERIMENTAL_LISTEN_ADMIN_UNIX"}, Usage: "experimental: unix socket path for credential-less local admin API access, e.g. /run/ntfy/admin.sock; empty or \"-\" disables it"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "key-file", Aliases: []string{"key_file", "K"}, EnvVars: []string{"NTFY_KEY_FILE"}, Usage: "private key file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "cert-file", Aliases: []string{"cert_file", "E"}, EnvVars: []string{"NTFY_CERT_FILE"}, Usage: "certificate file, if listen-https is set"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "firebase-key-file", Aliases: []string{"firebase_key_file", "F"}, EnvVars: []string{"NTFY_FIREBASE_KEY_FILE"}, Usage: "Firebase credentials file; if set additionally publish to FCM topic"}),
+	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-firebase-limit", Aliases: []string{"experimental_firebase_limit"}, EnvVars: []string{"NTFY_EXPERIMENTAL_FIREBASE_LIMIT"}, Usage: "limit Firebase messages per visitor and topic, e.g. 'defaults' or 'visitor-burst=5,visitor-refill=1m,topic-burst=10,topic-refill=6m' (experimental, for FCM's topic fanout limit; will be removed in a future release)"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "database-url", Aliases: []string{"database_url"}, EnvVars: []string{"NTFY_DATABASE_URL"}, Usage: "PostgreSQL connection string for database-backed stores (e.g. postgres://user:pass@host:5432/ntfy)"}),
 	altsrc.NewStringSliceFlag(&cli.StringSliceFlag{Name: "database-replica-urls", Aliases: []string{"database_replica_urls"}, EnvVars: []string{"NTFY_DATABASE_REPLICA_URLS"}, Usage: "PostgreSQL read replica connection strings for offloading read queries"}),
 	altsrc.NewStringFlag(&cli.StringFlag{Name: "experimental-cluster-node-id", Aliases: []string{"experimental_cluster_node_id"}, EnvVars: []string{"NTFY_EXPERIMENTAL_CLUSTER_NODE_ID"}, Usage: "stable per-node identifier for the cluster node registry (required in cluster mode)"}),
@@ -166,9 +168,11 @@ func execServe(c *cli.Context) error {
 	listenHTTPS := c.String("listen-https")
 	listenUnix := c.String("listen-unix")
 	listenUnixMode := c.Int("listen-unix-mode")
+	listenAdminUnix := c.String("experimental-listen-admin-unix")
 	keyFile := c.String("key-file")
 	certFile := c.String("cert-file")
 	firebaseKeyFile := c.String("firebase-key-file")
+	firebaseLimitStr := c.String("experimental-firebase-limit")
 	databaseURL := c.String("database-url")
 	databaseReplicaURLs := c.StringSlice("database-replica-urls")
 	clusterNodeID := c.String("experimental-cluster-node-id")
@@ -261,6 +265,10 @@ func execServe(c *cli.Context) error {
 	privacyPolicy := c.String("privacy-policy-url")
 	legalNotice := c.String("legal-notice-url")
 	// Convert durations
+	firebaseLimit, err := server.ParseFirebaseLimits(firebaseLimitStr)
+	if err != nil {
+		return fmt.Errorf("invalid experimental-firebase-limit: %w", err)
+	}
 	cacheDuration, err := util.ParseDuration(cacheDurationStr)
 	if err != nil {
 		return fmt.Errorf("invalid cache duration: %s", cacheDurationStr)
@@ -356,7 +364,17 @@ func execServe(c *cli.Context) error {
 		return fmt.Errorf("config option visitor-attachment-daily-bandwidth-limit must be lower than %d", math.MaxInt)
 	}
 
-	// Check values
+	// Check values; checks that don't return stay out of the else-if chain, which would end there
+	if baseURL != "" {
+		u, err := url.Parse(baseURL)
+		if err != nil {
+			return fmt.Errorf("if set, base-url must be a valid URL, e.g. https://ntfy.mydomain.com: %v", err)
+		} else if u.Scheme != "http" && u.Scheme != "https" {
+			return errors.New("if set, base-url must be a valid URL starting with http:// or https://, e.g. https://ntfy.mydomain.com")
+		} else if u.Path != "" {
+			return fmt.Errorf("if set, base-url must not have a path (%s), as hosting ntfy on a sub-path is not supported, e.g. https://ntfy.mydomain.com", u.Path)
+		}
+	}
 	if databaseURL != "" && !strings.HasPrefix(databaseURL, "postgres://") && !strings.HasPrefix(databaseURL, "postgresql://") {
 		return errors.New("if database-url is set, it must start with postgres:// or postgresql://")
 	} else if databaseURL != "" && (authFile != "" || cacheFile != "" || webPushFile != "") {
@@ -399,15 +417,6 @@ func execServe(c *cli.Context) error {
 		return errors.New("if smtp-server-listen is set, smtp-server-domain must also be set")
 	} else if attachmentCacheDir != "" && baseURL == "" {
 		return errors.New("if attachment-cache-dir is set, base-url must also be set")
-	} else if baseURL != "" {
-		u, err := url.Parse(baseURL)
-		if err != nil {
-			return fmt.Errorf("if set, base-url must be a valid URL, e.g. https://ntfy.mydomain.com: %v", err)
-		} else if u.Scheme != "http" && u.Scheme != "https" {
-			return errors.New("if set, base-url must be a valid URL starting with http:// or https://, e.g. https://ntfy.mydomain.com")
-		} else if u.Path != "" {
-			return fmt.Errorf("if set, base-url must not have a path (%s), as hosting ntfy on a sub-path is not supported, e.g. https://ntfy.mydomain.com", u.Path)
-		}
 	} else if upstreamBaseURL != "" && !strings.HasPrefix(upstreamBaseURL, "http://") && !strings.HasPrefix(upstreamBaseURL, "https://") {
 		return errors.New("if set, upstream-base-url must start with http:// or https://")
 	} else if upstreamBaseURL != "" && strings.HasSuffix(upstreamBaseURL, "/") {
@@ -428,11 +437,8 @@ func execServe(c *cli.Context) error {
 		return errors.New("if stripe-secret-key is set, stripe-webhook-key and base-url must also be set")
 	} else if twilioAccount != "" && (twilioAuthToken == "" || twilioPhoneNumber == "" || twilioVerifyService == "" || baseURL == "" || (authFile == "" && databaseURL == "")) {
 		return errors.New("if twilio-account is set, twilio-auth-token, twilio-phone-number, twilio-verify-service, base-url, and auth-file (or database-url) must also be set")
-	} else if messageSizeLimit > server.DefaultMessageSizeLimit {
-		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
-		if messageSizeLimit > 5*1024*1024 {
-			return errors.New("message-size-limit cannot be higher than 5M")
-		}
+	} else if messageSizeLimit > 5*1024*1024 {
+		return errors.New("message-size-limit cannot be higher than 5M")
 	} else if !server.WebPushAvailable && (webPushPrivateKey != "" || webPushPublicKey != "" || webPushFile != "") {
 		return errors.New("cannot enable WebPush, support is not available in this build (nowebpush)")
 	} else if webPushExpiryWarningDuration > 0 && webPushExpiryWarningDuration > webPushExpiryDuration {
@@ -447,12 +453,17 @@ func execServe(c *cli.Context) error {
 		return errors.New("if ban-file is set, ban-window must be greater than zero")
 	} else if banFile != "" && banThreshold <= 0 {
 		return errors.New("if ban-file is set, ban-threshold must be greater than zero")
+	} else if banFile != "" && banThreshold > ban.MaxThreshold {
+		return fmt.Errorf("if ban-file is set, ban-threshold must be at most %d", ban.MaxThreshold)
 	} else if banFile != "" && len(banWeights) == 0 {
 		return errors.New("if ban-file is set, ban-weights must not be empty")
 	} else if banFile != "" && !util.FileExists(filepath.Dir(banFile)) {
 		return fmt.Errorf("if ban-file is set, its directory (%s) must exist", filepath.Dir(banFile))
 	} else if runtime.GOOS == "windows" && listenUnix != "" {
 		return errors.New("listen-unix is not supported on Windows")
+	}
+	if messageSizeLimit > server.DefaultMessageSizeLimit {
+		log.Warn("message-size-limit is greater than 4K, this is not recommended and largely untested, and may lead to issues with some clients")
 	}
 	if cacheDuration > 0 && attachmentExpiryDuration > cacheDuration {
 		log.Warn("attachment-expiry-duration (%s) is longer than cache-duration (%s); attachments never outlive their message, so they will be deleted after %s", attachmentExpiryDurationStr, cacheDurationStr, cacheDurationStr)
@@ -490,6 +501,9 @@ func execServe(c *cli.Context) error {
 	listenHTTP, err := parseListenHTTP(listenHTTPRaw)
 	if err != nil {
 		return err
+	}
+	if listenAdminUnix == "-" {
+		listenAdminUnix = "" // Unsets the default, like listen-http
 	}
 
 	// Resolve hosts
@@ -538,9 +552,11 @@ func execServe(c *cli.Context) error {
 	conf.ListenHTTPS = listenHTTPS
 	conf.ListenUnix = listenUnix
 	conf.ListenUnixMode = fs.FileMode(listenUnixMode)
+	conf.ListenAdminUnix = listenAdminUnix
 	conf.KeyFile = keyFile
 	conf.CertFile = certFile
 	conf.FirebaseKeyFile = firebaseKeyFile
+	conf.FirebaseLimit = firebaseLimit
 	conf.CacheFile = cacheFile
 	conf.CacheDuration = cacheDuration
 	conf.CacheStartupQueries = cacheStartupQueries

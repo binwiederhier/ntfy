@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 	"net/netip"
-	"reflect"
+	"runtime"
+	"strconv"
 	"text/template"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 
 // Defines default config settings (excluding limits, see below)
 const (
+	DefaultListenAdminUnixMode                  = fs.FileMode(0660) // Owner (the ntfy user) and the ntfy group; root bypasses anyway
 	DefaultListenHTTP                           = ":80"
 	DefaultCacheDuration                        = 12 * time.Hour
 	DefaultCacheBatchTimeout                    = time.Duration(0)
@@ -54,16 +56,18 @@ const (
 	DefaultBanThreshold = 100 // Weighted strikes per BanWindow before a prefix is banned
 )
 
-// DefaultBanWeights is the ban-feed's default per-code strike weights: the auth-failure flood bans fast,
-// and everything else defaults to weight 1 (no "*" rule needed; see BanWeights.WeightFor).
+// DefaultBanWeights is the ban-feed's default per-code strike weights; everything else defaults to
+// weight 1 (no "*" rule needed; see BanWeights.WeightFor).
 var DefaultBanWeights = []string{
-	banWeight(errHTTPTooManyRequestsLimitAuthFailure, 10), // brute-force auth flood -> ban fast
+	banWeight(errHTTPTooManyRequestsLimitAuthFailure, 2),   // Brute-force auth flood: bans at half the threshold
+	banWeight(errHTTPInsufficientStorageUnifiedPush, 0.05), // An app server pushing to many offline phones is not an attack
+	banWeight(errHTTPGoneUnifiedPushTopicAbandoned, 0.05),  // The same app servers, told a subscription is gone
 }
 
 // banWeight formats a "CODE:WEIGHT" ban-feed default from an ntfy error, so the codes stay in sync with
 // the errHTTP definitions instead of being duplicated as string literals.
-func banWeight(err *errHTTP, weight int) string {
-	return fmt.Sprintf("%d:%d", err.Code, weight)
+func banWeight(err *errHTTP, weight float64) string {
+	return fmt.Sprintf("%d:%s", err.Code, strconv.FormatFloat(weight, 'f', -1, 64))
 }
 
 // Defines all global and per-visitor limits
@@ -116,9 +120,6 @@ const (
 )
 
 var (
-	// DefaultVisitorStatsResetTime defines the time at which visitor stats are reset (wall clock only)
-	DefaultVisitorStatsResetTime = time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC)
-
 	// DefaultDisallowedTopics defines the topics that are forbidden, because they are used elsewhere. This array can be
 	// extended using the server.yml config. If updated, also update in Android and web app.
 	DefaultDisallowedTopics = []string{"docs", "static", "file", "app", "metrics", "account", "settings", "signup", "login", "v1"}
@@ -132,6 +133,7 @@ type Config struct {
 	ListenHTTPS                          string
 	ListenUnix                           string
 	ListenUnixMode                       fs.FileMode
+	ListenAdminUnix                      string // Path of the local admin socket (CLI access without credentials); empty disables it
 	KeyFile                              string
 	CertFile                             string
 	DatabaseURL                          string        // PostgreSQL connection string (e.g. "postgres://user:pass@host:5432/ntfy")
@@ -139,12 +141,13 @@ type Config struct {
 	ClusterNodeID                        string        // Stable per-node identifier used to skip a node's own fan-out; required in cluster mode
 	ClusterListen                        string        // ip:port the dedicated cluster fan-out listener binds to (private network, e.g. "10.0.0.5:2587")
 	ClusterAdvertiseURL                  string        // Base URL peers use to reach this node's fan-out listener (defaults to "http://<cluster-listen>")
-	ClusterSecret                        string        `hash:"-"` // Shared secret authenticating node-to-node fan-out requests
+	ClusterSecret                        string        // Shared secret authenticating node-to-node fan-out requests
 	ClusterBatchLinger                   time.Duration // How long fan-out messages wait to form a batch per peer; 0 sends immediately
 	ClusterRole                          cluster.Role  // Active (default) or passive: a passive node never leads and never fences
 	ClusterDrainDelay                    time.Duration // On shutdown, how long a draining node withdraws (not ready, still serves everything) before it turns read-only
 	ClusterDrainDuration                 time.Duration // On shutdown, how long an active node takes to close its streams so they reconnect to other nodes; 0 disables
 	FirebaseKeyFile                      string
+	FirebaseLimit                        *FirebaseLimits // Limit Firebase messages per visitor and topic, against FCM's topic fanout limit; goes away with token-based delivery
 	CacheFile                            string
 	CacheDuration                        time.Duration
 	CacheStartupQueries                  string
@@ -153,9 +156,9 @@ type Config struct {
 	AuthFile                             string
 	AuthStartupQueries                   string
 	AuthDefault                          user.Permission
-	AuthUsers                            []*user.User `hash:"-"`
+	AuthUsers                            []*user.User
 	AuthAccess                           map[string][]*user.Grant
-	AuthTokens                           map[string][]*user.Token `hash:"-"`
+	AuthTokens                           map[string][]*user.Token
 	AuthBcryptCost                       int
 	AuthStatsQueueWriterInterval         time.Duration
 	AuthAccessCacheEnabled               bool          // Enables the in-memory ACL cache (high volume servers only)
@@ -176,17 +179,17 @@ type Config struct {
 	FirebasePollInterval                 time.Duration
 	FirebaseQuotaExceededPenaltyDuration time.Duration
 	UpstreamBaseURL                      string
-	UpstreamAccessToken                  string `hash:"-"`
+	UpstreamAccessToken                  string
 	SMTPSenderAddr                       string
 	SMTPSenderUser                       string
-	SMTPSenderPass                       string `hash:"-"`
+	SMTPSenderPass                       string
 	SMTPSenderFrom                       string
 	SMTPSenderVerify                     bool
 	SMTPServerListen                     string
 	SMTPServerDomain                     string
 	SMTPServerAddrPrefix                 string
 	TwilioAccount                        string
-	TwilioAuthToken                      string `hash:"-"`
+	TwilioAuthToken                      string
 	TwilioPhoneNumber                    string
 	TwilioCallsBaseURL                   string
 	TwilioVerifyBaseURL                  string
@@ -215,15 +218,14 @@ type Config struct {
 	VisitorAccountCreationLimitReplenish time.Duration
 	VisitorAuthFailureLimitBurst         int
 	VisitorAuthFailureLimitReplenish     time.Duration
-	VisitorStatsResetTime                time.Time      // Time of the day at which to reset visitor stats
 	VisitorSubscriberRateLimiting        bool           // Enable subscriber-based rate limiting for UnifiedPush topics
 	VisitorPrefixBitsIPv4                int            // Number of bits for IPv4 rate limiting (default: 32)
 	VisitorPrefixBitsIPv6                int            // Number of bits for IPv6 rate limiting (default: 64)
 	BehindProxy                          bool           // If true, the server will trust the proxy client IP header to determine the client IP address (IPv4 and IPv6 supported)
 	ProxyForwardedHeader                 string         // The header field to read the real/client IP address from, if BehindProxy is true, defaults to "X-Forwarded-For" (IPv4 and IPv6 supported)
 	ProxyTrustedPrefixes                 []netip.Prefix // List of trusted proxy networks (IPv4 or IPv6) that will be stripped from the Forwarded header if BehindProxy is true
-	StripeSecretKey                      string         `hash:"-"`
-	StripeWebhookKey                     string         `hash:"-"`
+	StripeSecretKey                      string
+	StripeWebhookKey                     string
 	StripePriceCacheDuration             time.Duration
 	BillingContact                       string
 	EnableSignup                         bool // Enable creation of accounts via API and UI
@@ -232,7 +234,7 @@ type Config struct {
 	EnableReservations                   bool // Allow users with role "user" to own/reserve topics
 	EnableMetrics                        bool
 	AccessControlAllowOrigin             string // CORS header field to restrict access from web clients
-	WebPushPrivateKey                    string `hash:"-"`
+	WebPushPrivateKey                    string
 	WebPushPublicKey                     string
 	WebPushFile                          string
 	WebPushEmailAddress                  string
@@ -252,6 +254,22 @@ type Config struct {
     LegalNoticeURL                       string `yaml:"legal-notice-url" json:"legal_notice_url"`
 }
 
+// DefaultListenAdminUnix returns the default admin socket path. On Windows there is none: unix socket
+// file permissions do not protect it there, so the CLI uses the database or --server instead.
+func DefaultListenAdminUnix() string {
+	return defaultListenAdminUnixFor(runtime.GOOS)
+}
+
+func defaultListenAdminUnixFor(goos string) string {
+	switch goos {
+	case "windows":
+		return ""
+	case "linux":
+		return "/run/ntfy/admin.sock"
+	}
+	return "/var/run/ntfy/admin.sock" // macOS and the BSDs have no /run
+}
+
 // NewConfig instantiates a default new server config
 func NewConfig() *Config {
 	return &Config{
@@ -261,6 +279,7 @@ func NewConfig() *Config {
 		ListenHTTPS:                          "",
 		ListenUnix:                           "",
 		ListenUnixMode:                       0,
+		ListenAdminUnix:                      "", // Experimental, off unless configured
 		KeyFile:                              "",
 		CertFile:                             "",
 		DatabaseURL:                          "",
@@ -273,6 +292,7 @@ func NewConfig() *Config {
 		ClusterDrainDelay:                    DefaultClusterDrainDelay,
 		ClusterDrainDuration:                 DefaultClusterDrainDuration,
 		FirebaseKeyFile:                      "",
+		FirebaseLimit:                        nil,
 		CacheFile:                            "",
 		CacheDuration:                        DefaultCacheDuration,
 		CacheStartupQueries:                  "",
@@ -339,7 +359,6 @@ func NewConfig() *Config {
 		VisitorAccountCreationLimitReplenish: DefaultVisitorAccountCreationLimitReplenish,
 		VisitorAuthFailureLimitBurst:         DefaultVisitorAuthFailureLimitBurst,
 		VisitorAuthFailureLimitReplenish:     DefaultVisitorAuthFailureLimitReplenish,
-		VisitorStatsResetTime:                DefaultVisitorStatsResetTime,
 		VisitorPrefixBitsIPv4:                DefaultVisitorPrefixBitsIPv4, // Default: use full IPv4 address
 		VisitorPrefixBitsIPv6:                DefaultVisitorPrefixBitsIPv6, // Default: use /64 for IPv6
 		BehindProxy:                          false,                        // If true, the server will trust the proxy client IP header to determine the client IP address
@@ -373,24 +392,13 @@ func NewConfig() *Config {
 	}
 }
 
-// Hash computes an SHA-256 hash of the configuration. This is used to detect
-// configuration changes for the web app version check feature. It uses reflection
-// to include all JSON-serializable fields automatically.
+// Hash computes an SHA-256 hash of the build and the configuration visible to the web app. This is used
+// to detect changes for the web app version check feature. It only covers what is served to every browser
+// anyway, so it contains no secrets, and is the same on all nodes of a cluster.
 func (c *Config) Hash() string {
-	v := reflect.ValueOf(*c)
-	t := v.Type()
-	var result string
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		fieldName := t.Field(i).Name
-		// Secrets must not feed the hash
-		if t.Field(i).Tag.Get("hash") == "-" {
-			continue
-		}
-		// Try to marshal the field and skip if it fails (e.g. *template.Template, netip.Prefix)
-		if b, err := json.Marshal(field.Interface()); err == nil {
-			result += fmt.Sprintf("%s:%s|", fieldName, string(b))
-		}
+	b, err := json.Marshal([]any{c.BuildVersion, c.BuildDate, c.BuildCommit, newConfigResponse(c)})
+	if err != nil {
+		return "" // Cannot happen, and the web app skips the version check without a hash
 	}
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(result)))
+	return fmt.Sprintf("%x", sha256.Sum256(b))
 }

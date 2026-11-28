@@ -22,6 +22,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Healthchecks.io](https://healthchecks.io/) ⭐ - Online service for monitoring regularly running tasks such as cron jobs
 - [Apprise](https://github.com/caronc/apprise/wiki/Notify_ntfy) ⭐ - Push notifications that work with just about every platform
 - [Uptime Kuma](https://uptime.kuma.pet/) ⭐ - A self-hosted monitoring tool
+- [Nightingale](https://n9e.io/) - Open-source alerting for your existing stack, with [built-in ntfy notifications](https://github.com/ccfos/nightingale/blob/v9.3.0/doc/api/notify-channel-native.md#ntfy) for firing and resolved alerts.
 - [Robusta](https://docs.robusta.dev/master/catalog/sinks/webhook.html) ⭐ - open source platform for Kubernetes troubleshooting
 - [borgmatic](https://torsion.org/borgmatic/docs/how-to/monitor-your-backups/#third-party-monitoring-services) ⭐ - configuration-driven backup software for servers and workstations
 - [Radarr](https://radarr.video/) ⭐ - Movie collection manager for Usenet and BitTorrent users
@@ -45,6 +46,8 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Simple Observability](https://simpleobservability.com/docs/alerts/ntfy) - Server monitoring and observability platform
 - [Sifio](https://sifio.net) - Aggregate updates from RSS, social media, and other sources, then deliver them to ntfy, Slack, Notion and more
 - [SolidPing](https://docs.solidping.io/docs/configuration/notifications#ntfy) - Uptime and synthetic monitoring
+- [Expiro](https://expiro.io/integrations) - Contract renewal reminders: alerts before every renewal and notice deadline, sent to ntfy, email, Slack, Teams and more
+- [Spooky Particles](https://spookyparticles.com/docs/check-ins) - Monitoring for Vercel apps and scheduled jobs: failed deploys, down sites and missed cron runs
 
 ## Integration via HTTP/SMTP/etc.
 
@@ -107,6 +110,8 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Ntfy App](https://github.com/rubix-studios-pty-ltd/ntfy-app) - Tauri/Rust desktop client for Windows, Linux and MacOS with push notifications.
 - [mac_ntfy](https://github.com/wangty163/mac_ntfy) - Native macOS client for ntfy (Swift)
 - [NtfyBar](https://github.com/roypadina/NtfyBar) - Native macOS menu-bar client: per-topic popups that stay, notifications, clipboard or shell-command actions, rules, history and sandboxed JavaScript plugins (Swift)
+- [mtfy](https://github.com/acidvegas/mtfy) - Native macOS menu bar client with notifications, searchable history, multiple servers, scheduled messages and an `mtfy` CLI (Swift)
+- [ntfy-admin](https://github.com/ksabev/ntfy-admin) - Web admin panel for self-hosted ntfy: users, access rules, tokens, onboarding QR codes, multiple servers (Go)
 
 ## Projects + scripts 
 
@@ -157,7 +162,7 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [nlog-ntfy](https://github.com/MichelMichels/nlog-ntfy) - Send NLog messages over ntfy (C# / .NET / NLog)
 - [helm-charts](https://github.com/sarab97/helm-charts) - Helm charts of some of the selfhosted services, incl. ntfy
 - [ntfy_ansible_role](https://github.com/stevenengland/ntfy_ansible_role) (on [Ansible Galaxy](https://galaxy.ansible.com/stevenengland/ntfy)) - Ansible role to install ntfy
-- [MASH playbook](https://github.com/mother-of-all-self-hosting/mash-playbook/blob/main/docs/services/ntfy.md) - Ansible playbook to install ntfy (and 250+ other self-hosted services) as Docker containers
+- [MASH playbook](https://github.com/mother-of-all-self-hosting/mash-playbook/blob/main/components/ntfy/README.md) - Ansible playbook to install ntfy (and 250+ other self-hosted services) as Docker containers
 - [easy2ntfy](https://github.com/chromoxdor/easy2ntfy) - Gateway for ESPeasy to receive commands through ntfy and using easyfetch (HTML/JS)
 - [ntfy_lite](https://github.com/MPI-IS/ntfy_lite) - Minimalist python API for pushing ntfy notifications (Python)
 - [notify](https://github.com/guanguans/notify) - 推送通知 (PHP)
@@ -204,9 +209,18 @@ I've added a ⭐ to projects or posts that have a significant following, or had 
 - [Pethost](https://pethost.dev/templates/ntfy/) - One-click ntfy server on Pethost, with an admin user made at the first start and anonymous access denied
 - [Sanctumd](https://github.com/Phioster/sanctum_daemon) - Android app for Jellyfin and the *arr stack; subscribes to ntfy topics for live pushes with images, priorities and action buttons (Kotlin)
 - [MeetAlert](https://github.com/roypadina/MeetAlert) - macOS meeting alerts from your calendars; when you're away from the Mac it escalates to your phone via ntfy with Ack/Join/Snooze actions (Swift)
+- [aibot-hostkit](https://github.com/monarchsofchaos004-gif/aibot-hostkit) - Keeps an AI coding agent (Claude Code, Codex, Gemini CLI) running on a cloud Linux box and pushes an ntfy alert to your phone whenever it restarts (Bash)
+- [Wudland](https://github.com/joexk1/wudland) - Pixel-art iPhone village that receives end-to-end encrypted coding-agent status through ntfy, with [plugins for Claude Code, Codex, opencode and terminal commands](https://github.com/joexk1/wudland-plugins) (Node.js, MIT; iOS app GPL-3.0, in App Store review)
+- [Topic Watch](https://github.com/0xzerolight/topic_watch) - Self-hosted news monitor that uses an LLM to only send ntfy notifications on genuinely new information (Python)
+- [camsentry-mcp](https://github.com/14manj01/camsentry-mcp) - MCP server that lets a local vision model watch Wyze cameras and sends an ntfy push describing what happened, with urgent priority for intruder and package-taken alerts (Python)
+- [FX Logger](https://github.com/cppHusky/fx-logger) - Monitor the foreign exchange rate and send you notifications when you need (Rust)
+- [Spring Winter](https://docs.springwinter.dev/deploy/open-source/ntfy) - Deploy ntfy into your own AWS account, with PostgreSQL on Amazon RDS for the message cache, users and access control
+- [pingaling](https://www.threeluckystars.com/pingaling) - iPhone and iPad app that watches headscale, Tailscale and NetBird networks and websites; with pingaling Pro it forwards alerts to an ntfy topic and takes ntfy-style Title/Priority posts (commercial, Swift)
 
 ## Blog + forum posts
 
+- [Self-host ntfy on a managed VPS: push notifications from your own server](https://www.simafri.com/en/guides/self-host-ntfy/) - simafri.com - 11/2026
+- [Get a free alert when a web page changes (price, stock, version), using GitHub Actions](https://caelum-kr-11.github.io/blog/website-change-alert-github-actions.html) - caelum-kr-11.github.io - 11/2026
 - [Push alerts for WHM using ntfy](https://rubixstudios.com.au/insights/push-alerts-for-whm-using-ntfy) - rubixstudios.com.au - 5/2026
 - [Device notifications via HTTP with ntfy](https://alistairshepherd.uk/writing/ntfy/) - alistairshepherd.uk - 6/2025
 - [Notifications about (almost) anything with ntfy.sh](https://hamatti.org/posts/notifications-about-almost-anything-with-ntfy-sh/) - hamatti.org - 6/2025

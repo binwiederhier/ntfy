@@ -2,16 +2,17 @@ package ban
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
 
 // Weights maps a matcher key to a strike weight for the abuse ban-feed (see ParseWeights, WeightFor).
-type Weights map[string]int
+type Weights map[string]float64
 
-// ParseWeights normalizes a list like ["42909:10","403:2","*:1"] into a Weights map. A key is an
+// ParseWeights normalizes a list like ["42909:10","403:2","50701:0.05","*:1"] into a Weights map. A key is an
 // exact ntfy code, a family ("429*"), a bare HTTP status ("403" -> "403*"), or "*"; weights are ints
-// >= 0 (0 = exempt). Malformed entries are rejected so misconfiguration fails at startup.
+// >= 0 in steps of 0.001 (0 = exempt). Malformed entries are rejected so misconfiguration fails at startup.
 func ParseWeights(entries []string) (Weights, error) {
 	out := make(Weights, len(entries))
 	for _, entry := range entries {
@@ -19,9 +20,13 @@ func ParseWeights(entries []string) (Weights, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid ban-weight %q, want KEY:WEIGHT", entry)
 		}
-		weight, err := strconv.Atoi(strings.TrimSpace(weightStr))
-		if err != nil || weight < 0 {
-			return nil, fmt.Errorf("invalid ban-weight value in %q, want a non-negative integer", entry)
+		weight, err := strconv.ParseFloat(strings.TrimSpace(weightStr), 64)
+		if err != nil || weight < 0 || math.IsInf(weight, 0) || math.IsNaN(weight) {
+			return nil, fmt.Errorf("invalid ban-weight value in %q, want a non-negative number", entry)
+		} else if weight > 0 && weight < 1.0/strikeUnits {
+			return nil, fmt.Errorf("invalid ban-weight value in %q, want 0 or at least %g", entry, 1.0/strikeUnits)
+		} else if weight > MaxWeight {
+			return nil, fmt.Errorf("invalid ban-weight value in %q, want at most %d", entry, MaxWeight)
 		}
 		key = strings.TrimSpace(key)
 		if !validWeightKey(key) {
@@ -39,9 +44,9 @@ func ParseWeights(entries []string) (Weights, error) {
 // WeightFor returns the strike weight for an ntfy error code, longest-match-wins (exact > family > "*").
 // If nothing matches (no "*" catch-all) it returns the implied default 1, so a forgotten "*" still
 // bans; use "*:0" to exempt everything not explicitly weighted.
-func (w Weights) WeightFor(errorCode int) int {
+func (w Weights) WeightFor(errorCode int) float64 {
 	code := strconv.Itoa(errorCode)
-	weight, bestLen, matched := 0, -1, false
+	weight, bestLen, matched := 0.0, -1, false
 	for key, wt := range w {
 		matchLen := -1
 		switch {

@@ -3,9 +3,14 @@ package s3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -181,6 +186,50 @@ func TestConfig_ListPrefix(t *testing.T) {
 	require.Equal(t, "", c2.ListPrefix())
 }
 
+// --- Tests using a fake in-process S3 server ---
+
+func TestClient_PutObject_Fake_Small(t *testing.T) {
+	fake, client := newFakeS3(t)
+	data := []byte("hello world")
+	require.Nil(t, client.PutObject(context.Background(), "small", bytes.NewReader(data), 0))
+	require.Equal(t, data, fake.object("small"))
+	require.Equal(t, 0, fake.multipartUploads())
+}
+
+func TestClient_PutObject_Fake_Empty(t *testing.T) {
+	fake, client := newFakeS3(t)
+	require.Nil(t, client.PutObject(context.Background(), "empty", bytes.NewReader(nil), 0))
+	require.Equal(t, []byte{}, fake.object("empty"))
+}
+
+func TestClient_PutObject_Fake_ExactPartSize(t *testing.T) {
+	fake, client := newFakeS3(t)
+	data := testPattern(partSize)
+	require.Nil(t, client.PutObject(context.Background(), "exact", bytes.NewReader(data), 0))
+	require.Equal(t, data, fake.object("exact"))
+	require.Equal(t, []int{partSize}, fake.partSizes())
+}
+
+func TestClient_PutObject_Fake_Multipart(t *testing.T) {
+	fake, client := newFakeS3(t)
+	data := testPattern(2*partSize + 12345)
+	reader := &trickleReader{data: data, chunk: 100 * 1024}
+	require.Nil(t, client.PutObject(context.Background(), "multi", reader, 0))
+	require.Equal(t, data, fake.object("multi"))
+	require.Equal(t, []int{partSize, partSize, 12345}, fake.partSizes())
+}
+
+func TestClient_PutObject_Fake_ReadErrorAbortsMultipart(t *testing.T) {
+	fake, client := newFakeS3(t)
+	readErr := errors.New("connection reset")
+	body := io.MultiReader(bytes.NewReader(testPattern(partSize+100)), &errReader{err: readErr})
+	err := client.PutObject(context.Background(), "broken", body, 0)
+	require.ErrorIs(t, err, readErr)
+	require.Nil(t, fake.object("broken"))
+	require.Equal(t, 1, fake.aborts())
+	require.Equal(t, []int{partSize}, fake.partSizes())
+}
+
 // --- Integration tests using real S3 ---
 
 func TestClient_PutGetObject(t *testing.T) {
@@ -278,69 +327,6 @@ func TestClient_ListObjects_Pagination(t *testing.T) {
 	waitForCount(t, client, total)
 }
 
-func TestClient_PutObject_LargeBody(t *testing.T) {
-	client := newTestClient(t)
-	ctx := context.Background()
-
-	// 1 MB object
-	data := make([]byte, 1024*1024)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
-	err := client.PutObject(ctx, "large", bytes.NewReader(data), 0)
-	require.Nil(t, err)
-
-	reader, size, err := client.GetObject(ctx, "large")
-	require.Nil(t, err)
-	require.Equal(t, int64(1024*1024), size)
-	got, err := io.ReadAll(reader)
-	reader.Close()
-	require.Nil(t, err)
-	require.Equal(t, data, got)
-}
-
-func TestClient_PutObject_ChunkedUpload(t *testing.T) {
-	client := newTestClient(t)
-	ctx := context.Background()
-
-	// 12 MB object, exceeds 5 MB partSize, triggers multipart upload path
-	data := make([]byte, 12*1024*1024)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
-	err := client.PutObject(ctx, "multipart", bytes.NewReader(data), 0)
-	require.Nil(t, err)
-
-	reader, size, err := client.GetObject(ctx, "multipart")
-	require.Nil(t, err)
-	require.Equal(t, int64(12*1024*1024), size)
-	got, err := io.ReadAll(reader)
-	reader.Close()
-	require.Nil(t, err)
-	require.Equal(t, data, got)
-}
-
-func TestClient_PutObject_ExactPartSize(t *testing.T) {
-	client := newTestClient(t)
-	ctx := context.Background()
-
-	// Exactly 5 MB (partSize), should use the simple put path (ReadFull succeeds fully)
-	data := make([]byte, 5*1024*1024)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
-	err := client.PutObject(ctx, "exact", bytes.NewReader(data), 0)
-	require.Nil(t, err)
-
-	reader, size, err := client.GetObject(ctx, "exact")
-	require.Nil(t, err)
-	require.Equal(t, int64(5*1024*1024), size)
-	got, err := io.ReadAll(reader)
-	reader.Close()
-	require.Nil(t, err)
-	require.Equal(t, data, got)
-}
-
 func TestClient_PutObject_StreamingExactLength(t *testing.T) {
 	client := newTestClient(t)
 	ctx := context.Background()
@@ -386,6 +372,55 @@ func TestClient_PutObject_StreamingBodyShorterThanClaimed(t *testing.T) {
 	// Object should not exist
 	_, _, err = client.GetObject(ctx, "stream-short")
 	require.Error(t, err)
+}
+
+func TestClient_PutObject_BufferedSizes(t *testing.T) {
+	// Bodies of unknown size are buffered in partChunkSize chunks and uploaded with a simple PUT up
+	// to partSize, and as a multipart upload beyond that. These sizes sit on either side of the chunk
+	// and part boundaries, so every way of assembling a request body from chunks is used.
+	client := newTestClient(t)
+	ctx := context.Background()
+	sizes := []int{
+		0,
+		1,
+		partChunkSize - 1,
+		partChunkSize,
+		partChunkSize + 1,
+		1024 * 1024,                    // Several full chunks
+		partSize - 1,                   // Largest simple PUT that ends inside a chunk
+		partSize,                       // Largest simple PUT
+		partSize + 1,                   // Smallest multipart upload
+		2 * partSize,                   // Multipart, body ends exactly at a part boundary (no empty last part)
+		2*partSize + partChunkSize + 7, // Multipart, last part ends inside a chunk
+		12 * 1024 * 1024,               // Multipart, last part ends at a chunk boundary
+	}
+	for _, size := range sizes {
+		key := fmt.Sprintf("size-%d", size)
+		data := testPattern(size)
+		require.Nil(t, client.PutObject(ctx, key, bytes.NewReader(data), 0), key)
+		reader, gotSize, err := client.GetObject(ctx, key)
+		require.Nil(t, err, key)
+		require.Equal(t, int64(size), gotSize, key)
+		got, err := io.ReadAll(reader)
+		reader.Close()
+		require.Nil(t, err, key)
+		require.Equal(t, data, got, key)
+	}
+}
+
+func TestClient_PutObject_SlowMultipart(t *testing.T) {
+	// A slow client sends small reads; parts must still be filled completely before uploading
+	client := newTestClient(t)
+	ctx := context.Background()
+	data := testPattern(partSize + 3*partChunkSize + 5)
+	require.Nil(t, client.PutObject(ctx, "slow", &trickleReader{data: data, chunk: 1000}, 0))
+	reader, size, err := client.GetObject(ctx, "slow")
+	require.Nil(t, err)
+	require.Equal(t, int64(len(data)), size)
+	got, err := io.ReadAll(reader)
+	reader.Close()
+	require.Nil(t, err)
+	require.Equal(t, data, got)
 }
 
 func TestClient_PutObject_NestedKey(t *testing.T) {
@@ -452,4 +487,142 @@ func waitForCount(t *testing.T, client *Client, expected int) {
 	}
 	objects, _ := client.ListObjectsV2(context.Background())
 	t.Fatalf("timed out waiting for %d objects, got %d", expected, len(objects))
+}
+
+// trickleReader returns data in small chunks, like a slow network client
+type trickleReader struct {
+	data  []byte
+	chunk int
+}
+
+func (r *trickleReader) Read(p []byte) (int, error) {
+	if len(r.data) == 0 {
+		return 0, io.EOF
+	}
+	n := min(len(p), r.chunk, len(r.data))
+	copy(p, r.data[:n])
+	r.data = r.data[n:]
+	return n, nil
+}
+
+// errReader always fails with err
+type errReader struct {
+	err error
+}
+
+func (r *errReader) Read(_ []byte) (int, error) {
+	return 0, r.err
+}
+
+// fakeS3 is a minimal in-process S3 server that implements simple PUT and multipart uploads
+type fakeS3 struct {
+	objects map[string][]byte
+	parts   map[int][]byte // part number -> data, of the current multipart upload
+	uploads int
+	aborted int
+	mu      sync.Mutex // Protects all fields above
+}
+
+func newFakeS3(t *testing.T) (*fakeS3, *Client) {
+	fake := &fakeS3{
+		objects: make(map[string][]byte),
+		parts:   make(map[int][]byte),
+	}
+	server := httptest.NewServer(http.HandlerFunc(fake.handle))
+	t.Cleanup(server.Close)
+	client := New(&Config{
+		Scheme:    "http",
+		Endpoint:  strings.TrimPrefix(server.URL, "http://"),
+		PathStyle: true,
+		Bucket:    "bucket",
+		Region:    "us-east-1",
+		AccessKey: "AKID",
+		SecretKey: "SECRET",
+	})
+	return fake, client
+}
+
+func (f *fakeS3) handle(w http.ResponseWriter, r *http.Request) {
+	key := strings.TrimPrefix(r.URL.Path, "/bucket/")
+	query := r.URL.Query()
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if r.ContentLength != int64(len(body)) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	switch {
+	case r.Method == http.MethodPost && query.Has("uploads"):
+		f.uploads++
+		f.parts = make(map[int][]byte)
+		fmt.Fprint(w, `<InitiateMultipartUploadResult><UploadId>upload-1</UploadId></InitiateMultipartUploadResult>`)
+	case r.Method == http.MethodPut && query.Has("partNumber"):
+		partNumber, _ := strconv.Atoi(query.Get("partNumber"))
+		f.parts[partNumber] = body
+		w.Header().Set("ETag", fmt.Sprintf(`"etag-%d"`, partNumber))
+	case r.Method == http.MethodPost && query.Has("uploadId"):
+		var object []byte
+		for _, n := range f.partNumbersNoLock() {
+			object = append(object, f.parts[n]...)
+		}
+		f.objects[key] = object
+		fmt.Fprint(w, `<CompleteMultipartUploadResult></CompleteMultipartUploadResult>`)
+	case r.Method == http.MethodDelete && query.Has("uploadId"):
+		f.aborted++
+		w.WriteHeader(http.StatusNoContent)
+	case r.Method == http.MethodPut:
+		f.objects[key] = body
+	default:
+		w.WriteHeader(http.StatusNotImplemented)
+	}
+}
+
+func (f *fakeS3) object(key string) []byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.objects[key]
+}
+
+func (f *fakeS3) multipartUploads() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.uploads
+}
+
+func (f *fakeS3) aborts() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.aborted
+}
+
+func (f *fakeS3) partSizes() []int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var sizes []int
+	for _, n := range f.partNumbersNoLock() {
+		sizes = append(sizes, len(f.parts[n]))
+	}
+	return sizes
+}
+
+func (f *fakeS3) partNumbersNoLock() []int {
+	numbers := make([]int, 0, len(f.parts))
+	for n := range f.parts {
+		numbers = append(numbers, n)
+	}
+	sort.Ints(numbers)
+	return numbers
+}
+
+func testPattern(size int) []byte {
+	data := make([]byte, size)
+	for i := range data {
+		data[i] = byte(i % 251)
+	}
+	return data
 }

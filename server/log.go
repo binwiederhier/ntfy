@@ -27,10 +27,10 @@ const (
 	tagStripe    = "stripe"
 	tagAccount   = "account"
 	tagManager   = "manager"
-	tagResetter  = "resetter"
 	tagWebsocket = "websocket"
 	tagMatrix    = "matrix"
 	tagWebPush   = "webpush"
+	tagAdmin     = "admin"
 )
 
 var (

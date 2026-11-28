@@ -7,13 +7,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stripe/stripe-go/v74"
-	"golang.org/x/time/rate"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/payments"
 	"heckel.io/ntfy/v2/user"
 	"heckel.io/ntfy/v2/util"
 	"io"
-	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -131,6 +129,26 @@ func TestPayments_Tiers(t *testing.T) {
 		require.Equal(t, int64(999111), tier.Limits.AttachmentFileSize)
 		require.Equal(t, int64(888111), tier.Limits.AttachmentTotalSize)
 		require.Equal(t, int64(3600), tier.Limits.AttachmentExpiryDuration)
+
+		// The billing list moved to /v1/account/billing/tiers; /v1/tiers still returns it to non-admins, for older web apps
+		require.Nil(t, s.userManager.AddUser("ben", "ben", user.RoleUser, false))
+		billing := request(t, s, "GET", "/v1/account/billing/tiers", "", nil)
+		require.Equal(t, 200, billing.Code)
+		legacy := request(t, s, "GET", "/v1/tiers", "", nil)
+		require.Equal(t, billing.Body.String(), legacy.Body.String())
+		legacy = request(t, s, "GET", "/v1/tiers", "", map[string]string{"Authorization": util.BasicAuth("ben", "ben")})
+		require.Equal(t, billing.Body.String(), legacy.Body.String())
+
+		// Admins get all tiers, as stored
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleAdmin, false))
+		admin := request(t, s, "GET", "/v1/tiers", "", map[string]string{"Authorization": util.BasicAuth("phil", "phil")})
+		require.Equal(t, 200, admin.Code)
+		var adminTiers []apiAdminTier
+		require.Nil(t, json.NewDecoder(admin.Body).Decode(&adminTiers))
+		require.Equal(t, 3, len(adminTiers))
+		require.Equal(t, "ti_1", adminTiers[0].ID)
+		require.Equal(t, "admin", adminTiers[0].Code)
+		require.Equal(t, "price_123", adminTiers[2].StripeMonthlyPriceID)
 	})
 }
 
@@ -262,7 +280,7 @@ func TestPayments_AccountDelete_Cancels_Subscription(t *testing.T) {
 	})
 }
 
-func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *testing.T) {
+func TestPayments_Checkout_Success_And_Increase_Rate_Limits(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, databaseURL string) {
 		// This test is too overloaded, but it's also a great end-to-end a test.
 		//
@@ -363,8 +381,6 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 		require.Equal(t, payments.PriceRecurringInterval(""), u.Billing.StripeSubscriptionInterval)
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionPaidUntil.Unix())
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
-		require.Equal(t, int64(0), u.Stats.Messages) // Messages and emails are not persisted for no-tier users!
-		require.Equal(t, int64(0), u.Stats.Emails)
 
 		// Simulate Stripe success return URL call (no user context)
 		rr = request(t, s, "GET", "/v1/account/billing/subscription/success/SOMETOKEN", "", nil)
@@ -380,8 +396,6 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 		require.Equal(t, payments.PriceRecurringInterval(stripe.PriceRecurringIntervalMonth), u.Billing.StripeSubscriptionInterval)
 		require.Equal(t, int64(123456789), u.Billing.StripeSubscriptionPaidUntil.Unix())
 		require.Equal(t, int64(0), u.Billing.StripeSubscriptionCancelAt.Unix())
-		require.Equal(t, int64(0), u.Stats.Messages)
-		require.Equal(t, int64(0), u.Stats.Emails)
 
 		// Now for the fun part: Verify that new rate limits are immediately applied
 		// This only tests the request limiter, which kicks in before the message limiter.
@@ -396,9 +410,11 @@ func TestPayments_Checkout_Success_And_Increase_Rate_Limits_Reset_Visitor(t *tes
 		})
 		require.Equal(t, 429, rr.Code)
 
-		// Now let's test the message limiter by faking a ridiculously generous rate limiter
-		v := s.visitor(netip.MustParseAddr("9.9.9.9"), u)
-		v.requestLimiter = rate.NewLimiter(rate.Every(time.Millisecond), 1000000)
+		// Now let's test the message limiter by faking a ridiculously generous request limit; the
+		// tier's request burst never goes below the configured one, and tier limits are resolved
+		// per request from the visitor config the server built at startup
+		s.visitors.limitsConfig.RequestLimitBurst = 1000000
+		s.visitors.limitsConfig.RequestLimitReplenish = time.Nanosecond
 
 		var wg sync.WaitGroup
 		for i := 0; i < 209; i++ {
@@ -876,6 +892,88 @@ const subscriptionDeletedEventJSON = `
 							"id": "price_1234",
 							"recurring": {
 								"interval": "month"
+							}
+						}
+					}
+				]
+			}
+		}
+	}
+}`
+
+func TestPayments_Webhook_Subscription_Updated_Expired_Other_Subscription_Ignored(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, databaseURL string) {
+		t.Parallel()
+
+		// A user abandons a yearly checkout (subscription stays "incomplete") and then completes a monthly
+		// one. 23h later Stripe expires the abandoned subscription and sends customer.subscription.updated
+		// with "incomplete_expired". That event is for a different subscription of the same customer and
+		// must not replace the user's current, paying subscription.
+
+		stripeMock := &testStripeAPI{}
+		defer stripeMock.AssertExpectations(t)
+
+		c := newTestConfigWithAuthFile(t, databaseURL)
+		c.StripeSecretKey = "secret key"
+		c.StripeWebhookKey = "webhook key"
+		s := newTestServer(t, c)
+		s.stripe = stripeMock
+
+		stripeMock.
+			On("ConstructWebhookEvent", mock.Anything, "stripe signature", "webhook key").
+			Return(jsonToStripeEvent(t, subscriptionUpdatedExpiredOtherEventJSON), nil)
+
+		require.Nil(t, s.userManager.AddTier(&user.Tier{
+			ID:                   "ti_1",
+			Code:                 "pro",
+			StripeMonthlyPriceID: "price_1234",
+			StripeYearlyPriceID:  "price_5678",
+			ReservationLimit:     1,
+		}))
+		require.Nil(t, s.userManager.AddUser("phil", "phil", user.RoleUser, false))
+		require.Nil(t, s.userManager.ChangeTier("phil", "pro"))
+		u, err := s.userManager.User("phil")
+		require.Nil(t, err)
+		require.Nil(t, s.userManager.ChangeBilling(u.Name, &user.Billing{
+			StripeCustomerID:            "acct_5555",
+			StripeSubscriptionID:        "sub_monthly",
+			StripeSubscriptionStatus:    payments.SubscriptionStatus(stripe.SubscriptionStatusActive),
+			StripeSubscriptionInterval:  payments.PriceRecurringInterval(stripe.PriceRecurringIntervalMonth),
+			StripeSubscriptionPaidUntil: time.Unix(123, 0),
+		}))
+
+		rr := request(t, s, "POST", "/v1/account/billing/webhook", "dummy", map[string]string{
+			"Stripe-Signature": "stripe signature",
+		})
+		require.Equal(t, 200, rr.Code)
+
+		u, err = s.userManager.User("phil")
+		require.Nil(t, err)
+		require.NotNil(t, u.Tier)
+		require.Equal(t, "pro", u.Tier.Code)
+		require.Equal(t, "sub_monthly", u.Billing.StripeSubscriptionID)
+		require.Equal(t, payments.SubscriptionStatus(stripe.SubscriptionStatusActive), u.Billing.StripeSubscriptionStatus)
+		require.Equal(t, payments.PriceRecurringInterval(stripe.PriceRecurringIntervalMonth), u.Billing.StripeSubscriptionInterval)
+		require.Equal(t, int64(123), u.Billing.StripeSubscriptionPaidUntil.Unix())
+	})
+}
+
+const subscriptionUpdatedExpiredOtherEventJSON = `
+{
+	"type": "customer.subscription.updated",
+	"data": {
+		"object": {
+			"id": "sub_yearly",
+			"customer": "acct_5555",
+			"status": "incomplete_expired",
+			"current_period_end": 1826120020,
+			"items": {
+				"data": [
+					{
+						"price": {
+							"id": "price_5678",
+							"recurring": {
+								"interval": "year"
 							}
 						}
 					}

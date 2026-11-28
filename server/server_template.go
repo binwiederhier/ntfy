@@ -6,19 +6,20 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"text/template/parse"
 	"time"
 
 	"gopkg.in/yaml.v2"
 	"heckel.io/ntfy/v2/model"
+	"heckel.io/ntfy/v2/template"
 	"heckel.io/ntfy/v2/template/gotext"
+	"heckel.io/ntfy/v2/template/sprig"
 	"heckel.io/ntfy/v2/util"
-	"heckel.io/ntfy/v2/util/sprig"
 )
 
 var (
@@ -28,12 +29,9 @@ var (
 
 	templateNameRegex = regexp.MustCompile(`^[-_A-Za-z0-9]+$`)
 
-	// templatePrintfLargeSizeRegex matches a printf directive whose width or precision is a star
-	// (taken from an argument) or has four or more digits, i.e. is at least 1000. It deliberately
-	// scans the flag/width/precision characters after a % without requiring a well-formed
-	// directive: fmt pads even malformed ones (e.g. "%000 9999999#" emits 10 MB), so anything
-	// unrecognized must still be caught.
-	templatePrintfLargeSizeRegex = regexp.MustCompile(`%[-+# 0-9.*\[\]]*(\*|[0-9]{4})`)
+	// templateDisallowedFuncs are builtins rejected when parsing: {{call}} invokes arbitrary
+	// functions, and the escapers (html, js, urlquery) are of no use in a notification
+	templateDisallowedFuncs = []string{"call", "html", "js", "urlquery"}
 
 	// templateMaxExecutionTime is the wall-clock deadline for a single template render, a DoS guard
 	// (GHSA-rhwf-xgc9-m9fp). It is a var (not a const) solely so tests can raise it; it is never
@@ -120,7 +118,7 @@ func (s *Server) renderTemplateFromFile(ctx context.Context, m *model.Message, t
 // message, title, and priority parameters.
 func (s *Server) renderTemplateFromParams(ctx context.Context, m *model.Message, peekedBody string, priorityStr string) error {
 	var err error
-	if m.Message, err = s.renderTemplate(ctx, "priority query parameter", m.Message, peekedBody); err != nil {
+	if m.Message, err = s.renderTemplate(ctx, "message query parameter", m.Message, peekedBody); err != nil {
 		return err
 	}
 	if m.Title, err = s.renderTemplate(ctx, "title query parameter", m.Title, peekedBody); err != nil {
@@ -147,7 +145,7 @@ func (s *Server) renderTemplate(ctx context.Context, name, tpl, source string) (
 	if err := json.Unmarshal([]byte(source), &data); err != nil {
 		return "", errHTTPBadRequestTemplateMessageNotJSON
 	}
-	t, err := gotext.New("").Funcs(sprig.TxtFuncMap()).Funcs(gotext.FuncMap{"printf": templatePrintf}).Parse(tpl)
+	t, err := gotext.New("").Funcs(sprig.TxtFuncMap()).PrintCheck(template.CheckPrintable).Parse(tpl)
 	if err != nil {
 		return "", errHTTPBadRequestTemplateInvalid.Wrap("%s", err.Error())
 	}
@@ -171,9 +169,10 @@ func (s *Server) renderTemplate(ctx context.Context, name, tpl, source string) (
 }
 
 // templateUsesDisallowedFeatures reports whether the parsed template defines or invokes a
-// sub-template ({{define}}/{{block}}/{{template}}) or uses the {{call}} builtin. None are useful for
-// ntfy's JSON-data templates. Checking the parse tree (rather than the raw string) catches every
-// syntactic form -- e.g. {{if call .x}} or {{$y := call .x}} -- that a regex would miss.
+// sub-template ({{define}}/{{block}}/{{template}}) or uses a disallowed builtin (see
+// templateDisallowedFuncs). None are useful for ntfy's JSON-data templates. Checking the parse tree
+// (rather than the raw string) catches every syntactic form -- e.g. {{if call .x}} or
+// {{$y := call .x}} -- that a regex would miss.
 func templateUsesDisallowedFeatures(t *gotext.Template) bool {
 	if len(t.Templates()) > 1 { // {{define}}/{{block}} create additional associated templates
 		return true
@@ -182,8 +181,8 @@ func templateUsesDisallowedFeatures(t *gotext.Template) bool {
 }
 
 // treeContainsDisallowedNode reports whether the parse tree contains a {{template}}/{{block}}
-// invocation or a {{call}} builtin, descending into pipes and command arguments (where {{call}} can
-// appear anywhere a function is allowed).
+// invocation or a disallowed builtin, descending into pipes and command arguments (where {{call}}
+// can appear anywhere a function is allowed).
 func treeContainsDisallowedNode(node parse.Node) bool {
 	switch n := node.(type) {
 	case *parse.ListNode:
@@ -222,23 +221,8 @@ func treeContainsDisallowedNode(node parse.Node) bool {
 				return true
 			}
 		}
-	case *parse.IdentifierNode: // a function name; {{call}} is the disallowed builtin
-		return n.Ident == "call"
+	case *parse.IdentifierNode: // a function name
+		return slices.Contains(templateDisallowedFuncs, n.Ident)
 	}
 	return false
-}
-
-// templatePrintf is the template builtin printf, guarded against memory amplification: fmt
-// allows widths and precisions up to 1e6 per verb, so a small template like
-// {{printf "%999999d%999999d..." ...}} can allocate gigabytes inside a single fmt call -- and the
-// executor's cancellation context is only checked between template nodes, never inside one.
-// Widths and precisions of 1000 or more are therefore rejected, as is the star (*) form, which
-// takes the width from an argument. Combined with the template size limit, this bounds a single
-// render to a few MB. Registered via Funcs, which takes precedence over the builtin, and checked
-// at call time so a format string assembled during execution is covered too.
-func templatePrintf(format string, args ...any) (string, error) {
-	if templatePrintfLargeSizeRegex.MatchString(strings.ReplaceAll(format, "%%", "")) { // Strip escaped percent signs, they take no width
-		return "", errors.New("printf width or precision too large")
-	}
-	return fmt.Sprintf(format, args...), nil
 }

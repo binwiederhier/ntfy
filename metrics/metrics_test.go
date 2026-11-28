@@ -30,16 +30,19 @@ var expectedMetricNames = []string{
 	"ntfy_cluster_peers",
 	"ntfy_cluster_queue_dropped_total",
 	"ntfy_cluster_send_errors_total",
+	"ntfy_db_ping_seconds",
 	"ntfy_db_pool_connections_idle",
 	"ntfy_db_pool_connections_in_use",
 	"ntfy_db_pool_connections_max",
 	"ntfy_db_pool_connections_open",
 	"ntfy_db_pool_wait_seconds_total",
 	"ntfy_db_pool_waits_total",
+	"ntfy_db_up",
 	"ntfy_emails_received_failure",
 	"ntfy_emails_received_success",
 	"ntfy_emails_sent_failure",
 	"ntfy_emails_sent_success",
+	"ntfy_firebase_limited_total",
 	"ntfy_firebase_published_failure",
 	"ntfy_firebase_published_success",
 	"ntfy_http_requests_total",
@@ -54,6 +57,7 @@ var expectedMetricNames = []string{
 	"ntfy_tail_messages_missed_total",
 	"ntfy_tail_messages_read_total",
 	"ntfy_topics_total",
+	"ntfy_topics_unifiedpush_total",
 	"ntfy_unifiedpush_published_success",
 	"ntfy_users_total",
 	"ntfy_visitors_total",
@@ -62,6 +66,7 @@ var expectedMetricNames = []string{
 func TestRegisteredMetricNames(t *testing.T) {
 	HTTPRequests.WithLabelValues("200", "20000", "GET").Inc() // Vectors are only gathered once they have a series
 	ClusterPeerBatchesSent.WithLabelValues("node-b", "ok").Inc()
+	ClusterSendErrors.WithLabelValues("/v1/cluster/message")
 	ClusterPeerBatchesReceived.WithLabelValues("node-b").Inc()
 	ClusterPeerLastSendSuccess.WithLabelValues("node-b").Set(1)
 	SetDBPoolsFunc(func() []*DBPool {
@@ -99,8 +104,10 @@ func TestDBPoolMetrics(t *testing.T) {
 	SetDBPoolsFunc(func() []*DBPool {
 		return []*DBPool{
 			{
-				Role: db.PoolRolePrimary,
-				Addr: "db:5432",
+				Role:         db.PoolRolePrimary,
+				Addr:         "db:5432",
+				Up:           true,
+				PingDuration: 250 * time.Millisecond,
 				Stats: sql.DBStats{
 					MaxOpenConnections: 30,
 					OpenConnections:    12,
@@ -124,6 +131,10 @@ func TestDBPoolMetrics(t *testing.T) {
 	})
 	defer SetDBPoolsFunc(nil)
 	expected := fmt.Sprintf(`
+# HELP ntfy_db_ping_seconds How long the last health check ping took (every 30s), including any wait for a free connection, per pool
+# TYPE ntfy_db_ping_seconds gauge
+ntfy_db_ping_seconds{host="db:5432",role="%[1]s"} 0.25
+ntfy_db_ping_seconds{host="replica:5432",role="%[2]s"} 0
 # HELP ntfy_db_pool_connections_in_use Database connections currently in use, per pool
 # TYPE ntfy_db_pool_connections_in_use gauge
 ntfy_db_pool_connections_in_use{host="db:5432",role="%[1]s"} 5
@@ -140,9 +151,13 @@ ntfy_db_pool_wait_seconds_total{host="replica:5432",role="%[2]s"} 0
 # TYPE ntfy_db_pool_waits_total counter
 ntfy_db_pool_waits_total{host="db:5432",role="%[1]s"} 3
 ntfy_db_pool_waits_total{host="replica:5432",role="%[2]s"} 0
+# HELP ntfy_db_up 1 if the last health check of the pool's database (a ping every 30s) succeeded, 0 if not, per pool
+# TYPE ntfy_db_up gauge
+ntfy_db_up{host="db:5432",role="%[1]s"} 1
+ntfy_db_up{host="replica:5432",role="%[2]s"} 0
 `, db.PoolRolePrimary, db.PoolRoleReplica)
 	require.Nil(t, testutil.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(expected),
-		"ntfy_db_pool_connections_in_use", "ntfy_db_pool_connections_max", "ntfy_db_pool_waits_total", "ntfy_db_pool_wait_seconds_total"))
+		"ntfy_db_ping_seconds", "ntfy_db_pool_connections_in_use", "ntfy_db_pool_connections_max", "ntfy_db_pool_waits_total", "ntfy_db_pool_wait_seconds_total", "ntfy_db_up"))
 	open, err := testutil.GatherAndCount(prometheus.DefaultGatherer, "ntfy_db_pool_connections_open", "ntfy_db_pool_connections_idle")
 	require.Nil(t, err)
 	require.Equal(t, 4, open)

@@ -11,11 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"heckel.io/ntfy/v2/cluster"
 	"heckel.io/ntfy/v2/db"
 	"heckel.io/ntfy/v2/db/pg"
 	dbtest "heckel.io/ntfy/v2/db/test"
+	"heckel.io/ntfy/v2/limit"
+	"heckel.io/ntfy/v2/metrics"
 	"heckel.io/ntfy/v2/model"
 	"heckel.io/ntfy/v2/user"
 )
@@ -237,6 +240,27 @@ func TestServer_Cluster_Role(t *testing.T) {
 	require.Equal(t, cluster.RolePassive, members[0].Role)
 }
 
+func TestServer_Cluster_StopClosesCluster(t *testing.T) {
+	// Stopping the server must stop the cluster: it deregisters the node, so a node starting
+	// after it no longer sees it, and its heartbeat does not outlive the server's database
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	newNode := func(nodeID string) *Server {
+		conf := newTestConfig(t, schemaDSN)
+		conf.ClusterNodeID = nodeID
+		conf.ClusterListen = "127.0.0.1:1" // Enables clustering; not bound since Run() is not called
+		conf.ClusterSecret = "s3cret"
+		conf.ClusterAdvertiseURL = "http://127.0.0.1:1"
+		return newTestServer(t, conf)
+	}
+	sA := newNode("node-a")
+	require.Len(t, sA.cluster.Members(), 1)
+	sA.Stop()
+	sB := newNode("node-b")
+	members := sB.cluster.Members()
+	require.Len(t, members, 1)
+	require.Equal(t, cluster.NodeID("node-b"), members[0].NodeID)
+}
+
 func TestServer_Cluster_ActiveWithPassivePeer(t *testing.T) {
 	// The setup for trying clustering beside production: the production server is the only
 	// active node, a second one runs passive. The active one leads right away, both deliver
@@ -340,6 +364,135 @@ func TestServer_Cluster_EndToEnd(t *testing.T) {
 	require.Equal(t, "hello cluster", received[0].Message)
 }
 
+func TestServer_Cluster_RequestLimitAcrossNodes(t *testing.T) {
+	// A client spread over two nodes gets its request limit once, not once per node: the requests
+	// node A admits for its visitor key are charged into node B's bucket for the same key
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	sB := newTestClusterNode(t, schemaDSN, "node-b", "").s
+	sA := newTestClusterNode(t, schemaDSN, "node-a", "").s
+
+	// One request on node B, nine left there; then the whole burst on node A
+	require.Equal(t, 200, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	for i := 0; i < 10; i++ {
+		require.Equal(t, 200, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	require.Equal(t, 429, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
+
+	// Node A's next gossip round tells node B, which then has no tokens left either (watched
+	// without spending any)
+	waitFor(t, func() bool {
+		return sB.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == 0
+	})
+	require.Equal(t, 429, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+}
+
+func TestServer_Cluster_ModerateClientAcrossNodes(t *testing.T) {
+	// A client that alternates between two nodes never drains either node's bucket below half on
+	// its own; it still gets its burst once, not once per node
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	sB := newTestClusterNode(t, schemaDSN, "node-b", "").s
+	sA := newTestClusterNode(t, schemaDSN, "node-a", "").s
+	waitFor(t, func() bool {
+		return len(sB.cluster.Peers()) == 1 // B registered first and sees A from its next heartbeat
+	})
+	for i := 0; i < 5; i++ {
+		require.Equal(t, 200, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
+		require.Equal(t, 200, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	waitFor(t, func() bool {
+		return sA.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == 0 && sB.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == 0
+	})
+	require.Equal(t, 429, request(t, sA, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	require.Equal(t, 429, request(t, sB, "GET", "/mytopic/json?poll=1", "", nil).Code)
+}
+
+func TestServer_Cluster_RollingRestartKeepsBuckets(t *testing.T) {
+	// A node that restarts takes the buckets over from its peers before it serves, so a rolling
+	// restart forgives nothing as long as one node is up: node A's spent burst survives A's
+	// restart (from B), and then B's (from the new A)
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	nodeB := newTestClusterNode(t, schemaDSN, "node-b", "")
+	nodeA := newTestClusterNode(t, schemaDSN, "node-a", "")
+	for i := 0; i < 10; i++ {
+		require.Equal(t, 200, request(t, nodeA.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	waitFor(t, func() bool {
+		return nodeB.s.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule) == 0
+	})
+
+	nodeA.stop()
+	nodeA = newTestClusterNode(t, schemaDSN, "node-a", nodeA.listen)
+	require.Equal(t, 429, request(t, nodeA.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+
+	nodeB.stop()
+	nodeB = newTestClusterNode(t, schemaDSN, "node-b", nodeB.listen)
+	require.Equal(t, 429, request(t, nodeB.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+}
+
+func TestServer_Cluster_StopSendsLastBuckets(t *testing.T) {
+	// A node that stops sends what it used since its last gossip round before it goes, so an
+	// orderly restart loses nothing: the burst node A just spent is on node B once A has stopped
+	schemaDSN := dbtest.CreateTestPostgresSchema(t)
+	nodeB := newTestClusterNode(t, schemaDSN, "node-b", "")
+	nodeA := newTestClusterNode(t, schemaDSN, "node-a", "")
+	for i := 0; i < 10; i++ {
+		require.Equal(t, 200, request(t, nodeA.s, "GET", "/mytopic/json?poll=1", "", nil).Code)
+	}
+	nodeA.stop()
+	require.Equal(t, int64(0), nodeB.s.limiter.Tokens("ip:9.9.9.9", testClusterRequestRule))
+}
+
+// testClusterRequestRule is the request bucket of the nodes newTestClusterNode starts
+var testClusterRequestRule = limit.Rule{
+	Kind:   limit.KindRequests,
+	Burst:  10,
+	Refill: time.Hour,
+}
+
+// testClusterNode is a cluster node of a test, running (Run) with its peer API on listen
+type testClusterNode struct {
+	s      *Server
+	listen string
+}
+
+// newTestClusterNode runs a cluster node with a request burst of 10 (testClusterRequestRule) whose
+// peer API listens on listen, or on a free port if empty, and waits until the peer API answers
+func newTestClusterNode(t *testing.T, schemaDSN, nodeID, listen string) *testClusterNode {
+	t.Helper()
+	if listen == "" {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		require.Nil(t, err)
+		listen = listener.Addr().String()
+		require.Nil(t, listener.Close())
+	}
+	conf := newTestConfig(t, schemaDSN)
+	conf.ClusterNodeID = nodeID
+	conf.ClusterListen = listen
+	conf.ClusterSecret = "s3cret"
+	conf.ClusterAdvertiseURL = "http://" + listen
+	conf.VisitorRequestLimitBurst = int(testClusterRequestRule.Burst)
+	conf.VisitorRequestLimitReplenish = testClusterRequestRule.Refill
+	node := &testClusterNode{
+		s:      newTestServer(t, conf),
+		listen: listen,
+	}
+	runTestServer(t, node.s)
+	waitFor(t, func() bool {
+		conn, err := net.Dial("tcp", listen)
+		if err != nil {
+			return false
+		}
+		conn.Close()
+		return true
+	})
+	return node
+}
+
+// stop stops the node, freeing its address for a restart
+func (n *testClusterNode) stop() {
+	n.s.Stop()
+}
+
 func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 	// deliverFromBus is the receive side of the broadcaster: a message that originated on a peer
 	// node must reach this node's local subscribers, but must NOT be re-broadcast (loop) nor
@@ -368,6 +521,37 @@ func TestServer_Cluster_DeliverFromBus(t *testing.T) {
 	require.Empty(t, b.Messages()) // Peer messages are never re-relayed
 }
 
+func TestServer_Cluster_DeliverFromBus_WastedWithoutSubscribers(t *testing.T) {
+	// A fan-out message that no subscriber here wants is counted as wasted: its topic is unknown
+	// here, or known but without subscribers. The latter is not published either, so the fan-out
+	// does not keep an idle topic alive (see topicExpungeAfter).
+	s := newTestServer(t, newTestConfig(t, ""))
+	s.cluster = &fakeCluster{}
+	topics, err := s.topicsFromIDs(nil, "idletopic")
+	require.Nil(t, err)
+	idle := topics[0]
+	idle.mu.Lock()
+	idle.lastAccess = time.Now().Add(-topicExpungeAfter - time.Minute)
+	idle.mu.Unlock()
+	wasted := testutil.ToFloat64(metrics.ClusterMessagesWasted)
+
+	// Unknown topic
+	s.deliverFromBus(model.NewDefaultMessage("unknowntopic", "from peer"))
+	require.Equal(t, wasted+1, testutil.ToFloat64(metrics.ClusterMessagesWasted))
+
+	// Known topic without subscribers: wasted, and still stale
+	s.deliverFromBus(model.NewDefaultMessage("idletopic", "from peer"))
+	require.Equal(t, wasted+2, testutil.ToFloat64(metrics.ClusterMessagesWasted))
+	require.True(t, idle.Stale())
+
+	// Known topic with a subscriber: delivered, not wasted
+	idle.Subscribe(func(_ *visitor, m *model.Message) error {
+		return nil
+	}, nil, func() {})
+	s.deliverFromBus(model.NewDefaultMessage("idletopic", "from peer"))
+	require.Equal(t, wasted+2, testutil.ToFloat64(metrics.ClusterMessagesWasted))
+}
+
 func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
 	// Every FCM keepalive wakes all subscribed phones, so only the leader may send them;
 	// N nodes sending N keepalives would multiply the battery cost for every user
@@ -375,7 +559,7 @@ func TestServer_Cluster_FirebaseKeepaliverOnlyOnLeader(t *testing.T) {
 	c.FirebaseKeepaliveInterval = 20 * time.Millisecond
 	s := newTestServer(t, c)
 	sender := newTestFirebaseSender(100)
-	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true})
+	s.firebaseClient = newFirebaseClient(sender, &testAuther{Allow: true}, nil)
 	cl := &fakeCluster{notLeader: true}
 	s.cluster = cl
 	s.closeChan = make(chan bool) // Closed by Stop() in the test cleanup
@@ -481,6 +665,7 @@ func TestServer_Cluster_StopDoesNotWaitForCallbackUnderServerLock(t *testing.T) 
 		// TTL truncates the liveness cutoff to 0 and the peer inserted below counts as live
 		// only within the same wall-clock second, leaving nothing to probe for isolation
 		HeartbeatInterval: 10 * time.Millisecond, NodeTTL: time.Second,
+		Limiter: s.limiter,
 		IsolatedFunc: func() {
 			once.Do(func() { close(entered) })
 			<-release

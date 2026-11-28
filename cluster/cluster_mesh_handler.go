@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"heckel.io/ntfy/v2/limit"
 	"heckel.io/ntfy/v2/log"
 	"heckel.io/ntfy/v2/model"
 )
@@ -97,6 +98,30 @@ func (c *meshCluster) handleState(origin NodeID, w http.ResponseWriter, r *http.
 		c.conf.UsersDeletedFunc(state.DeletedUserIDs)
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// handleBuckets receives what a peer used of its visitors' buckets and charges it into this node's own
+func (c *meshCluster) handleBuckets(_ NodeID, w http.ResponseWriter, r *http.Request) {
+	var buckets limit.Buckets
+	if err := json.NewDecoder(io.LimitReader(r.Body, bucketsMaxBytes)).Decode(&buckets); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	} else if r.Context().Err() != nil {
+		return // The peer gave up on this round; charged after its next one, it could undo a refund there
+	}
+	c.conf.Limiter.ChargeBuckets(buckets)
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleBucketSnapshot serves this node's buckets that are not full to a starting peer
+func (c *meshCluster) handleBucketSnapshot(w http.ResponseWriter, _ *http.Request) {
+	snapshot := c.conf.Limiter.BucketSnapshot()
+	w.Header().Set("Content-Type", contentTypeJSON)
+	if err := json.NewEncoder(w).Encode(snapshot); err != nil {
+		log.Tag(tag).Err(err).Warn("Cannot write buckets")
+		return
+	}
+	log.Tag(tag).Info("Sent buckets of %d visitor key(s) to a starting peer", len(snapshot))
 }
 
 // handleMembers lists the live cluster members for the load balancers' agents

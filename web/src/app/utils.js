@@ -9,7 +9,7 @@ import config from "./config";
 import emojisMapped from "./emojisMapped";
 import { THEME, DATE_FORMAT, TIME_FORMAT } from "./Prefs";
 
-export const tiersUrl = (baseUrl) => `${baseUrl}/v1/tiers`;
+export const tiersUrl = (baseUrl) => `${baseUrl}/v1/account/billing/tiers`;
 export const shortUrl = (url) => url.replaceAll(/https?:\/\//g, "");
 export const expandUrl = (url) => [`https://${url}`, `http://${url}`];
 export const expandSecureUrl = (url) => `https://${url}`;
@@ -222,6 +222,10 @@ export const formatDateTime = (timestamp, dateFormat = DATE_FORMAT.SYSTEM, timeF
     hour12: hour12For(timeFormat),
   }).format(new Date(timestamp * 1000));
 };
+
+// formatResetAt formats the account's stats.reset_at (unix seconds), or returns null if the server
+// does not send it (a server from before rolling daily limits)
+export const formatResetAt = (resetAt, dateFormat, timeFormat) => (resetAt ? formatDateTime(resetAt, dateFormat, timeFormat) : null);
 
 export const formatShortDuration = (ms, language) => {
   const seconds = Math.round(ms / 1000);

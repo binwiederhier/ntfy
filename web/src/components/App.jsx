@@ -2,7 +2,7 @@ import * as React from "react";
 import { Suspense, useContext, useEffect, useState, useMemo } from "react";
 import { Box, Toolbar, CssBaseline, Backdrop, CircularProgress, useMediaQuery, ThemeProvider, createTheme } from "@mui/material";
 import { useLiveQuery } from "dexie-react-hooks";
-import { BrowserRouter, Outlet, Route, Routes, useParams } from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { AllSubscriptions, SingleSubscription } from "./Notifications";
 import { darkTheme, lightTheme } from "./theme";
@@ -30,6 +30,7 @@ import session from "../app/Session";
 import AccountContext from "./AccountContext";
 import { PrefCacheProvider } from "./PrefCache";
 import hideSplash from "../app/splash";
+import { getShareFragment, readShareDraft } from "../app/share";
 
 initI18n();
 
@@ -65,7 +66,7 @@ const App = () => {
 
   useEffect(() => {
     if (!session.exists() && config.require_login && window.location.pathname !== routes.login) {
-      window.location.href = routes.login;
+      window.location.href = routes.login + getShareFragment(window.location.hash);
     }
   }, []);
 
@@ -116,9 +117,14 @@ const AuthLayout = () => {
 
 const Layout = () => {
   const params = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { account, setAccount } = useContext(AccountContext);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [sendDialogOpenMode, setSendDialogOpenMode] = useState("");
+  const shareFragment =
+    location.pathname === routes.app && (!config.require_login || session.exists()) ? getShareFragment(location.hash) : "";
+  const [shareDraft, setShareDraft] = useState(() => readShareDraft(shareFragment));
+  const [sendDialogOpenMode, setSendDialogOpenMode] = useState(shareDraft ? PublishDialog.OPEN_MODE_DEFAULT : "");
   const users = useLiveQuery(() => userManager.all());
   const subscriptions = useLiveQuery(() => subscriptionManager.all());
   // Preloaded here so the All view (and single topics, via filter) have data on mount -- no empty
@@ -133,6 +139,12 @@ const Layout = () => {
   useAccountListener(setAccount);
   useBackgroundProcesses();
   useEffect(() => updateTitle(newNotificationsCount), [newNotificationsCount]);
+
+  useEffect(() => {
+    if (shareFragment) {
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true });
+    }
+  }, [shareFragment, location.pathname, location.search, navigate]);
 
   // Hide the splash only once subscriptions have loaded, so the nav/list don't pop in empty-then-filled.
   useEffect(() => {
@@ -162,7 +174,13 @@ const Layout = () => {
             }}
           />
         </Main>
-        <Messaging selected={selected} dialogOpenMode={sendDialogOpenMode} onDialogOpenModeChange={setSendDialogOpenMode} />
+        <Messaging
+          selected={selected}
+          dialogOpenMode={sendDialogOpenMode}
+          onDialogOpenModeChange={setSendDialogOpenMode}
+          shareDraft={shareDraft}
+          onClearShareDraft={() => setShareDraft(null)}
+        />
       </Box>
     </PrefCacheProvider>
   );

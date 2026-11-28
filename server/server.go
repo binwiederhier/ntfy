@@ -112,6 +112,7 @@ var (
 
 	webAppConfigPath              = "/config.js"
 	webAppManifestPath            = "/manifest.webmanifest"
+	webAppSharePath               = "/v1/web/share"
 	webAppEmailVerifyPathPrefix   = "/account/email/verify/"                                       // Browser landing route; raw token appended
 	webAppEmailVerifyRegex        = regexp.MustCompile(`^/account/email/verify/[-_A-Za-z0-9]+$`)   // Magic-link landing (served by the web app)
 	webAppPasswordResetPathPrefix = "/account/password/reset/"                                     // Browser landing route; raw token appended
@@ -783,6 +784,8 @@ func (s *Server) handleInternal(w http.ResponseWriter, r *http.Request, v *visit
 		return s.ensureWebEnabled(s.handleWebConfig)(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == webAppManifestPath {
 		return s.ensureWebPushEnabled(s.handleWebManifest)(w, r, v)
+	} else if r.Method == http.MethodPost && r.URL.Path == webAppSharePath {
+		return s.ensureWebEnabled(s.limitRequests(s.handleWebShare))(w, r, v)
 	} else if r.Method == http.MethodGet && r.URL.Path == apiUsersPath {
 		return s.ensureAdmin(s.handleUsersGet)(w, r, v)
 	} else if r.Method == http.MethodPost && r.URL.Path == apiUsersPath {

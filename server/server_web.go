@@ -96,5 +96,9 @@ func newConfigResponse(conf *Config) *apiConfigResponse {
 		BillingContact:      conf.BillingContact,
 		WebPushPublicKey:    conf.WebPushPublicKey,
 		DisallowedTopics:    conf.DisallowedTopics,
+    LegalName:           s.config.LegalName,
+		LegalEmail:          s.config.LegalEmail,
+		PrivacyPolicyURL:    s.config.PrivacyPolicyURL,
+    LegalNoticeURL:      s.config.LegalNoticeURL,  
 	}
 }

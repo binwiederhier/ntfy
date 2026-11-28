@@ -471,5 +471,10 @@
     "prefs_appearance_date_format_mdy": "月/日/年",
     "prefs_appearance_time_format_title": "时间格式",
     "prefs_appearance_time_format_12h": "12 小时",
-    "prefs_appearance_time_format_24h": "24 小时"
+    "prefs_appearance_time_format_24h": "24 小时",
+    "prefs_legal_contact_title": "联系方式：",
+    "prefs_legal_name": "名称",
+    "prefs_legal_email": "电子邮件",
+    "prefs_legal_notice": "法律声明",
+    "prefs_privacy_policy": "隐私政策"
 }

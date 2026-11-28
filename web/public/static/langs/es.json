@@ -441,5 +441,10 @@
     "account_basics_emails_dialog_verify_button": "Enviar enlace de verificacion",
     "account_basics_emails_unverified": "no verificado",
     "account_basics_emails_resend": "Reenviar correo de verificacion",
-    "prefs_users_dialog_base_url_exists": "Un usuario pare este enlace de servicio ya existe"
+    "prefs_users_dialog_base_url_exists": "Un usuario pare este enlace de servicio ya existe",
+    "prefs_legal_contact_title": "Contacto:",
+    "prefs_legal_name": "Nombre",
+    "prefs_legal_email": "Correo electrónico",
+    "prefs_legal_notice": "Aviso legal",
+    "prefs_privacy_policy": "Política de privacidad"
 }

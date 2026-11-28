@@ -457,5 +457,10 @@
     "web_push_subscription_expiring_title": "Les notificacions es posaran en pausa",
     "web_push_subscription_expiring_body": "Obre ntfy per continuar rebent notificacions",
     "web_push_unknown_notification_title": "S'ha rebut una notificació desconeguda del servidor",
-    "web_push_unknown_notification_body": "És possible que hagis d'actualitzar ntfy obrint l'aplicació web"
+    "web_push_unknown_notification_body": "És possible que hagis d'actualitzar ntfy obrint l'aplicació web",
+    "prefs_legal_contact_title": "Contacte:",
+    "prefs_legal_name": "Nom",
+    "prefs_legal_email": "Correu electrònic",
+    "prefs_legal_notice": "Avís legal",
+    "prefs_privacy_policy": "Política de privacitat"
 }

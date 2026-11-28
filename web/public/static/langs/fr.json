@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "Provisionné",
     "account_usage_emails_none": "Aucune notification par mail ne peut être envoyée avec ce compte",
     "prefs_users_dialog_base_url_invalid": "Format d'URL invalide. Doit commencer par http:// ou https://",
-    "prefs_users_dialog_base_url_exists": "Un utilisateur pour cette URL existe déjà"
+    "prefs_users_dialog_base_url_exists": "Un utilisateur pour cette URL existe déjà",
+    "prefs_legal_contact_title": "Contact :",
+    "prefs_legal_name": "Nom",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Mentions légales",
+    "prefs_privacy_policy": "Politique de confidentialité"
 }

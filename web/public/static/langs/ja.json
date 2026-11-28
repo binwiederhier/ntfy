@@ -471,5 +471,10 @@
     "prefs_appearance_date_format_mdy": "月/日/年",
     "prefs_appearance_time_format_title": "日時フォーマット",
     "prefs_appearance_time_format_12h": "12時間",
-    "prefs_appearance_time_format_24h": "24時間"
+    "prefs_appearance_time_format_24h": "24時間",
+    "prefs_legal_contact_title": "連絡先：",
+    "prefs_legal_name": "名前",
+    "prefs_legal_email": "メールアドレス",
+    "prefs_legal_notice": "法的通知",
+    "prefs_privacy_policy": "プライバシーポリシー"
 }

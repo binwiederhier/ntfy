@@ -52,5 +52,10 @@
     "nav_button_subscribe": "สมัครรับหัวข้อ",
     "nav_button_muted": "ปิดการแจ้งเตือน",
     "nav_button_connecting": "การเชื่อมต่อ",
-    "nav_upgrade_banner_label": "อัพเกรดเป็น ntfy Pro"
+    "nav_upgrade_banner_label": "อัพเกรดเป็น ntfy Pro",
+    "prefs_legal_contact_title": "ติดต่อ:",
+    "prefs_legal_name": "ชื่อ",
+    "prefs_legal_email": "อีเมล",
+    "prefs_legal_notice": "ประกาศทางกฎหมาย",
+    "prefs_privacy_policy": "นโยบายความเป็นส่วนตัว"
 }

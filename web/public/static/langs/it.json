@@ -459,5 +459,10 @@
     "account_basics_tier_provisioned": "Predisposto",
     "account_usage_emails_none": "Le notifiche tramite posta elettronica non possono essere inviate con questo profilo",
     "prefs_users_dialog_base_url_invalid": "Formato dell'indirizzo invalido. Deve iniziare con http:// o https://",
-    "prefs_users_dialog_base_url_exists": "Un utente per questo indirizzo di servizio è già presente"
+    "prefs_users_dialog_base_url_exists": "Un utente per questo indirizzo di servizio è già presente",
+    "prefs_legal_contact_title": "Contatti:",
+    "prefs_legal_name": "Nome",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Note legali",
+    "prefs_privacy_policy": "Informativa sulla privacy"
 }

@@ -436,5 +436,10 @@
     "reset_password_success_title": "Palavra-passe alterada",
     "reset_password_success_description": "A sua palavra passe foi alterada. Pode agora iniciar sessão com a nova palavra passe.",
     "action_bar_reload": "Reiniciar aplicação",
-    "account_basics_emails_title": "Endereços de email"
+    "account_basics_emails_title": "Endereços de email",
+    "prefs_legal_contact_title": "Contacto:",
+    "prefs_legal_name": "Nome",
+    "prefs_legal_email": "E-mail",
+    "prefs_legal_notice": "Aviso legal",
+    "prefs_privacy_policy": "Política de privacidade"
 }

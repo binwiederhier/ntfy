@@ -54,5 +54,10 @@
     "alert_notification_permission_required_description": "به مرورگر خود اجازه دهید تا اعلان‌های دسکتاپ را نمایش دهد",
     "alert_notification_permission_denied_title": "اعلان‌ها مسدود هستند",
     "alert_notification_ios_install_required_title": "لازم به نصب نسخه iOS است",
-    "alert_notification_ios_install_required_description": "برای فعال کردن اعلان‌ها در iOS، روی نماد اشتراک‌گذاری و افزودن به صفحه اصلی کلیک کنید"
+    "alert_notification_ios_install_required_description": "برای فعال کردن اعلان‌ها در iOS، روی نماد اشتراک‌گذاری و افزودن به صفحه اصلی کلیک کنید",
+    "prefs_legal_contact_title": "تماس:",
+    "prefs_legal_name": "نام",
+    "prefs_legal_email": "ایمیل",
+    "prefs_legal_notice": "اطلاعیه حقوقی",
+    "prefs_privacy_policy": "سیاست حفظ حریم خصوصی"
 }

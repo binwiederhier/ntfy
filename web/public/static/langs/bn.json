@@ -1,4 +1,9 @@
 {
+    "prefs_legal_contact_title": "যোগাযোগ:",
+    "prefs_legal_name": "নাম",
+    "prefs_legal_email": "ইমেইল",
+    "prefs_legal_notice": "আইনি বিজ্ঞপ্তি",
+    "prefs_privacy_policy": "গোপনীয়তা নীতি",
     "common_cancel": "বাতিল করুন",
     "common_save": "সংরক্ষণ করুন",
     "common_add": "যোগ করুন",

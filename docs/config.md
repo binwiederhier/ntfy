@@ -2088,6 +2088,17 @@ if it's not behind a proxy, the ntfy server can keep about **as many connections
 This limit is typically called `nofile`. Other than that, RAM and CPU are obviously relevant. You may also want to check
 out [this discussion on Reddit](https://www.reddit.com/r/golang/comments/r9u4ee/how_many_actively_connected_http_clients_can_a_go/).
 
+For reference, measured on ntfy v2.38.3 in Docker, with a cache file, an auth file and `deny-all` access, three runs
+per profile ([method and data](https://www.simafri.com/en/requirements/ntfy/)):
+
+| Usage                        | Working set memory | CPU (95th percentile) |
+|------------------------------|--------------------|-----------------------|
+| Idle                         | 31 MiB             | 0.1% of one vCPU      |
+| 10 subscribers, 1 message/s  | 54 MiB             | 2% of one vCPU        |
+| 50 subscribers, 5 messages/s | 96 MiB             | 6% of one vCPU        |
+
+All three profiles held on 1 vCPU and 2 GB of RAM.
+
 Depending on *how you run it*, here are a few limits that are relevant:
 
 ### Message cache
